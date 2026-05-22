@@ -14,6 +14,62 @@ Cloud-backed agents or hosted model calls are not part of the default workflow. 
 - Assumption: use a Godot 4.x executable compatible with the `4.6` project feature tag.
 - Do not hard-code a Godot executable path. Validation scripts use `GODOT_BIN`.
 
+## Design North Star
+
+- This is a household-rooted civilization simulation, not a generic worker-slot city builder.
+- Households are the core social, economic, and cultural unit.
+- Cities should aggregate household behavior; regions should aggregate city behavior; future states/nations should inherit patterns from lower layers.
+- Labor should be derived from household capability rather than raw population or anonymous worker slots.
+- Population represents mouths to feed, shelter demand, demographics, family continuity, military potential, and future growth.
+- Do not tune away household/population/labor tensions without an explicit product-design decision.
+
+## Current Product Direction
+
+- First playable loop: survival and growth, with trade as a support system.
+- The player grows and stabilizes a small settlement through housing, production buildings, household responsibility assignment, and pressure management.
+- One household represents a family or family-like social/economic unit.
+- One household usually represents about 3-6 people.
+- Baseline household labor capacity should usually remain 1, meaning one primary household responsibility, not one generic worker.
+- Household maturity means age/stage, such as young, middle, and old; it should eventually affect fertility, dependents, succession, and new household formation, not automatically mean higher productivity.
+- Food consumption should scale primarily by population.
+- Production should initially come from assigned household responsibility plus building/resource rules.
+- Later productivity/effectiveness may be affected by assignment fit, traits, tools, building quality, prosperity, stability, health, values, local resources, and season.
+- Values can exist as data/placeholders now, but should influence real outcomes later.
+
+## High-Risk Systems
+
+High-risk systems:
+
+- `main.gd`
+- `main.tscn`
+- `project.godot`
+- `household.gd`
+- `city.gd`
+- Calendar/time progression
+- Production/resource formulas
+- Trade behavior
+- Map generation algorithms
+- Save/load, if present
+
+High-risk does not mean forbidden. It means:
+
+- Change only when relevant to the assigned goal.
+- Avoid unrelated rewrites.
+- Checkpoint before and after meaningful edits.
+- Validate afterward when practical.
+- Report the reason for the change clearly.
+
+Safe areas for local-agent work:
+
+- `docs/`
+- `tasks/`
+- Isolated demo scenes
+- Test scenes
+- Read-only debug displays
+- Non-invasive UI labels/tooltips
+- Proof-of-work reports
+- Architecture notes
+
 ## Working Rules
 
 - Start every meaningful change from a named branch.
@@ -69,11 +125,14 @@ This section exists to prove the workflow is backed by an actual local model-dri
 ## Codex And Local Agent Roles
 
 - Codex is for planning, architecture, owner questions, task definition, and review.
-- The local LM Studio agent is for bounded implementation on explicit feature branches.
+- The local LM Studio agent is for bounded implementation on explicit feature branches, including real feature work when assigned.
+- The local agent may edit scripts, scenes, UI, documentation, tests, resources, and project wiring as needed to complete an assigned goal.
+- The agent may modify any files reasonably necessary to complete an explicitly assigned goal, as long as it works on a feature branch, keeps the work scoped to the goal, uses clean checkpoints, validates when practical, and reports changes clearly.
 - The local agent must only work from explicit task files or handoff prompts.
 - Do not start open-ended local-agent work.
 - No overnight local-agent run should exceed the configured task or time limit.
-- Stop local-agent work at the first missing product decision, validation failure, forbidden-file need, or unclear rollback path.
+- Stop local-agent work at the first missing product decision, out-of-scope change need, validation failure that cannot be fixed within scope, or unclear rollback path.
+- Real implementation must use checkpoint commits and must never merge automatically to `main`.
 
 ### Local Agent Verification
 

@@ -181,23 +181,17 @@ TODO
 Attempt the repository validation script:
 
 ```powershell
-.\scripts\check-godot.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_project.ps1
 ```
 
-If Godot is not globally available, configure one of the supported local options:
+If Godot is not globally available, configure `GODOT_BIN`:
 
 ```powershell
-$env:GODOT_EXE = "C:\Path\To\Godot.exe"
-.\scripts\check-godot.ps1
+$env:GODOT_BIN = "C:\Path\To\Godot.exe"
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_project.ps1
 ```
 
-or:
-
-```powershell
-.\scripts\check-godot.ps1 -GodotExe "C:\Path\To\Godot.exe"
-```
-
-Do not assume either path exists. Record missing executable or permission failures as valid verification results.
+Do not assume the path exists. Record missing executable, missing `GODOT_BIN`, or permission failures as valid verification results.
 
 Result:
 
@@ -251,15 +245,70 @@ TODO
 - Use bounded tasks with acceptance criteria, expected files, and stopping conditions.
 - Require branches and commits for every meaningful change.
 
+## Real Implementation Workflow
+
+A local agent may make real code, scene, UI, test, and documentation changes when explicitly assigned.
+
+- Real implementation requires a feature branch.
+- `main` must not be edited directly.
+- Work should begin from `develop` unless instructed otherwise.
+- The agent may edit scripts, scenes, UI, documentation, tests, resources, and project wiring as needed to complete the assigned goal.
+- Important files are not forbidden by default. They are high-risk and should be changed deliberately when reasonably needed for the assigned goal.
+- The agent should avoid unnecessary rewrites, renames, deletions, or broad refactors unless clearly useful for the assigned goal.
+- If a refactor is needed, it should be done in a checkpointed way.
+- The agent must make checkpoint commits.
+- The agent must run validation/tests before checkpoint commits when practical.
+- Final reports must include branch, commit hashes, changed files, validation results, assumptions, and open questions.
+- `main` receives changes only through reviewed feature branches.
+- The agent must report what changed, what worked, what failed, and what remains.
+
+## Checkpoint Requirements
+
+Checkpoints are reviewable commits.
+
+- Use milestone-based checkpoints with a 30-45 minute maximum gap.
+- Checkpoints should be frequent enough that the owner can redirect the project without losing hours of work.
+- Checkpoint commits are only for clean, reviewable progress.
+- Checkpoint commits should be meaningful and not hide unrelated changes.
+- If validation fails at a checkpoint, the agent should either fix within scope or stop and report.
+- If the project is in a system-error state, validation is failing, imports are broken, or the feature cannot run, do not create a checkpoint commit merely because the time limit was reached.
+- If roughly 45 minutes pass without a working/reviewable state, roll back to the previous clean commit/state, preserve a written note of what was attempted, and report the blocker.
+- A failed experiment may be documented, but should not be committed as a normal checkpoint unless explicitly requested.
+- Rollback means returning code to the previous clean commit/state before the failing attempt, while preserving a written summary of the failure in the final report or an approved docs note.
+- The agent should not hide failed attempts; it should report them clearly.
+- If rollback itself is unsafe or ambiguous, the agent should stop immediately and report instead of trying more changes.
+- Each checkpoint report should name the branch, commit hash, changed files, validation result, behavior changed, assumptions, open questions, and known risks.
+
+## Three-Attempt Stop Rule
+
+If the agent makes three attempts to solve the same issue without meaningful progress, it must stop, roll back to the previous clean commit if needed, and write a note explaining:
+
+- What it attempted.
+- What failed.
+- Current suspected cause.
+- Files touched during the attempts.
+- Recommended next human/Codex decision.
+
+## Proof Task Scope Enforcement
+
+A proof task is only a workflow verification.
+
+- By default, a proof task may only add or update `docs/AGENT_PROOF_OF_WORK.md`.
+- Any change to `AGENTS.md`, validation scripts, project files, gameplay scripts, scenes, resources, or import settings is outside default proof scope and must be separately approved.
+- A successful validation exit code does not automatically approve out-of-scope file changes.
+- This proof-task restriction does not prevent later real implementation tasks. It only keeps proof verification clean.
+- The proof report must include git status, `git diff --stat`, validation command/result, current branch, commit hash if committed, and an explicit list of assumptions.
+- If toolchain changes are required, stop and create a separate tooling task before continuing the proof run.
+
 ## Proof Task
 
 A real agent should perform this harmless proof task without touching gameplay code:
 
 1. Create branch `agent/proof-of-work`.
 2. Add or update `docs/AGENT_PROOF_OF_WORK.md`.
-3. Include timestamp, active branch, validation command attempted, and result.
+3. Include timestamp, active branch, git status, `git diff --stat`, validation command attempted, validation result, assumptions, and commit hash if committed.
 4. Commit with message `test: verify agent runtime workflow`.
-5. Report the diff summary.
+5. Report the diff summary and explicitly confirm whether only `docs/AGENT_PROOF_OF_WORK.md` changed.
 
 Suggested command sequence:
 
@@ -278,7 +327,8 @@ git switch agent/proof-of-work
 After editing `docs/AGENT_PROOF_OF_WORK.md`:
 
 ```powershell
-.\scripts\check-godot.ps1
+git status --short --branch
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_project.ps1
 git status --short
 git diff --stat
 git add docs/AGENT_PROOF_OF_WORK.md
@@ -286,4 +336,6 @@ git commit -m "test: verify agent runtime workflow"
 git show --stat --oneline --summary HEAD
 ```
 
-Do not perform destructive changes. Do not modify gameplay code for the proof task.
+Use the project's preferred validation script, but record the exact command used.
+
+Do not perform destructive changes. Do not modify gameplay code, validation scripts, project files, scenes, resources, import settings, or governance docs for the default proof task unless separately approved.

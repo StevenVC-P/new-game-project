@@ -1,21 +1,27 @@
-# Inventory Resource And Trade Model
+# Inventory Resource, Household, Labor, And Trade Model
 
 ## Goal
 
-Document the current resource, production, maintenance, and trade route model before changing any economy behavior.
+Document the current resource, household, labor capacity, production, maintenance, and trade route model before changing any economy behavior.
 
 ## Scope
 
-- Inspect `city.gd`, `building_placement.gd`, `trade_route.gd`, `trade_menu.gd`, and related display code.
-- Create a concise resource/trade model note under `docs/`.
-- Do not change resource values, production formulas, or trade behavior.
+- Inspect `household.gd`, `city.gd`, `building.gd`, `building_placement.gd`, `trade_route.gd`, `trade_menu.gd`, and related resource/production display code.
+- Compare observed behavior against `docs/household_simulation_philosophy.md` and `docs/PROJECT_OWNER_QUESTIONS.md`.
+- Create a concise resource/household/labor/trade model note under `docs/`.
+- Do not change resource values, household labor semantics, production formulas, consumption formulas, maintenance behavior, or trade behavior.
 
 ## Files Likely Involved
 
+- `household.gd`
 - `city.gd`
+- `building.gd`
 - `building_placement.gd`
 - `trade_route.gd`
 - `trade_menu.gd`
+- `docs/household_simulation_philosophy.md`
+- `docs/PROJECT_OWNER_QUESTIONS.md`
+- `docs/RESOURCE_HOUSEHOLD_LABOR_TRADE_MODEL.md`
 - `docs/`
 
 ## Risk Level
@@ -24,8 +30,9 @@ Low. Documentation-only if implemented as scoped.
 
 ## Acceptance Criteria
 
-- A resource/trade model document exists under `docs/`.
-- It lists known resources, production sources, consumption/upkeep paths, trade transfer behavior, and open questions.
+- `docs/RESOURCE_HOUSEHOLD_LABOR_TRADE_MODEL.md` exists.
+- It lists known resources, household fields, household responsibility/labor meaning, production sources, consumption/upkeep paths, trade transfer behavior, design tensions, and open questions.
+- It explicitly preserves the owner decision that one household represents a family-like unit and one baseline labor capacity means one primary responsibility, not one generic worker.
 - No gameplay code is modified.
 
 ## Validation Command
@@ -36,4 +43,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_project.p
 
 ## Rollback Notes
 
-Delete or revert the added resource/trade documentation file.
+Delete or revert the added resource/household/labor/trade documentation file.

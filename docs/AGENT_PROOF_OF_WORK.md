@@ -32,6 +32,22 @@ Notes:
 - The import pass completed successfully and did not run the main scene/game loop.
 - Godot printed editor settings save warnings after completion in this sandboxed session, but the process exit code was `0`.
 
+## Human Review Required
+
+Validation succeeded.
+
+However, this proof branch included changes outside the default harmless proof-file scope:
+
+- `AGENTS.md`
+- `scripts/validate_project.ps1`
+- `scripts/validate_project.sh`
+
+These changes may be legitimate toolchain improvements, but they require human review before this proof run is treated as a clean local-agent workflow verification.
+
+Future proof runs should isolate documentation-only proof edits to `docs/AGENT_PROOF_OF_WORK.md` unless validation-script changes are explicitly authorized.
+
+This does not mean real implementation is forbidden; it only means proof-of-work tasks should stay clean unless explicitly scoped otherwise.
+
 ## Git Diff Summary
 
 ```text
