@@ -357,6 +357,18 @@ function Convert-ModelOutputToPatch {
 	}
 }
 
+function Get-PatchDiagnostic {
+	param([string]$PatchText)
+
+	$Diagnostics = @()
+	foreach ($Line in ($PatchText -split "\r?\n")) {
+		if ($Line -match '^@@ .*[\+\-]\d+ @@') {
+			$Diagnostics += "Malformed hunk header uses shorthand line count: '$Line'. Use explicit start,count form such as '@@ -0,0 +1,1 @@'."
+		}
+	}
+	return ($Diagnostics | Sort-Object -Unique) -join " "
+}
+
 function Get-PatchInfo {
 	param(
 		[string]$PatchText,
@@ -742,7 +754,7 @@ $Plan = Invoke-LocalChat -Endpoint $Endpoint -Model $Model -SystemPrompt "You ar
 Write-TextFile $RawPlanPath $Plan
 Write-TextFile $PlanPath $Plan
 
-$PatchSystemPrompt = "You produce unified git diffs only. No Markdown, no code fences, no explanations, no prose."
+$PatchSystemPrompt = "You produce valid unified git diffs only. No Markdown, no code fences, no explanations, no prose. Always use explicit hunk ranges with comma counts, for example +1,1 instead of +1."
 $UnifiedDiffInstructions = @'
 Unified diff requirements:
 - Use real repo-relative paths.
@@ -752,6 +764,8 @@ Unified diff requirements:
 - Keep `a/` and `b/` prefixes consistent when the unified diff format requires them.
 - Hunk headers must match the actual lines in the hunk.
 - Hunk headers use `@@ -old_start,old_count +new_start,new_count @@`.
+- Always include comma counts in both old and new ranges.
+- Never use shorthand hunk ranges like `+1` or `-3`; use `+1,1` or `-3,1`.
 - For a one-line new file, use `@@ -0,0 +1,1 @@`, not `@@ -0,0 +1 @@`.
 - Every added content line in a hunk must start with `+`.
 - Every removed content line in a hunk must start with `-`.
@@ -883,7 +897,9 @@ $ValidationText
 	if ($Check.ExitCode -ne 0) {
 		$SanitizationStatus = if ($SanitizedPatch.Sanitized) { "single fenced diff extracted" } else { "raw unified diff" }
 		$LastRejectedPatch = $PatchText
-		$LastFailure = "git apply --check --whitespace=error failed after sanitization '$SanitizationStatus': $($Check.Output)"
+		$PatchDiagnostic = Get-PatchDiagnostic $PatchText
+		$DiagnosticSuffix = if ($PatchDiagnostic) { " Diagnostic: $PatchDiagnostic" } else { "" }
+		$LastFailure = "git apply --check --whitespace=error failed after sanitization '$SanitizationStatus': $($Check.Output)$DiagnosticSuffix"
 		$AttemptLines += "- Attempt ${Attempt}: git apply --check failed after sanitization '$SanitizationStatus': $($Check.Output)"
 		continue
 	}
