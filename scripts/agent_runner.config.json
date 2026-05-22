@@ -1,0 +1,22 @@
+{
+  "endpoint": "http://localhost:1234/v1",
+  "model": "qwen2.5-coder-7b-instruct",
+  "baseBranch": "develop",
+  "maxAttempts": 3,
+  "maxFilesChanged": 4,
+  "maxLinesAdded": 400,
+  "maxLinesDeleted": 200,
+  "validationCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\validate_project.ps1",
+  "artifactRoot": "docs/agent-runs",
+  "globalBlockedPaths": [
+    ".git/",
+    ".godot/",
+    ".import/",
+    "project.godot",
+    ".godot-exe"
+  ],
+  "defaultBlockedGlobs": [
+    "*.tmp",
+    "*.import"
+  ]
+}
