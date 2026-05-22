@@ -33,12 +33,32 @@ Small local coding models can struggle to produce valid Git patch hunks, especia
 
 The runner, not the model, generates the actual Git diff after applying validated JSON edits. The runner still enforces allowed paths, blocked paths, line/file budgets, `git diff --check`, validation, explicit staging, and commit rules.
 
+For feature tasks, `allowed_paths` are not enough by themselves. They define where the model may write, but they do not prove it wrote the intended files. Use `required_paths` when a task must produce specific artifacts, such as a Godot script and demo scene.
+
 Supported v0 JSON actions are only:
 
 - `create`
 - `replace_entire_file`
 
 Delete, rename, shell commands, partial edits, and arbitrary patch application are not supported in JSON mode.
+
+Example task front matter:
+
+```yaml
+edit_mode: json_file_ops
+allowed_paths:
+  - scripts/ui/
+  - scenes/debug/
+required_paths:
+  - scripts/ui/household_debug_inspector.gd
+  - scenes/debug/household_debug_inspector_demo.tscn
+blocked_paths:
+  - docs/example.md
+  - project.godot
+max_files_changed: 2
+allow_new_files: true
+allow_replacements: false
+```
 
 ## Unified Diff Mode
 
@@ -135,6 +155,7 @@ Invalid patch:
 Invalid JSON:
 
 - JSON mode rejects invalid JSON, unknown fields, unsupported actions, prose around JSON, multiple fenced blocks, absolute paths, `../` traversal, blocked paths, binary-looking content, creates over existing files, and replacements unless `allow_replacements: true`.
+- If the model creates an irrelevant but safe file, such as `docs/example.md`, add exact `required_paths` for the expected outputs and block the junk path explicitly with `blocked_paths`.
 - Inspect `raw-patch-attempt-*.txt`, `edits-attempt-*.json`, and `edit-manifest-attempt-*.json` in the run artifact directory.
 
 Validation failure:

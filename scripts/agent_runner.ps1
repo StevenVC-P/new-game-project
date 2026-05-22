@@ -487,6 +487,7 @@ function Test-JsonEditManifest {
 		[string[]]$BlockedPaths,
 		[string[]]$GlobalBlockedPaths,
 		[string[]]$BlockedGlobs,
+		[string[]]$RequiredPaths,
 		[bool]$AllowNewFiles,
 		[bool]$AllowReplacements,
 		[int]$MaxFilesChanged
@@ -557,6 +558,13 @@ function Test-JsonEditManifest {
 	}
 	if ($Files.Keys.Count -gt $MaxFilesChanged) {
 		$Errors += "Edit manifest changes $($Files.Keys.Count) files; limit is $MaxFilesChanged."
+	}
+	foreach ($RequiredPath in $RequiredPaths) {
+		$RequiredCheck = Test-RepoPathAllowed -Path $RequiredPath -AllowedPaths $AllowedPaths -BlockedPaths $BlockedPaths -GlobalBlockedPaths $GlobalBlockedPaths -BlockedGlobs $BlockedGlobs
+		$Errors += $RequiredCheck.Errors
+		if (-not $Files.Contains($RequiredCheck.Path)) {
+			$Errors += "Missing required path in edit manifest: $($RequiredCheck.Path)"
+		}
 	}
 	return [pscustomobject]@{
 		Errors = @($Errors | Sort-Object -Unique)
@@ -890,6 +898,7 @@ $CommitMessage = Get-MetaValue $Meta "commit_message" "chore: apply local agent 
 $TaskTitle = Get-MetaValue $Meta "title" (Split-Path -Leaf $TaskPath)
 $AllowedPaths = @(Get-MetaValue $Meta "allowed_paths" @())
 $TaskBlockedPaths = @(Get-MetaValue $Meta "blocked_paths" @())
+$RequiredPaths = @((Get-MetaValue $Meta "required_paths" @()) | ForEach-Object { Normalize-RepoPath $_ })
 $GlobalBlockedPaths = @($Config.globalBlockedPaths)
 $BlockedGlobs = @($Config.defaultBlockedGlobs)
 $ArtifactRoot = $Config.artifactRoot
@@ -950,6 +959,7 @@ Runner constraints:
 - Max lines added: $MaxLinesAdded
 - Max lines deleted: $MaxLinesDeleted
 - Allowed paths: $($AllowedPaths -join ', ')
+- Required paths: $($RequiredPaths -join ', ')
 - Blocked paths: $(@($GlobalBlockedPaths + $TaskBlockedPaths) -join ', ')
 - Blocked globs: $($BlockedGlobs -join ', ')
 - Allow new files: $AllowNewFiles
@@ -1022,6 +1032,7 @@ JSON file-operation requirements:
 - Supported actions are only "create" and "replace_entire_file".
 - Do not include delete, rename, shell commands, patches, partial edits, comments, or extra fields.
 - Use real repo-relative paths with forward slashes.
+- If required paths are listed in the runner constraints, include every required path exactly.
 - Do not use absolute paths or ../ traversal.
 - For this task, prefer one create edit under docs/.
 - The runner will write files, generate the Git diff, run validation, and commit if allowed.
@@ -1203,7 +1214,7 @@ $ValidationText
 		}
 		Write-TextFile $ManifestPath ($Manifest | ConvertTo-Json -Depth 20)
 
-		$ManifestInfo = Test-JsonEditManifest -Manifest $Manifest -AllowedPaths $AllowedPaths -BlockedPaths $TaskBlockedPaths -GlobalBlockedPaths $GlobalBlockedPaths -BlockedGlobs $BlockedGlobs -AllowNewFiles $AllowNewFiles -AllowReplacements $AllowReplacements -MaxFilesChanged $MaxFilesChanged
+		$ManifestInfo = Test-JsonEditManifest -Manifest $Manifest -AllowedPaths $AllowedPaths -BlockedPaths $TaskBlockedPaths -GlobalBlockedPaths $GlobalBlockedPaths -BlockedGlobs $BlockedGlobs -RequiredPaths $RequiredPaths -AllowNewFiles $AllowNewFiles -AllowReplacements $AllowReplacements -MaxFilesChanged $MaxFilesChanged
 		if ($ManifestInfo.Errors.Count -gt 0) {
 			$JsonSanitizationStatus = if ($SanitizedJson.Sanitized) { "single fenced json extracted" } else { "raw JSON" }
 			$LastRejectedPatch = $SanitizedJson.JsonText
@@ -1355,6 +1366,7 @@ $ArtifactRelPaths = @($ArtifactRelPaths | Where-Object { Test-Path -LiteralPath 
 
 $RequestedScope = @(
 	"- Allowed paths: $($AllowedPaths -join ', ')",
+	"- Required paths: $($RequiredPaths -join ', ')",
 	"- Task blocked paths: $($TaskBlockedPaths -join ', ')",
 	"- Global blocked paths: $($GlobalBlockedPaths -join ', ')",
 	"- New files allowed: $AllowNewFiles",

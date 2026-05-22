@@ -6,19 +6,23 @@ branch_name: feature/household-debug-inspector-v0
 edit_mode: json_file_ops
 allowed_paths:
   - scripts/ui/
-  - scenes/
-  - docs/
+  - scenes/debug/
+required_paths:
+  - scripts/ui/household_debug_inspector.gd
+  - scenes/debug/household_debug_inspector_demo.tscn
 blocked_paths:
+  - docs/example.md
   - project.godot
   - scripts/domain/
   - scripts/simulation/
   - scripts/world/
   - scripts/main.gd
-max_files_changed: 3
+  - scenes/main.tscn
+max_files_changed: 2
 max_lines_added: 300
 max_lines_deleted: 50
 allow_new_files: true
-allow_replacements: true
+allow_replacements: false
 allow_deletes: false
 allow_renames: false
 validation_command: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_project.ps1
@@ -27,7 +31,7 @@ commit_message: "feat: add household debug inspector v0"
 
 # Goal
 
-Add a small read-only Household Settlement Debug Inspector v0.
+Create a standalone read-only Household Settlement Debug Inspector v0 demo scene and script.
 
 # Scope
 
@@ -37,9 +41,12 @@ The inspector should be small and read-only. It must not change simulation formu
 
 # Preferred Implementation
 
-Prefer adding a new script under scripts/ui/.
+Create exactly these files:
 
-If scene wiring is required, limit scene edits to the minimum necessary.
+- `scripts/ui/household_debug_inspector.gd`
+- `scenes/debug/household_debug_inspector_demo.tscn`
+
+Do not wire the inspector into `scenes/main.tscn` yet. The scene may use placeholder/fallback values if live city data is not available. The purpose of this v0 is to prove the local agent can create a coherent Godot-facing UI artifact in the right location.
 
 # Display Fields
 
@@ -63,10 +70,12 @@ Desired fields:
 - Do not modify project.godot
 - Do not redesign scenes/main.tscn
 - Do not rename nodes/classes/files
+- Do not create docs/example.md
 
 # Definition of Done
 
-- Inspector exists and is read-only.
-- It is visible or clearly documented how to view it.
+- Inspector script exists at `scripts/ui/household_debug_inspector.gd` and is read-only.
+- Demo scene exists at `scenes/debug/household_debug_inspector_demo.tscn`.
+- Demo scene opens independently and is not wired into the main scene.
 - Validation passes.
 - No simulation behavior changes.
