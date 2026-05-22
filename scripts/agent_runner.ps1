@@ -474,7 +474,7 @@ function Read-JsonEditManifest {
 	param([string]$JsonText)
 
 	try {
-		return $JsonText | ConvertFrom-Json -Depth 20
+		return $JsonText | ConvertFrom-Json
 	} catch {
 		throw "Invalid JSON: $($_.Exception.Message)"
 	}
