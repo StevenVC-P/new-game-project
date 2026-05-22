@@ -2,3 +2,7 @@
 .godot/
 .godot-exe
 /android/
+
+# Local Godot/editor machine state
+.mono/
+*.tmp

@@ -4,25 +4,59 @@ This repository is a Godot project. Coding-agent work is intended to run locally
 
 Cloud-backed agents or hosted model calls are not part of the default workflow. Use them only when explicitly requested for a bounded task.
 
+## Godot Assumptions
+
+- Project file: `project.godot`
+- Main scene: `main.tscn`
+- Godot feature tag: `4.6`
+- Renderer feature: Forward Plus
+- Physics engine setting: Jolt Physics
+- Assumption: use a Godot 4.x executable compatible with the `4.6` project feature tag.
+- Do not hard-code a Godot executable path. Validation scripts use `GODOT_BIN`.
+
 ## Working Rules
 
 - Start every meaningful change from a named branch.
+- Work from `develop` for ongoing development.
+- Do not edit `main` directly.
 - Keep `.godot/`, `.godot-exe`, and other local machine state out of commits.
 - Do not modify gameplay scripts for documentation-only tasks.
 - Run validation before reporting work complete when a Godot executable is available.
 - Commit each meaningful change with a clear message and a concise diff summary.
 - Prefer small, reviewable changes with explicit acceptance criteria.
 - Keep agent setup local-only unless the user explicitly opts into a cloud-backed model for a specific task.
+- Do not use destructive git rewrites such as force-push, reset, rebase, or history editing unless the user explicitly asks for that operation.
+- Do not delete files without explicit instruction.
+- Prefer additive, modular changes over broad rewrites.
+- Add isolated test or demo scenes for new features when practical.
+- If a setup choice is ambiguous, document the assumption here instead of making an invasive change.
+
+## Branch Rules
+
+- `main` is the stable baseline branch and should only receive reviewed or intentionally merged work.
+- `backup/pre-agent-baseline` preserves the pre-agent setup baseline.
+- `develop` is the integration branch for active development.
+- Feature work should use named branches from `develop`, such as `feature/<short-name>`, `fix/<short-name>`, or `agent/<short-name>`.
+- Every meaningful change should end in a commit with a clear message.
+- Before committing, run validation or document why validation could not run.
 
 ## Validation
 
 Use the repository validation script when possible:
 
 ```powershell
-.\scripts\check-godot.ps1
+.\scripts\validate_project.ps1
 ```
 
-If Godot is not on `PATH`, provide it through `GODOT_EXE`, pass `-GodotExe`, or create a local `.godot-exe` file. The `.godot-exe` file is intentionally ignored by git.
+On shells that support `sh`, use:
+
+```sh
+./scripts/validate_project.sh
+```
+
+Set `GODOT_BIN` to the full Godot executable path if Godot is not on `PATH`.
+
+The older `scripts/check-godot.ps1` helper also exists and supports `GODOT_EXE`, `-GodotExe`, and local `.godot-exe` workflows.
 
 ## Agent Runtime Verification
 
