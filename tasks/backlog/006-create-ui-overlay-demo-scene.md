@@ -13,10 +13,10 @@ Add an isolated demo scene for UI overlays and visual helpers so UI polish can b
 ## Files Likely Involved
 
 - `demos/` or `test_scenes/`
-- `visual_style.gd`
-- `map_element_visuals.gd`
-- `terrain_visuals.gd`
-- `building_visuals.gd`
+- `scripts/visuals/visual_style.gd`
+- `scripts/visuals/map_element_visuals.gd`
+- `scripts/visuals/terrain_visuals.gd`
+- `scripts/visuals/building_visuals.gd`
 - `city_building_overlay.gd`
 - New demo scene/script files
 

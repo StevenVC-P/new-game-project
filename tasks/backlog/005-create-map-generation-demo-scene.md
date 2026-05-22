@@ -17,7 +17,7 @@ Add an isolated demo scene for regional and local map generation so future map c
 - `region_map_generator.gd`
 - `local_city_map_generator.gd`
 - `settlement_site_profile.gd`
-- `terrain_visuals.gd`
+- `scripts/visuals/terrain_visuals.gd`
 - New demo scene/script files
 
 ## Risk Level

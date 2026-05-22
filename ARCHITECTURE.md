@@ -32,16 +32,16 @@ This is a starting inventory for safe agent-assisted development. It describes w
 - `household.gd`: Household simulation model.
 - `building.gd`: Building data/model.
 - `building_placement.gd`: Building placement logic.
-- `building_visuals.gd`: Building rendering helpers.
+- `scripts/visuals/building_visuals.gd`: Building rendering helpers.
 - `city_building_overlay.gd`: Overlay logic for city/building display.
 - `calendar.gd`: Calendar model with day, month, season, and year signals.
 - `simulation_clock.gd`: Simulation timing helper.
 - `region_map_generator.gd`: Regional map generation.
 - `local_city_map_generator.gd`: Local city map generation.
 - `settlement_site_profile.gd`: Settlement/site profile data.
-- `terrain_visuals.gd`: Terrain rendering helpers.
-- `map_element_visuals.gd`: Map element rendering helpers.
-- `visual_style.gd`: Shared visual style values/helpers.
+- `scripts/visuals/terrain_visuals.gd`: Terrain rendering helpers.
+- `scripts/visuals/map_element_visuals.gd`: Map element rendering helpers.
+- `scripts/visuals/visual_style.gd`: Shared visual style values/helpers.
 - `trade_menu.gd`: Trade menu UI/model helper.
 - `trade_route.gd`: Trade route data/model.
 
