@@ -14,6 +14,15 @@ Cloud-backed agents or hosted model calls are not part of the default workflow. 
 - Assumption: use a Godot 4.x executable compatible with the `4.6` project feature tag.
 - Do not hard-code a Godot executable path. Validation scripts use `GODOT_BIN`.
 
+## Design North Star
+
+- This is a household-rooted civilization simulation, not a generic worker-slot city builder.
+- Households are the core social, economic, and cultural unit.
+- Cities should aggregate household behavior; regions should aggregate city behavior; future states/nations should inherit patterns from lower layers.
+- Labor should be derived from household capability rather than raw population or anonymous worker slots.
+- Population represents mouths to feed, shelter demand, demographics, family continuity, military potential, and future growth.
+- Do not tune away household/population/labor tensions without an explicit product-design decision.
+
 ## Working Rules
 
 - Start every meaningful change from a named branch.

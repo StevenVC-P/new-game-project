@@ -181,23 +181,17 @@ TODO
 Attempt the repository validation script:
 
 ```powershell
-.\scripts\check-godot.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_project.ps1
 ```
 
-If Godot is not globally available, configure one of the supported local options:
+If Godot is not globally available, configure `GODOT_BIN`:
 
 ```powershell
-$env:GODOT_EXE = "C:\Path\To\Godot.exe"
-.\scripts\check-godot.ps1
+$env:GODOT_BIN = "C:\Path\To\Godot.exe"
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_project.ps1
 ```
 
-or:
-
-```powershell
-.\scripts\check-godot.ps1 -GodotExe "C:\Path\To\Godot.exe"
-```
-
-Do not assume either path exists. Record missing executable or permission failures as valid verification results.
+Do not assume the path exists. Record missing executable, missing `GODOT_BIN`, or permission failures as valid verification results.
 
 Result:
 
@@ -251,15 +245,25 @@ TODO
 - Use bounded tasks with acceptance criteria, expected files, and stopping conditions.
 - Require branches and commits for every meaningful change.
 
+## Proof Task Scope Enforcement
+
+A proof task is only a workflow verification.
+
+- By default, a proof task may only add or update `docs/AGENT_PROOF_OF_WORK.md`.
+- Any change to `AGENTS.md`, validation scripts, project files, gameplay scripts, scenes, resources, or import settings is outside default proof scope and must be separately approved.
+- A successful validation exit code does not automatically approve out-of-scope file changes.
+- The proof report must include git status, `git diff --stat`, validation command/result, current branch, commit hash if committed, and an explicit list of assumptions.
+- If toolchain changes are required, stop and create a separate tooling task before continuing the proof run.
+
 ## Proof Task
 
 A real agent should perform this harmless proof task without touching gameplay code:
 
 1. Create branch `agent/proof-of-work`.
 2. Add or update `docs/AGENT_PROOF_OF_WORK.md`.
-3. Include timestamp, active branch, validation command attempted, and result.
+3. Include timestamp, active branch, git status, `git diff --stat`, validation command attempted, validation result, assumptions, and commit hash if committed.
 4. Commit with message `test: verify agent runtime workflow`.
-5. Report the diff summary.
+5. Report the diff summary and explicitly confirm whether only `docs/AGENT_PROOF_OF_WORK.md` changed.
 
 Suggested command sequence:
 
@@ -278,7 +282,8 @@ git switch agent/proof-of-work
 After editing `docs/AGENT_PROOF_OF_WORK.md`:
 
 ```powershell
-.\scripts\check-godot.ps1
+git status --short --branch
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_project.ps1
 git status --short
 git diff --stat
 git add docs/AGENT_PROOF_OF_WORK.md
@@ -286,4 +291,6 @@ git commit -m "test: verify agent runtime workflow"
 git show --stat --oneline --summary HEAD
 ```
 
-Do not perform destructive changes. Do not modify gameplay code for the proof task.
+Use the project's preferred validation script, but record the exact command used.
+
+Do not perform destructive changes. Do not modify gameplay code, validation scripts, project files, scenes, resources, import settings, or governance docs for the default proof task unless separately approved.

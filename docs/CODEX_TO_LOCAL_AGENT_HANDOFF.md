@@ -2,6 +2,18 @@
 
 This handoff prepares the project for bounded local-agent implementation. It does not authorize gameplay changes by itself. Future implementation should happen from explicit task files or handoff prompts on feature branches.
 
+## Current Design North Star
+
+This game is a household-rooted civilization simulation. It is not a generic city builder about anonymous worker slots.
+
+- Households are the core social, economic, and cultural unit.
+- Cities aggregate household behavior.
+- Regions aggregate city behavior.
+- States and nations should eventually inherit patterns from the household, city, and regional layers below them.
+- Labor should be derived from household capability, not treated as generic worker slots.
+- Population should represent mouths to feed, shelter demand, demographics, family continuity, military potential, and future growth, not simply assignable labor.
+- Household values should eventually shape real outcomes such as productivity, resilience, reproduction, migration pressure, prosperity, cultural continuity, and higher-level regional/state/nation behavior.
+
 ## Current Known Project State
 
 - Branch for active development: `develop`.
@@ -18,7 +30,7 @@ The current gameplay direction appears to be a settlement/city simulation protot
 
 - Regional map generation and display.
 - Local city map generation and display.
-- Cities with households, buildings, resources, worker assignment, housing pressure, and maintenance.
+- Cities with households, buildings, resources, household-derived labor, housing pressure, and maintenance.
 - Calendar and simulation clock progression.
 - Trade route creation and resource transfer.
 - Visual helper classes for terrain, buildings, map elements, and UI styling.
@@ -29,6 +41,18 @@ Current risk shape:
 - Most support systems are `RefCounted` classes with `class_name`.
 - There are no autoloads currently listed in `project.godot`.
 - The roadmap is intentionally skeletal; product direction still needs owner answers before major implementation.
+- Current conceptual risk: the prototype may drift toward conventional city-builder worker-slot logic.
+- Known tension: one household may currently represent about 4 population while providing only 1 labor capacity; food consumption scales by population while production scales by labor capacity.
+- This tension should be documented and evaluated, not hidden by quick tuning.
+
+## Protected Product Assumptions
+
+- Do not convert houses into simple worker-slot providers.
+- Do not tune away the household/population/labor mismatch by making population directly assignable as generic labor.
+- Do not create higher-level regional or national behavior that ignores household/city roots.
+- Do not make household values cosmetic only.
+- Do not solve design questions inside implementation tasks unless the owner has explicitly answered them.
+- Short-term abstractions are acceptable only when they point toward household-derived behavior.
 
 ## Current Safety Rules
 
@@ -118,7 +142,64 @@ Codex should ask these before approving major gameplay implementation:
 11. Should future work prioritize regional map, city view, buildings, households, trade, or save/load?
 12. Should the project stay mouse-driven, keyboard-driven, or support both?
 
-## Recommended Next 3 Local-Agent Tasks
+## Recommended Next Local-Agent Tasks
+
+### Task 0: Clean Agent Proof-of-Work Documentation
+
+Goal:
+
+Normalize proof-of-work docs so the checklist and actual proof report agree.
+
+Scope:
+
+- Review `docs/AGENT_PROOF_OF_WORK.md` and `docs/AGENT_RUNTIME_CHECKLIST.md`.
+- Clarify whether validation-script changes were intentionally approved.
+- Add a note that future proof tasks should only modify `docs/AGENT_PROOF_OF_WORK.md` unless explicitly scoped otherwise.
+- If `docs/AGENT_PROOF_OF_WORK.md` reports changes to `AGENTS.md` or validation scripts, mark them as requiring human review before trusting the proof run.
+
+Branch name:
+
+```text
+docs/clean-agent-proof-work-docs
+```
+
+Files likely involved:
+
+- `docs/AGENT_PROOF_OF_WORK.md`
+- `docs/AGENT_RUNTIME_CHECKLIST.md`
+
+Allowed changes:
+
+- Documentation updates only.
+
+Forbidden changes:
+
+- Do not modify scripts.
+- Do not modify gameplay code.
+- Do not modify scenes, resources, project settings, or import settings.
+
+Definition of done:
+
+- Docs clearly distinguish proof-of-work verification from toolchain changes.
+- Any non-doc changes in the proof branch are called out as review-required.
+- Validation passes or the exact validation failure is reported.
+
+Validation command:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_project.ps1
+```
+
+Stop conditions:
+
+- Stop if proof cleanup appears to require script changes.
+- Stop if the proof branch history cannot be understood from docs alone.
+
+Expected local-agent prompt:
+
+```text
+You are the local LM Studio coding agent for this Godot project. Work only on branch docs/clean-agent-proof-work-docs. Read AGENTS.md, docs/AGENT_PROOF_OF_WORK.md, and docs/AGENT_RUNTIME_CHECKLIST.md. Update documentation only so proof-of-work verification is clearly separated from toolchain changes. Do not modify scripts, gameplay code, scenes, resources, project.godot, or import settings. Run powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_project.ps1. Commit with message "docs: clarify agent proof-of-work scope". Stop if any script change seems necessary.
+```
 
 ### Task 1: Document Current Controls
 
@@ -181,33 +262,36 @@ Expected local-agent prompt:
 You are the local LM Studio coding agent for this Godot project. Work only on branch docs/current-controls-reference. Read AGENTS.md, ARCHITECTURE.md, tasks/README.md, main.gd, and trade_menu.gd. Add docs/CONTROLS.md documenting existing controls only. Do not modify gameplay code. Run powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_project.ps1. Commit with message "docs: document current controls". Stop and report if any behavior is ambiguous.
 ```
 
-### Task 2: Document Resource And Trade Model
+### Task 2: Document Resource, Household, Labor, And Trade Model
 
 Goal:
 
-Create a concise reference for resources, production, maintenance, population pressure, and trade behavior.
+Create a concise reference for resources, households, labor capacity, population pressure, maintenance, and trade behavior, then compare observed behavior against `docs/household_simulation_philosophy.md`.
 
 Scope:
 
-- Inspect current model code.
-- Create `docs/RESOURCE_TRADE_MODEL.md`.
-- Separate observed behavior from open questions.
+- Inspect `household.gd`, `city.gd`, `building.gd`, `building_placement.gd`, `trade_route.gd`, `trade_menu.gd`, and any resource/production scripts.
+- Create `docs/RESOURCE_HOUSEHOLD_LABOR_TRADE_MODEL.md`.
+- Compare observed behavior against `docs/household_simulation_philosophy.md`.
+- Separate observed behavior, design tension, assumptions, and open questions.
 
 Branch name:
 
 ```text
-docs/resource-trade-model
+docs/resource-household-labor-trade-model
 ```
 
 Files likely involved:
 
+- `household.gd`
 - `city.gd`
 - `building.gd`
 - `building_placement.gd`
 - `household.gd`
 - `trade_route.gd`
 - `trade_menu.gd`
-- `docs/RESOURCE_TRADE_MODEL.md`
+- `docs/household_simulation_philosophy.md`
+- `docs/RESOURCE_HOUSEHOLD_LABOR_TRADE_MODEL.md`
 
 Allowed changes:
 
@@ -216,12 +300,15 @@ Allowed changes:
 Forbidden changes:
 
 - Do not alter resource values.
-- Do not alter production, consumption, maintenance, or trade logic.
+- Do not alter household, labor, production, consumption, maintenance, migration, values, reproduction, or trade logic.
 - Do not modify gameplay scripts.
+- Do not reinterpret population as generic labor.
+- Do not convert houses into worker-slot providers.
 
 Definition of done:
 
-- Document lists known resources, building costs, production sources, consumption/upkeep paths, trade transfer rules, and open design questions.
+- Document lists known resources, household fields, labor capacity behavior, building costs, production sources, consumption/upkeep paths, trade transfer rules, and open design questions.
+- Document explicitly calls out the household/population/labor tension rather than hiding it.
 - Validation passes.
 - Commit includes only documentation changes.
 
@@ -239,7 +326,7 @@ Stop conditions:
 Expected local-agent prompt:
 
 ```text
-You are the local LM Studio coding agent for this Godot project. Work only on branch docs/resource-trade-model. Read AGENTS.md, ARCHITECTURE.md, city.gd, building.gd, building_placement.gd, household.gd, trade_route.gd, and trade_menu.gd. Add docs/RESOURCE_TRADE_MODEL.md describing observed resource and trade behavior only. Do not modify gameplay code. Run powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_project.ps1. Commit with message "docs: document resource and trade model". Report open questions.
+You are the local LM Studio coding agent for this Godot project. Work only on branch docs/resource-household-labor-trade-model. Read AGENTS.md, ARCHITECTURE.md, docs/household_simulation_philosophy.md, household.gd, city.gd, building.gd, building_placement.gd, trade_route.gd, trade_menu.gd, and any resource/production scripts. Add docs/RESOURCE_HOUSEHOLD_LABOR_TRADE_MODEL.md describing observed resource, household, labor, and trade behavior only, and compare it to the household simulation philosophy. Do not modify gameplay code. Do not reinterpret population as generic labor or houses as worker slots. Run powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_project.ps1. Commit with message "docs: document household labor and trade model". Report open questions.
 ```
 
 ### Task 3: Add Isolated Map Generation Demo Scene
@@ -329,10 +416,11 @@ After the local agent completes work, the owner or Codex reviewer should check:
 
 Until the owner answers the product questions, overnight local-agent runs should be limited to:
 
-- Documentation-only tasks, or
-- One additive demo/test scene task,
-- Maximum one branch and one commit,
-- Validation required before commit,
-- Stop after the first failure, ambiguity, or forbidden-file need.
+- Documentation-only tasks, or isolated demo/test scene tasks only.
+- No autonomous gameplay logic changes overnight.
+- Maximum one branch and one commit.
+- Validation required before commit.
+- Stop after the first ambiguity, validation failure, forbidden-file need, or product-design uncertainty.
+- Produce a proof-of-work report with branch, files changed, validation command/result, commit hash, and assumptions.
 
 No overnight run should exceed the configured task or time limit.

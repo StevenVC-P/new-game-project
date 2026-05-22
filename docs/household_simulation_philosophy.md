@@ -150,3 +150,11 @@ These shortcuts are dangerous if they become permanent design anchors:
 - city behavior ignoring household behavior
 - higher-level regional systems inventing culture/economy without household roots
 - tuning numbers to hide conceptual mismatches instead of clarifying the model
+
+## Agent Implementation Warning
+
+Local agents may be useful for documentation, isolated demos, and bounded additive work.
+
+They should not reinterpret the simulation as a conventional worker-slot city builder. Any formula change involving household population, labor capacity, food consumption, production, reproduction, values, migration, or prosperity must be treated as a product-design change unless explicitly scoped.
+
+Short-term abstraction is acceptable only when it points toward household-derived behavior.
