@@ -14,6 +14,24 @@ This game is a household-rooted civilization simulation. It is not a generic cit
 - Population should represent mouths to feed, shelter demand, demographics, family continuity, military potential, and future growth, not simply assignable labor.
 - Household values should eventually shape real outcomes such as productivity, resilience, reproduction, migration pressure, prosperity, cultural continuity, and higher-level regional/state/nation behavior.
 
+## Owner Decisions Captured
+
+The project owner has clarified the first playable direction:
+
+- The first loop is survival and growth, with trade as a support system.
+- The player should grow and stabilize a small settlement by placing housing and production buildings, assigning household responsibilities, managing pressure, and using trade or expansion to relieve shortages.
+- First pressure comes from food shortage, housing shortage, maintenance/resource shortage, and not enough households to cover responsibilities.
+- One household represents a family or family-like social/economic unit.
+- A household usually represents about 3-6 people, but household labor capacity should usually remain baseline 1.
+- That 1 labor capacity means one primary household responsibility, not one adult worker and not one quarter of a population pool.
+- Food consumption should scale primarily by population.
+- Production should initially come from assigned household responsibility plus building/resource rules.
+- Values can exist as data or placeholder traits for now, but should not be required for the first playable loop.
+- Prototype player control should use direct household assignment for legibility; later stages can add priorities, fit, preference indicators, household choice, and resistance.
+- Visible walkers represent household activity, not fully simulated individuals.
+- Regions, states, and nations should wait until the city/household loop is stable.
+- The first playable milestone should prove households -> responsibilities -> production/consumption -> growth/shortage.
+
 ## Current Known Project State
 
 - Branch for active development: `develop`.
@@ -44,6 +62,7 @@ Current risk shape:
 - Current conceptual risk: the prototype may drift toward conventional city-builder worker-slot logic.
 - Known tension: one household may currently represent about 4 population while providing only 1 labor capacity; food consumption scales by population while production scales by labor capacity.
 - This tension should be documented and evaluated, not hidden by quick tuning.
+- The 4 population to 1 labor-capacity ratio is acceptable as a provisional baseline only if interpreted as one household of several people holding one primary responsibility.
 
 ## Protected Product Assumptions
 
@@ -53,6 +72,33 @@ Current risk shape:
 - Do not make household values cosmetic only.
 - Do not solve design questions inside implementation tasks unless the owner has explicitly answered them.
 - Short-term abstractions are acceptable only when they point toward household-derived behavior.
+- Do not change production/resource formulas, household labor semantics, or protected files without an explicit scoped task.
+
+## Protected And Safe Areas
+
+Protected unless explicitly scoped:
+
+- `main.gd`
+- `main.tscn`
+- `project.godot`
+- `household.gd`
+- `city.gd`
+- Calendar/time progression
+- Production/resource formulas
+- Trade behavior
+- Map generation algorithms
+- Save/load, if present
+
+Safe local-agent areas:
+
+- `docs/`
+- `tasks/`
+- Isolated demo scenes
+- Test scenes
+- Read-only debug displays
+- Non-invasive UI labels/tooltips
+- Proof-of-work reports
+- Architecture notes
 
 ## Current Safety Rules
 
@@ -121,26 +167,17 @@ The local LM Studio agent should be used for:
 - Isolated demo/test scenes.
 - Small additive code changes with validation.
 
-## Questions For The Project Owner
+## Project Owner Answers
 
-Codex should ask these before approving major gameplay implementation:
+The owner answered the main product questions in `docs/PROJECT_OWNER_QUESTIONS.md`. Treat that file as the source of truth for:
 
-1. What is the intended core loop?
-2. What is the next development target: playable loop, simulation depth, UI clarity, map generation, or economy?
-3. What is the definition of done for the next milestone?
-4. What should not be changed under any circumstances right now?
-5. What is the preferred first playable milestone?
-6. What overnight autonomy level is acceptable?
-   - Documentation-only
-   - Demo/test scenes only
-   - Small feature branches under a time limit
-   - No overnight autonomous implementation
-7. Which matters more first: visual clarity, simulation correctness, input feel, or progression?
-8. Which systems are experimental and safe to change?
-9. Which systems are protected and should only be touched after review?
-10. Should `main.gd` be gradually modularized, or should gameplay direction be clarified first?
-11. Should future work prioritize regional map, city view, buildings, households, trade, or save/load?
-12. Should the project stay mouse-driven, keyboard-driven, or support both?
+- First playable core loop.
+- Household, population, and labor interpretation.
+- Player control staging.
+- First milestone resource and shortage priorities.
+- Protected systems.
+- Local-agent autonomy limits.
+- Definition of done.
 
 ## Recommended Next Local-Agent Tasks
 

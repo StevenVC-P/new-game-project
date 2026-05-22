@@ -23,6 +23,43 @@ Cloud-backed agents or hosted model calls are not part of the default workflow. 
 - Population represents mouths to feed, shelter demand, demographics, family continuity, military potential, and future growth.
 - Do not tune away household/population/labor tensions without an explicit product-design decision.
 
+## Current Product Direction
+
+- First playable loop: survival and growth, with trade as a support system.
+- The player grows and stabilizes a small settlement through housing, production buildings, household responsibility assignment, and pressure management.
+- One household represents a family or family-like social/economic unit.
+- One household usually represents about 3-6 people.
+- Baseline household labor capacity should usually remain 1, meaning one primary household responsibility, not one generic worker.
+- Food consumption should scale primarily by population.
+- Production should initially come from assigned household responsibility plus building/resource rules.
+- Values can exist as data/placeholders now, but should influence real outcomes later.
+
+## Protected Systems
+
+Protected unless explicitly scoped:
+
+- `main.gd`
+- `main.tscn`
+- `project.godot`
+- `household.gd`
+- `city.gd`
+- Calendar/time progression
+- Production/resource formulas
+- Trade behavior
+- Map generation algorithms
+- Save/load, if present
+
+Safe areas for local-agent work:
+
+- `docs/`
+- `tasks/`
+- Isolated demo scenes
+- Test scenes
+- Read-only debug displays
+- Non-invasive UI labels/tooltips
+- Proof-of-work reports
+- Architecture notes
+
 ## Working Rules
 
 - Start every meaningful change from a named branch.
