@@ -668,7 +668,7 @@ if ($InitialDirty.Count -gt 0) {
 	if (-not $Resume) {
 		Stop-Run "Working tree is dirty. Commit, stash, or clean changes before running."
 	}
-	if (-not (Test-OnlyAllowedDirtyPaths @($ArtifactRoot))) {
+	if (-not (Test-OnlyAllowedDirtyPaths @("$ArtifactRoot/"))) {
 		Stop-Run "Working tree is dirty outside runner-owned artifacts; refusing resume."
 	}
 }
