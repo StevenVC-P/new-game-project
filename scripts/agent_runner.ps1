@@ -58,8 +58,14 @@ function Invoke-Git {
 		[switch]$AllowFailure
 	)
 
-	$Output = & git @Arguments 2>&1
-	$ExitCode = $LASTEXITCODE
+	$PreviousErrorActionPreference = $ErrorActionPreference
+	$ErrorActionPreference = "Continue"
+	try {
+		$Output = & git @Arguments 2>&1
+		$ExitCode = $LASTEXITCODE
+	} finally {
+		$ErrorActionPreference = $PreviousErrorActionPreference
+	}
 	$Text = ($Output | Out-String).TrimEnd()
 	if ($ExitCode -ne 0 -and -not $AllowFailure) {
 		throw "git $($Arguments -join ' ') failed with exit code $ExitCode.`n$Text"
@@ -425,6 +431,8 @@ function Invoke-ValidationCommand {
 
 	$Output = @()
 	$ExitCode = 0
+	$PreviousErrorActionPreference = $ErrorActionPreference
+	$ErrorActionPreference = "Continue"
 	try {
 		$Output = & ([scriptblock]::Create($Command)) 2>&1
 		$ExitCode = $LASTEXITCODE
@@ -432,6 +440,8 @@ function Invoke-ValidationCommand {
 	} catch {
 		$Output += $_.Exception.Message
 		$ExitCode = 1
+	} finally {
+		$ErrorActionPreference = $PreviousErrorActionPreference
 	}
 	$Text = ($Output | Out-String)
 	Write-TextFile $LogPath $Text
