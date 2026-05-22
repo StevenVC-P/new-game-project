@@ -56,9 +56,9 @@ Buildings should be operated by specific households or household responsibility 
 
 Regions should matter after the city/household loop is stable. Higher-level systems should inherit from lower-level behavior. Do not build complex regional/state/nation systems until one settlement clearly shows households -> assignments -> production/consumption -> growth/shortage.
 
-## Protected Systems
+## High-Risk Systems
 
-Protected unless explicitly scoped:
+High-risk systems:
 
 - `main.gd`
 - `main.tscn`
@@ -71,7 +71,7 @@ Protected unless explicitly scoped:
 - Map generation algorithms
 - Save/load if present
 
-The local agent may inspect and document these, but should not alter them without a very specific task.
+High-risk does not mean forbidden. It means change only when relevant to the assigned goal, avoid unrelated rewrites, checkpoint before and after meaningful edits, validate afterward when practical, and report the reason for the change clearly.
 
 ## Safe Agent Areas
 
@@ -91,6 +91,10 @@ Safe when scoped:
 Real implementation is allowed when explicitly assigned. The local agent may make code, scene, UI, test, and documentation changes on feature branches.
 
 The local agent may edit scripts, scenes, UI, documentation, tests, resources, and project wiring as needed to complete the assigned goal, as long as the work stays on a named feature branch and does not merge to `main` without human review.
+
+The agent may modify any files reasonably necessary to complete an explicitly assigned goal, as long as it keeps the work scoped to the goal, uses clean checkpoints, validates when practical, and reports changes clearly.
+
+Important files are not forbidden by default. They are high-risk and should be changed deliberately, with checkpoint commits and clear reporting.
 
 The project has backup points and version-control checkpoints. The agent should use those checkpoints to work productively rather than stopping every time a change touches an important file.
 

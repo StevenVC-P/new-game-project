@@ -8,7 +8,7 @@ Add an isolated demo scene for UI overlays and visual helpers so UI polish can b
 
 - Create a demo scene that exercises visual helper classes with sample data.
 - Keep all demo data local to the demo.
-- Do not alter `main.gd` UI behavior.
+- Prefer not to alter `main.gd` UI behavior. If minimal wiring into a central file is reasonably necessary for the demo scene to function, make the smallest useful change, checkpoint it, validate, and report why it was needed.
 
 ## Files Likely Involved
 

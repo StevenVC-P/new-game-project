@@ -36,9 +36,9 @@ Cloud-backed agents or hosted model calls are not part of the default workflow. 
 - Later productivity/effectiveness may be affected by assignment fit, traits, tools, building quality, prosperity, stability, health, values, local resources, and season.
 - Values can exist as data/placeholders now, but should influence real outcomes later.
 
-## Protected Systems
+## High-Risk Systems
 
-Protected unless explicitly scoped:
+High-risk systems:
 
 - `main.gd`
 - `main.tscn`
@@ -51,7 +51,13 @@ Protected unless explicitly scoped:
 - Map generation algorithms
 - Save/load, if present
 
-Protected does not mean permanently untouchable. It means the task must explicitly authorize the file or system, describe the intended change, and include validation, checkpoint, and rollback expectations.
+High-risk does not mean forbidden. It means:
+
+- Change only when relevant to the assigned goal.
+- Avoid unrelated rewrites.
+- Checkpoint before and after meaningful edits.
+- Validate afterward when practical.
+- Report the reason for the change clearly.
 
 Safe areas for local-agent work:
 
@@ -121,10 +127,11 @@ This section exists to prove the workflow is backed by an actual local model-dri
 - Codex is for planning, architecture, owner questions, task definition, and review.
 - The local LM Studio agent is for bounded implementation on explicit feature branches, including real feature work when assigned.
 - The local agent may edit scripts, scenes, UI, documentation, tests, resources, and project wiring as needed to complete an assigned goal.
+- The agent may modify any files reasonably necessary to complete an explicitly assigned goal, as long as it works on a feature branch, keeps the work scoped to the goal, uses clean checkpoints, validates when practical, and reports changes clearly.
 - The local agent must only work from explicit task files or handoff prompts.
 - Do not start open-ended local-agent work.
 - No overnight local-agent run should exceed the configured task or time limit.
-- Stop local-agent work at the first missing product decision, out-of-scope protected-file need, validation failure that cannot be fixed within scope, or unclear rollback path.
+- Stop local-agent work at the first missing product decision, out-of-scope change need, validation failure that cannot be fixed within scope, or unclear rollback path.
 - Real implementation must use checkpoint commits and must never merge automatically to `main`.
 
 ### Local Agent Verification

@@ -18,7 +18,7 @@ For implementation tasks, name the allowed systems explicitly. A local agent may
 
 Name expected files or folders. Use this as guidance, not permission for broad rewrites.
 
-If important or protected files are allowed, list them directly and explain why they are in scope.
+If important/high-risk files are likely to be touched, list them directly and explain why they are relevant to the goal. High-risk files are not forbidden by default, but they should be changed deliberately and reported clearly.
 
 ## Acceptance Criteria
 

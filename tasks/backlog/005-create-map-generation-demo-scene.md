@@ -9,7 +9,7 @@ Add an isolated demo scene for regional and local map generation so future map c
 - Create a new demo scene under a dedicated demo/test folder.
 - Use existing generator classes without changing their behavior.
 - Keep the demo additive and separate from `main.tscn`.
-- Do not modify gameplay systems except for minimal scene script glue if needed.
+- Prefer additive implementation and avoid unnecessary changes to central gameplay systems. If minimal glue is reasonably necessary for the demo scene to function, keep it scoped, checkpointed, and clearly reported.
 
 ## Files Likely Involved
 

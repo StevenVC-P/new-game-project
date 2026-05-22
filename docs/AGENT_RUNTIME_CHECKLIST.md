@@ -253,7 +253,7 @@ A local agent may make real code, scene, UI, test, and documentation changes whe
 - `main` must not be edited directly.
 - Work should begin from `develop` unless instructed otherwise.
 - The agent may edit scripts, scenes, UI, documentation, tests, resources, and project wiring as needed to complete the assigned goal.
-- Important/protected files may be edited only when explicitly listed in the task scope.
+- Important files are not forbidden by default. They are high-risk and should be changed deliberately when reasonably needed for the assigned goal.
 - The agent should avoid unnecessary rewrites, renames, deletions, or broad refactors unless clearly useful for the assigned goal.
 - If a refactor is needed, it should be done in a checkpointed way.
 - The agent must make checkpoint commits.

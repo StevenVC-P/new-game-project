@@ -76,7 +76,7 @@ Current risk shape:
 - Short-term abstractions are acceptable only when they point toward household-derived behavior.
 - Do not change production/resource formulas, household labor semantics, or protected files without an explicit scoped task.
 
-## Local Agent Autonomy Policy
+## Goal-Driven Autonomy
 
 The local agent may make real project changes, including gameplay code, UI code, scenes, tests, and documentation, when explicitly assigned a bounded objective by the project owner or Codex.
 
@@ -84,12 +84,22 @@ The local agent may edit scripts, scenes, UI, documentation, tests, resources, a
 
 The project has backup points and version-control checkpoints. The local agent should use those checkpoints to work productively rather than stopping every time a change touches an important file.
 
+The agent should not stop merely because a task touches a central file. Instead, it should proceed carefully on a feature branch, commit reviewable checkpoints, and report the risk.
+
 The local agent may work for extended sessions, including multi-hour sessions, when asked, but only inside a named feature branch with clear checkpoints.
+
+The agent may modify any files reasonably necessary to complete an explicitly assigned goal, as long as it works on a feature branch, keeps the work scoped to the goal, uses clean checkpoints, validates when practical, and reports changes clearly.
+
+Important files are not forbidden by default. They are high-risk and should be changed deliberately, with checkpoint commits and clear reporting.
+
+## Feature Branch Requirement
 
 - The agent must never work directly on `main`.
 - The agent should normally start from `develop` unless instructed otherwise.
+- The agent must create a named feature branch for each assigned goal.
 - All work intended for `main` must pass through feature branches and human review.
 - No automatic merge to `main` is allowed.
+- The owner reviews feature branches and decides whether to merge, redirect, or revert.
 - Real implementation authority comes from explicit task scope, not from general access to the repo.
 - The agent should make real progress toward the assigned objective.
 - The agent should avoid unnecessary rewrites, renames, deletions, or broad refactors unless they are clearly useful for the assigned goal.
@@ -97,9 +107,11 @@ The local agent may work for extended sessions, including multi-hour sessions, w
 - The agent must preserve the household-rooted simulation direction.
 - The agent must report what changed, what worked, what failed, and what remains.
 
-## Feature Branch Checkpoint Workflow
+## Checkpoint Workflow
 
 A checkpoint is a commit that represents a reviewable state of the project.
+
+A checkpoint is a clean, reviewable commit.
 
 Every meaningful version should be committed so the owner can review it, revert it, compare it, or redirect the next task.
 
@@ -108,11 +120,14 @@ Use milestone-based checkpoints with a 30-45 minute maximum gap. The agent shoul
 For extended sessions, the agent should commit at natural milestones, such as:
 
 - After adding a new system skeleton.
+- After a visible or testable feature appears.
 - After wiring UI.
 - After passing validation.
 - After completing a vertical slice.
 - Before attempting a risky refactor.
 - After fixing a validation failure.
+- Before switching subsystems.
+- Before ending the session.
 
 Each checkpoint report should include:
 
@@ -125,7 +140,7 @@ Each checkpoint report should include:
 - Open questions.
 - Known risks.
 
-### Failure Checkpoint Rule
+## Failure And Rollback Policy
 
 Checkpoint commits are only for reviewable progress. A checkpoint commit means a clean, reviewable state.
 
@@ -197,7 +212,7 @@ An extended local-agent task must include:
 - Clear objective.
 - Expected outcome.
 - Allowed files or systems.
-- Forbidden files or systems.
+- Out-of-scope or high-risk files/systems.
 - Acceptance criteria.
 - Validation command.
 - Checkpoint cadence.
@@ -214,7 +229,7 @@ The local agent must stop if:
 - The agent makes three attempts to solve the same issue without meaningful progress.
 - Rollback to the previous clean state is unsafe or ambiguous.
 - The task requires an unresolved product/design decision.
-- The agent needs to alter protected systems not listed in the task.
+- The agent needs to make high-risk or out-of-scope changes not reasonably tied to the assigned goal.
 - Changes drift beyond the assigned feature purpose.
 - Implementation violates the household simulation philosophy.
 - Implementation converts households into generic worker-slot providers.
@@ -223,9 +238,9 @@ The local agent must stop if:
 - The agent would need to merge to `main`.
 - The agent is unsure whether a change is in scope.
 
-## Protected And Safe Areas
+## High-Risk Systems
 
-Protected unless explicitly scoped:
+High-risk systems:
 
 - `main.gd`
 - `main.tscn`
@@ -238,7 +253,15 @@ Protected unless explicitly scoped:
 - Map generation algorithms
 - Save/load, if present
 
-Safe local-agent areas:
+High-risk does not mean forbidden. It means:
+
+- Change only when relevant to the assigned goal.
+- Avoid unrelated rewrites.
+- Checkpoint before and after meaningful edits.
+- Validate afterward when practical.
+- Report the reason for the change clearly.
+
+Lower-risk local-agent areas:
 
 - `docs/`
 - `tasks/`
@@ -249,7 +272,7 @@ Safe local-agent areas:
 - Proof-of-work reports
 - Architecture notes
 
-Protected does not mean permanently untouchable. It means the task must explicitly authorize the file or system, describe the intended change, and include validation, checkpoint, and rollback expectations.
+Important files are not forbidden by default. They are high-risk and should be changed deliberately, with checkpoint commits and clear reporting.
 
 ## Current Safety Rules
 
@@ -327,7 +350,7 @@ The owner answered the main product questions in `docs/PROJECT_OWNER_QUESTIONS.m
 - Household, population, and labor interpretation.
 - Player control staging.
 - First milestone resource and shortage priorities.
-- Protected systems.
+- High-risk systems.
 - Local-agent autonomy limits.
 - Definition of done.
 
@@ -528,7 +551,7 @@ Scope:
 
 - Add a new demo/test scene and script under a clearly named folder.
 - Use existing map generator classes.
-- Do not change generator behavior.
+- Prefer not to change generator behavior unless the assigned demo goal reasonably requires a small, clearly reported adjustment.
 - Do not change `main.tscn` or `project.godot`.
 
 Branch name:
@@ -583,7 +606,7 @@ Stop conditions:
 Expected local-agent prompt:
 
 ```text
-You are the local LM Studio coding agent for this Godot project. Work only on branch feature/map-generation-demo-scene. Read AGENTS.md, ARCHITECTURE.md, tasks/backlog/005-create-map-generation-demo-scene.md, region_map_generator.gd, local_city_map_generator.gd, settlement_site_profile.gd, and terrain_visuals.gd. Add an isolated map generation demo scene under a new demo/test folder. Do not modify main.tscn, project.godot, or existing gameplay algorithms. Run powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_project.ps1. Commit with message "feat: add map generation demo scene". Stop if any existing gameplay code change seems necessary.
+You are the local LM Studio coding agent for this Godot project. Work only on branch feature/map-generation-demo-scene. Read AGENTS.md, ARCHITECTURE.md, tasks/backlog/005-create-map-generation-demo-scene.md, region_map_generator.gd, local_city_map_generator.gd, settlement_site_profile.gd, and terrain_visuals.gd. Add an isolated map generation demo scene under a new demo/test folder. Prefer additive implementation and avoid unnecessary changes to main.tscn, project.godot, or existing gameplay algorithms. If minimal wiring into a central file is reasonably necessary for the demo to function, make the smallest useful change, checkpoint it, validate, and report why it was needed. Run powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_project.ps1. Commit with message "feat: add map generation demo scene". Stop if the work drifts beyond the assigned demo goal.
 ```
 
 ## Project Owner Review Checklist
@@ -592,7 +615,7 @@ After the local agent completes work, the owner or Codex reviewer should check:
 
 - The agent worked on the requested branch.
 - The diff matches the task scope.
-- No forbidden files were changed.
+- High-risk file changes are relevant to the assigned goal and clearly reported.
 - No files, scenes, nodes, scripts, folders, or resources were renamed.
 - No files were deleted.
 - Validation command was run and result was reported.
