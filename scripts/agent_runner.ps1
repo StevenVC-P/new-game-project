@@ -841,7 +841,8 @@ $ValidationText
 
 	$Check = Invoke-Git @("apply", "--check", "--whitespace=error", $PatchPath) -AllowFailure
 	if ($Check.ExitCode -ne 0) {
-		$AttemptLines += "- Attempt ${Attempt}: git apply --check failed: $($Check.Output)"
+		$SanitizationStatus = if ($SanitizedPatch.Sanitized) { "single fenced diff extracted" } else { "raw unified diff" }
+		$AttemptLines += "- Attempt ${Attempt}: git apply --check failed after sanitization '$SanitizationStatus': $($Check.Output)"
 		continue
 	}
 
