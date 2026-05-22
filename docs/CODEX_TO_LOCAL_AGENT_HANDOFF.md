@@ -1,6 +1,6 @@
 # Codex To Local Agent Handoff
 
-This handoff prepares the project for bounded local-agent implementation. It does not authorize gameplay changes by itself. Future implementation should happen from explicit task files or handoff prompts on feature branches.
+This handoff prepares the project for bounded local-agent implementation. Real implementation work is allowed when explicitly assigned by the project owner or Codex, but it must happen on named feature branches with reviewable checkpoints.
 
 ## Current Design North Star
 
@@ -10,8 +10,8 @@ This game is a household-rooted civilization simulation. It is not a generic cit
 - Cities aggregate household behavior.
 - Regions aggregate city behavior.
 - States and nations should eventually inherit patterns from the household, city, and regional layers below them.
-- Labor should be derived from household capability, not treated as generic worker slots.
-- Population should represent mouths to feed, shelter demand, demographics, family continuity, military potential, and future growth, not simply assignable labor.
+- Labor should be one baseline responsibility unit per household, not a generic worker pool.
+- Population should represent mouths to feed, shelter demand, demographics, family continuity, future household formation, military potential, and future growth, not simply assignable labor.
 - Household values should eventually shape real outcomes such as productivity, resilience, reproduction, migration pressure, prosperity, cultural continuity, and higher-level regional/state/nation behavior.
 
 ## Owner Decisions Captured
@@ -67,12 +67,119 @@ Current risk shape:
 ## Protected Product Assumptions
 
 - Do not convert houses into simple worker-slot providers.
-- Do not tune away the household/population/labor mismatch by making population directly assignable as generic labor.
+- Do not convert population directly into assignable generic labor.
+- Do not tune away household/population/labor tension by flattening the model into a conventional worker pool.
 - Do not create higher-level regional or national behavior that ignores household/city roots.
 - Do not make household values cosmetic only.
+- Do not treat household maturity as a direct productivity multiplier by default.
 - Do not solve design questions inside implementation tasks unless the owner has explicitly answered them.
 - Short-term abstractions are acceptable only when they point toward household-derived behavior.
 - Do not change production/resource formulas, household labor semantics, or protected files without an explicit scoped task.
+
+## Local Agent Autonomy Policy
+
+The local agent may make real project changes, including gameplay code, UI code, scenes, tests, and documentation, when explicitly assigned a bounded objective by the project owner or Codex.
+
+The local agent may work for extended sessions, including multi-hour sessions, when asked, but only inside a named feature branch with clear checkpoints.
+
+- The agent must never work directly on `main`.
+- The agent should normally start from `develop` unless instructed otherwise.
+- All work intended for `main` must pass through feature branches and human review.
+- No automatic merge to `main` is allowed.
+- Real implementation authority comes from explicit task scope, not from general access to the repo.
+
+## Feature Branch Checkpoint Workflow
+
+A checkpoint is a commit that represents a reviewable state of the project.
+
+Every meaningful version should be committed so the owner can review it, revert it, compare it, or redirect the next task.
+
+For extended sessions, the agent should commit at natural milestones, such as:
+
+- After adding a new system skeleton.
+- After wiring UI.
+- After passing validation.
+- After completing a vertical slice.
+- Before attempting a risky refactor.
+- After fixing a validation failure.
+
+Each checkpoint report should include:
+
+- Branch name.
+- Commit hash.
+- Changed files.
+- Validation command and result.
+- Summary of behavior changed.
+- Assumptions made.
+- Open questions.
+- Known risks.
+
+## Tiered Autonomy Levels
+
+### Level 0: Read-Only Analysis
+
+- Inspect files.
+- Summarize architecture.
+- Identify risks.
+- No file edits.
+
+### Level 1: Documentation-Only
+
+- Docs, task files, checklists, and reports.
+- No gameplay code.
+
+### Level 2: Isolated Demos/Tests
+
+- Demo scenes.
+- Test scenes.
+- Validation helpers.
+- No main scene or main project flow changes unless explicitly scoped.
+
+### Level 3: Small Implementation Task
+
+- Bounded gameplay/UI/code changes.
+- Specific files or systems allowed.
+- Validation required.
+- Checkpoint commit required.
+
+### Level 4: Extended Feature-Branch Implementation Session
+
+- Multi-hour work allowed.
+- Clear objective required.
+- Acceptance criteria required.
+- Checkpoint cadence required.
+- Stop conditions required.
+- Final proof-of-work report required.
+- No merge to `main`.
+
+## Extended Session Requirements
+
+An extended local-agent task must include:
+
+- Clear objective.
+- Expected outcome.
+- Allowed files or systems.
+- Forbidden files or systems.
+- Acceptance criteria.
+- Validation command.
+- Checkpoint cadence.
+- Stop conditions.
+- Final report requirements.
+
+## Stop Conditions
+
+The local agent must stop if:
+
+- Validation fails and cannot be fixed within the assigned scope.
+- The task requires an unresolved product/design decision.
+- The agent needs to alter protected systems not listed in the task.
+- Changes drift beyond the assigned feature purpose.
+- Implementation violates the household simulation philosophy.
+- Implementation converts households into generic worker-slot providers.
+- Implementation treats population as directly assignable raw labor.
+- The agent needs to rename or delete files without explicit permission.
+- The agent would need to merge to `main`.
+- The agent is unsure whether a change is in scope.
 
 ## Protected And Safe Areas
 
@@ -165,7 +272,8 @@ The local LM Studio agent should be used for:
 - Bounded implementation from explicit prompts.
 - Documentation tasks.
 - Isolated demo/test scenes.
-- Small additive code changes with validation.
+- Real feature work, including gameplay/UI/code/scene/test changes, when explicitly scoped.
+- Checkpointed extended sessions when the owner or Codex provides objective, acceptance criteria, allowed files/systems, checkpoint cadence, and stop conditions.
 
 ## Project Owner Answers
 
@@ -451,13 +559,6 @@ After the local agent completes work, the owner or Codex reviewer should check:
 
 ## Overnight Autonomy Recommendation
 
-Until the owner answers the product questions, overnight local-agent runs should be limited to:
+Extended/overnight runs are allowed only when explicitly requested, on a named feature branch, with a clear objective, acceptance criteria, validation command, checkpoint cadence, and stop conditions.
 
-- Documentation-only tasks, or isolated demo/test scene tasks only.
-- No autonomous gameplay logic changes overnight.
-- Maximum one branch and one commit.
-- Validation required before commit.
-- Stop after the first ambiguity, validation failure, forbidden-file need, or product-design uncertainty.
-- Produce a proof-of-work report with branch, files changed, validation command/result, commit hash, and assumptions.
-
-No overnight run should exceed the configured task or time limit.
+The agent may continue implementing within scope, but must produce reviewable checkpoint commits and a final proof-of-work report. No automatic merge to `main` is allowed.

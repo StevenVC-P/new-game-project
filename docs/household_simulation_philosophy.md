@@ -153,8 +153,16 @@ These shortcuts are dangerous if they become permanent design anchors:
 
 ## Agent Implementation Warning
 
-Local agents may be useful for documentation, isolated demos, and bounded additive work.
+Local agents may be used for real implementation work when explicitly assigned bounded objectives.
 
-They should not reinterpret the simulation as a conventional worker-slot city builder. Any formula change involving household population, labor capacity, food consumption, production, reproduction, values, migration, or prosperity must be treated as a product-design change unless explicitly scoped.
+Feature branches and checkpoint commits are required for reviewable progress.
+
+Agents must not reinterpret the game as a conventional worker-slot city builder.
+
+Baseline household labor capacity is one responsibility unit by default. Household population is demographic weight, consumption pressure, growth potential, and family continuity, not directly assignable labor.
+
+Household maturity means age/stage, such as young, middle, and old, and should mainly affect family growth, dependents, succession, and new household formation.
+
+Formula changes involving household population, labor capacity, food consumption, production, reproduction, values, migration, prosperity, or maturity are product-design changes unless explicitly scoped.
 
 Short-term abstraction is acceptable only when it points toward household-derived behavior.

@@ -30,8 +30,10 @@ Cloud-backed agents or hosted model calls are not part of the default workflow. 
 - One household represents a family or family-like social/economic unit.
 - One household usually represents about 3-6 people.
 - Baseline household labor capacity should usually remain 1, meaning one primary household responsibility, not one generic worker.
+- Household maturity means age/stage, such as young, middle, and old; it should eventually affect fertility, dependents, succession, and new household formation, not automatically mean higher productivity.
 - Food consumption should scale primarily by population.
 - Production should initially come from assigned household responsibility plus building/resource rules.
+- Later productivity/effectiveness may be affected by assignment fit, traits, tools, building quality, prosperity, stability, health, values, local resources, and season.
 - Values can exist as data/placeholders now, but should influence real outcomes later.
 
 ## Protected Systems
@@ -115,11 +117,12 @@ This section exists to prove the workflow is backed by an actual local model-dri
 ## Codex And Local Agent Roles
 
 - Codex is for planning, architecture, owner questions, task definition, and review.
-- The local LM Studio agent is for bounded implementation on explicit feature branches.
+- The local LM Studio agent is for bounded implementation on explicit feature branches, including real feature work when assigned.
 - The local agent must only work from explicit task files or handoff prompts.
 - Do not start open-ended local-agent work.
 - No overnight local-agent run should exceed the configured task or time limit.
 - Stop local-agent work at the first missing product decision, validation failure, forbidden-file need, or unclear rollback path.
+- Real implementation must use checkpoint commits and must never merge automatically to `main`.
 
 ### Local Agent Verification
 

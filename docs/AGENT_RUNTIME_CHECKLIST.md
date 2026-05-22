@@ -245,6 +245,27 @@ TODO
 - Use bounded tasks with acceptance criteria, expected files, and stopping conditions.
 - Require branches and commits for every meaningful change.
 
+## Real Implementation Workflow
+
+A local agent may make real code, scene, UI, test, and documentation changes when explicitly assigned.
+
+- Real implementation requires a feature branch.
+- `main` must not be edited directly.
+- Work should begin from `develop` unless instructed otherwise.
+- The agent must make checkpoint commits.
+- The agent must run validation/tests before checkpoint commits when practical.
+- Final reports must include branch, commit hashes, changed files, validation results, assumptions, and open questions.
+- `main` receives changes only through reviewed feature branches.
+
+## Checkpoint Requirements
+
+Checkpoints are reviewable commits.
+
+- Checkpoints should be frequent enough that the owner can redirect the project without losing hours of work.
+- Checkpoint commits should be meaningful and not hide unrelated changes.
+- If validation fails at a checkpoint, the agent should either fix within scope or stop and report.
+- Each checkpoint report should name the branch, commit hash, changed files, validation result, behavior changed, assumptions, open questions, and known risks.
+
 ## Proof Task Scope Enforcement
 
 A proof task is only a workflow verification.
@@ -252,6 +273,7 @@ A proof task is only a workflow verification.
 - By default, a proof task may only add or update `docs/AGENT_PROOF_OF_WORK.md`.
 - Any change to `AGENTS.md`, validation scripts, project files, gameplay scripts, scenes, resources, or import settings is outside default proof scope and must be separately approved.
 - A successful validation exit code does not automatically approve out-of-scope file changes.
+- This proof-task restriction does not prevent later real implementation tasks. It only keeps proof verification clean.
 - The proof report must include git status, `git diff --stat`, validation command/result, current branch, commit hash if committed, and an explicit list of assumptions.
 - If toolchain changes are required, stop and create a separate tooling task before continuing the proof run.
 

@@ -46,6 +46,8 @@ These changes may be legitimate toolchain improvements, but they require human r
 
 Future proof runs should isolate documentation-only proof edits to `docs/AGENT_PROOF_OF_WORK.md` unless validation-script changes are explicitly authorized.
 
+This does not mean real implementation is forbidden; it only means proof-of-work tasks should stay clean unless explicitly scoped otherwise.
+
 ## Git Diff Summary
 
 ```text
