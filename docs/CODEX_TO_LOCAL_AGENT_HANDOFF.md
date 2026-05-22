@@ -94,6 +94,8 @@ A checkpoint is a commit that represents a reviewable state of the project.
 
 Every meaningful version should be committed so the owner can review it, revert it, compare it, or redirect the next task.
 
+Use milestone-based checkpoints with a 30-45 minute maximum gap. The agent should commit whenever a reviewable unit of progress exists, and should not continue accumulating broad uncommitted changes for more than roughly 45 minutes.
+
 For extended sessions, the agent should commit at natural milestones, such as:
 
 - After adding a new system skeleton.
@@ -113,6 +115,32 @@ Each checkpoint report should include:
 - Assumptions made.
 - Open questions.
 - Known risks.
+
+### Failure Checkpoint Rule
+
+Checkpoint commits are only for reviewable progress. A checkpoint commit means a clean, reviewable state.
+
+If the project is in a system-error state, validation is failing, imports are broken, or the feature cannot run, the agent should not create a checkpoint commit merely because the time limit was reached.
+
+If the agent spends roughly 45 minutes without producing a working/reviewable state, it should roll back to the previous clean commit, preserve a written note of what was attempted, and report the blocker.
+
+A failed experiment may be documented, but should not be committed as a normal checkpoint unless explicitly requested.
+
+Rollback means returning code to the previous clean commit/state before the failing attempt, while preserving a written summary of the failure in the final report or an approved docs note.
+
+The agent should not hide failed attempts. It should report them clearly.
+
+If rollback itself is unsafe or ambiguous, the agent should stop immediately and report instead of trying more changes.
+
+### Three-Attempt Stop Rule
+
+If the agent makes three attempts to solve the same issue without meaningful progress, it must stop, roll back to the previous clean commit if needed, and write a note explaining:
+
+- What it attempted.
+- What failed.
+- Current suspected cause.
+- Files touched during the attempts.
+- Recommended next human/Codex decision.
 
 ## Tiered Autonomy Levels
 
@@ -148,6 +176,7 @@ Each checkpoint report should include:
 - Clear objective required.
 - Acceptance criteria required.
 - Checkpoint cadence required.
+- Failure checkpoint policy required.
 - Stop conditions required.
 - Final proof-of-work report required.
 - No merge to `main`.
@@ -163,6 +192,7 @@ An extended local-agent task must include:
 - Acceptance criteria.
 - Validation command.
 - Checkpoint cadence.
+- Failure checkpoint policy.
 - Stop conditions.
 - Final report requirements.
 
@@ -171,6 +201,9 @@ An extended local-agent task must include:
 The local agent must stop if:
 
 - Validation fails and cannot be fixed within the assigned scope.
+- The project is not in a clean/reviewable state when the checkpoint time limit is reached.
+- The agent makes three attempts to solve the same issue without meaningful progress.
+- Rollback to the previous clean state is unsafe or ambiguous.
 - The task requires an unresolved product/design decision.
 - The agent needs to alter protected systems not listed in the task.
 - Changes drift beyond the assigned feature purpose.

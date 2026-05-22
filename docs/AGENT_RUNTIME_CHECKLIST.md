@@ -261,10 +261,28 @@ A local agent may make real code, scene, UI, test, and documentation changes whe
 
 Checkpoints are reviewable commits.
 
+- Use milestone-based checkpoints with a 30-45 minute maximum gap.
 - Checkpoints should be frequent enough that the owner can redirect the project without losing hours of work.
+- Checkpoint commits are only for clean, reviewable progress.
 - Checkpoint commits should be meaningful and not hide unrelated changes.
 - If validation fails at a checkpoint, the agent should either fix within scope or stop and report.
+- If the project is in a system-error state, validation is failing, imports are broken, or the feature cannot run, do not create a checkpoint commit merely because the time limit was reached.
+- If roughly 45 minutes pass without a working/reviewable state, roll back to the previous clean commit/state, preserve a written note of what was attempted, and report the blocker.
+- A failed experiment may be documented, but should not be committed as a normal checkpoint unless explicitly requested.
+- Rollback means returning code to the previous clean commit/state before the failing attempt, while preserving a written summary of the failure in the final report or an approved docs note.
+- The agent should not hide failed attempts; it should report them clearly.
+- If rollback itself is unsafe or ambiguous, the agent should stop immediately and report instead of trying more changes.
 - Each checkpoint report should name the branch, commit hash, changed files, validation result, behavior changed, assumptions, open questions, and known risks.
+
+## Three-Attempt Stop Rule
+
+If the agent makes three attempts to solve the same issue without meaningful progress, it must stop, roll back to the previous clean commit if needed, and write a note explaining:
+
+- What it attempted.
+- What failed.
+- Current suspected cause.
+- Files touched during the attempts.
+- Recommended next human/Codex decision.
 
 ## Proof Task Scope Enforcement
 

@@ -96,6 +96,18 @@ Every meaningful version should be committed so the owner can review, revert, co
 
 For now, each run should have one named branch, explicit scope, validation, checkpoint cadence, and clear stop conditions.
 
+Checkpoint cadence should be milestone-based with a 30-45 minute maximum gap. The agent should commit whenever a reviewable unit of progress exists, and should not continue accumulating broad uncommitted changes for more than roughly 45 minutes.
+
+Checkpoint commits are only for clean, reviewable progress. If the project is in a system-error state, validation is failing, imports are broken, or the feature cannot run, the agent should not create a checkpoint commit merely because the time limit was reached.
+
+If roughly 45 minutes pass without a working/reviewable state, the agent should roll back to the previous clean commit/state, preserve a written note of what was attempted, and report the blocker.
+
+If the agent makes three attempts to solve the same issue without meaningful progress, it must stop, roll back to the previous clean commit if needed, and write a note explaining what it attempted, what failed, current suspected cause, files touched, and the recommended next human/Codex decision.
+
+Failed experiments should not be hidden. They may be documented, but should not be committed as normal checkpoints unless explicitly requested.
+
+If rollback itself is unsafe or ambiguous, the agent should stop immediately and report instead of trying more changes.
+
 ## Definition Of Done
 
 The first playable milestone is a small settlement simulation where the player can place or expand housing, assign household responsibilities, see household count and city population, see food consumption pressure, see housing pressure, see responsibility coverage, see basic resource production, and survive/grow for a short calendar period.
