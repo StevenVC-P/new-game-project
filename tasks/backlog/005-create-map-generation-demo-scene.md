@@ -8,15 +8,15 @@ Add an isolated demo scene for regional and local map generation so future map c
 
 - Create a new demo scene under a dedicated demo/test folder.
 - Use existing generator classes without changing their behavior.
-- Keep the demo additive and separate from `main.tscn`.
+- Keep the demo additive and separate from `scenes/main.tscn`.
 - Prefer additive implementation and avoid unnecessary changes to central gameplay systems. If minimal glue is reasonably necessary for the demo scene to function, keep it scoped, checkpointed, and clearly reported.
 
 ## Files Likely Involved
 
 - `demos/` or `test_scenes/`
-- `region_map_generator.gd`
-- `local_city_map_generator.gd`
-- `settlement_site_profile.gd`
+- `scripts/world/region_map_generator.gd`
+- `scripts/world/local_city_map_generator.gd`
+- `scripts/domain/settlement_site_profile.gd`
 - `scripts/visuals/terrain_visuals.gd`
 - New demo scene/script files
 
@@ -26,7 +26,7 @@ Medium-low. Additive scene/script work, but it touches generator usage.
 
 ## Acceptance Criteria
 
-- A new isolated demo scene opens without replacing `main.tscn`.
+- A new isolated demo scene opens without replacing `scenes/main.tscn`.
 - The demo can generate and display representative map output.
 - Existing main scene behavior is unchanged.
 - Validation import pass succeeds.

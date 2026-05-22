@@ -6,7 +6,7 @@ Turn the placeholder Core Loop roadmap section into a concrete hypothesis based 
 
 ## Scope
 
-- Inspect `main.gd`, `city.gd`, `household.gd`, `trade_route.gd`, and `ROADMAP.md`.
+- Inspect `scripts/main.gd`, `scripts/domain/city.gd`, `scripts/domain/household.gd`, `scripts/domain/trade_route.gd`, and `ROADMAP.md`.
 - Draft a short core-loop note covering map generation, city inspection, building placement, time progression, and trade.
 - Do not implement new mechanics.
 
@@ -14,10 +14,10 @@ Turn the placeholder Core Loop roadmap section into a concrete hypothesis based 
 
 - `ROADMAP.md`
 - `docs/`
-- `main.gd`
-- `city.gd`
-- `household.gd`
-- `trade_route.gd`
+- `scripts/main.gd`
+- `scripts/domain/city.gd`
+- `scripts/domain/household.gd`
+- `scripts/domain/trade_route.gd`
 
 ## Risk Level
 

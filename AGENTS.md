@@ -7,7 +7,7 @@ Cloud-backed agents or hosted model calls are not part of the default workflow. 
 ## Godot Assumptions
 
 - Project file: `project.godot`
-- Main scene: `main.tscn`
+- Main scene: `scenes/main.tscn`
 - Godot feature tag: `4.6`
 - Renderer feature: Forward Plus
 - Physics engine setting: Jolt Physics
@@ -40,11 +40,11 @@ Cloud-backed agents or hosted model calls are not part of the default workflow. 
 
 High-risk systems:
 
-- `main.gd`
-- `main.tscn`
+- `scripts/main.gd`
+- `scenes/main.tscn`
 - `project.godot`
-- `household.gd`
-- `city.gd`
+- `scripts/domain/household.gd`
+- `scripts/domain/city.gd`
 - Calendar/time progression
 - Production/resource formulas
 - Trade behavior

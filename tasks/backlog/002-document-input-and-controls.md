@@ -6,14 +6,14 @@ Create a clear reference for current player inputs, mouse interactions, view swi
 
 ## Scope
 
-- Inspect input handling in `main.gd` and helper classes such as `trade_menu.gd`.
+- Inspect input handling in `scripts/main.gd` and helper classes such as `scripts/ui/trade_menu.gd`.
 - Document existing controls in a new or existing docs file.
 - Do not change input behavior.
 
 ## Files Likely Involved
 
-- `main.gd`
-- `trade_menu.gd`
+- `scripts/main.gd`
+- `scripts/ui/trade_menu.gd`
 - `docs/`
 
 ## Risk Level

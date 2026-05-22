@@ -8,8 +8,8 @@ allowed_paths:
   - docs/
 blocked_paths:
   - project.godot
-  - main.gd
-  - main.tscn
+  - scripts/main.gd
+  - scenes/main.tscn
   - scripts/
   - scenes/
 max_files_changed: 2

@@ -2,17 +2,17 @@
 
 ## Goal
 
-Find safe candidates for future modular extraction from `main.gd` without performing the extraction yet.
+Find safe candidates for future modular extraction from `scripts/main.gd` without performing the extraction yet.
 
 ## Scope
 
-- Inspect function groups in `main.gd`.
+- Inspect function groups in `scripts/main.gd`.
 - Propose small, additive extraction candidates such as input handling, drawing helpers, inspector panels, or trade UI coordination.
 - Do not edit gameplay code.
 
 ## Files Likely Involved
 
-- `main.gd`
+- `scripts/main.gd`
 - `ARCHITECTURE.md`
 - `docs/`
 

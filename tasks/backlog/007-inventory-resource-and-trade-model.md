@@ -6,19 +6,19 @@ Document the current resource, household, labor capacity, production, maintenanc
 
 ## Scope
 
-- Inspect `household.gd`, `city.gd`, `building.gd`, `building_placement.gd`, `trade_route.gd`, `trade_menu.gd`, and related resource/production display code.
+- Inspect `scripts/domain/household.gd`, `scripts/domain/city.gd`, `scripts/domain/building.gd`, `scripts/ui/building_placement.gd`, `scripts/domain/trade_route.gd`, `scripts/ui/trade_menu.gd`, and related resource/production display code.
 - Compare observed behavior against `docs/household_simulation_philosophy.md` and `docs/PROJECT_OWNER_QUESTIONS.md`.
 - Create a concise resource/household/labor/trade model note under `docs/`.
 - Do not change resource values, household labor semantics, production formulas, consumption formulas, maintenance behavior, or trade behavior.
 
 ## Files Likely Involved
 
-- `household.gd`
-- `city.gd`
-- `building.gd`
-- `building_placement.gd`
-- `trade_route.gd`
-- `trade_menu.gd`
+- `scripts/domain/household.gd`
+- `scripts/domain/city.gd`
+- `scripts/domain/building.gd`
+- `scripts/ui/building_placement.gd`
+- `scripts/domain/trade_route.gd`
+- `scripts/ui/trade_menu.gd`
 - `docs/household_simulation_philosophy.md`
 - `docs/PROJECT_OWNER_QUESTIONS.md`
 - `docs/RESOURCE_HOUSEHOLD_LABOR_TRADE_MODEL.md`

@@ -14,7 +14,7 @@ Update `ARCHITECTURE.md` so it stays accurate as the project evolves.
 
 - `ARCHITECTURE.md`
 - `project.godot`
-- `main.tscn`
+- `scenes/main.tscn`
 - `*.gd`
 - `docs/`
 - `scripts/`

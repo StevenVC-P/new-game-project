@@ -2,6 +2,8 @@
 
 This is a read-only audit. No Godot game files were moved as part of this note.
 
+Status: superseded by `docs/FILE_ORGANIZATION_MIGRATION_PLAN.md` after the file organization cleanup. The inventory below describes the pre-migration root-level layout and remains useful as historical context for why the move batches were chosen.
+
 ## Current Structure
 
 The project currently keeps most game source at the repository root:

@@ -45,5 +45,5 @@ This roadmap is intentionally lightweight. Replace placeholders with scoped task
 
 ## Technical Debt
 
-- `main.gd` should not be modularized casually. Delay broad modularization until the core loop is clarified.
+- `scripts/main.gd` should not be modularized casually. Delay broad modularization until the core loop is clarified.
 - TODO: Track validation, test scenes, and tooling gaps.

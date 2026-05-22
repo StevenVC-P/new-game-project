@@ -5,17 +5,17 @@ This is a starting inventory for safe agent-assisted development. It describes w
 ## Project Shape
 
 - `project.godot`: Godot project configuration.
-- `main.tscn`: Main scene configured by `project.godot`.
-- `main.gd`: Main `Node2D` script. It owns the main runtime loop, drawing, input handling, UI coordination, map display, and simulation orchestration.
+- `scenes/main.tscn`: Main scene configured by `project.godot`.
+- `scripts/main.gd`: Main `Node2D` script. It owns the main runtime loop, drawing, input handling, UI coordination, map display, and simulation orchestration.
 - `docs/`: Design and workflow documentation.
-- `scripts/`: Local validation helpers.
+- `scripts/`: Game scripts plus local validation/agent runner helpers.
 - `tasks/`: Future task specifications for bounded agent work.
 
 ## Godot Configuration
 
 - Config version: `5`
 - Project name: `New Game Project`
-- Main scene: `res://main.tscn`
+- Main scene: `res://scenes/main.tscn`
 - Feature tag: `4.6`
 - Rendering: Forward Plus with Windows rendering device driver set to `d3d12`
 - Physics: Jolt Physics
@@ -23,27 +23,27 @@ This is a starting inventory for safe agent-assisted development. It describes w
 
 ## Major Scenes
 
-- `main.tscn`: Entry scene. It attaches `main.gd` to a `Node2D` root.
+- `scenes/main.tscn`: Entry scene. It attaches `scripts/main.gd` to a `Node2D` root.
 
 ## Major Scripts
 
-- `main.gd`: Top-level scene behavior, rendering, input, simulation update, and UI coordination.
-- `city.gd`: City simulation model and settlement-level state.
-- `household.gd`: Household simulation model.
-- `building.gd`: Building data/model.
-- `building_placement.gd`: Building placement logic.
+- `scripts/main.gd`: Top-level scene behavior, rendering, input, simulation update, and UI coordination.
+- `scripts/domain/city.gd`: City simulation model and settlement-level state.
+- `scripts/domain/household.gd`: Household simulation model.
+- `scripts/domain/building.gd`: Building data/model.
+- `scripts/ui/building_placement.gd`: Building placement logic.
 - `scripts/visuals/building_visuals.gd`: Building rendering helpers.
-- `city_building_overlay.gd`: Overlay logic for city/building display.
-- `calendar.gd`: Calendar model with day, month, season, and year signals.
-- `simulation_clock.gd`: Simulation timing helper.
-- `region_map_generator.gd`: Regional map generation.
-- `local_city_map_generator.gd`: Local city map generation.
-- `settlement_site_profile.gd`: Settlement/site profile data.
+- `scripts/ui/city_building_overlay.gd`: Overlay logic for city/building display.
+- `scripts/simulation/calendar.gd`: Calendar model with day, month, season, and year signals.
+- `scripts/simulation/simulation_clock.gd`: Simulation timing helper.
+- `scripts/world/region_map_generator.gd`: Regional map generation.
+- `scripts/world/local_city_map_generator.gd`: Local city map generation.
+- `scripts/domain/settlement_site_profile.gd`: Settlement/site profile data.
 - `scripts/visuals/terrain_visuals.gd`: Terrain rendering helpers.
 - `scripts/visuals/map_element_visuals.gd`: Map element rendering helpers.
 - `scripts/visuals/visual_style.gd`: Shared visual style values/helpers.
-- `trade_menu.gd`: Trade menu UI/model helper.
-- `trade_route.gd`: Trade route data/model.
+- `scripts/ui/trade_menu.gd`: Trade menu UI/model helper.
+- `scripts/domain/trade_route.gd`: Trade route data/model.
 
 ## Known Systems
 
@@ -58,5 +58,5 @@ This is a starting inventory for safe agent-assisted development. It describes w
 
 - There are no autoloads at the time of this inventory.
 - Most supporting scripts are `RefCounted` classes with `class_name`.
-- `main.gd` is large and central; prefer extracting new behavior into additive helper scripts instead of expanding it when practical.
+- `scripts/main.gd` is large and central; prefer extracting new behavior into additive helper scripts instead of expanding it when practical.
 - Do not rename scenes, nodes, scripts, or folders without an explicit task.

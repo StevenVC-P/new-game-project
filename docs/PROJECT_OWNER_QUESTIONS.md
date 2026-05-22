@@ -60,11 +60,11 @@ Regions should matter after the city/household loop is stable. Higher-level syst
 
 High-risk systems:
 
-- `main.gd`
-- `main.tscn`
+- `scripts/main.gd`
+- `scenes/main.tscn`
 - `project.godot`
-- `household.gd`
-- `city.gd`
+- `scripts/domain/household.gd`
+- `scripts/domain/city.gd`
 - Calendar/time progression
 - Production/resource formulas
 - Trade behavior
