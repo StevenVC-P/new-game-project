@@ -6,3 +6,8 @@
 # Local Godot/editor machine state
 .mono/
 *.tmp
+
+# Local agent runner artifacts
+docs/agent-runs/*
+!docs/agent-runs/README.md
+docs/AGENT_JSON_PROOF_OF_WORK.md

@@ -82,6 +82,12 @@ If the dry run is clean, restore or commit as appropriate, then run without `-No
 
 The runner starts from `develop`, creates the branch named in the task file, writes artifacts under `docs/agent-runs/<timestamp>/`, validates, and commits only after validation passes.
 
+## Local Artifacts
+
+The runner infrastructure is currently committed as a project-local v0 so it can be tested against this Godot project. Timestamped run artifacts under `docs/agent-runs/` are local-only and ignored by Git, except for `docs/agent-runs/README.md`.
+
+Agent run logs, raw model outputs, sanitized edit files, proof outputs, and reports should not be committed unless explicitly requested. After several clean proof runs, the runner can be extracted into a separate reusable runner project.
+
 ## Safe Defaults
 
 For this machine, use:
