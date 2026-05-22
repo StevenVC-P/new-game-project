@@ -90,6 +90,12 @@ Safe when scoped:
 
 Real implementation is allowed when explicitly assigned. The local agent may make code, scene, UI, test, and documentation changes on feature branches.
 
+The local agent may edit scripts, scenes, UI, documentation, tests, resources, and project wiring as needed to complete the assigned goal, as long as the work stays on a named feature branch and does not merge to `main` without human review.
+
+The project has backup points and version-control checkpoints. The agent should use those checkpoints to work productively rather than stopping every time a change touches an important file.
+
+The agent should avoid unnecessary rewrites, renames, deletions, or broad refactors unless they are clearly useful for the assigned goal. If a refactor is needed, it should be done in a checkpointed way.
+
 Long-running sessions are acceptable if the task is bounded and checkpointed. The agent must never merge to `main` or work directly on `main`.
 
 Every meaningful version should be committed so the owner can review, revert, compare, or redirect.

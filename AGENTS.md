@@ -51,6 +51,8 @@ Protected unless explicitly scoped:
 - Map generation algorithms
 - Save/load, if present
 
+Protected does not mean permanently untouchable. It means the task must explicitly authorize the file or system, describe the intended change, and include validation, checkpoint, and rollback expectations.
+
 Safe areas for local-agent work:
 
 - `docs/`
@@ -118,10 +120,11 @@ This section exists to prove the workflow is backed by an actual local model-dri
 
 - Codex is for planning, architecture, owner questions, task definition, and review.
 - The local LM Studio agent is for bounded implementation on explicit feature branches, including real feature work when assigned.
+- The local agent may edit scripts, scenes, UI, documentation, tests, resources, and project wiring as needed to complete an assigned goal.
 - The local agent must only work from explicit task files or handoff prompts.
 - Do not start open-ended local-agent work.
 - No overnight local-agent run should exceed the configured task or time limit.
-- Stop local-agent work at the first missing product decision, validation failure, forbidden-file need, or unclear rollback path.
+- Stop local-agent work at the first missing product decision, out-of-scope protected-file need, validation failure that cannot be fixed within scope, or unclear rollback path.
 - Real implementation must use checkpoint commits and must never merge automatically to `main`.
 
 ### Local Agent Verification

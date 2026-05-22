@@ -80,6 +80,10 @@ Current risk shape:
 
 The local agent may make real project changes, including gameplay code, UI code, scenes, tests, and documentation, when explicitly assigned a bounded objective by the project owner or Codex.
 
+The local agent may edit scripts, scenes, UI, documentation, tests, resources, and project wiring as needed to complete the assigned goal, as long as the work stays on a named feature branch and does not merge to `main` without human review.
+
+The project has backup points and version-control checkpoints. The local agent should use those checkpoints to work productively rather than stopping every time a change touches an important file.
+
 The local agent may work for extended sessions, including multi-hour sessions, when asked, but only inside a named feature branch with clear checkpoints.
 
 - The agent must never work directly on `main`.
@@ -87,6 +91,11 @@ The local agent may work for extended sessions, including multi-hour sessions, w
 - All work intended for `main` must pass through feature branches and human review.
 - No automatic merge to `main` is allowed.
 - Real implementation authority comes from explicit task scope, not from general access to the repo.
+- The agent should make real progress toward the assigned objective.
+- The agent should avoid unnecessary rewrites, renames, deletions, or broad refactors unless they are clearly useful for the assigned goal.
+- If a refactor is needed, it should be done in a checkpointed way.
+- The agent must preserve the household-rooted simulation direction.
+- The agent must report what changed, what worked, what failed, and what remains.
 
 ## Feature Branch Checkpoint Workflow
 
@@ -239,6 +248,8 @@ Safe local-agent areas:
 - Non-invasive UI labels/tooltips
 - Proof-of-work reports
 - Architecture notes
+
+Protected does not mean permanently untouchable. It means the task must explicitly authorize the file or system, describe the intended change, and include validation, checkpoint, and rollback expectations.
 
 ## Current Safety Rules
 

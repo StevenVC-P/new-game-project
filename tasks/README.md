@@ -12,9 +12,13 @@ Describe the outcome in one or two sentences.
 
 List what is included and what is intentionally out of scope.
 
+For implementation tasks, name the allowed systems explicitly. A local agent may edit scripts, scenes, UI, documentation, tests, resources, and project wiring as needed to complete the assigned goal, but only inside the task scope.
+
 ## Files Likely Involved
 
 Name expected files or folders. Use this as guidance, not permission for broad rewrites.
+
+If important or protected files are allowed, list them directly and explain why they are in scope.
 
 ## Acceptance Criteria
 
@@ -58,3 +62,5 @@ Failed experiments may be documented, but should not be committed as normal chec
 ## Notes
 
 Document assumptions, risks, or follow-up tasks.
+
+Agents should report what changed, what worked, what failed, and what remains. Avoid unnecessary rewrites, renames, deletions, or broad refactors unless clearly useful for the assigned goal.
