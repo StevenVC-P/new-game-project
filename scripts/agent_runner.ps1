@@ -743,6 +743,30 @@ Write-TextFile $RawPlanPath $Plan
 Write-TextFile $PlanPath $Plan
 
 $PatchSystemPrompt = "You produce unified git diffs only. No Markdown, no code fences, no explanations, no prose."
+$UnifiedDiffInstructions = @'
+Unified diff requirements:
+- Use real repo-relative paths.
+- Use `diff --git a/path b/path` headers.
+- Use `--- a/path` and `+++ b/path` for existing-file edits.
+- For a new file, include `diff --git a/path b/path`, `new file mode 100644`, `index 0000000..<hash-or-0000000>`, `--- /dev/null`, `+++ b/path`, and a valid `@@` hunk.
+- Keep `a/` and `b/` prefixes consistent when the unified diff format requires them.
+- Hunk headers must match the actual lines in the hunk.
+- Hunk headers use `@@ -old_start,old_count +new_start,new_count @@`.
+- For a one-line new file, use `@@ -0,0 +1,1 @@`, not `@@ -0,0 +1 @@`.
+- Every added content line in a hunk must start with `+`.
+- Every removed content line in a hunk must start with `-`.
+- Context lines must start with one space.
+- Do not include placeholder metadata, invented absolute paths, or explanatory text.
+
+Minimal valid new-file example:
+diff --git a/docs/example.md b/docs/example.md
+new file mode 100644
+index 0000000..0000000
+--- /dev/null
++++ b/docs/example.md
+@@ -0,0 +1,1 @@
++Example line.
+'@
 $PatchPromptBase = @"
 Create the implementation patch for the task below.
 
@@ -752,6 +776,8 @@ No code fences.
 No explanations.
 No tool-call text.
 No prose before or after the diff.
+
+$UnifiedDiffInstructions
 
 $ConstraintText
 
@@ -782,6 +808,8 @@ $CommitHash = ""
 $ValidationExitCode = -1
 $ValidationSummary = "Validation did not run."
 $LastPatchInfo = $null
+$LastRejectedPatch = ""
+$LastFailure = ""
 $AppliedAnyPatch = $false
 
 for ($Attempt = 1; $Attempt -le $MaxAttempts; $Attempt++) {
@@ -803,7 +831,15 @@ No explanations.
 No tool-call text.
 No prose before or after the diff.
 
+$UnifiedDiffInstructions
+
 $ConstraintText
+
+Last failure:
+$LastFailure
+
+Rejected sanitized patch:
+$LastRejectedPatch
 
 Original task:
 $($TaskData.Content)
@@ -824,6 +860,8 @@ $ValidationText
 	$SanitizedPatch = Convert-ModelOutputToPatch $RawPatch
 	if ($SanitizedPatch.Errors.Count -gt 0) {
 		Write-TextFile $PatchPath $RawPatch.Trim()
+		$LastRejectedPatch = $RawPatch.Trim()
+		$LastFailure = "Sanitization failed: $($SanitizedPatch.Errors -join '; ')"
 		$AttemptLines += "- Attempt ${Attempt}: rejected during sanitization: $($SanitizedPatch.Errors -join '; ')"
 		continue
 	}
@@ -835,6 +873,8 @@ $ValidationText
 
 	if ($PatchInfo.Errors.Count -gt 0) {
 		$SanitizationStatus = if ($SanitizedPatch.Sanitized) { "single fenced diff extracted" } else { "raw unified diff" }
+		$LastRejectedPatch = $PatchText
+		$LastFailure = "Patch safety checks failed after sanitization '$SanitizationStatus': $($PatchInfo.Errors -join '; ')"
 		$AttemptLines += "- Attempt ${Attempt}: rejected before apply after sanitization '$SanitizationStatus': $($PatchInfo.Errors -join '; ')"
 		continue
 	}
@@ -842,6 +882,8 @@ $ValidationText
 	$Check = Invoke-Git @("apply", "--check", "--whitespace=error", $PatchPath) -AllowFailure
 	if ($Check.ExitCode -ne 0) {
 		$SanitizationStatus = if ($SanitizedPatch.Sanitized) { "single fenced diff extracted" } else { "raw unified diff" }
+		$LastRejectedPatch = $PatchText
+		$LastFailure = "git apply --check --whitespace=error failed after sanitization '$SanitizationStatus': $($Check.Output)"
 		$AttemptLines += "- Attempt ${Attempt}: git apply --check failed after sanitization '$SanitizationStatus': $($Check.Output)"
 		continue
 	}
@@ -865,6 +907,8 @@ $ValidationText
 		$AttemptLines += "- Attempt ${Attempt}: git diff --check failed: $($DiffCheck.Output)"
 		$ValidationExitCode = $DiffCheck.ExitCode
 		$ValidationSummary = "git diff --check failed."
+		$LastRejectedPatch = (Invoke-Git @("diff", "--") ).Output
+		$LastFailure = "git diff --check failed after applying patch: $($DiffCheck.Output)"
 		continue
 	}
 
@@ -872,6 +916,10 @@ $ValidationText
 	$ValidationExitCode = $Validation.ExitCode
 	$ValidationSummary = if ($Validation.ExitCode -eq 0) { "Validation passed." } else { "Validation failed. See validation.log." }
 	$AttemptLines += "- Attempt ${Attempt}: validation exit code $ValidationExitCode."
+	if ($Validation.ExitCode -ne 0) {
+		$LastRejectedPatch = (Invoke-Git @("diff", "--") ).Output
+		$LastFailure = "Validation failed with exit code $ValidationExitCode. See validation log below."
+	}
 
 	if ($Validation.ExitCode -eq 0) {
 		$FinalStatus = "passed"

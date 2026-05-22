@@ -110,6 +110,7 @@ Model missing:
 Invalid patch:
 
 - v0 rejects Markdown, code fences, absolute paths, `../` traversal, blocked paths, binary patches, disallowed deletes, disallowed renames, and budget overruns.
+- If `git apply --check` reports a corrupt patch, inspect the saved sanitized `patch-attempt-*.diff`. Common causes are malformed hunk headers such as `@@ -0,0 +1 @@`, hunk line counts that do not match the actual added/removed/context lines, or inconsistent `a/` and `b/` paths. Repair attempts include the rejected sanitized patch and the exact apply-check error.
 
 Validation failure:
 
