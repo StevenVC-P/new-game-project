@@ -3,6 +3,7 @@ id: agent-runner-proof-task
 title: Add local agent proof report
 base_branch: develop
 branch_name: agent/proof-runner-v0
+edit_mode: json_file_ops
 allowed_paths:
   - docs/
 blocked_paths:
@@ -15,6 +16,7 @@ max_files_changed: 2
 max_lines_added: 100
 max_lines_deleted: 50
 allow_new_files: true
+allow_replacements: false
 allow_deletes: false
 allow_renames: false
 validation_command: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_project.ps1
@@ -25,7 +27,7 @@ commit_message: "test: verify local agent runner"
 
 ## Goal
 
-Create or update a harmless documentation file proving the local LLM runner can make a documentation-only change through patch application, validation, and reporting.
+Create one harmless documentation file proving the local LLM runner can make a documentation-only change through structured JSON file operations, validation, and reporting.
 
 ## Scope
 
@@ -35,8 +37,8 @@ Create or update a harmless documentation file proving the local LLM runner can 
 
 ## Acceptance Criteria
 
-- The patch changes no more than two files.
+- The JSON edit manifest creates no more than two files.
 - All changed files are under `docs/`.
-- No files are deleted or renamed.
+- No files are replaced, deleted, or renamed.
 - Validation is attempted with the configured validation command.
 - The final report records changed files, validation status, and commit hash if committed.

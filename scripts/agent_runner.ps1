@@ -357,6 +357,223 @@ function Convert-ModelOutputToPatch {
 	}
 }
 
+function Convert-ModelOutputToJson {
+	param([string]$RawOutput)
+
+	$Errors = @()
+	$Trimmed = $RawOutput.Trim()
+	$Sanitized = $false
+	$JsonText = $Trimmed
+
+	$FenceMatches = [regex]::Matches($RawOutput, '```')
+	if ($FenceMatches.Count -eq 0) {
+		return [pscustomobject]@{
+			JsonText = $JsonText
+			Sanitized = $false
+			Errors = @()
+		}
+	}
+
+	if ($FenceMatches.Count -ne 2) {
+		$Errors += "JSON contains multiple or incomplete Markdown code fences."
+		return [pscustomobject]@{
+			JsonText = $JsonText
+			Sanitized = $false
+			Errors = $Errors
+		}
+	}
+
+	$FencePattern = '(?s)^\s*```(?<language>[A-Za-z0-9_-]*)[ \t]*\r?\n(?<body>.*?)\r?\n```\s*$'
+	$Match = [regex]::Match($RawOutput, $FencePattern)
+	if (-not $Match.Success) {
+		$Errors += "JSON contains Markdown fences with text outside the single fenced block."
+		return [pscustomobject]@{
+			JsonText = $JsonText
+			Sanitized = $false
+			Errors = $Errors
+		}
+	}
+
+	$Language = $Match.Groups["language"].Value
+	if ($Language -and $Language.ToLowerInvariant() -ne "json") {
+		$Errors += "JSON fenced block language '$Language' is not allowed."
+		return [pscustomobject]@{
+			JsonText = $JsonText
+			Sanitized = $false
+			Errors = $Errors
+		}
+	}
+
+	$JsonText = $Match.Groups["body"].Value.Trim()
+	return [pscustomobject]@{
+		JsonText = $JsonText
+		Sanitized = $true
+		Errors = @()
+	}
+}
+
+function Test-BinaryLookingContent {
+	param([string]$Content)
+
+	if ($Content -match "`0") { return $true }
+	foreach ($Char in $Content.ToCharArray()) {
+		$Code = [int][char]$Char
+		if ($Code -lt 32 -and $Code -notin @(9, 10, 13)) {
+			return $true
+		}
+	}
+	return $false
+}
+
+function Test-RepoPathAllowed {
+	param(
+		[string]$Path,
+		[string[]]$AllowedPaths,
+		[string[]]$BlockedPaths,
+		[string[]]$GlobalBlockedPaths,
+		[string[]]$BlockedGlobs
+	)
+
+	$Errors = @()
+	$File = Normalize-RepoPath $Path
+	if ([System.IO.Path]::IsPathRooted($File)) {
+		$Errors += "Path is absolute: $File"
+	}
+	if ($File -match '(^|/)\.\.(/|$)') {
+		$Errors += "Path uses traversal: $File"
+	}
+	foreach ($Blocked in @($GlobalBlockedPaths + $BlockedPaths)) {
+		if (-not [string]::IsNullOrWhiteSpace($Blocked) -and (Test-PathUnderPrefix $File $Blocked)) {
+			$Errors += "Path is blocked: $File"
+		}
+	}
+	foreach ($Glob in $BlockedGlobs) {
+		if (Test-GlobMatch $File $Glob) {
+			$Errors += "Path matches blocked glob ${Glob}: $File"
+		}
+	}
+	if ($AllowedPaths.Count -gt 0) {
+		$Allowed = $false
+		foreach ($AllowedPath in $AllowedPaths) {
+			if (Test-PathUnderPrefix $File $AllowedPath) {
+				$Allowed = $true
+				break
+			}
+		}
+		if (-not $Allowed) {
+			$Errors += "Path is outside allowed_paths: $File"
+		}
+	}
+	return [pscustomobject]@{
+		Path = $File
+		Errors = @($Errors)
+	}
+}
+
+function Read-JsonEditManifest {
+	param([string]$JsonText)
+
+	try {
+		return $JsonText | ConvertFrom-Json -Depth 20
+	} catch {
+		throw "Invalid JSON: $($_.Exception.Message)"
+	}
+}
+
+function Test-JsonEditManifest {
+	param(
+		[object]$Manifest,
+		[string[]]$AllowedPaths,
+		[string[]]$BlockedPaths,
+		[string[]]$GlobalBlockedPaths,
+		[string[]]$BlockedGlobs,
+		[bool]$AllowNewFiles,
+		[bool]$AllowReplacements,
+		[int]$MaxFilesChanged
+	)
+
+	$Errors = @()
+	$Files = [ordered]@{}
+	$AllowedRootFields = @("edits")
+	$RootFields = @($Manifest.PSObject.Properties | ForEach-Object { $_.Name })
+	foreach ($Field in $RootFields) {
+		if ($AllowedRootFields -notcontains $Field) {
+			$Errors += "Unknown root field: $Field"
+		}
+	}
+	if (-not $Manifest.PSObject.Properties["edits"]) {
+		$Errors += "Missing required root field: edits"
+	}
+	if (-not ($Manifest.edits -is [array])) {
+		$Errors += "Field 'edits' must be an array."
+	}
+
+	$EditIndex = 0
+	foreach ($Edit in @($Manifest.edits)) {
+		$EditIndex += 1
+		$AllowedEditFields = @("action", "path", "content")
+		foreach ($Field in @($Edit.PSObject.Properties | ForEach-Object { $_.Name })) {
+			if ($AllowedEditFields -notcontains $Field) {
+				$Errors += "Edit ${EditIndex} has unknown field: $Field"
+			}
+		}
+		$Action = [string]$Edit.action
+		$Path = [string]$Edit.path
+		$Content = $Edit.content
+		if (@("create", "replace_entire_file") -notcontains $Action) {
+			$Errors += "Edit ${EditIndex} has unsupported action: $Action"
+		}
+		if ([string]::IsNullOrWhiteSpace($Path)) {
+			$Errors += "Edit ${EditIndex} has missing path."
+			continue
+		}
+		if ($null -eq $Content -or -not ($Content -is [string])) {
+			$Errors += "Edit ${EditIndex} content must be a string."
+		} elseif (Test-BinaryLookingContent $Content) {
+			$Errors += "Edit ${EditIndex} content looks binary."
+		}
+		$PathCheck = Test-RepoPathAllowed -Path $Path -AllowedPaths $AllowedPaths -BlockedPaths $BlockedPaths -GlobalBlockedPaths $GlobalBlockedPaths -BlockedGlobs $BlockedGlobs
+		$Errors += $PathCheck.Errors
+		$RepoPath = $PathCheck.Path
+		$Files[$RepoPath] = $true
+		$FullPath = Join-Path $RepoRoot $RepoPath
+		$Exists = Test-Path -LiteralPath $FullPath
+		if ($Action -eq "create") {
+			if (-not $AllowNewFiles) {
+				$Errors += "Edit ${EditIndex} creates a file, but allow_new_files is false."
+			}
+			if ($Exists) {
+				$Errors += "Edit ${EditIndex} create target already exists: $RepoPath"
+			}
+		}
+		if ($Action -eq "replace_entire_file") {
+			if (-not $AllowReplacements) {
+				$Errors += "Edit ${EditIndex} replaces a file, but allow_replacements is false."
+			}
+			if (-not $Exists) {
+				$Errors += "Edit ${EditIndex} replace target does not exist: $RepoPath"
+			}
+		}
+	}
+	if ($Files.Keys.Count -gt $MaxFilesChanged) {
+		$Errors += "Edit manifest changes $($Files.Keys.Count) files; limit is $MaxFilesChanged."
+	}
+	return [pscustomobject]@{
+		Errors = @($Errors | Sort-Object -Unique)
+		Files = @($Files.Keys)
+	}
+}
+
+function Apply-JsonEditManifest {
+	param([object]$Manifest)
+
+	foreach ($Edit in @($Manifest.edits)) {
+		$RepoPath = Normalize-RepoPath ([string]$Edit.path)
+		$FullPath = Join-Path $RepoRoot $RepoPath
+		Write-TextFile $FullPath ([string]$Edit.content)
+	}
+}
+
 function Get-PatchDiagnostic {
 	param([string]$PatchText)
 
@@ -523,6 +740,7 @@ function Restore-RunnerChanges {
 
 	foreach ($Path in ($Paths | Sort-Object -Unique)) {
 		$ExistsInHead = (Invoke-Git @("cat-file", "-e", "HEAD:$Path") -AllowFailure).ExitCode -eq 0
+		Invoke-Git @("restore", "--staged", "--", $Path) -AllowFailure | Out-Null
 		if ($ExistsInHead) {
 			Invoke-Git @("restore", "--", $Path) | Out-Null
 		} elseif (Test-Path -LiteralPath $Path) {
@@ -663,6 +881,11 @@ $MaxLinesDeleted = [int](Get-MetaValue $Meta "max_lines_deleted" $MaxLinesDelete
 $AllowNewFiles = [bool](Get-MetaValue $Meta "allow_new_files" $false)
 $AllowDeletes = [bool](Get-MetaValue $Meta "allow_deletes" $false)
 $AllowRenames = [bool](Get-MetaValue $Meta "allow_renames" $false)
+$AllowReplacements = [bool](Get-MetaValue $Meta "allow_replacements" $false)
+$EditMode = Get-MetaValue $Meta "edit_mode" "unified_diff"
+if (@("unified_diff", "json_file_ops") -notcontains $EditMode) {
+	Stop-Run "Unsupported edit_mode '$EditMode'. Supported modes: unified_diff, json_file_ops."
+}
 $CommitMessage = Get-MetaValue $Meta "commit_message" "chore: apply local agent patch"
 $TaskTitle = Get-MetaValue $Meta "title" (Split-Path -Leaf $TaskPath)
 $AllowedPaths = @(Get-MetaValue $Meta "allowed_paths" @())
@@ -732,6 +955,8 @@ Runner constraints:
 - Allow new files: $AllowNewFiles
 - Allow deletes: $AllowDeletes
 - Allow renames: $AllowRenames
+- Allow replacements: $AllowReplacements
+- Edit mode: $EditMode
 - Validation command: $ValidationCommand
 "@
 
@@ -781,7 +1006,49 @@ index 0000000..0000000
 @@ -0,0 +1,1 @@
 +Example line.
 '@
-$PatchPromptBase = @"
+$JsonSystemPrompt = "You produce strict JSON edit manifests only. No Markdown, no code fences unless the entire response is one json fenced block, no explanations, no prose."
+$JsonEditInstructions = @'
+JSON file-operation requirements:
+- Return exactly one JSON object with this shape:
+{
+  "edits": [
+    {
+      "action": "create",
+      "path": "docs/example.md",
+      "content": "file contents here\n"
+    }
+  ]
+}
+- Supported actions are only "create" and "replace_entire_file".
+- Do not include delete, rename, shell commands, patches, partial edits, comments, or extra fields.
+- Use real repo-relative paths with forward slashes.
+- Do not use absolute paths or ../ traversal.
+- For this task, prefer one create edit under docs/.
+- The runner will write files, generate the Git diff, run validation, and commit if allowed.
+'@
+if ($EditMode -eq "json_file_ops") {
+	$PatchSystemPrompt = $JsonSystemPrompt
+	$PatchPromptBase = @"
+Create the implementation edits for the task below.
+
+Return ONLY strict JSON.
+No Markdown unless the entire response is exactly one fenced json block.
+No explanations.
+No tool-call text.
+No prose before or after the JSON.
+
+$JsonEditInstructions
+
+$ConstraintText
+
+Plan:
+$Plan
+
+Task file:
+$($TaskData.Content)
+"@
+} else {
+	$PatchPromptBase = @"
 Create the implementation patch for the task below.
 
 Return ONLY a unified diff.
@@ -801,6 +1068,7 @@ $Plan
 Task file:
 $($TaskData.Content)
 "@
+}
 
 Write-TextFile $PromptPatchPath $PatchPromptBase
 
@@ -810,11 +1078,17 @@ $SafetyLines = @(
 	"- Confirmed Git repository and repo root.",
 	"- Confirmed LM Studio/OpenAI-compatible endpoint and configured model.",
 	"- Enforced branch ownership.",
+	"- Edit mode: $EditMode.",
 	"- Enforced blocked paths, allowed paths, file budget, and line budgets.",
-	"- Accepted raw unified diffs or exactly one fenced diff/patch block with no surrounding prose.",
-	"- Used git apply --check --whitespace=error before applying patches.",
 	"- Used explicit staging only; never git add .."
 )
+if ($EditMode -eq "json_file_ops") {
+	$SafetyLines += "- JSON file-operation mode uses runner-owned file writes and Git-generated diffs."
+	$SafetyLines += "- Accepted raw JSON or exactly one fenced json block with no surrounding prose."
+} else {
+	$SafetyLines += "- Accepted raw unified diffs or exactly one fenced diff/patch block with no surrounding prose."
+	$SafetyLines += "- Used git apply --check --whitespace=error before applying patches."
+}
 $ApprovedPatchFiles = @()
 $FinalStatus = "failed"
 $StopReason = "attempts exhausted"
@@ -829,13 +1103,48 @@ $AppliedAnyPatch = $false
 for ($Attempt = 1; $Attempt -le $MaxAttempts; $Attempt++) {
 	$RawPatchPath = Join-Path $RunDir ("raw-patch-attempt-{0}.txt" -f $Attempt)
 	$PatchPath = Join-Path $RunDir ("patch-attempt-{0}.diff" -f $Attempt)
+	$JsonPath = Join-Path $RunDir ("edits-attempt-{0}.json" -f $Attempt)
+	$ManifestPath = Join-Path $RunDir ("edit-manifest-attempt-{0}.json" -f $Attempt)
 
 	if ($Attempt -eq 1) {
 		$PatchPrompt = $PatchPromptBase
 	} else {
 		$CurrentDiff = (Invoke-Git @("diff", "--") ).Output
 		$ValidationText = if (Test-Path -LiteralPath $ValidationLogPath) { [System.IO.File]::ReadAllText($ValidationLogPath) } else { "" }
-		$PatchPrompt = @"
+		if ($EditMode -eq "json_file_ops") {
+			$PatchPrompt = @"
+Repair the current failed JSON file-operation edits.
+
+Return ONLY strict JSON.
+No Markdown unless the entire response is exactly one fenced json block.
+No explanations.
+No tool-call text.
+No prose before or after the JSON.
+
+$JsonEditInstructions
+
+$ConstraintText
+
+Last failure:
+$LastFailure
+
+Rejected sanitized JSON or current diff:
+$LastRejectedPatch
+
+Original task:
+$($TaskData.Content)
+
+Original plan:
+$Plan
+
+Current diff:
+$CurrentDiff
+
+Validation log:
+$ValidationText
+"@
+		} else {
+			$PatchPrompt = @"
 Repair the current failed patch.
 
 Return ONLY a unified diff.
@@ -867,10 +1176,90 @@ $CurrentDiff
 Validation log:
 $ValidationText
 "@
+		}
 	}
 
 	$RawPatch = Invoke-LocalChat -Endpoint $Endpoint -Model $Model -SystemPrompt $PatchSystemPrompt -UserPrompt $PatchPrompt -MaxTokens 4096
 	Write-TextFile $RawPatchPath $RawPatch
+
+	if ($EditMode -eq "json_file_ops") {
+		$SanitizedJson = Convert-ModelOutputToJson $RawPatch
+		if ($SanitizedJson.Errors.Count -gt 0) {
+			Write-TextFile $JsonPath $RawPatch.Trim()
+			$LastRejectedPatch = $RawPatch.Trim()
+			$LastFailure = "JSON sanitization failed: $($SanitizedJson.Errors -join '; ')"
+			$AttemptLines += "- Attempt ${Attempt}: rejected during JSON sanitization: $($SanitizedJson.Errors -join '; ')"
+			continue
+		}
+		Write-TextFile $JsonPath $SanitizedJson.JsonText
+
+		try {
+			$Manifest = Read-JsonEditManifest $SanitizedJson.JsonText
+		} catch {
+			$LastRejectedPatch = $SanitizedJson.JsonText
+			$LastFailure = $_.Exception.Message
+			$AttemptLines += "- Attempt ${Attempt}: rejected invalid JSON: $LastFailure"
+			continue
+		}
+		Write-TextFile $ManifestPath ($Manifest | ConvertTo-Json -Depth 20)
+
+		$ManifestInfo = Test-JsonEditManifest -Manifest $Manifest -AllowedPaths $AllowedPaths -BlockedPaths $TaskBlockedPaths -GlobalBlockedPaths $GlobalBlockedPaths -BlockedGlobs $BlockedGlobs -AllowNewFiles $AllowNewFiles -AllowReplacements $AllowReplacements -MaxFilesChanged $MaxFilesChanged
+		if ($ManifestInfo.Errors.Count -gt 0) {
+			$JsonSanitizationStatus = if ($SanitizedJson.Sanitized) { "single fenced json extracted" } else { "raw JSON" }
+			$LastRejectedPatch = $SanitizedJson.JsonText
+			$LastFailure = "JSON edit manifest checks failed after sanitization '$JsonSanitizationStatus': $($ManifestInfo.Errors -join '; ')"
+			$AttemptLines += "- Attempt ${Attempt}: rejected JSON edit manifest after sanitization '$JsonSanitizationStatus': $($ManifestInfo.Errors -join '; ')"
+			continue
+		}
+
+		Apply-JsonEditManifest $Manifest
+		$AppliedAnyPatch = $true
+		$ApprovedPatchFiles = @($ApprovedPatchFiles + $ManifestInfo.Files) | Sort-Object -Unique
+		foreach ($ManifestPathItem in $ManifestInfo.Files) {
+			$ExistsInHead = (Invoke-Git @("cat-file", "-e", "HEAD:$ManifestPathItem") -AllowFailure).ExitCode -eq 0
+			if (-not $ExistsInHead) {
+				Invoke-Git @("add", "-N", "--", $ManifestPathItem) | Out-Null
+			}
+		}
+		$JsonSanitizationStatus = if ($SanitizedJson.Sanitized) { "single fenced json extracted" } else { "raw JSON" }
+		$AttemptLines += "- Attempt ${Attempt}: JSON edits applied to $($ManifestInfo.Files.Count) file(s); sanitization: $JsonSanitizationStatus."
+
+		$Budget = Get-CurrentDiffBudget -IgnorePrefixes @($ArtifactRoot)
+		if ($Budget.Files.Count -gt $MaxFilesChanged -or $Budget.Added -gt $MaxLinesAdded -or $Budget.Deleted -gt $MaxLinesDeleted) {
+			$AttemptLines += "- Attempt ${Attempt}: cumulative diff budget exceeded ($($Budget.Files.Count) files, +$($Budget.Added), -$($Budget.Deleted))."
+			$ValidationExitCode = 1
+			$ValidationSummary = "Cumulative diff budget exceeded."
+			$LastRejectedPatch = (Invoke-Git @("diff", "--") ).Output
+			$LastFailure = "Cumulative diff budget exceeded."
+			continue
+		}
+
+		$DiffCheck = Invoke-Git @("diff", "--check") -AllowFailure
+		if ($DiffCheck.ExitCode -ne 0) {
+			$AttemptLines += "- Attempt ${Attempt}: git diff --check failed: $($DiffCheck.Output)"
+			$ValidationExitCode = $DiffCheck.ExitCode
+			$ValidationSummary = "git diff --check failed."
+			$LastRejectedPatch = (Invoke-Git @("diff", "--") ).Output
+			$LastFailure = "git diff --check failed after applying JSON edits: $($DiffCheck.Output)"
+			continue
+		}
+
+		$Validation = Invoke-ValidationCommand -Command $ValidationCommand -LogPath $ValidationLogPath
+		$ValidationExitCode = $Validation.ExitCode
+		$ValidationSummary = if ($Validation.ExitCode -eq 0) { "Validation passed." } else { "Validation failed. See validation.log." }
+		$AttemptLines += "- Attempt ${Attempt}: validation exit code $ValidationExitCode."
+		if ($Validation.ExitCode -ne 0) {
+			$LastRejectedPatch = (Invoke-Git @("diff", "--") ).Output
+			$LastFailure = "Validation failed with exit code $ValidationExitCode. See validation log below."
+		}
+		if ($Validation.ExitCode -eq 0) {
+			$FinalStatus = "passed"
+			$StopReason = if ($NoCommit) { "validation passed; NoCommit set" } else { "validation passed and committed" }
+			break
+		}
+		continue
+	}
+
 	$SanitizedPatch = Convert-ModelOutputToPatch $RawPatch
 	if ($SanitizedPatch.Errors.Count -gt 0) {
 		Write-TextFile $PatchPath $RawPatch.Trim()
@@ -959,6 +1348,8 @@ $ArtifactRelPaths = @(
 for ($I = 1; $I -le $MaxAttempts; $I++) {
 	$ArtifactRelPaths += "$RunDirRel/raw-patch-attempt-$I.txt"
 	$ArtifactRelPaths += "$RunDirRel/patch-attempt-$I.diff"
+	$ArtifactRelPaths += "$RunDirRel/edits-attempt-$I.json"
+	$ArtifactRelPaths += "$RunDirRel/edit-manifest-attempt-$I.json"
 }
 $ArtifactRelPaths = @($ArtifactRelPaths | Where-Object { Test-Path -LiteralPath (Join-Path $RepoRoot $_) })
 
@@ -967,13 +1358,15 @@ $RequestedScope = @(
 	"- Task blocked paths: $($TaskBlockedPaths -join ', ')",
 	"- Global blocked paths: $($GlobalBlockedPaths -join ', ')",
 	"- New files allowed: $AllowNewFiles",
+	"- Replacements allowed: $AllowReplacements",
 	"- Deletes allowed: $AllowDeletes",
-	"- Renames allowed: $AllowRenames"
+	"- Renames allowed: $AllowRenames",
+	"- Edit mode: $EditMode"
 )
 $ArtifactLines = @($ArtifactRelPaths | ForEach-Object { "- $_" })
 $ResidualRisks = @(
 	"- Validation is an import pass and does not prove every gameplay path.",
-	"- v0 rejects noisy model output instead of attempting patch extraction.",
+	"- v0 rejects noisy model output instead of attempting broad extraction.",
 	"- A report committed in the same commit cannot contain its own final commit hash; the runner prints the final hash after commit.",
 	"- Task success is bounded by the model context supplied to the prompt."
 )
