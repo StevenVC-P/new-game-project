@@ -301,6 +301,62 @@ function Test-ModelAvailable {
 	return @($Ids) -contains $Model
 }
 
+function Convert-ModelOutputToPatch {
+	param([string]$RawOutput)
+
+	$Errors = @()
+	$Trimmed = $RawOutput.Trim()
+	$Sanitized = $false
+	$PatchText = $Trimmed
+
+	$FenceMatches = [regex]::Matches($RawOutput, '```')
+	if ($FenceMatches.Count -eq 0) {
+		return [pscustomobject]@{
+			PatchText = $PatchText
+			Sanitized = $false
+			Errors = @()
+		}
+	}
+
+	if ($FenceMatches.Count -ne 2) {
+		$Errors += "Patch contains multiple or incomplete Markdown code fences."
+		return [pscustomobject]@{
+			PatchText = $PatchText
+			Sanitized = $false
+			Errors = $Errors
+		}
+	}
+
+	$FencePattern = '(?s)^\s*```(?<language>[A-Za-z0-9_-]*)[ \t]*\r?\n(?<body>.*?)\r?\n```\s*$'
+	$Match = [regex]::Match($RawOutput, $FencePattern)
+	if (-not $Match.Success) {
+		$Errors += "Patch contains Markdown fences with text outside the single fenced block."
+		return [pscustomobject]@{
+			PatchText = $PatchText
+			Sanitized = $false
+			Errors = $Errors
+		}
+	}
+
+	$Language = $Match.Groups["language"].Value
+	if ($Language -and @("diff", "patch") -notcontains $Language.ToLowerInvariant()) {
+		$Errors += "Patch fenced block language '$Language' is not allowed."
+		return [pscustomobject]@{
+			PatchText = $PatchText
+			Sanitized = $false
+			Errors = $Errors
+		}
+	}
+
+	$PatchText = $Match.Groups["body"].Value.Trim()
+	$Sanitized = $true
+	return [pscustomobject]@{
+		PatchText = $PatchText
+		Sanitized = $Sanitized
+		Errors = @()
+	}
+}
+
 function Get-PatchInfo {
 	param(
 		[string]$PatchText,
@@ -320,9 +376,6 @@ function Get-PatchInfo {
 	$Trimmed = $PatchText.Trim()
 	if ([string]::IsNullOrWhiteSpace($Trimmed)) {
 		$Errors += "Patch is empty."
-	}
-	if ($Trimmed -match '```') {
-		$Errors += "Patch contains Markdown code fences."
 	}
 	if ($Trimmed -notmatch '(?m)^diff --git a/.+ b/.+') {
 		$Errors += "Patch does not contain unified git diff headers."
@@ -718,6 +771,7 @@ $SafetyLines = @(
 	"- Confirmed LM Studio/OpenAI-compatible endpoint and configured model.",
 	"- Enforced branch ownership.",
 	"- Enforced blocked paths, allowed paths, file budget, and line budgets.",
+	"- Accepted raw unified diffs or exactly one fenced diff/patch block with no surrounding prose.",
 	"- Used git apply --check --whitespace=error before applying patches.",
 	"- Used explicit staging only; never git add .."
 )
@@ -767,14 +821,21 @@ $ValidationText
 
 	$RawPatch = Invoke-LocalChat -Endpoint $Endpoint -Model $Model -SystemPrompt $PatchSystemPrompt -UserPrompt $PatchPrompt -MaxTokens 4096
 	Write-TextFile $RawPatchPath $RawPatch
-	$PatchText = $RawPatch.Trim()
+	$SanitizedPatch = Convert-ModelOutputToPatch $RawPatch
+	if ($SanitizedPatch.Errors.Count -gt 0) {
+		Write-TextFile $PatchPath $RawPatch.Trim()
+		$AttemptLines += "- Attempt ${Attempt}: rejected during sanitization: $($SanitizedPatch.Errors -join '; ')"
+		continue
+	}
+	$PatchText = $SanitizedPatch.PatchText
 	Write-TextFile $PatchPath $PatchText
 
 	$PatchInfo = Get-PatchInfo -PatchText $PatchText -AllowedPaths $AllowedPaths -BlockedPaths $TaskBlockedPaths -GlobalBlockedPaths $GlobalBlockedPaths -BlockedGlobs $BlockedGlobs -AllowNewFiles $AllowNewFiles -AllowDeletes $AllowDeletes -AllowRenames $AllowRenames -MaxFilesChanged $MaxFilesChanged -MaxLinesAdded $MaxLinesAdded -MaxLinesDeleted $MaxLinesDeleted
 	$LastPatchInfo = $PatchInfo
 
 	if ($PatchInfo.Errors.Count -gt 0) {
-		$AttemptLines += "- Attempt ${Attempt}: rejected before apply: $($PatchInfo.Errors -join '; ')"
+		$SanitizationStatus = if ($SanitizedPatch.Sanitized) { "single fenced diff extracted" } else { "raw unified diff" }
+		$AttemptLines += "- Attempt ${Attempt}: rejected before apply after sanitization '$SanitizationStatus': $($PatchInfo.Errors -join '; ')"
 		continue
 	}
 
@@ -787,7 +848,8 @@ $ValidationText
 	Invoke-Git @("apply", "--whitespace=error", $PatchPath) | Out-Null
 	$AppliedAnyPatch = $true
 	$ApprovedPatchFiles = @($ApprovedPatchFiles + $PatchInfo.Files) | Sort-Object -Unique
-	$AttemptLines += "- Attempt ${Attempt}: patch applied to $($PatchInfo.Files.Count) file(s)."
+	$SanitizationStatus = if ($SanitizedPatch.Sanitized) { "single fenced diff extracted" } else { "raw unified diff" }
+	$AttemptLines += "- Attempt ${Attempt}: patch applied to $($PatchInfo.Files.Count) file(s); sanitization: $SanitizationStatus."
 
 	$Budget = Get-CurrentDiffBudget -IgnorePrefixes @($ArtifactRoot)
 	if ($Budget.Files.Count -gt $MaxFilesChanged -or $Budget.Added -gt $MaxLinesAdded -or $Budget.Deleted -gt $MaxLinesDeleted) {
