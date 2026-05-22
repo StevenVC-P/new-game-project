@@ -1,164 +1,26 @@
-# Agent Runtime Checklist
+# Local Agent Runtime Checklist
 
-Use this checklist to verify that an agent workflow is actually backed by a model runtime with bounded tool access. Record the command used and the observed result for each step.
+Use this checklist to verify that the coding-agent workflow is backed by a local model runtime with bounded tool access. Record the command used and the observed result for each step.
 
-## Codex CLI
+Cloud-backed agents and hosted model calls are outside the default setup. Use them only when the user explicitly opts in for a specific bounded task.
 
-### Confirm Codex Is Installed
+## Local Agent Wrapper
 
-PowerShell:
+Check for any local agent wrapper the user intentionally installed. Do not install new tools from this checklist unless the user explicitly asks.
 
-```powershell
-Get-Command codex -ErrorAction SilentlyContinue
-```
-
-If `codex` is found:
+Common checks:
 
 ```powershell
-codex --version
+Get-Command aider -ErrorAction SilentlyContinue
+Get-Command interpreter -ErrorAction SilentlyContinue
+Get-Command continue -ErrorAction SilentlyContinue
 ```
 
-Result:
-
-```text
-TODO
-```
-
-### Confirm Authentication
-
-Run the authentication or status command supported by the installed Codex CLI.
-
-Common possibilities to check:
+If a local agent wrapper is found, record its version using that tool's documented command. Examples:
 
 ```powershell
-codex auth status
-codex login
-codex --help
-```
-
-Use `codex --help` if the installed CLI does not support `auth status`, then record the correct command for that version.
-
-Result:
-
-```text
-TODO
-```
-
-### Confirm Codex Can Read This Repo
-
-Ask Codex to inspect repository files without editing them:
-
-```text
-Read README.md, project.godot, and scripts/check-godot.ps1. Summarize what this project is and how validation is run. Do not edit files.
-```
-
-Optional shell checks for the same files:
-
-```powershell
-Test-Path README.md
-Test-Path project.godot
-Test-Path .\scripts\check-godot.ps1
-```
-
-Result:
-
-```text
-TODO
-```
-
-### Confirm Codex Can Create a Test Branch
-
-Check the current branch:
-
-```powershell
-git branch --show-current
-```
-
-Create the proof branch only if it does not already exist:
-
-```powershell
-git branch --list agent/proof-of-work
-git switch -c agent/proof-of-work
-```
-
-If the branch already exists, switch to it instead:
-
-```powershell
-git switch agent/proof-of-work
-```
-
-Result:
-
-```text
-TODO
-```
-
-### Confirm Codex Can Make a Harmless File Edit
-
-The proof edit must only add or update:
-
-```text
-docs/AGENT_PROOF_OF_WORK.md
-```
-
-The file should include:
-
-- Timestamp
-- Active branch
-- Validation command attempted
-- Validation result
-- Diff summary
-
-Do not modify gameplay code for this proof task.
-
-Result:
-
-```text
-TODO
-```
-
-### Confirm Codex Can Run Validation
-
-Attempt the repository validation script:
-
-```powershell
-.\scripts\check-godot.ps1
-```
-
-If Godot is not globally available, configure one of the supported local options:
-
-```powershell
-$env:GODOT_EXE = "C:\Path\To\Godot.exe"
-.\scripts\check-godot.ps1
-```
-
-or:
-
-```powershell
-.\scripts\check-godot.ps1 -GodotExe "C:\Path\To\Godot.exe"
-```
-
-Do not assume either path exists. Record missing executable or permission failures as valid verification results.
-
-Result:
-
-```text
-TODO
-```
-
-### Confirm Codex Can Summarize the Diff
-
-Commands:
-
-```powershell
-git diff --stat
-git diff -- docs/AGENT_PROOF_OF_WORK.md
-```
-
-After committing:
-
-```powershell
-git show --stat --oneline --summary HEAD
+aider --version
+interpreter --version
 ```
 
 Result:
@@ -239,6 +101,131 @@ Result:
 TODO
 ```
 
+## Repo Access
+
+### Confirm the Agent Can Read This Repo
+
+Ask the local agent wrapper to inspect repository files without editing them:
+
+```text
+Read README.md, project.godot, and scripts/check-godot.ps1. Summarize what this project is and how validation is run. Do not edit files.
+```
+
+Optional shell checks for the same files:
+
+```powershell
+Test-Path README.md
+Test-Path project.godot
+Test-Path .\scripts\check-godot.ps1
+```
+
+Result:
+
+```text
+TODO
+```
+
+### Confirm the Agent Can Create a Test Branch
+
+Check the current branch:
+
+```powershell
+git branch --show-current
+```
+
+Create the proof branch only if it does not already exist:
+
+```powershell
+git branch --list agent/proof-of-work
+git switch -c agent/proof-of-work
+```
+
+If the branch already exists, switch to it instead:
+
+```powershell
+git switch agent/proof-of-work
+```
+
+Result:
+
+```text
+TODO
+```
+
+### Confirm the Agent Can Make a Harmless File Edit
+
+The proof edit must only add or update:
+
+```text
+docs/AGENT_PROOF_OF_WORK.md
+```
+
+The file should include:
+
+- Timestamp
+- Active branch
+- Validation command attempted
+- Validation result
+- Diff summary
+
+Do not modify gameplay code for this proof task.
+
+Result:
+
+```text
+TODO
+```
+
+### Confirm the Agent Can Run Validation
+
+Attempt the repository validation script:
+
+```powershell
+.\scripts\check-godot.ps1
+```
+
+If Godot is not globally available, configure one of the supported local options:
+
+```powershell
+$env:GODOT_EXE = "C:\Path\To\Godot.exe"
+.\scripts\check-godot.ps1
+```
+
+or:
+
+```powershell
+.\scripts\check-godot.ps1 -GodotExe "C:\Path\To\Godot.exe"
+```
+
+Do not assume either path exists. Record missing executable or permission failures as valid verification results.
+
+Result:
+
+```text
+TODO
+```
+
+### Confirm the Agent Can Summarize the Diff
+
+Commands:
+
+```powershell
+git diff --stat
+git diff -- docs/AGENT_PROOF_OF_WORK.md
+```
+
+After committing:
+
+```powershell
+git show --stat --oneline --summary HEAD
+```
+
+Result:
+
+```text
+TODO
+```
+
 ### Tool and File Access
 
 Document whether the local model can access tools and files directly or only through a wrapper.
@@ -258,7 +245,8 @@ TODO
 ## Cost-Control Guidance
 
 - Use local LLMs for repetitive, low-risk edits and summaries.
-- Use Codex or another cloud model for planning, architecture, hard debugging, review, and changes with higher blast radius.
+- Keep hosted/cloud models disabled by default.
+- Use a cloud model only when the user explicitly opts in for a bounded planning, architecture, hard debugging, or review task.
 - Avoid open-ended prompts such as "continue forever" or "keep improving this."
 - Use bounded tasks with acceptance criteria, expected files, and stopping conditions.
 - Require branches and commits for every meaningful change.
