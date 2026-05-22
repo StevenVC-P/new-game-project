@@ -21,9 +21,29 @@ if [ -z "$GODOT_CMD" ]; then
 	fi
 fi
 
-echo "Using Godot: $GODOT_CMD"
-echo "Checking project: $PROJECT_ROOT"
+START_TIME=$(date +%s)
 
-"$GODOT_CMD" --headless --editor --quit --path "$PROJECT_ROOT"
+echo "Godot executable: $GODOT_CMD"
+echo "Project path: $PROJECT_ROOT"
+echo "Command: \"$GODOT_CMD\" --headless --import --path \"$PROJECT_ROOT\""
+echo "Validation mode: headless editor import pass; does not run the main scene."
+
+# The --import mode starts the editor import pipeline, waits for resources to import,
+# and exits automatically without entering gameplay runtime.
+set +e
+"$GODOT_CMD" --headless --import --path "$PROJECT_ROOT"
+EXIT_CODE=$?
+set -e
+
+END_TIME=$(date +%s)
+ELAPSED=$((END_TIME - START_TIME))
+
+echo "Exit code: $EXIT_CODE"
+echo "Elapsed time: ${ELAPSED}s"
+
+if [ "$EXIT_CODE" -ne 0 ]; then
+	echo "ERROR: Godot validation failed with exit code $EXIT_CODE." >&2
+	exit "$EXIT_CODE"
+fi
 
 echo "Godot validation completed successfully."

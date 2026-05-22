@@ -56,6 +56,10 @@ On shells that support `sh`, use:
 
 Set `GODOT_BIN` to the full Godot executable path if Godot is not on `PATH`.
 
+The validation scripts run Godot with `--headless --import --path <project>`. This is a safe, non-interactive Godot 4.x editor import pass that waits for resources to import and exits automatically without entering the main scene or gameplay loop.
+
+Known limitation: Godot does not provide a single perfect "validate the whole project without running anything" mode. The import pass is the default pre-commit validation because it catches project loading, import, and many script parse/compile issues. It does not prove all gameplay paths are correct; use targeted demo/test scenes or manual checks for feature behavior.
+
 The older `scripts/check-godot.ps1` helper also exists and supports `GODOT_EXE`, `-GodotExe`, and local `.godot-exe` workflows.
 
 ## Agent Runtime Verification

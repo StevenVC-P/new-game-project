@@ -7,6 +7,7 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = (Resolve-Path (Join-Path $ScriptDir "..")).Path
 $ProjectFile = Join-Path $ProjectRoot "project.godot"
+$GodotArgs = @("--headless", "--import", "--path", $ProjectRoot)
 
 function Stop-WithMessage {
 	param(
@@ -16,6 +17,18 @@ function Stop-WithMessage {
 
 	Write-Host "ERROR: $Message" -ForegroundColor Red
 	exit $Code
+}
+
+function Format-CommandPart {
+	param(
+		[string]$Part
+	)
+
+	if ($Part -match '\s') {
+		return '"' + ($Part -replace '"', '\"') + '"'
+	}
+
+	return $Part
 }
 
 if (-not (Test-Path -LiteralPath $ProjectFile)) {
@@ -40,11 +53,26 @@ try {
 	Stop-WithMessage "Godot executable was not found at: $GodotBin"
 }
 
-Write-Host "Using Godot: $ResolvedGodotBin"
-Write-Host "Checking project: $ProjectRoot"
+$CommandDisplay = (@($ResolvedGodotBin) + $GodotArgs | ForEach-Object { Format-CommandPart $_ }) -join " "
 
-& $ResolvedGodotBin --headless --editor --quit --path $ProjectRoot
-$ExitCode = $LASTEXITCODE
+Write-Host "Godot executable: $ResolvedGodotBin"
+Write-Host "Project path: $ProjectRoot"
+Write-Host "Command: $CommandDisplay"
+Write-Host "Validation mode: headless editor import pass; does not run the main scene."
+
+# Start-Process with -Wait and -PassThru provides a reliable process exit code
+# on Windows. Arguments are quoted before joining so project paths with spaces
+# remain single command-line arguments.
+$ArgumentString = ($GodotArgs | ForEach-Object { Format-CommandPart $_ }) -join " "
+
+$Timer = [System.Diagnostics.Stopwatch]::StartNew()
+$Process = Start-Process -FilePath $ResolvedGodotBin -ArgumentList $ArgumentString -WorkingDirectory $ProjectRoot -Wait -PassThru -NoNewWindow
+$Timer.Stop()
+
+$ExitCode = $Process.ExitCode
+
+Write-Host ("Exit code: {0}" -f $ExitCode)
+Write-Host ("Elapsed time: {0:n2}s" -f $Timer.Elapsed.TotalSeconds)
 
 if ($ExitCode -ne 0) {
 	Stop-WithMessage "Godot validation failed with exit code $ExitCode." $ExitCode
