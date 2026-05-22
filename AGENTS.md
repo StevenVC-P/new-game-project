@@ -66,6 +66,15 @@ The older `scripts/check-godot.ps1` helper also exists and supports `GODOT_EXE`,
 
 This section exists to prove the workflow is backed by an actual local model-driven agent process, not only documentation scaffolding. Use the checklist in `docs/AGENT_RUNTIME_CHECKLIST.md` to record the commands and results.
 
+## Codex And Local Agent Roles
+
+- Codex is for planning, architecture, owner questions, task definition, and review.
+- The local LM Studio agent is for bounded implementation on explicit feature branches.
+- The local agent must only work from explicit task files or handoff prompts.
+- Do not start open-ended local-agent work.
+- No overnight local-agent run should exceed the configured task or time limit.
+- Stop local-agent work at the first missing product decision, validation failure, forbidden-file need, or unclear rollback path.
+
 ### Local Agent Verification
 
 Verify the local agent can perform a bounded repo task end to end:
