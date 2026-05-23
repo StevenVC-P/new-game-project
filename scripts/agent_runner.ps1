@@ -271,7 +271,7 @@ function Convert-Scalar {
 	param([string]$Value)
 
 	$Trimmed = $Value.Trim()
-	if (($Trimmed.StartsWith('"') -and $Trimmed.EndsWith('"')) -or ($Trimmed.StartsWith("'") -and $Trimmed.EndsWith("'"))) {
+	if ($Trimmed.Length -ge 2 -and (($Trimmed.StartsWith('"') -and $Trimmed.EndsWith('"')) -or ($Trimmed.StartsWith("'") -and $Trimmed.EndsWith("'")))) {
 		$Trimmed = $Trimmed.Substring(1, $Trimmed.Length - 2)
 	}
 	if ($Trimmed -ieq "true") { return $true }
