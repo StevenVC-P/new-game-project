@@ -102,6 +102,12 @@ If the dry run is clean, restore or commit as appropriate, then run without `-No
 
 The runner starts from `develop`, creates the branch named in the task file, writes artifacts under `docs/agent-runs/<timestamp>/`, validates, and commits only after validation passes.
 
+## Godot Validation Logs
+
+Godot can occasionally exit with code `0` even when scene, script, or resource parse errors appear in the output log. The repository validation script and the runner both scan validation output for serious Godot patterns such as `Parse Error`, `SCRIPT ERROR:`, `Failed loading resource`, `Cannot load`, `Invalid get index`, `Invalid call`, unexpected `ERROR:` lines, and unexpected `res://` resource error lines.
+
+Known local editor-state warnings are ignored only when they exactly match the documented harmless editor layout/settings cases. This targeted ignore keeps stale local editor metadata from failing a run while still failing malformed `.tscn`, `.gd`, or resource output.
+
 ## Local Artifacts
 
 The runner infrastructure is currently committed as a project-local v0 so it can be tested against this Godot project. Timestamped run artifacts under `docs/agent-runs/` are local-only and ignored by Git, except for `docs/agent-runs/README.md`.
@@ -162,6 +168,8 @@ Validation failure:
 
 - The runner asks for repair JSON edits or repair patches up to `MaxAttempts`.
 - If attempts are exhausted, failed changes are rolled back unless `-KeepFailedChanges` is set.
+- If Godot exits `0` but the log contains serious parse/script/resource errors, the runner treats validation as failed and records the matched lines in `validation.log`.
+- A known local editor warning about stale `res://main.tscn` editor navigation or editor settings save state is ignored only by exact targeted patterns.
 
 PowerShell path quoting:
 

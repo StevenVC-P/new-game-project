@@ -147,6 +147,51 @@ function Test-PathUnderPrefix {
 	return $CleanPath.Equals($CleanPrefix, [System.StringComparison]::OrdinalIgnoreCase)
 }
 
+function Test-KnownHarmlessGodotLogLine {
+	param(
+		[string]$Line
+	)
+
+	$Trimmed = $Line.Trim()
+	if ($Trimmed -match "^ERROR: Cannot navigate to 'res://main\.tscn' as it has not been found in the file system!$") {
+		return $true
+	}
+	if ($Trimmed -match "^ERROR: Cannot save file '.+[\\/]Godot[\\/]editor_settings-4\.6\.tres'\.$") {
+		return $true
+	}
+	if ($Trimmed -match "^ERROR: Error saving editor settings to .+[\\/]Godot[\\/]editor_settings-4\.6\.tres$") {
+		return $true
+	}
+	return $false
+}
+
+function Get-SeriousGodotLogLines {
+	param(
+		[string]$Text
+	)
+
+	$Serious = @()
+	foreach ($Line in ($Text -split "\r?\n")) {
+		if ([string]::IsNullOrWhiteSpace($Line)) { continue }
+		if (Test-KnownHarmlessGodotLogLine $Line) { continue }
+
+		$Trimmed = $Line.Trim()
+		if (
+			$Trimmed.Contains("Parse Error") -or
+			$Trimmed.Contains("SCRIPT ERROR:") -or
+			$Trimmed.Contains("Failed loading resource") -or
+			$Trimmed.Contains("Cannot load") -or
+			$Trimmed.Contains("Invalid get index") -or
+			$Trimmed.Contains("Invalid call") -or
+			$Trimmed.StartsWith("ERROR:") -or
+			$Trimmed.Contains("res://")
+		) {
+			$Serious += $Line
+		}
+	}
+	return @($Serious)
+}
+
 function Convert-Scalar {
 	param([string]$Value)
 
@@ -734,10 +779,22 @@ function Invoke-ValidationCommand {
 		$ErrorActionPreference = $PreviousErrorActionPreference
 	}
 	$Text = ($Output | Out-String)
+	$SeriousLogLines = @(Get-SeriousGodotLogLines $Text)
+	if ($SeriousLogLines.Count -gt 0) {
+		$Text = $Text.TrimEnd() + @"
+
+Serious Godot validation log lines detected:
+$($SeriousLogLines -join "`n")
+"@
+		if ($ExitCode -eq 0) {
+			$ExitCode = 1
+		}
+	}
 	Write-TextFile $LogPath $Text
 	return [pscustomobject]@{
 		ExitCode = $ExitCode
 		Output = $Text
+		SeriousLogLines = $SeriousLogLines
 	}
 }
 
@@ -1257,7 +1314,7 @@ $ValidationText
 
 		$Validation = Invoke-ValidationCommand -Command $ValidationCommand -LogPath $ValidationLogPath
 		$ValidationExitCode = $Validation.ExitCode
-		$ValidationSummary = if ($Validation.ExitCode -eq 0) { "Validation passed." } else { "Validation failed. See validation.log." }
+		$ValidationSummary = if ($Validation.ExitCode -eq 0) { "Validation passed." } elseif (@($Validation.SeriousLogLines).Count -gt 0) { "Validation failed because serious Godot log lines were detected. See validation.log." } else { "Validation failed. See validation.log." }
 		$AttemptLines += "- Attempt ${Attempt}: validation exit code $ValidationExitCode."
 		if ($Validation.ExitCode -ne 0) {
 			$LastRejectedPatch = (Invoke-Git @("diff", "--") ).Output
@@ -1330,7 +1387,7 @@ $ValidationText
 
 	$Validation = Invoke-ValidationCommand -Command $ValidationCommand -LogPath $ValidationLogPath
 	$ValidationExitCode = $Validation.ExitCode
-	$ValidationSummary = if ($Validation.ExitCode -eq 0) { "Validation passed." } else { "Validation failed. See validation.log." }
+	$ValidationSummary = if ($Validation.ExitCode -eq 0) { "Validation passed." } elseif (@($Validation.SeriousLogLines).Count -gt 0) { "Validation failed because serious Godot log lines were detected. See validation.log." } else { "Validation failed. See validation.log." }
 	$AttemptLines += "- Attempt ${Attempt}: validation exit code $ValidationExitCode."
 	if ($Validation.ExitCode -ne 0) {
 		$LastRejectedPatch = (Invoke-Git @("diff", "--") ).Output

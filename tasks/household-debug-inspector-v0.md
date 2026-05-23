@@ -6,11 +6,10 @@ branch_name: feature/household-debug-inspector-v0
 edit_mode: json_file_ops
 allowed_paths:
   - scripts/ui/
-  - scenes/debug/
 required_paths:
   - scripts/ui/household_debug_inspector.gd
-  - scenes/debug/household_debug_inspector_demo.tscn
 blocked_paths:
+  - scenes/
   - docs/example.md
   - project.godot
   - scripts/domain/
@@ -18,8 +17,8 @@ blocked_paths:
   - scripts/world/
   - scripts/main.gd
   - scenes/main.tscn
-max_files_changed: 2
-max_lines_added: 300
+max_files_changed: 1
+max_lines_added: 250
 max_lines_deleted: 50
 allow_new_files: true
 allow_replacements: false
@@ -31,22 +30,28 @@ commit_message: "feat: add household debug inspector v0"
 
 # Goal
 
-Create a standalone read-only Household Settlement Debug Inspector v0 demo scene and script.
+Create a standalone reusable Control script for a future Household Settlement Debug Inspector.
 
 # Scope
 
-Create a minimal UI/debug inspector that can display household-settlement summary information where available.
-
-The inspector should be small and read-only. It must not change simulation formulas, household behavior, production, trade, calendar logic, or map generation.
-
-# Preferred Implementation
-
-Create exactly these files:
+Create exactly this file:
 
 - `scripts/ui/household_debug_inspector.gd`
-- `scenes/debug/household_debug_inspector_demo.tscn`
 
-Do not wire the inspector into `scenes/main.tscn` yet. The scene may use placeholder/fallback values if live city data is not available. The purpose of this v0 is to prove the local agent can create a coherent Godot-facing UI artifact in the right location.
+Do not create scene files yet. Do not wire the inspector into `scenes/main.tscn` yet.
+
+The inspector should be small, read-only, and defensive. It must not change simulation formulas, household behavior, production, trade, calendar logic, or map generation.
+
+# Required Implementation Shape
+
+- Extend `Control`.
+- Create UI elements programmatically in `_ready()`.
+- Expose a method such as `set_city(city)` or `update_from_city(city)`.
+- Read available city/household data defensively.
+- Use fallback labels when values are not accessible.
+- Remain read-only.
+- Do not require scene wiring.
+- Do not create `.tscn` files.
 
 # Display Fields
 
@@ -62,20 +67,22 @@ Desired fields:
 
 # Forbidden
 
-- Do not edit scripts/domain/
-- Do not edit scripts/simulation/
-- Do not edit scripts/world/
-- Do not edit formulas
-- Do not change household labor semantics
-- Do not modify project.godot
-- Do not redesign scenes/main.tscn
-- Do not rename nodes/classes/files
-- Do not create docs/example.md
+- Do not create scene files.
+- Do not edit `scenes/`.
+- Do not edit `scripts/domain/`.
+- Do not edit `scripts/simulation/`.
+- Do not edit `scripts/world/`.
+- Do not edit formulas.
+- Do not change household labor semantics.
+- Do not modify `project.godot`.
+- Do not redesign `scenes/main.tscn`.
+- Do not rename nodes/classes/files.
+- Do not create `docs/example.md`.
 
 # Definition of Done
 
-- Inspector script exists at `scripts/ui/household_debug_inspector.gd` and is read-only.
-- Demo scene exists at `scenes/debug/household_debug_inspector_demo.tscn`.
-- Demo scene opens independently and is not wired into the main scene.
+- Inspector script exists at `scripts/ui/household_debug_inspector.gd`.
+- Inspector is read-only.
+- Inspector can be instantiated later as a `Control` script.
 - Validation passes.
 - No simulation behavior changes.
