@@ -2,7 +2,7 @@
 id: household-debug-inspector-v0
 title: Add Household Settlement Debug Inspector v0
 base_branch: develop
-branch_name: feature/household-debug-inspector-v0
+branch_name: feature/household-settlement-debug-inspector
 edit_mode: json_file_ops
 allowed_paths:
   - scripts/ui/
