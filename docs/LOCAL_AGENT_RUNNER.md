@@ -35,6 +35,10 @@ The runner, not the model, generates the actual Git diff after applying validate
 
 For feature tasks, `allowed_paths` are not enough by themselves. They define where the model may write, but they do not prove it wrote the intended files. Use `required_paths` when a task must produce specific artifacts, such as a Godot script and demo scene.
 
+Before writing JSON text edits, the runner normalizes text content by trimming trailing whitespace from each line and enforcing a final newline. This keeps benign formatting noise from failing `git diff --check` while preserving the model's substantive content.
+
+If a JSON edit passes manifest and content checks but later fails `git diff --check` or validation, repair attempts may rewrite files created earlier in the same runner run. This same-run repair replacement is limited to runner-created files that already passed path checks; pre-existing repo files still require `allow_replacements: true`.
+
 Some model outputs can satisfy path and syntax checks while still being too weak to review. For v0, task front matter can add content acceptance checks so shape-correct but semantically thin code is rejected before the runner writes files.
 
 Supported content checks:
@@ -191,6 +195,8 @@ Validation failure:
 
 - The runner asks for repair JSON edits or repair patches up to `MaxAttempts`.
 - If attempts are exhausted, failed changes are rolled back unless `-KeepFailedChanges` is set.
+- `git diff --check` failures are treated as validation failures because whitespace and conflict-marker problems should be repaired before a branch is considered safe.
+- In JSON mode, repair attempts may replace files created earlier in the same runner run, but cannot replace pre-existing repository files unless the task allows replacements.
 - If Godot exits `0` but the log contains serious parse/script/resource errors, the runner treats validation as failed and records the matched lines in `validation.log`.
 - A known local editor warning about stale `res://main.tscn` editor navigation or editor settings save state is ignored only by exact targeted patterns.
 

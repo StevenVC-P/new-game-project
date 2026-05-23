@@ -489,6 +489,60 @@ function Test-BinaryLookingContent {
 	return $false
 }
 
+function ConvertTo-NormalizedTextContent {
+	param([string]$Content)
+
+	if (Test-BinaryLookingContent $Content) {
+		return [pscustomobject]@{
+			Content = $Content
+			Changed = $false
+			TrimmedLines = 0
+		}
+	}
+
+	$Lines = @([regex]::Split($Content, "\r?\n"))
+	if ($Lines.Count -gt 0 -and $Lines[-1] -eq "") {
+		$Lines = @($Lines | Select-Object -First ($Lines.Count - 1))
+	}
+
+	$TrimmedLines = 0
+	$NormalizedLines = @()
+	foreach ($Line in $Lines) {
+		$NormalizedLine = $Line -replace "[`t ]+$", ""
+		if ($NormalizedLine -ne $Line) {
+			$TrimmedLines += 1
+		}
+		$NormalizedLines += $NormalizedLine
+	}
+
+	$NormalizedContent = ($NormalizedLines -join "`n") + "`n"
+	return [pscustomobject]@{
+		Content = $NormalizedContent
+		Changed = ($NormalizedContent -ne $Content)
+		TrimmedLines = $TrimmedLines
+	}
+}
+
+function Normalize-JsonEditManifestText {
+	param([object]$Manifest)
+
+	$SummaryLines = @()
+	foreach ($Edit in @($Manifest.edits)) {
+		if ($null -eq $Edit.content -or -not ($Edit.content -is [string])) { continue }
+		$RepoPath = Normalize-RepoPath ([string]$Edit.path)
+		$Normalization = ConvertTo-NormalizedTextContent ([string]$Edit.content)
+		if ($Normalization.Changed) {
+			$Edit.content = $Normalization.Content
+			$SummaryLines += "- ${RepoPath}: normalized text whitespace ($($Normalization.TrimmedLines) trailing-whitespace line(s) trimmed; final newline enforced)."
+		}
+	}
+
+	return [pscustomobject]@{
+		Changed = ($SummaryLines.Count -gt 0)
+		SummaryLines = @($SummaryLines)
+	}
+}
+
 function Test-RepoPathAllowed {
 	param(
 		[string]$Path,
@@ -555,6 +609,7 @@ function Test-JsonEditManifest {
 		[string[]]$RequiredContent,
 		[string[]]$BlockedContent,
 		[hashtable]$MinLines,
+		[string[]]$SameRunReplacePaths,
 		[bool]$AllowNewFiles,
 		[bool]$AllowReplacements,
 		[int]$MaxFilesChanged
@@ -562,6 +617,7 @@ function Test-JsonEditManifest {
 
 	$Errors = @()
 	$Files = [ordered]@{}
+	$SameRunReplacementFiles = [ordered]@{}
 	$AllowedRootFields = @("edits")
 	$RootFields = @($Manifest.PSObject.Properties | ForEach-Object { $_.Name })
 	foreach ($Field in $RootFields) {
@@ -604,18 +660,23 @@ function Test-JsonEditManifest {
 		$Errors += $PathCheck.Errors
 		$RepoPath = $PathCheck.Path
 		$Files[$RepoPath] = $true
+		$IsSameRunFile = @($SameRunReplacePaths) -contains $RepoPath
 		$FullPath = Join-Path $RepoRoot $RepoPath
 		$Exists = Test-Path -LiteralPath $FullPath
 		if ($Action -eq "create") {
 			if (-not $AllowNewFiles) {
 				$Errors += "Edit ${EditIndex} creates a file, but allow_new_files is false."
 			}
-			if ($Exists) {
+			if ($Exists -and $IsSameRunFile) {
+				$SameRunReplacementFiles[$RepoPath] = $true
+			} elseif ($Exists) {
 				$Errors += "Edit ${EditIndex} create target already exists: $RepoPath"
 			}
 		}
 		if ($Action -eq "replace_entire_file") {
-			if (-not $AllowReplacements) {
+			if (-not $AllowReplacements -and $IsSameRunFile) {
+				$SameRunReplacementFiles[$RepoPath] = $true
+			} elseif (-not $AllowReplacements) {
 				$Errors += "Edit ${EditIndex} replaces a file, but allow_replacements is false."
 			}
 			if (-not $Exists) {
@@ -639,6 +700,7 @@ function Test-JsonEditManifest {
 		Errors = @($Errors | Sort-Object -Unique)
 		Files = @($Files.Keys)
 		ContentCheckLines = @($ContentInfo.SummaryLines)
+		SameRunReplacementFiles = @($SameRunReplacementFiles.Keys)
 	}
 }
 
@@ -1235,6 +1297,8 @@ $SafetyLines = @(
 if ($EditMode -eq "json_file_ops") {
 	$SafetyLines += "- JSON file-operation mode uses runner-owned file writes and Git-generated diffs."
 	$SafetyLines += "- Accepted raw JSON or exactly one fenced json block with no surrounding prose."
+	$SafetyLines += "- Normalized JSON text edits before writing by trimming trailing line whitespace and enforcing a final newline."
+	$SafetyLines += "- Allowed same-run repair replacement only for files created earlier by this runner run."
 	if ($RequiredContent.Count -gt 0 -or $BlockedContent.Count -gt 0 -or $MinLines.Keys.Count -gt 0) {
 		$SafetyLines += "- Enforced task content checks before writing JSON file-operation edits."
 		$SafetyLines += "- Required content tokens: $($RequiredContent.Count); blocked content tokens: $($BlockedContent.Count); min_lines entries: $($MinLines.Keys.Count)."
@@ -1253,6 +1317,7 @@ $LastPatchInfo = $null
 $LastRejectedPatch = ""
 $LastFailure = ""
 $AppliedAnyPatch = $false
+$RunnerCreatedPaths = @()
 
 for ($Attempt = 1; $Attempt -le $MaxAttempts; $Attempt++) {
 	$RawPatchPath = Join-Path $RunDir ("raw-patch-attempt-{0}.txt" -f $Attempt)
@@ -1355,9 +1420,13 @@ $ValidationText
 			$AttemptLines += "- Attempt ${Attempt}: rejected invalid JSON: $LastFailure"
 			continue
 		}
+		$NormalizationInfo = Normalize-JsonEditManifestText $Manifest
 		Write-TextFile $ManifestPath ($Manifest | ConvertTo-Json -Depth 20)
+		foreach ($NormalizationLine in @($NormalizationInfo.SummaryLines)) {
+			$AttemptLines += "- Attempt ${Attempt}: whitespace normalization $($NormalizationLine.TrimStart('-').Trim())"
+		}
 
-		$ManifestInfo = Test-JsonEditManifest -Manifest $Manifest -AllowedPaths $AllowedPaths -BlockedPaths $TaskBlockedPaths -GlobalBlockedPaths $GlobalBlockedPaths -BlockedGlobs $BlockedGlobs -RequiredPaths $RequiredPaths -RequiredContent $RequiredContent -BlockedContent $BlockedContent -MinLines $MinLines -AllowNewFiles $AllowNewFiles -AllowReplacements $AllowReplacements -MaxFilesChanged $MaxFilesChanged
+		$ManifestInfo = Test-JsonEditManifest -Manifest $Manifest -AllowedPaths $AllowedPaths -BlockedPaths $TaskBlockedPaths -GlobalBlockedPaths $GlobalBlockedPaths -BlockedGlobs $BlockedGlobs -RequiredPaths $RequiredPaths -RequiredContent $RequiredContent -BlockedContent $BlockedContent -MinLines $MinLines -SameRunReplacePaths $RunnerCreatedPaths -AllowNewFiles $AllowNewFiles -AllowReplacements $AllowReplacements -MaxFilesChanged $MaxFilesChanged
 		if ($ManifestInfo.Errors.Count -gt 0) {
 			$JsonSanitizationStatus = if ($SanitizedJson.Sanitized) { "single fenced json extracted" } else { "raw JSON" }
 			$LastRejectedPatch = $SanitizedJson.JsonText
@@ -1368,6 +1437,9 @@ $ValidationText
 		foreach ($ContentCheckLine in @($ManifestInfo.ContentCheckLines)) {
 			$AttemptLines += "- Attempt ${Attempt}: content check $($ContentCheckLine.TrimStart('-').Trim())"
 		}
+		foreach ($SameRunPath in @($ManifestInfo.SameRunReplacementFiles)) {
+			$AttemptLines += "- Attempt ${Attempt}: same-run repair replacement allowed for $SameRunPath."
+		}
 
 		Apply-JsonEditManifest $Manifest
 		$AppliedAnyPatch = $true
@@ -1376,6 +1448,7 @@ $ValidationText
 			$ExistsInHead = (Invoke-Git @("cat-file", "-e", "HEAD:$ManifestPathItem") -AllowFailure).ExitCode -eq 0
 			if (-not $ExistsInHead) {
 				Invoke-Git @("add", "-N", "--", $ManifestPathItem) | Out-Null
+				$RunnerCreatedPaths = @($RunnerCreatedPaths + $ManifestPathItem) | Sort-Object -Unique
 			}
 		}
 		$JsonSanitizationStatus = if ($SanitizedJson.Sanitized) { "single fenced json extracted" } else { "raw JSON" }
