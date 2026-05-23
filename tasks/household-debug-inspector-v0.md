@@ -8,6 +8,28 @@ allowed_paths:
   - scripts/ui/
 required_paths:
   - scripts/ui/household_debug_inspector.gd
+required_content:
+  - "extends Control"
+  - "var root_box"
+  - "var title_label"
+  - "var household_label"
+  - "var population_label"
+  - "var housing_label"
+  - "var food_label"
+  - "var responsibility_label"
+  - "var resource_label"
+  - "func set_city"
+  - "func update_from_city"
+  - "func _safe_get"
+  - "func _format_value"
+blocked_content:
+  - "typeid ="
+  - "get_household_data()"
+  - "{"
+  - "} if "
+  - " pass"
+min_lines:
+  scripts/ui/household_debug_inspector.gd: 80
 blocked_paths:
   - scenes/
   - docs/example.md
@@ -66,7 +88,14 @@ The inspector should be small, read-only, and defensive. It must not change simu
 - Implement `set_city(city)` by storing the city reference and calling `update_from_city(city)`.
 - Implement `update_from_city(city)` with defensive reads only.
 - Read available city/household data defensively and show fallback values when data is missing.
-- Include helper methods for safe property or dictionary access if useful.
+- Use `var current_city = null` to store the current city reference.
+- Include `func _safe_get(target, property_name, fallback = "unavailable")` for defensive property or dictionary access.
+- Include `func _format_value(value, fallback = "unavailable")` and use `str(value)` for formatting.
+- Use GDScript string concatenation with `+`, not Python-style interpolation or brace expressions.
+- If reading a method result, check `target.has_method(method_name)` before calling the method.
+- If reading a property, first check that the target is not null and that the property exists or can be read safely.
+- Do not call invented city methods unless each call is guarded by `has_method`.
+- Do not use undeclared top-level assignments.
 - Remain read-only.
 - Never mutate city or household state.
 - Do not require scene wiring.
@@ -103,6 +132,10 @@ Desired fields:
 - Do not return empty methods or only `pass` statements.
 - Do not return a script that creates no visible UI labels.
 - Do not return a script that fails to update label text from city data or fallback values.
+- Do not use `typeid =`.
+- Do not call `get_household_data()`.
+- Do not use Python-style `{value if condition else fallback}` string expressions.
+- Do not use placeholder-only methods.
 
 # Definition of Done
 

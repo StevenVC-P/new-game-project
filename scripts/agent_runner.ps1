@@ -216,6 +216,13 @@ function Read-TaskFile {
 		$Body = $Matches[2]
 		$CurrentKey = $null
 		foreach ($Line in ($FrontMatter -split "\r?\n")) {
+			if ($Line -match '^\s+([^:\s][^:]*?):\s*(.+?)\s*$' -and $CurrentKey) {
+				if (-not ($Meta[$CurrentKey] -is [hashtable])) {
+					$Meta[$CurrentKey] = @{}
+				}
+				$Meta[$CurrentKey][(Convert-Scalar $Matches[1])] = Convert-Scalar $Matches[2]
+				continue
+			}
 			if ($Line -match '^\s*-\s*(.+?)\s*$' -and $CurrentKey) {
 				if (-not $Meta.ContainsKey($CurrentKey)) {
 					$Meta[$CurrentKey] = @()
@@ -258,6 +265,18 @@ function Get-MetaValue {
 		return $Metadata[$Key]
 	}
 	return $Default
+}
+
+function Get-MetaMap {
+	param(
+		[hashtable]$Metadata,
+		[string]$Key
+	)
+
+	if ($Metadata.ContainsKey($Key) -and $Metadata[$Key] -is [hashtable]) {
+		return $Metadata[$Key]
+	}
+	return @{}
 }
 
 function Get-StatusPaths {
@@ -533,6 +552,9 @@ function Test-JsonEditManifest {
 		[string[]]$GlobalBlockedPaths,
 		[string[]]$BlockedGlobs,
 		[string[]]$RequiredPaths,
+		[string[]]$RequiredContent,
+		[string[]]$BlockedContent,
+		[hashtable]$MinLines,
 		[bool]$AllowNewFiles,
 		[bool]$AllowReplacements,
 		[int]$MaxFilesChanged
@@ -611,9 +633,63 @@ function Test-JsonEditManifest {
 			$Errors += "Missing required path in edit manifest: $($RequiredCheck.Path)"
 		}
 	}
+	$ContentInfo = Test-JsonEditContent -Manifest $Manifest -RequiredPaths $RequiredPaths -RequiredContent $RequiredContent -BlockedContent $BlockedContent -MinLines $MinLines
+	$Errors += $ContentInfo.Errors
 	return [pscustomobject]@{
 		Errors = @($Errors | Sort-Object -Unique)
 		Files = @($Files.Keys)
+		ContentCheckLines = @($ContentInfo.SummaryLines)
+	}
+}
+
+function Test-JsonEditContent {
+	param(
+		[object]$Manifest,
+		[string[]]$RequiredPaths,
+		[string[]]$RequiredContent,
+		[string[]]$BlockedContent,
+		[hashtable]$MinLines
+	)
+
+	$Errors = @()
+	$SummaryLines = @()
+	$RequireTargets = @($RequiredPaths | ForEach-Object { Normalize-RepoPath $_ })
+	foreach ($Edit in @($Manifest.edits)) {
+		$RepoPath = Normalize-RepoPath ([string]$Edit.path)
+		$Content = [string]$Edit.content
+		$ShouldRequireContent = $RequireTargets.Count -eq 0 -or @($RequireTargets) -contains $RepoPath
+		if ($ShouldRequireContent) {
+			foreach ($Token in $RequiredContent) {
+				if ([string]::IsNullOrEmpty($Token)) { continue }
+				if (-not $Content.Contains($Token)) {
+					$Errors += "Content check failed for ${RepoPath}: missing required_content token '$Token'."
+				}
+			}
+		}
+		foreach ($Token in $BlockedContent) {
+			if ([string]::IsNullOrEmpty($Token)) { continue }
+			if ($Content.Contains($Token)) {
+				$Errors += "Content check failed for ${RepoPath}: contains blocked_content token '$Token'."
+			}
+		}
+		if ($MinLines.ContainsKey($RepoPath)) {
+			$RequiredLineCount = [int]$MinLines[$RepoPath]
+			$ActualLineCount = if ([string]::IsNullOrEmpty($Content)) { 0 } else { @($Content -split "\r?\n").Count }
+			if ($ActualLineCount -lt $RequiredLineCount) {
+				$Errors += "Content check failed for ${RepoPath}: has $ActualLineCount line(s); min_lines requires $RequiredLineCount."
+			}
+			$SummaryLines += "- ${RepoPath}: $ActualLineCount line(s), minimum $RequiredLineCount."
+		}
+	}
+	if ($RequiredContent.Count -gt 0) {
+		$SummaryLines += "- Required content tokens checked: $($RequiredContent.Count)."
+	}
+	if ($BlockedContent.Count -gt 0) {
+		$SummaryLines += "- Blocked content tokens checked: $($BlockedContent.Count)."
+	}
+	return [pscustomobject]@{
+		Errors = @($Errors | Sort-Object -Unique)
+		SummaryLines = @($SummaryLines)
 	}
 }
 
@@ -956,6 +1032,9 @@ $TaskTitle = Get-MetaValue $Meta "title" (Split-Path -Leaf $TaskPath)
 $AllowedPaths = @(Get-MetaValue $Meta "allowed_paths" @())
 $TaskBlockedPaths = @(Get-MetaValue $Meta "blocked_paths" @())
 $RequiredPaths = @((Get-MetaValue $Meta "required_paths" @()) | ForEach-Object { Normalize-RepoPath $_ })
+$RequiredContent = @(Get-MetaValue $Meta "required_content" @())
+$BlockedContent = @(Get-MetaValue $Meta "blocked_content" @())
+$MinLines = Get-MetaMap $Meta "min_lines"
 $GlobalBlockedPaths = @($Config.globalBlockedPaths)
 $BlockedGlobs = @($Config.defaultBlockedGlobs)
 $ArtifactRoot = $Config.artifactRoot
@@ -1017,6 +1096,9 @@ Runner constraints:
 - Max lines deleted: $MaxLinesDeleted
 - Allowed paths: $($AllowedPaths -join ', ')
 - Required paths: $($RequiredPaths -join ', ')
+- Required content: $($RequiredContent -join ', ')
+- Blocked content: $($BlockedContent -join ', ')
+- Min lines: $((@($MinLines.Keys) | ForEach-Object { "$_=$($MinLines[$_])" }) -join ', ')
 - Blocked paths: $(@($GlobalBlockedPaths + $TaskBlockedPaths) -join ', ')
 - Blocked globs: $($BlockedGlobs -join ', ')
 - Allow new files: $AllowNewFiles
@@ -1153,6 +1235,10 @@ $SafetyLines = @(
 if ($EditMode -eq "json_file_ops") {
 	$SafetyLines += "- JSON file-operation mode uses runner-owned file writes and Git-generated diffs."
 	$SafetyLines += "- Accepted raw JSON or exactly one fenced json block with no surrounding prose."
+	if ($RequiredContent.Count -gt 0 -or $BlockedContent.Count -gt 0 -or $MinLines.Keys.Count -gt 0) {
+		$SafetyLines += "- Enforced task content checks before writing JSON file-operation edits."
+		$SafetyLines += "- Required content tokens: $($RequiredContent.Count); blocked content tokens: $($BlockedContent.Count); min_lines entries: $($MinLines.Keys.Count)."
+	}
 } else {
 	$SafetyLines += "- Accepted raw unified diffs or exactly one fenced diff/patch block with no surrounding prose."
 	$SafetyLines += "- Used git apply --check --whitespace=error before applying patches."
@@ -1271,13 +1357,16 @@ $ValidationText
 		}
 		Write-TextFile $ManifestPath ($Manifest | ConvertTo-Json -Depth 20)
 
-		$ManifestInfo = Test-JsonEditManifest -Manifest $Manifest -AllowedPaths $AllowedPaths -BlockedPaths $TaskBlockedPaths -GlobalBlockedPaths $GlobalBlockedPaths -BlockedGlobs $BlockedGlobs -RequiredPaths $RequiredPaths -AllowNewFiles $AllowNewFiles -AllowReplacements $AllowReplacements -MaxFilesChanged $MaxFilesChanged
+		$ManifestInfo = Test-JsonEditManifest -Manifest $Manifest -AllowedPaths $AllowedPaths -BlockedPaths $TaskBlockedPaths -GlobalBlockedPaths $GlobalBlockedPaths -BlockedGlobs $BlockedGlobs -RequiredPaths $RequiredPaths -RequiredContent $RequiredContent -BlockedContent $BlockedContent -MinLines $MinLines -AllowNewFiles $AllowNewFiles -AllowReplacements $AllowReplacements -MaxFilesChanged $MaxFilesChanged
 		if ($ManifestInfo.Errors.Count -gt 0) {
 			$JsonSanitizationStatus = if ($SanitizedJson.Sanitized) { "single fenced json extracted" } else { "raw JSON" }
 			$LastRejectedPatch = $SanitizedJson.JsonText
 			$LastFailure = "JSON edit manifest checks failed after sanitization '$JsonSanitizationStatus': $($ManifestInfo.Errors -join '; ')"
 			$AttemptLines += "- Attempt ${Attempt}: rejected JSON edit manifest after sanitization '$JsonSanitizationStatus': $($ManifestInfo.Errors -join '; ')"
 			continue
+		}
+		foreach ($ContentCheckLine in @($ManifestInfo.ContentCheckLines)) {
+			$AttemptLines += "- Attempt ${Attempt}: content check $($ContentCheckLine.TrimStart('-').Trim())"
 		}
 
 		Apply-JsonEditManifest $Manifest

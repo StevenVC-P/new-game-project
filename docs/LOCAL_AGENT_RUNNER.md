@@ -35,6 +35,14 @@ The runner, not the model, generates the actual Git diff after applying validate
 
 For feature tasks, `allowed_paths` are not enough by themselves. They define where the model may write, but they do not prove it wrote the intended files. Use `required_paths` when a task must produce specific artifacts, such as a Godot script and demo scene.
 
+Some model outputs can satisfy path and syntax checks while still being too weak to review. For v0, task front matter can add content acceptance checks so shape-correct but semantically thin code is rejected before the runner writes files.
+
+Supported content checks:
+
+- `required_content`: literal text tokens that must appear in changed required files.
+- `blocked_content`: literal text tokens that must not appear in changed text files.
+- `min_lines`: per-path minimum line counts.
+
 Supported v0 JSON actions are only:
 
 - `create`
@@ -52,6 +60,14 @@ allowed_paths:
 required_paths:
   - scripts/ui/household_debug_inspector.gd
   - scenes/debug/household_debug_inspector_demo.tscn
+required_content:
+  - "extends Control"
+  - "func update_from_city"
+blocked_content:
+  - "typeid ="
+  - "pass"
+min_lines:
+  scripts/ui/household_debug_inspector.gd: 80
 blocked_paths:
   - docs/example.md
   - project.godot
@@ -162,6 +178,7 @@ Invalid JSON:
 
 - JSON mode rejects invalid JSON, unknown fields, unsupported actions, prose around JSON, multiple fenced blocks, absolute paths, `../` traversal, blocked paths, binary-looking content, creates over existing files, and replacements unless `allow_replacements: true`.
 - If the model creates an irrelevant but safe file, such as `docs/example.md`, add exact `required_paths` for the expected outputs and block the junk path explicitly with `blocked_paths`.
+- If the model creates shape-correct but weak code, add `required_content`, `blocked_content`, and `min_lines` checks. For example, block tokens such as invalid top-level assignments or placeholder `pass` bodies, require helper method names, and require a minimum line count for the target file.
 - Inspect `raw-patch-attempt-*.txt`, `edits-attempt-*.json`, and `edit-manifest-attempt-*.json` in the run artifact directory.
 
 Validation failure:
