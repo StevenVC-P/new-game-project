@@ -150,6 +150,12 @@ After several clean proof runs, overnight work may use:
 
 Do not run open-ended sessions.
 
+## Model Comparison Notes
+
+Qwen2.5-Coder 7B has been mechanically safe under the runner on the household inspector task, but it has produced weak or non-GDScript output, including Python-like constructs. The next comparison target should be Qwen2.5-Coder 14B Instruct Q4_K_M.
+
+Before retrying the household inspector task, set the LM Studio model context to `8192`. The previous 7B repair loop failed when LM Studio was loaded with `n_ctx: 4096` and the repair prompt exceeded the available context.
+
 ## Troubleshooting
 
 Dirty git state:

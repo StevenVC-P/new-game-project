@@ -28,6 +28,12 @@ blocked_content:
   - "{"
   - "} if "
   - " pass"
+  - "hasattr"
+  - "getattr"
+  - "None"
+  - " is null"
+  - "len("
+  - "dict("
 min_lines:
   scripts/ui/household_debug_inspector.gd: 80
 blocked_paths:
