@@ -41,18 +41,31 @@ If a JSON edit passes manifest and content checks but later fails `git diff --ch
 
 Some model outputs can satisfy path and syntax checks while still being too weak to review. For v0, task front matter can add content acceptance checks so shape-correct but semantically thin code is rejected before the runner writes files.
 
+Large existing files should not be rewritten wholesale by local models. By default, `replace_entire_file` is rejected for existing files over `max_replaced_file_lines` unless `allow_large_replacements: true` is set. The runner also enforces `max_deleted_lines_ratio` and `preserve_content` checks so a task cannot quietly remove most of a high-risk script such as `scripts/main.gd`.
+
+If LM Studio fails during a repair prompt, including context overflow errors such as `n_keep >= n_ctx`, the runner treats the API failure as a failed attempt and rolls back runner-applied files unless `-KeepFailedChanges` is set.
+
 Supported content checks:
 
 - `required_content`: literal text tokens that must appear in changed required files.
 - `blocked_content`: literal text tokens that must not appear in changed text files.
 - `min_lines`: per-path minimum line counts.
+- `preserve_content`: literal tokens that must remain in an existing changed file if they were present before the edit.
+
+Replacement safety checks:
+
+- `allow_large_replacements`: defaults to `false`.
+- `max_replaced_file_lines`: defaults to `300`.
+- `max_deleted_lines_ratio`: defaults to `0.25`.
 
 Supported v0 JSON actions are only:
 
 - `create`
 - `replace_entire_file`
+- `insert_after`
+- `insert_before`
 
-Delete, rename, shell commands, partial edits, and arbitrary patch application are not supported in JSON mode.
+Use `insert_after` or `insert_before` for targeted edits to large existing files. These actions require `path`, `anchor`, and `content`, with optional `occurrence` when a repeated anchor must be disambiguated. Delete, rename, shell commands, arbitrary patch application, and broad unbounded partial edits are not supported in JSON mode.
 
 Example task front matter:
 
@@ -78,6 +91,11 @@ blocked_paths:
 max_files_changed: 2
 allow_new_files: true
 allow_replacements: false
+preserve_content:
+  - "extends Node2D"
+  - "func _ready"
+max_replaced_file_lines: 300
+max_deleted_lines_ratio: 0.25
 ```
 
 ## Unified Diff Mode
@@ -160,6 +178,8 @@ Qwen2.5-Coder 7B has been mechanically safe under the runner on the household in
 
 Before retrying the household inspector task, set the LM Studio model context to `8192`. The previous 7B repair loop failed when LM Studio was loaded with `n_ctx: 4096` and the repair prompt exceeded the available context.
 
+For `main.gd`-scale tasks with Qwen3, load the model with context length `8192` or higher before running. If LM Studio reports `n_keep >= n_ctx`, reduce the task context or increase the model context before retrying. Whole-file replacement of large existing scripts should be avoided; prefer targeted insert actions and strict preservation checks.
+
 ## Troubleshooting
 
 Dirty git state:
@@ -187,6 +207,7 @@ Invalid patch:
 Invalid JSON:
 
 - JSON mode rejects invalid JSON, unknown fields, unsupported actions, prose around JSON, multiple fenced blocks, absolute paths, `../` traversal, blocked paths, binary-looking content, creates over existing files, and replacements unless `allow_replacements: true`.
+- JSON mode rejects large whole-file replacements by default. If a task must modify a large existing file, use `insert_after` or `insert_before`, strict line budgets, `preserve_content`, and `blocked_content` instead of `replace_entire_file`.
 - If the model creates an irrelevant but safe file, such as `docs/example.md`, add exact `required_paths` for the expected outputs and block the junk path explicitly with `blocked_paths`.
 - If the model creates shape-correct but weak code, add `required_content`, `blocked_content`, and `min_lines` checks. For example, block tokens such as invalid top-level assignments or placeholder `pass` bodies, require helper method names, and require a minimum line count for the target file.
 - Inspect `raw-patch-attempt-*.txt`, `edits-attempt-*.json`, and `edit-manifest-attempt-*.json` in the run artifact directory.
@@ -195,6 +216,7 @@ Validation failure:
 
 - The runner asks for repair JSON edits or repair patches up to `MaxAttempts`.
 - If attempts are exhausted, failed changes are rolled back unless `-KeepFailedChanges` is set.
+- If a model/API request fails during repair, including LM Studio context overflow, the run is failed and runner-applied files are rolled back unless `-KeepFailedChanges` is set.
 - `git diff --check` failures are treated as validation failures because whitespace and conflict-marker problems should be repaired before a branch is considered safe.
 - In JSON mode, repair attempts may replace files created earlier in the same runner run, but cannot replace pre-existing repository files unless the task allows replacements.
 - If Godot exits `0` but the log contains serious parse/script/resource errors, the runner treats validation as failed and records the matched lines in `validation.log`.

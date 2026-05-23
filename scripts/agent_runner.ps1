@@ -113,6 +113,81 @@ function Get-CurrentDiffBudget {
 	}
 }
 
+function Get-TextLineCount {
+	param([string]$Text)
+
+	if ([string]::IsNullOrEmpty($Text)) {
+		return 0
+	}
+	return @($Text -split "\r?\n").Count
+}
+
+function Test-CurrentDiffSafety {
+	param(
+		[string[]]$IgnorePrefixes,
+		[int]$MaxFilesChanged,
+		[int]$MaxLinesAdded,
+		[int]$MaxLinesDeleted,
+		[double]$MaxDeletedLinesRatio,
+		[string[]]$PreserveContent
+	)
+
+	$Budget = Get-CurrentDiffBudget -IgnorePrefixes $IgnorePrefixes
+	$Errors = @()
+	if ($Budget.Files.Count -gt $MaxFilesChanged) {
+		$Errors += "Cumulative diff changes $($Budget.Files.Count) files; limit is $MaxFilesChanged."
+	}
+	if ($Budget.Added -gt $MaxLinesAdded) {
+		$Errors += "Cumulative diff adds $($Budget.Added) lines; limit is $MaxLinesAdded."
+	}
+	if ($Budget.Deleted -gt $MaxLinesDeleted) {
+		$Errors += "Cumulative diff deletes $($Budget.Deleted) lines; limit is $MaxLinesDeleted."
+	}
+
+	$Numstat = (Invoke-Git @("diff", "--numstat") ).Output
+	if (-not [string]::IsNullOrWhiteSpace($Numstat)) {
+		foreach ($Line in ($Numstat -split "\r?\n")) {
+			$Parts = $Line -split "\t"
+			if ($Parts.Count -lt 3) { continue }
+			$Path = Normalize-RepoPath $Parts[2]
+			$Ignored = $false
+			foreach ($Prefix in $IgnorePrefixes) {
+				if (Test-PathUnderPrefix $Path $Prefix) {
+					$Ignored = $true
+					break
+				}
+			}
+			if ($Ignored) { continue }
+			if ($Parts[1] -notmatch '^\d+$') { continue }
+			$Deleted = [int]$Parts[1]
+			$Original = (Invoke-Git @("show", "HEAD:$Path") -AllowFailure)
+			if ($Original.ExitCode -ne 0) { continue }
+			$OriginalLineCount = Get-TextLineCount $Original.Output
+			if ($OriginalLineCount -gt 0) {
+				$DeletedRatio = [double]$Deleted / [double]$OriginalLineCount
+				if ($DeletedRatio -gt $MaxDeletedLinesRatio) {
+					$Errors += "Cumulative diff deletes $Deleted of $OriginalLineCount line(s) in ${Path}; ratio $([math]::Round($DeletedRatio, 3)) exceeds limit $MaxDeletedLinesRatio."
+				}
+			}
+			if ($PreserveContent.Count -gt 0 -and (Test-Path -LiteralPath (Join-Path $RepoRoot $Path))) {
+				$OriginalText = $Original.Output
+				$CurrentText = [System.IO.File]::ReadAllText((Join-Path $RepoRoot $Path))
+				foreach ($Token in $PreserveContent) {
+					if ([string]::IsNullOrEmpty($Token)) { continue }
+					if ($OriginalText.Contains($Token) -and -not $CurrentText.Contains($Token)) {
+						$Errors += "Preserve check failed for ${Path}: original contained '$Token' but changed file does not."
+					}
+				}
+			}
+		}
+	}
+
+	return [pscustomobject]@{
+		Budget = $Budget
+		Errors = @($Errors | Sort-Object -Unique)
+	}
+}
+
 function Normalize-RepoPath {
 	param([string]$Path)
 
@@ -608,11 +683,14 @@ function Test-JsonEditManifest {
 		[string[]]$RequiredPaths,
 		[string[]]$RequiredContent,
 		[string[]]$BlockedContent,
+		[string[]]$PreserveContent,
 		[hashtable]$MinLines,
 		[string[]]$SameRunReplacePaths,
 		[bool]$AllowNewFiles,
 		[bool]$AllowReplacements,
-		[int]$MaxFilesChanged
+		[int]$MaxFilesChanged,
+		[bool]$AllowLargeReplacements,
+		[int]$MaxReplacedFileLines
 	)
 
 	$Errors = @()
@@ -635,7 +713,7 @@ function Test-JsonEditManifest {
 	$EditIndex = 0
 	foreach ($Edit in @($Manifest.edits)) {
 		$EditIndex += 1
-		$AllowedEditFields = @("action", "path", "content")
+		$AllowedEditFields = @("action", "path", "content", "anchor", "occurrence")
 		foreach ($Field in @($Edit.PSObject.Properties | ForEach-Object { $_.Name })) {
 			if ($AllowedEditFields -notcontains $Field) {
 				$Errors += "Edit ${EditIndex} has unknown field: $Field"
@@ -644,7 +722,7 @@ function Test-JsonEditManifest {
 		$Action = [string]$Edit.action
 		$Path = [string]$Edit.path
 		$Content = $Edit.content
-		if (@("create", "replace_entire_file") -notcontains $Action) {
+		if (@("create", "replace_entire_file", "insert_after", "insert_before") -notcontains $Action) {
 			$Errors += "Edit ${EditIndex} has unsupported action: $Action"
 		}
 		if ([string]::IsNullOrWhiteSpace($Path)) {
@@ -681,6 +759,43 @@ function Test-JsonEditManifest {
 			}
 			if (-not $Exists) {
 				$Errors += "Edit ${EditIndex} replace target does not exist: $RepoPath"
+			} else {
+				$ExistingText = [System.IO.File]::ReadAllText($FullPath)
+				$ExistingLineCount = Get-TextLineCount $ExistingText
+				if (-not $AllowLargeReplacements -and $ExistingLineCount -gt $MaxReplacedFileLines) {
+					$Errors += "Edit ${EditIndex} replaces large file ${RepoPath} with $ExistingLineCount line(s); limit is $MaxReplacedFileLines unless allow_large_replacements is true."
+				}
+				foreach ($Token in $PreserveContent) {
+					if ([string]::IsNullOrEmpty($Token)) { continue }
+					if ($ExistingText.Contains($Token) -and -not ([string]$Content).Contains($Token)) {
+						$Errors += "Edit ${EditIndex} fails preserve_content for ${RepoPath}: missing '$Token'."
+					}
+				}
+			}
+		}
+		if ($Action -eq "insert_after" -or $Action -eq "insert_before") {
+			if (-not $Exists) {
+				$Errors += "Edit ${EditIndex} ${Action} target does not exist: $RepoPath"
+			}
+			if (-not $Edit.PSObject.Properties["anchor"] -or [string]::IsNullOrEmpty([string]$Edit.anchor)) {
+				$Errors += "Edit ${EditIndex} ${Action} requires a non-empty anchor."
+			}
+			if ($Edit.PSObject.Properties["occurrence"]) {
+				$Occurrence = 1
+				if (-not [int]::TryParse([string]$Edit.occurrence, [ref]$Occurrence) -or $Occurrence -lt 1) {
+					$Errors += "Edit ${EditIndex} occurrence must be a positive integer."
+				}
+			}
+			if ($Exists -and $Edit.PSObject.Properties["anchor"] -and -not [string]::IsNullOrEmpty([string]$Edit.anchor)) {
+				$Occurrence = 1
+				if ($Edit.PSObject.Properties["occurrence"] -and [int]::TryParse([string]$Edit.occurrence, [ref]$Occurrence)) {
+					# Parsed above; reused for anchor match validation.
+				}
+				$ExistingText = [System.IO.File]::ReadAllText($FullPath)
+				$Matches = [regex]::Matches($ExistingText, [regex]::Escape([string]$Edit.anchor))
+				if ($Matches.Count -lt $Occurrence) {
+					$Errors += "Edit ${EditIndex} ${Action} anchor was not found $Occurrence time(s) in ${RepoPath}: $($Edit.anchor)"
+				}
 			}
 		}
 	}
@@ -761,7 +876,48 @@ function Apply-JsonEditManifest {
 	foreach ($Edit in @($Manifest.edits)) {
 		$RepoPath = Normalize-RepoPath ([string]$Edit.path)
 		$FullPath = Join-Path $RepoRoot $RepoPath
-		Write-TextFile $FullPath ([string]$Edit.content)
+		$Action = [string]$Edit.action
+		if ($Action -eq "create" -or $Action -eq "replace_entire_file") {
+			Write-TextFile $FullPath ([string]$Edit.content)
+			continue
+		}
+
+		if ($Action -eq "insert_after" -or $Action -eq "insert_before") {
+			$ExistingText = [System.IO.File]::ReadAllText($FullPath)
+			$LineEnding = if ($ExistingText.Contains("`r`n")) { "`r`n" } else { "`n" }
+			$Lines = [System.Collections.Generic.List[string]]::new()
+			foreach ($Line in ($ExistingText -split "\r?\n", -1)) {
+				$Lines.Add($Line)
+			}
+			if ($Lines.Count -gt 0 -and $Lines[$Lines.Count - 1] -eq "") {
+				$Lines.RemoveAt($Lines.Count - 1)
+			}
+			$Occurrence = 1
+			if ($Edit.PSObject.Properties["occurrence"]) {
+				$Occurrence = [int]$Edit.occurrence
+			}
+			$Seen = 0
+			$AnchorIndex = -1
+			for ($I = 0; $I -lt $Lines.Count; $I++) {
+				if ($Lines[$I].Contains([string]$Edit.anchor)) {
+					$Seen += 1
+					if ($Seen -eq $Occurrence) {
+						$AnchorIndex = $I
+						break
+					}
+				}
+			}
+			if ($AnchorIndex -lt 0) {
+				throw "Anchor not found for ${Action} in ${RepoPath}: $($Edit.anchor)"
+			}
+			$InsertLines = [System.Collections.Generic.List[string]]::new()
+			foreach ($Line in (([string]$Edit.content).TrimEnd("`r", "`n") -split "\r?\n", -1)) {
+				$InsertLines.Add($Line)
+			}
+			$InsertIndex = if ($Action -eq "insert_after") { $AnchorIndex + 1 } else { $AnchorIndex }
+			$Lines.InsertRange($InsertIndex, $InsertLines)
+			Write-TextFile $FullPath (($Lines -join $LineEnding) + $LineEnding)
+		}
 	}
 }
 
@@ -1051,6 +1207,9 @@ if (-not $PSBoundParameters.ContainsKey("MaxAttempts")) { $MaxAttempts = [int]$C
 if (-not $PSBoundParameters.ContainsKey("MaxFilesChanged")) { $MaxFilesChanged = [int]$Config.maxFilesChanged }
 if (-not $PSBoundParameters.ContainsKey("MaxLinesAdded")) { $MaxLinesAdded = [int]$Config.maxLinesAdded }
 if (-not $PSBoundParameters.ContainsKey("MaxLinesDeleted")) { $MaxLinesDeleted = [int]$Config.maxLinesDeleted }
+$DefaultAllowLargeReplacements = if ($null -ne $Config.allowLargeReplacements) { [bool]$Config.allowLargeReplacements } else { $false }
+$DefaultMaxReplacedFileLines = if ($null -ne $Config.maxReplacedFileLines) { [int]$Config.maxReplacedFileLines } else { 300 }
+$DefaultMaxDeletedLinesRatio = if ($null -ne $Config.maxDeletedLinesRatio) { [double]$Config.maxDeletedLinesRatio } else { 0.25 }
 
 $GitCommand = Get-Command git -ErrorAction SilentlyContinue
 if (-not $GitCommand) { Stop-Run "Git was not found on PATH." }
@@ -1096,7 +1255,11 @@ $TaskBlockedPaths = @(Get-MetaValue $Meta "blocked_paths" @())
 $RequiredPaths = @((Get-MetaValue $Meta "required_paths" @()) | ForEach-Object { Normalize-RepoPath $_ })
 $RequiredContent = @(Get-MetaValue $Meta "required_content" @())
 $BlockedContent = @(Get-MetaValue $Meta "blocked_content" @())
+$PreserveContent = @(Get-MetaValue $Meta "preserve_content" @())
 $MinLines = Get-MetaMap $Meta "min_lines"
+$AllowLargeReplacements = [bool](Get-MetaValue $Meta "allow_large_replacements" $DefaultAllowLargeReplacements)
+$MaxReplacedFileLines = [int](Get-MetaValue $Meta "max_replaced_file_lines" $DefaultMaxReplacedFileLines)
+$MaxDeletedLinesRatio = [double](Get-MetaValue $Meta "max_deleted_lines_ratio" $DefaultMaxDeletedLinesRatio)
 $GlobalBlockedPaths = @($Config.globalBlockedPaths)
 $BlockedGlobs = @($Config.defaultBlockedGlobs)
 $ArtifactRoot = $Config.artifactRoot
@@ -1160,6 +1323,7 @@ Runner constraints:
 - Required paths: $($RequiredPaths -join ', ')
 - Required content: $($RequiredContent -join ', ')
 - Blocked content: $($BlockedContent -join ', ')
+- Preserve content: $($PreserveContent -join ', ')
 - Min lines: $((@($MinLines.Keys) | ForEach-Object { "$_=$($MinLines[$_])" }) -join ', ')
 - Blocked paths: $(@($GlobalBlockedPaths + $TaskBlockedPaths) -join ', ')
 - Blocked globs: $($BlockedGlobs -join ', ')
@@ -1167,6 +1331,9 @@ Runner constraints:
 - Allow deletes: $AllowDeletes
 - Allow renames: $AllowRenames
 - Allow replacements: $AllowReplacements
+- Allow large replacements: $AllowLargeReplacements
+- Max replaced file lines: $MaxReplacedFileLines
+- Max deleted lines ratio: $MaxDeletedLinesRatio
 - Edit mode: $EditMode
 - Validation command: $ValidationCommand
 "@
@@ -1230,12 +1397,15 @@ JSON file-operation requirements:
     }
   ]
 }
-- Supported actions are only "create" and "replace_entire_file".
+- Supported actions are only "create", "replace_entire_file", "insert_after", and "insert_before".
+- Prefer insert_after or insert_before for existing large files.
+- insert_after and insert_before require "path", "anchor", and "content". Optional "occurrence" selects which anchor match to use.
+- Do not use replace_entire_file for large existing files unless the task explicitly allows large replacements.
 - Do not include delete, rename, shell commands, patches, partial edits, comments, or extra fields.
 - Use real repo-relative paths with forward slashes.
 - If required paths are listed in the runner constraints, include every required path exactly.
 - Do not use absolute paths or ../ traversal.
-- For this task, prefer one create edit under docs/.
+- For each task, edit only the paths required or directly necessary for the task.
 - The runner will write files, generate the Git diff, run validation, and commit if allowed.
 '@
 if ($EditMode -eq "json_file_ops") {
@@ -1299,6 +1469,8 @@ if ($EditMode -eq "json_file_ops") {
 	$SafetyLines += "- Accepted raw JSON or exactly one fenced json block with no surrounding prose."
 	$SafetyLines += "- Normalized JSON text edits before writing by trimming trailing line whitespace and enforcing a final newline."
 	$SafetyLines += "- Allowed same-run repair replacement only for files created earlier by this runner run."
+	$SafetyLines += "- Rejected destructive large-file replacement unless explicitly allowed by task."
+	$SafetyLines += "- Enforced preserve_content tokens for changed existing files."
 	if ($RequiredContent.Count -gt 0 -or $BlockedContent.Count -gt 0 -or $MinLines.Keys.Count -gt 0) {
 		$SafetyLines += "- Enforced task content checks before writing JSON file-operation edits."
 		$SafetyLines += "- Required content tokens: $($RequiredContent.Count); blocked content tokens: $($BlockedContent.Count); min_lines entries: $($MinLines.Keys.Count)."
@@ -1398,7 +1570,16 @@ $ValidationText
 		}
 	}
 
-	$RawPatch = Invoke-LocalChat -Endpoint $Endpoint -Model $Model -SystemPrompt $PatchSystemPrompt -UserPrompt $PatchPrompt -MaxTokens 4096
+	try {
+		$RawPatch = Invoke-LocalChat -Endpoint $Endpoint -Model $Model -SystemPrompt $PatchSystemPrompt -UserPrompt $PatchPrompt -MaxTokens 4096
+	} catch {
+		$LastFailure = "Model/API request failed: $($_.Exception.Message)"
+		$AttemptLines += "- Attempt ${Attempt}: model/API request failed: $($_.Exception.Message)"
+		$ValidationExitCode = 1
+		$ValidationSummary = "Model/API request failed before validation."
+		$StopReason = "model/API failure; runner-applied files rolled back if any"
+		break
+	}
 	Write-TextFile $RawPatchPath $RawPatch
 
 	if ($EditMode -eq "json_file_ops") {
@@ -1426,7 +1607,7 @@ $ValidationText
 			$AttemptLines += "- Attempt ${Attempt}: whitespace normalization $($NormalizationLine.TrimStart('-').Trim())"
 		}
 
-		$ManifestInfo = Test-JsonEditManifest -Manifest $Manifest -AllowedPaths $AllowedPaths -BlockedPaths $TaskBlockedPaths -GlobalBlockedPaths $GlobalBlockedPaths -BlockedGlobs $BlockedGlobs -RequiredPaths $RequiredPaths -RequiredContent $RequiredContent -BlockedContent $BlockedContent -MinLines $MinLines -SameRunReplacePaths $RunnerCreatedPaths -AllowNewFiles $AllowNewFiles -AllowReplacements $AllowReplacements -MaxFilesChanged $MaxFilesChanged
+		$ManifestInfo = Test-JsonEditManifest -Manifest $Manifest -AllowedPaths $AllowedPaths -BlockedPaths $TaskBlockedPaths -GlobalBlockedPaths $GlobalBlockedPaths -BlockedGlobs $BlockedGlobs -RequiredPaths $RequiredPaths -RequiredContent $RequiredContent -BlockedContent $BlockedContent -PreserveContent $PreserveContent -MinLines $MinLines -SameRunReplacePaths $RunnerCreatedPaths -AllowNewFiles $AllowNewFiles -AllowReplacements $AllowReplacements -MaxFilesChanged $MaxFilesChanged -AllowLargeReplacements $AllowLargeReplacements -MaxReplacedFileLines $MaxReplacedFileLines
 		if ($ManifestInfo.Errors.Count -gt 0) {
 			$JsonSanitizationStatus = if ($SanitizedJson.Sanitized) { "single fenced json extracted" } else { "raw JSON" }
 			$LastRejectedPatch = $SanitizedJson.JsonText
@@ -1454,13 +1635,14 @@ $ValidationText
 		$JsonSanitizationStatus = if ($SanitizedJson.Sanitized) { "single fenced json extracted" } else { "raw JSON" }
 		$AttemptLines += "- Attempt ${Attempt}: JSON edits applied to $($ManifestInfo.Files.Count) file(s); sanitization: $JsonSanitizationStatus."
 
-		$Budget = Get-CurrentDiffBudget -IgnorePrefixes @($ArtifactRoot)
-		if ($Budget.Files.Count -gt $MaxFilesChanged -or $Budget.Added -gt $MaxLinesAdded -or $Budget.Deleted -gt $MaxLinesDeleted) {
-			$AttemptLines += "- Attempt ${Attempt}: cumulative diff budget exceeded ($($Budget.Files.Count) files, +$($Budget.Added), -$($Budget.Deleted))."
+		$DiffSafety = Test-CurrentDiffSafety -IgnorePrefixes @($ArtifactRoot) -MaxFilesChanged $MaxFilesChanged -MaxLinesAdded $MaxLinesAdded -MaxLinesDeleted $MaxLinesDeleted -MaxDeletedLinesRatio $MaxDeletedLinesRatio -PreserveContent $PreserveContent
+		$Budget = $DiffSafety.Budget
+		if ($DiffSafety.Errors.Count -gt 0) {
+			$AttemptLines += "- Attempt ${Attempt}: cumulative diff safety checks failed ($($Budget.Files.Count) files, +$($Budget.Added), -$($Budget.Deleted)): $($DiffSafety.Errors -join '; ')"
 			$ValidationExitCode = 1
-			$ValidationSummary = "Cumulative diff budget exceeded."
+			$ValidationSummary = "Cumulative diff safety checks failed."
 			$LastRejectedPatch = (Invoke-Git @("diff", "--") ).Output
-			$LastFailure = "Cumulative diff budget exceeded."
+			$LastFailure = "Cumulative diff safety checks failed: $($DiffSafety.Errors -join '; ')"
 			continue
 		}
 
@@ -1529,11 +1711,14 @@ $ValidationText
 	$SanitizationStatus = if ($SanitizedPatch.Sanitized) { "single fenced diff extracted" } else { "raw unified diff" }
 	$AttemptLines += "- Attempt ${Attempt}: patch applied to $($PatchInfo.Files.Count) file(s); sanitization: $SanitizationStatus."
 
-	$Budget = Get-CurrentDiffBudget -IgnorePrefixes @($ArtifactRoot)
-	if ($Budget.Files.Count -gt $MaxFilesChanged -or $Budget.Added -gt $MaxLinesAdded -or $Budget.Deleted -gt $MaxLinesDeleted) {
-		$AttemptLines += "- Attempt ${Attempt}: cumulative diff budget exceeded ($($Budget.Files.Count) files, +$($Budget.Added), -$($Budget.Deleted))."
+	$DiffSafety = Test-CurrentDiffSafety -IgnorePrefixes @($ArtifactRoot) -MaxFilesChanged $MaxFilesChanged -MaxLinesAdded $MaxLinesAdded -MaxLinesDeleted $MaxLinesDeleted -MaxDeletedLinesRatio $MaxDeletedLinesRatio -PreserveContent $PreserveContent
+	$Budget = $DiffSafety.Budget
+	if ($DiffSafety.Errors.Count -gt 0) {
+		$AttemptLines += "- Attempt ${Attempt}: cumulative diff safety checks failed ($($Budget.Files.Count) files, +$($Budget.Added), -$($Budget.Deleted)): $($DiffSafety.Errors -join '; ')"
 		$ValidationExitCode = 1
-		$ValidationSummary = "Cumulative diff budget exceeded."
+		$ValidationSummary = "Cumulative diff safety checks failed."
+		$LastRejectedPatch = (Invoke-Git @("diff", "--") ).Output
+		$LastFailure = "Cumulative diff safety checks failed: $($DiffSafety.Errors -join '; ')"
 		continue
 	}
 
@@ -1590,6 +1775,10 @@ $RequestedScope = @(
 	"- Global blocked paths: $($GlobalBlockedPaths -join ', ')",
 	"- New files allowed: $AllowNewFiles",
 	"- Replacements allowed: $AllowReplacements",
+	"- Large replacements allowed: $AllowLargeReplacements",
+	"- Max replaced file lines: $MaxReplacedFileLines",
+	"- Max deleted lines ratio: $MaxDeletedLinesRatio",
+	"- Preserve content: $($PreserveContent -join ', ')",
 	"- Deletes allowed: $AllowDeletes",
 	"- Renames allowed: $AllowRenames",
 	"- Edit mode: $EditMode"
