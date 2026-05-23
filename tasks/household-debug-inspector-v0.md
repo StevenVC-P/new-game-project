@@ -45,13 +45,35 @@ The inspector should be small, read-only, and defensive. It must not change simu
 # Required Implementation Shape
 
 - Extend `Control`.
+- Define at least these variables:
+  - `var root_box: VBoxContainer`
+  - `var title_label: Label`
+  - `var household_label: Label`
+  - `var population_label: Label`
+  - `var housing_label: Label`
+  - `var food_label: Label`
+  - `var responsibility_label: Label`
+  - `var resource_label: Label`
 - Create UI elements programmatically in `_ready()`.
-- Expose a method such as `set_city(city)` or `update_from_city(city)`.
-- Read available city/household data defensively.
-- Use fallback labels when values are not accessible.
+- Add a visible title label with exactly this text: `Household Settlement Debug Inspector`.
+- Add visible fallback text labels:
+  - `Households: unavailable`
+  - `Population: unavailable`
+  - `Housing: unavailable`
+  - `Food: unavailable`
+  - `Responsibilities: unavailable`
+  - `Resources: unavailable`
+- Implement `set_city(city)` by storing the city reference and calling `update_from_city(city)`.
+- Implement `update_from_city(city)` with defensive reads only.
+- Read available city/household data defensively and show fallback values when data is missing.
+- Include helper methods for safe property or dictionary access if useful.
 - Remain read-only.
+- Never mutate city or household state.
 - Do not require scene wiring.
 - Do not create `.tscn` files.
+- Contain no pass-only method bodies.
+- Contain no placeholder "TODO only" implementation.
+- Contain at least 80 lines of meaningful GDScript while staying under `max_lines_added`.
 
 # Display Fields
 
@@ -78,11 +100,17 @@ Desired fields:
 - Do not redesign `scenes/main.tscn`.
 - Do not rename nodes/classes/files.
 - Do not create `docs/example.md`.
+- Do not return empty methods or only `pass` statements.
+- Do not return a script that creates no visible UI labels.
+- Do not return a script that fails to update label text from city data or fallback values.
 
 # Definition of Done
 
 - Inspector script exists at `scripts/ui/household_debug_inspector.gd`.
 - Inspector is read-only.
 - Inspector can be instantiated later as a `Control` script.
+- Inspector creates visible UI labels programmatically.
+- Inspector updates labels from city data where possible and fallback values otherwise.
+- Empty methods or pass-only stubs do not satisfy this task.
 - Validation passes.
 - No simulation behavior changes.
