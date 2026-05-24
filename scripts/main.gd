@@ -908,6 +908,12 @@ func draw_selected_object_summary(font: Font, font_size: int, city: City, x: flo
 	else:
 		y = draw_sidebar_label_value(font, font_size, "Worker", get_selected_building_worker_summary(city, building), x, y, VisualStyle.COLOR_POPULATION_LABOR)
 		y = draw_sidebar_label_value(font, font_size, "Upkeep", str(building.maintenance_level) + "%", x, y, get_maintenance_summary_color(building))
+	# Display selected building action hints
+	var selected_building_hint_lines := SelectedBuildingActionHintHelper.get_hints(building, city)
+	if selected_building_hint_lines.size() > 0:
+		y = draw_sidebar_section_title(font, "Selected Building Hints", x, y)
+		for hint_text in selected_building_hint_lines:
+			y = draw_sidebar_line(font, font_size, hint_text, x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
 
 	return y
 
