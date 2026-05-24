@@ -6,7 +6,6 @@ branch_name: feature/expanded-goods-resource-keys-v0
 edit_mode: json_file_ops
 allowed_paths:
   - scripts/domain/city.gd
-  - scripts/main.gd
   - docs/RESOURCE_HOUSEHOLD_LABOR_TRADE_MODEL.md
 blocked_paths:
   - project.godot
@@ -19,9 +18,8 @@ blocked_paths:
   - docs/MONEY_OBLIGATION_AND_CITY_CREDIT_MODEL.md
 required_paths:
   - scripts/domain/city.gd
-  - scripts/main.gd
 max_files_changed: 3
-max_lines_added: 140
+max_lines_added: 90
 max_lines_deleted: 10
 allow_new_files: false
 allow_replacements: false
@@ -41,26 +39,8 @@ required_content_by_path:
     - '"pottery"'
     - '"wool"'
     - '"clothing"'
-  scripts/main.gd:
-    - "Wheat"
-    - "Bread"
-    - "Fish"
-    - "Stone"
-    - "Planks"
-    - "Clay"
-    - "Pottery"
-    - "Wool"
-    - "Clothing"
 blocked_content_by_path:
   scripts/domain/city.gd:
-    - "city_credit"
-    - "obligation"
-    - "debt"
-    - "currency"
-    - "wooden_tools"
-  scripts/main.gd:
-    - "replace_entire_file"
-    - ".tscn"
     - "city_credit"
     - "obligation"
     - "debt"
@@ -73,10 +53,6 @@ preserve_content:
   - "func update_building_maintenance(building: Building):"
   - "func record_resource_history():"
   - "func get_resource_trends() -> Dictionary:"
-  - "func draw_city_sidebar(font: Font, font_size: int):"
-  - "CityPressureHintHelper"
-  - "SelectedBuildingActionHintHelper"
-  - "HouseholdHomeWorkLinkHelper"
 ---
 
 # Goal
@@ -91,7 +67,7 @@ This is a conservative first implementation slice for:
 
 # Scope
 
-Add initialized resource keys and read-only visibility for expanded goods.
+Add initialized resource keys for expanded goods.
 
 Required new resource keys:
 
@@ -137,8 +113,6 @@ Do not change:
 
 `scripts/domain/city.gd` should safely initialize the new resource keys, likely in `make_starting_resources()`, with starting values of `0`.
 
-`scripts/main.gd` should make the expanded goods visible in the existing City Overview resource display if it can be done safely and compactly.
-
 Keep existing food, wood, and tools display intact.
 
 The new goods are storage/display groundwork only. They should not affect:
@@ -154,34 +128,26 @@ The new goods are storage/display groundwork only. They should not affect:
 
 # Main Script Guidance
 
-Use targeted `insert_after` or `insert_before` operations only.
+Do not edit `scripts/main.gd` in this v0 task.
 
-Do not use `replace_entire_file` for `scripts/main.gd`.
+The current resource display in `scripts/main.gd` is manual, not generic. The real City Overview resource rows are:
 
-Use exact anchors from:
+```gdscript
+y = draw_sidebar_label_value(font, font_size, "Food", str(resources["food"]) + "  use " + str(resources["food_consumption_rate"]) + "/tick", text_x, y, VisualStyle.COLOR_RESOURCE_FOOD)
+y = draw_sidebar_label_value(font, font_size, "Wood", str(resources["wood"]), text_x, y, VisualStyle.COLOR_RESOURCE_WOOD)
+y = draw_sidebar_label_value(font, font_size, "Tools", str(resources["tools"]), text_x, y, VisualStyle.COLOR_RESOURCE_TOOLS)
+```
 
-- docs/MAIN_GD_INTEGRATION_MAP.md
-- docs/CITY_SIDEBAR_INTEGRATION_MAP.md
+There is no `draw_resource_line(...)` helper. Do not invent one.
 
-Likely safe area:
-
-- the existing `Resources` section in `draw_city_sidebar(font, font_size)`
-
-Keep display compact. If space is tight, group goods into short lines such as:
-
-- `Grain: wheat / bread`
-- `Food+: fish`
-- `Materials: stone / planks / clay`
-- `Goods: pottery / wool / clothing`
-
-Do not create a new control, scene, or UI file.
+Expanded goods display is deferred to a later task after resource keys exist and the desired sidebar layout is decided.
 
 # Documentation Guidance
 
 If updating `docs/RESOURCE_HOUSEHOLD_LABOR_TRADE_MODEL.md`, clearly separate observed behavior from future design:
 
-- observed after this task: expanded keys exist and display as groundwork
-- not yet implemented: production chains, consumption migration, access gating, money/credit/obligation
+- observed after this task: expanded keys exist as resource-key groundwork
+- not yet implemented: display expansion, production chains, consumption migration, access gating, money/credit/obligation
 
 # Definition of Done
 
@@ -189,7 +155,7 @@ If updating `docs/RESOURCE_HOUSEHOLD_LABOR_TRADE_MODEL.md`, clearly separate obs
 - Current `food`, `wood`, and `tools` behavior remains unchanged.
 - Current food consumption remains based on generic `food`.
 - Current farm, woodcutter, and toolmaker formulas remain unchanged.
-- New goods are visible or safely readable without runtime errors.
+- New goods are safely readable without runtime errors.
 - No money, credit, debt, obligation, or currency mechanics are added.
 - Validation passes.
 
@@ -198,7 +164,7 @@ If updating `docs/RESOURCE_HOUSEHOLD_LABOR_TRADE_MODEL.md`, clearly separate obs
 1. Run the game.
 2. Enter city view.
 3. Confirm existing food, wood, and tools display still works.
-4. Confirm expanded goods are visible or safely initialized.
+4. Confirm expanded goods are safely initialized if inspected through debug/script state.
 5. Place and assign current production buildings.
 6. Advance simulation.
 7. Confirm generic food consumption still works as before.
@@ -216,5 +182,5 @@ Reject the output if:
 - `wooden_tools` is added
 - project files or scenes change
 - domain files other than `scripts/domain/city.gd` change
+- `scripts/main.gd` changes
 - UI/debug helper files change
-- `scripts/main.gd` is broadly replaced
