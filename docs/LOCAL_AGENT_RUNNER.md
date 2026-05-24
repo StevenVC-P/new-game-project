@@ -47,10 +47,14 @@ If LM Studio fails during a repair prompt, including context overflow errors suc
 
 Supported content checks:
 
-- `required_content`: literal text tokens that must appear in changed required files.
-- `blocked_content`: literal text tokens that must not appear in changed text files.
+- `required_content`: global literal text tokens that must appear in every changed required file.
+- `blocked_content`: global literal text tokens that must not appear in any changed text file.
+- `required_content_by_path`: per-file literal text tokens that must appear only in the listed file.
+- `blocked_content_by_path`: per-file literal text tokens that must not appear only in the listed file.
 - `min_lines`: per-path minimum line counts.
 - `preserve_content`: literal tokens that must remain in an existing changed file if they were present before the edit.
+
+Use global content checks for simple one-file tasks where every changed required file should contain the same tokens. Use path-specific content checks for multi-file tasks. For example, a new UI script can require `extends Control`, `func set_city`, and panel labels, while an integration edit in `scripts/main.gd` should instead preserve existing anchors and block unsafe references. Avoid applying UI-script tokens globally to integration files such as `scripts/main.gd`.
 
 Replacement safety checks:
 
@@ -83,6 +87,14 @@ required_content:
 blocked_content:
   - "typeid ="
   - "pass"
+required_content_by_path:
+  scripts/ui/example_panel.gd:
+    - "extends Control"
+    - "func set_city"
+blocked_content_by_path:
+  scripts/main.gd:
+    - ".tscn"
+    - "replace_entire_file"
 min_lines:
   scripts/ui/household_debug_inspector.gd: 80
 blocked_paths:
@@ -236,7 +248,7 @@ Invalid JSON:
 - JSON mode rejects invalid JSON, unknown fields, unsupported actions, prose around JSON, multiple fenced blocks, absolute paths, `../` traversal, blocked paths, binary-looking content, creates over existing files, and replacements unless `allow_replacements: true`.
 - JSON mode rejects large whole-file replacements by default. If a task must modify a large existing file, use `insert_after` or `insert_before`, strict line budgets, `preserve_content`, and `blocked_content` instead of `replace_entire_file`.
 - If the model creates an irrelevant but safe file, such as `docs/example.md`, add exact `required_paths` for the expected outputs and block the junk path explicitly with `blocked_paths`.
-- If the model creates shape-correct but weak code, add `required_content`, `blocked_content`, and `min_lines` checks. For example, block tokens such as invalid top-level assignments or placeholder `pass` bodies, require helper method names, and require a minimum line count for the target file.
+- If the model creates shape-correct but weak code, add `required_content`, `blocked_content`, path-specific content checks, and `min_lines` checks. For example, block tokens such as invalid top-level assignments or placeholder `pass` bodies, require helper method names in the target file, and require a minimum line count for that file.
 - Inspect `raw-patch-attempt-*.txt`, `edits-attempt-*.json`, and `edit-manifest-attempt-*.json` in the run artifact directory.
 
 Validation failure:

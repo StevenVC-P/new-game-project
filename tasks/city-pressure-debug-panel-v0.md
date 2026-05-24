@@ -25,24 +25,29 @@ allow_deletes: false
 allow_renames: false
 validation_command: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_project.ps1
 commit_message: "feat: add city pressure debug panel"
-required_content:
-  - "extends Control"
-  - "func set_city"
-  - "func update_from_city"
-  - "get_pressure_summary"
-  - "food"
-  - "shelter"
-  - "labor"
-  - "tools"
-  - "maintenance"
-  - "unavailable"
-blocked_content:
-  - "replace_entire_file"
-  - ".tscn"
-  - "city.tick"
-  - "pay_cost"
-  - "add_resource"
-  - "remove_resource"
+required_content_by_path:
+  scripts/ui/city_pressure_debug_panel.gd:
+    - "extends Control"
+    - "func set_city"
+    - "func update_from_city"
+    - "get_pressure_summary"
+    - "food"
+    - "shelter"
+    - "labor"
+    - "tools"
+    - "maintenance"
+    - "unavailable"
+blocked_content_by_path:
+  scripts/ui/city_pressure_debug_panel.gd:
+    - "city.tick"
+    - "pay_cost"
+    - "add_resource"
+    - "remove_resource"
+  scripts/main.gd:
+    - "replace_entire_file"
+    - ".tscn"
+    - "household_debug_inspector.tscn"
+    - "city_pressure_debug_panel.tscn"
 preserve_content:
   - "func _ready():"
   - "func _input(event: InputEvent):"

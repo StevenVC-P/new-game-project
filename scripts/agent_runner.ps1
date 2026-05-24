@@ -324,23 +324,43 @@ function Read-TaskFile {
 		$FrontMatter = $Matches[1]
 		$Body = $Matches[2]
 		$CurrentKey = $null
+		$CurrentMapKey = $null
 		foreach ($Line in ($FrontMatter -split "\r?\n")) {
-			if ($Line -match '^\s+([^:\s][^:]*?):\s*(.+?)\s*$' -and $CurrentKey) {
+			if ($Line -match '^\s*-\s*(.+?)\s*$' -and $CurrentKey) {
+				if ($CurrentMapKey) {
+					if (-not ($Meta[$CurrentKey] -is [hashtable])) {
+						$Meta[$CurrentKey] = @{}
+					}
+					if (-not $Meta[$CurrentKey].ContainsKey($CurrentMapKey)) {
+						$Meta[$CurrentKey][$CurrentMapKey] = @()
+					}
+					$Meta[$CurrentKey][$CurrentMapKey] = @($Meta[$CurrentKey][$CurrentMapKey]) + @((Convert-Scalar $Matches[1]))
+				} else {
+					if (-not $Meta.ContainsKey($CurrentKey)) {
+						$Meta[$CurrentKey] = @()
+					}
+					$Meta[$CurrentKey] = @($Meta[$CurrentKey]) + @((Convert-Scalar $Matches[1]))
+				}
+				continue
+			}
+			if ($Line -match '^\s+([^:\s][^:]*?):\s*(.*?)\s*$' -and $CurrentKey) {
 				if (-not ($Meta[$CurrentKey] -is [hashtable])) {
 					$Meta[$CurrentKey] = @{}
 				}
-				$Meta[$CurrentKey][(Convert-Scalar $Matches[1])] = Convert-Scalar $Matches[2]
-				continue
-			}
-			if ($Line -match '^\s*-\s*(.+?)\s*$' -and $CurrentKey) {
-				if (-not $Meta.ContainsKey($CurrentKey)) {
-					$Meta[$CurrentKey] = @()
+				$NestedKey = Convert-Scalar $Matches[1]
+				$NestedValue = $Matches[2]
+				if ([string]::IsNullOrWhiteSpace($NestedValue)) {
+					$Meta[$CurrentKey][$NestedKey] = @()
+					$CurrentMapKey = $NestedKey
+				} else {
+					$Meta[$CurrentKey][$NestedKey] = Convert-Scalar $NestedValue
+					$CurrentMapKey = $null
 				}
-				$Meta[$CurrentKey] = @($Meta[$CurrentKey]) + @((Convert-Scalar $Matches[1]))
 				continue
 			}
 			if ($Line -match '^([A-Za-z0-9_]+):\s*(.*)$') {
 				$CurrentKey = $Matches[1]
+				$CurrentMapKey = $null
 				$Value = $Matches[2]
 				if ([string]::IsNullOrWhiteSpace($Value)) {
 					$Meta[$CurrentKey] = @()
@@ -386,6 +406,32 @@ function Get-MetaMap {
 		return $Metadata[$Key]
 	}
 	return @{}
+}
+
+function Get-MetaListMap {
+	param(
+		[hashtable]$Metadata,
+		[string]$Key
+	)
+
+	$Result = @{}
+	if (-not ($Metadata.ContainsKey($Key) -and $Metadata[$Key] -is [hashtable])) {
+		return $Result
+	}
+	foreach ($MapKey in $Metadata[$Key].Keys) {
+		$RepoPath = Normalize-RepoPath ([string]$MapKey)
+		$Result[$RepoPath] = @($Metadata[$Key][$MapKey])
+	}
+	return $Result
+}
+
+function Format-ListMapSummary {
+	param([hashtable]$Map)
+
+	if ($Map.Keys.Count -eq 0) {
+		return ""
+	}
+	return ((@($Map.Keys) | Sort-Object | ForEach-Object { "$_=$(@($Map[$_]).Count)" }) -join ', ')
 }
 
 function Get-StatusPaths {
@@ -717,6 +763,8 @@ function Test-JsonEditManifest {
 		[string[]]$RequiredPaths,
 		[string[]]$RequiredContent,
 		[string[]]$BlockedContent,
+		[hashtable]$RequiredContentByPath,
+		[hashtable]$BlockedContentByPath,
 		[string[]]$PreserveContent,
 		[hashtable]$MinLines,
 		[string[]]$SameRunReplacePaths,
@@ -843,7 +891,7 @@ function Test-JsonEditManifest {
 			$Errors += "Missing required path in edit manifest: $($RequiredCheck.Path)"
 		}
 	}
-	$ContentInfo = Test-JsonEditContent -Manifest $Manifest -RequiredPaths $RequiredPaths -RequiredContent $RequiredContent -BlockedContent $BlockedContent -MinLines $MinLines
+	$ContentInfo = Test-JsonEditContent -Manifest $Manifest -RequiredPaths $RequiredPaths -RequiredContent $RequiredContent -BlockedContent $BlockedContent -RequiredContentByPath $RequiredContentByPath -BlockedContentByPath $BlockedContentByPath -MinLines $MinLines
 	$Errors += $ContentInfo.Errors
 	return [pscustomobject]@{
 		Errors = @($Errors | Sort-Object -Unique)
@@ -859,6 +907,8 @@ function Test-JsonEditContent {
 		[string[]]$RequiredPaths,
 		[string[]]$RequiredContent,
 		[string[]]$BlockedContent,
+		[hashtable]$RequiredContentByPath,
+		[hashtable]$BlockedContentByPath,
 		[hashtable]$MinLines
 	)
 
@@ -883,6 +933,24 @@ function Test-JsonEditContent {
 				$Errors += "Content check failed for ${RepoPath}: contains blocked_content token '$Token'."
 			}
 		}
+		if ($RequiredContentByPath.ContainsKey($RepoPath)) {
+			foreach ($Token in @($RequiredContentByPath[$RepoPath])) {
+				if ([string]::IsNullOrEmpty($Token)) { continue }
+				if (-not $Content.Contains($Token)) {
+					$Errors += "Content check failed for ${RepoPath}: missing required_content_by_path token '$Token'."
+				}
+			}
+			$SummaryLines += "- ${RepoPath}: path-specific required content tokens checked: $(@($RequiredContentByPath[$RepoPath]).Count)."
+		}
+		if ($BlockedContentByPath.ContainsKey($RepoPath)) {
+			foreach ($Token in @($BlockedContentByPath[$RepoPath])) {
+				if ([string]::IsNullOrEmpty($Token)) { continue }
+				if ($Content.Contains($Token)) {
+					$Errors += "Content check failed for ${RepoPath}: contains blocked_content_by_path token '$Token'."
+				}
+			}
+			$SummaryLines += "- ${RepoPath}: path-specific blocked content tokens checked: $(@($BlockedContentByPath[$RepoPath]).Count)."
+		}
 		if ($MinLines.ContainsKey($RepoPath)) {
 			$RequiredLineCount = [int]$MinLines[$RepoPath]
 			$ActualLineCount = if ([string]::IsNullOrEmpty($Content)) { 0 } else { @($Content -split "\r?\n").Count }
@@ -893,10 +961,16 @@ function Test-JsonEditContent {
 		}
 	}
 	if ($RequiredContent.Count -gt 0) {
-		$SummaryLines += "- Required content tokens checked: $($RequiredContent.Count)."
+		$SummaryLines += "- Global required content tokens checked: $($RequiredContent.Count)."
 	}
 	if ($BlockedContent.Count -gt 0) {
-		$SummaryLines += "- Blocked content tokens checked: $($BlockedContent.Count)."
+		$SummaryLines += "- Global blocked content tokens checked: $($BlockedContent.Count)."
+	}
+	if ($RequiredContentByPath.Keys.Count -gt 0) {
+		$SummaryLines += "- Path-specific required content entries checked: $($RequiredContentByPath.Keys.Count)."
+	}
+	if ($BlockedContentByPath.Keys.Count -gt 0) {
+		$SummaryLines += "- Path-specific blocked content entries checked: $($BlockedContentByPath.Keys.Count)."
 	}
 	return [pscustomobject]@{
 		Errors = @($Errors | Sort-Object -Unique)
@@ -1294,6 +1368,8 @@ $TaskBlockedPaths = @(Get-MetaValue $Meta "blocked_paths" @())
 $RequiredPaths = @((Get-MetaValue $Meta "required_paths" @()) | ForEach-Object { Normalize-RepoPath $_ })
 $RequiredContent = @(Get-MetaValue $Meta "required_content" @())
 $BlockedContent = @(Get-MetaValue $Meta "blocked_content" @())
+$RequiredContentByPath = Get-MetaListMap $Meta "required_content_by_path"
+$BlockedContentByPath = Get-MetaListMap $Meta "blocked_content_by_path"
 $PreserveContent = @(Get-MetaValue $Meta "preserve_content" @())
 $MinLines = Get-MetaMap $Meta "min_lines"
 $AllowLargeReplacements = [bool](Get-MetaValue $Meta "allow_large_replacements" $DefaultAllowLargeReplacements)
@@ -1371,6 +1447,8 @@ Runner constraints:
 - Required paths: $($RequiredPaths -join ', ')
 - Required content: $($RequiredContent -join ', ')
 - Blocked content: $($BlockedContent -join ', ')
+- Required content by path: $(Format-ListMapSummary $RequiredContentByPath)
+- Blocked content by path: $(Format-ListMapSummary $BlockedContentByPath)
 - Preserve content: $($PreserveContent -join ', ')
 - Min lines: $((@($MinLines.Keys) | ForEach-Object { "$_=$($MinLines[$_])" }) -join ', ')
 - Blocked paths: $(@($GlobalBlockedPaths + $TaskBlockedPaths) -join ', ')
@@ -1530,7 +1608,11 @@ if ($EditMode -eq "json_file_ops") {
 	$SafetyLines += "- Enforced preserve_content tokens for changed existing files."
 	if ($RequiredContent.Count -gt 0 -or $BlockedContent.Count -gt 0 -or $MinLines.Keys.Count -gt 0) {
 		$SafetyLines += "- Enforced task content checks before writing JSON file-operation edits."
-		$SafetyLines += "- Required content tokens: $($RequiredContent.Count); blocked content tokens: $($BlockedContent.Count); min_lines entries: $($MinLines.Keys.Count)."
+		$SafetyLines += "- Global required content tokens: $($RequiredContent.Count); global blocked content tokens: $($BlockedContent.Count); min_lines entries: $($MinLines.Keys.Count)."
+	}
+	if ($RequiredContentByPath.Keys.Count -gt 0 -or $BlockedContentByPath.Keys.Count -gt 0) {
+		$SafetyLines += "- Enforced path-specific content checks before writing JSON file-operation edits."
+		$SafetyLines += "- Path-specific required content entries: $($RequiredContentByPath.Keys.Count); path-specific blocked content entries: $($BlockedContentByPath.Keys.Count)."
 	}
 } else {
 	$SafetyLines += "- Accepted raw unified diffs or exactly one fenced diff/patch block with no surrounding prose."
@@ -1683,7 +1765,7 @@ $ValidationText
 
 		Write-RunnerLog "Edit manifest validation started for attempt $Attempt."
 		Write-RunnerLog "Content checks started for attempt $Attempt."
-		$ManifestInfo = Test-JsonEditManifest -Manifest $Manifest -AllowedPaths $AllowedPaths -BlockedPaths $TaskBlockedPaths -GlobalBlockedPaths $GlobalBlockedPaths -BlockedGlobs $BlockedGlobs -RequiredPaths $RequiredPaths -RequiredContent $RequiredContent -BlockedContent $BlockedContent -PreserveContent $PreserveContent -MinLines $MinLines -SameRunReplacePaths $RunnerCreatedPaths -AllowNewFiles $AllowNewFiles -AllowReplacements $AllowReplacements -MaxFilesChanged $MaxFilesChanged -AllowLargeReplacements $AllowLargeReplacements -MaxReplacedFileLines $MaxReplacedFileLines
+		$ManifestInfo = Test-JsonEditManifest -Manifest $Manifest -AllowedPaths $AllowedPaths -BlockedPaths $TaskBlockedPaths -GlobalBlockedPaths $GlobalBlockedPaths -BlockedGlobs $BlockedGlobs -RequiredPaths $RequiredPaths -RequiredContent $RequiredContent -BlockedContent $BlockedContent -RequiredContentByPath $RequiredContentByPath -BlockedContentByPath $BlockedContentByPath -PreserveContent $PreserveContent -MinLines $MinLines -SameRunReplacePaths $RunnerCreatedPaths -AllowNewFiles $AllowNewFiles -AllowReplacements $AllowReplacements -MaxFilesChanged $MaxFilesChanged -AllowLargeReplacements $AllowLargeReplacements -MaxReplacedFileLines $MaxReplacedFileLines
 		if ($ManifestInfo.Errors.Count -gt 0) {
 			$JsonSanitizationStatus = if ($SanitizedJson.Sanitized) { "single fenced json extracted" } else { "raw JSON" }
 			$LastRejectedPatch = $SanitizedJson.JsonText
@@ -1890,6 +1972,10 @@ $RequestedScope = @(
 	"- Max replaced file lines: $MaxReplacedFileLines",
 	"- Max deleted lines ratio: $MaxDeletedLinesRatio",
 	"- Preserve content: $($PreserveContent -join ', ')",
+	"- Global required content tokens: $($RequiredContent.Count)",
+	"- Global blocked content tokens: $($BlockedContent.Count)",
+	"- Path-specific required content: $(Format-ListMapSummary $RequiredContentByPath)",
+	"- Path-specific blocked content: $(Format-ListMapSummary $BlockedContentByPath)",
 	"- Deletes allowed: $AllowDeletes",
 	"- Renames allowed: $AllowRenames",
 	"- Edit mode: $EditMode"
