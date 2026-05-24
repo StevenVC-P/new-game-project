@@ -5,6 +5,16 @@ const BUILDING_HOUSE: String = "house"
 const BUILDING_FARM: String = "farm"
 const BUILDING_WOODCUTTER: String = "woodcutter"
 const BUILDING_TOOLMAKER: String = "toolmaker"
+const BUILDING_QUARRY: String = "quarry"
+const BUILDING_STONECUTTER: String = "stonecutter"
+const BUILDING_BRICKWORKS: String = "brickworks"
+const BUILDING_LIME_KILN: String = "lime_kiln"
+const BUILDING_MORTAR_YARD: String = "mortar_yard"
+const BUILDING_MASON_YARD: String = "mason_yard"
+const BUILDING_SCULPTOR: String = "sculptor"
+const BUILDING_CARVER: String = "carver"
+const BUILDING_TILEWORKS: String = "tileworks"
+const BUILDING_PAVER_YARD: String = "paver_yard"
 const WORK_PREF_NEUTRAL: String = "neutral"
 const WORK_PREF_AGRARIAN: String = "agrarian"
 const WORK_PREF_INDUSTRIAL: String = "industrial"
@@ -12,6 +22,7 @@ const FARM_BASE_OUTPUT: int = 2
 const WOODCUTTER_BASE_OUTPUT: int = 2
 const TOOLMAKER_BASE_OUTPUT: int = 1
 const TOOLMAKER_WOOD_INPUT: int = 2
+const EXPANDED_GOODS_BASE_OUTPUT: int = 1
 const STARTER_NEUTRAL_WORKERS: int = 0
 const STARTING_EXTERNAL_POPULATION_POOL: int = 20
 const STARTING_HOUSEHOLD_COUNT: int = 3
@@ -372,6 +383,44 @@ func apply_building_production(building: Building):
 			var tool_output: int = min(output_amount, max_tool_output_from_wood)
 			resources["wood"] = int(resources["wood"]) - tool_output * TOOLMAKER_WOOD_INPUT
 			resources["tools"] = int(resources["tools"]) + tool_output
+	elif building_type == BUILDING_QUARRY:
+		resources["stone_blocks"] = int(resources["stone_blocks"]) + output_amount
+	elif building_type == BUILDING_STONECUTTER:
+		apply_input_output_production("cut_stone", output_amount, {"stone_blocks": 1})
+	elif building_type == BUILDING_BRICKWORKS:
+		apply_input_output_production("bricks", output_amount, {"wood": 1})
+	elif building_type == BUILDING_LIME_KILN:
+		apply_input_output_production("lime", output_amount, {"stone_blocks": 1, "wood": 1})
+	elif building_type == BUILDING_MORTAR_YARD:
+		apply_input_output_production("mortar", output_amount, {"lime": 1, "stone_blocks": 1})
+	elif building_type == BUILDING_MASON_YARD:
+		apply_input_output_production("masonry", output_amount, {"cut_stone": 1, "mortar": 1})
+	elif building_type == BUILDING_SCULPTOR:
+		apply_input_output_production("statues", output_amount, {"cut_stone": 1, "tools": 1})
+	elif building_type == BUILDING_CARVER:
+		apply_input_output_production("carved_goods", output_amount, {"wood": 1, "tools": 1})
+	elif building_type == BUILDING_TILEWORKS:
+		apply_input_output_production("tiles", output_amount, {"bricks": 1, "wood": 1})
+	elif building_type == BUILDING_PAVER_YARD:
+		apply_input_output_production("paving_stones", output_amount, {"stone_blocks": 1})
+
+func apply_input_output_production(output_key: String, output_amount: int, input_costs: Dictionary):
+	var capped_output: int = output_amount
+	for input_key: String in input_costs.keys():
+		var input_cost: int = int(input_costs[input_key])
+		if input_cost <= 0:
+			continue
+		capped_output = min(capped_output, int(floor(float(int(resources[input_key])) / float(input_cost))))
+
+	if capped_output <= 0:
+		return
+
+	for input_key: String in input_costs.keys():
+		var input_cost: int = int(input_costs[input_key])
+		if input_cost > 0:
+			resources[input_key] = int(resources[input_key]) - capped_output * input_cost
+
+	resources[output_key] = int(resources[output_key]) + capped_output
 
 func get_current_building_output_amount(building: Building) -> int:
 	var maintenance_level: int = building.maintenance_level
@@ -404,6 +453,26 @@ func get_base_building_output_amount(building_type: String) -> int:
 		return WOODCUTTER_BASE_OUTPUT
 	if building_type == BUILDING_TOOLMAKER:
 		return TOOLMAKER_BASE_OUTPUT
+	if building_type == BUILDING_QUARRY:
+		return EXPANDED_GOODS_BASE_OUTPUT
+	if building_type == BUILDING_STONECUTTER:
+		return EXPANDED_GOODS_BASE_OUTPUT
+	if building_type == BUILDING_BRICKWORKS:
+		return EXPANDED_GOODS_BASE_OUTPUT
+	if building_type == BUILDING_LIME_KILN:
+		return EXPANDED_GOODS_BASE_OUTPUT
+	if building_type == BUILDING_MORTAR_YARD:
+		return EXPANDED_GOODS_BASE_OUTPUT
+	if building_type == BUILDING_MASON_YARD:
+		return EXPANDED_GOODS_BASE_OUTPUT
+	if building_type == BUILDING_SCULPTOR:
+		return EXPANDED_GOODS_BASE_OUTPUT
+	if building_type == BUILDING_CARVER:
+		return EXPANDED_GOODS_BASE_OUTPUT
+	if building_type == BUILDING_TILEWORKS:
+		return EXPANDED_GOODS_BASE_OUTPUT
+	if building_type == BUILDING_PAVER_YARD:
+		return EXPANDED_GOODS_BASE_OUTPUT
 
 	return 0
 
@@ -432,6 +501,26 @@ func get_preferred_worker_for_building(building_type: String) -> String:
 	if building_type == BUILDING_FARM:
 		return WORK_PREF_AGRARIAN
 	if building_type == BUILDING_WOODCUTTER or building_type == BUILDING_TOOLMAKER:
+		return WORK_PREF_INDUSTRIAL
+	if building_type == BUILDING_QUARRY:
+		return WORK_PREF_INDUSTRIAL
+	if building_type == BUILDING_STONECUTTER:
+		return WORK_PREF_INDUSTRIAL
+	if building_type == BUILDING_BRICKWORKS:
+		return WORK_PREF_INDUSTRIAL
+	if building_type == BUILDING_LIME_KILN:
+		return WORK_PREF_INDUSTRIAL
+	if building_type == BUILDING_MORTAR_YARD:
+		return WORK_PREF_INDUSTRIAL
+	if building_type == BUILDING_MASON_YARD:
+		return WORK_PREF_INDUSTRIAL
+	if building_type == BUILDING_SCULPTOR:
+		return WORK_PREF_INDUSTRIAL
+	if building_type == BUILDING_CARVER:
+		return WORK_PREF_INDUSTRIAL
+	if building_type == BUILDING_TILEWORKS:
+		return WORK_PREF_INDUSTRIAL
+	if building_type == BUILDING_PAVER_YARD:
 		return WORK_PREF_INDUSTRIAL
 
 	return WORK_PREF_NEUTRAL

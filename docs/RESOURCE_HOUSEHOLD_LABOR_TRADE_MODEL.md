@@ -41,6 +41,23 @@ The implementation already treats households as named simulation units rather th
 
 The primary material resources are `food`, `wood`, and `tools`. Other keys are derived or state-tracking values used for shelter, population, labor, food pressure, growth, production timing, and maintenance grace.
 
+### Expanded Goods Keys
+
+`City.make_starting_resources()` also initializes these expanded-goods resource keys:
+
+- `stone_blocks`
+- `cut_stone`
+- `bricks`
+- `masonry`
+- `lime`
+- `mortar`
+- `statues`
+- `carved_goods`
+- `tiles`
+- `paving_stones`
+
+Basic v1 building production now exists for these keys. Household demand, UI display, trade pricing, prosperity effects, and settlement access rules for these goods are not implemented yet.
+
 `City.record_resource_history()` tracks recent `food`, `wood`, and `tools` values. `City.get_resource_trends()` uses that history to estimate per-tick trends for pressure summaries.
 
 ## Household-First Labor Semantics
@@ -68,6 +85,16 @@ Observed production behavior:
 - Farms add `food`.
 - Woodcutters add `wood`.
 - Toolmakers consume `wood` and add `tools`.
+- Quarries add `stone_blocks`.
+- Stonecutters consume `stone_blocks` and add `cut_stone`.
+- Brickworks consume `wood` and add `bricks`.
+- Lime kilns consume `stone_blocks` and `wood` and add `lime`.
+- Mortar yards consume `lime` and `stone_blocks` and add `mortar`.
+- Mason yards consume `cut_stone` and `mortar` and add `masonry`.
+- Sculptors consume `cut_stone` and `tools` and add `statues`.
+- Carvers consume `wood` and `tools` and add `carved_goods`.
+- Tileworks consume `bricks` and `wood` and add `tiles`.
+- Paver yards consume `stone_blocks` and add `paving_stones`.
 - Food shortage can skip production on alternating ticks through `should_skip_for_food_shortage()`.
 - Maintenance level affects production frequency and can reduce output to zero.
 - Household work preference can modify output up or down through `apply_worker_preference_output_modifier()`.
@@ -77,8 +104,11 @@ Current base outputs are:
 - farm: `2`
 - woodcutter: `2`
 - toolmaker: `1`
+- expanded-goods buildings: `1`
 
 Toolmakers require `2` wood per tool output. If not enough wood exists, tool output is capped by available wood.
+
+Expanded-goods buildings cap or skip output when required inputs are unavailable. Resource values should not go negative.
 
 ## Food, Housing, and Maintenance Pressure
 
