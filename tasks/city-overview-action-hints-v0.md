@@ -35,7 +35,9 @@ required_content_by_path:
     - "labor"
     - "tools"
     - "maintenance"
-    - "unavailable"
+    - "No urgent action hints."
+    - "status"
+    - "severity"
 blocked_content_by_path:
   scripts/ui/city_pressure_hint_helper.gd:
     - "city.tick"
@@ -44,6 +46,11 @@ blocked_content_by_path:
     - "remove_resource"
     - "assign_"
     - "toggle_maintenance"
+    - "pressure_summary[\"food\"] <"
+    - "pressure_summary[\"shelter\"] <"
+    - "pressure_summary[\"labor\"] <"
+    - "pressure_summary[\"tools\"] <"
+    - "pressure_summary[\"maintenance\"] <"
   scripts/main.gd:
     - "replace_entire_file"
     - ".tscn"
@@ -107,8 +114,12 @@ The helper should:
 - use existing pressure summary/resource data only
 - return a small `Array[String]` of actionable hints
 - never mutate city/resources/households/buildings/trade
-- use honest fallbacks
+- use honest fallbacks; for this hint helper, the preferred calm fallback is `"No urgent action hints."`, not a visible `"unavailable"` label
 - not invent mechanics not visible in code
+- treat entries from `city.get_pressure_summary()` as dictionaries, not numeric pressure scores
+- read each pressure entry's `status`, `severity`, and `detail` fields defensively
+- treat `severity == "danger"` and `severity == "warning"` as the main reasons to emit hints
+- do not compare pressure entries directly to numbers
 
 Example hints:
 
@@ -142,8 +153,16 @@ Add an "Action Hints" section to the City Overview sidebar:
 - Keep it short: ideally 1-3 hints.
 - Draw hints under the existing pressure summary or near City Health.
 - If no hints exist, show a calm fallback such as "No urgent action hints."
+- If pressure data is missing or malformed, return the same calm fallback rather than exposing implementation errors to the player.
 - Do not add input controls.
 - Do not change pressure calculations.
+
+Current pressure summary shape:
+
+- `city.get_pressure_summary()` returns a Dictionary with keys `food`, `shelter`, `labor`, `tools`, and `maintenance`.
+- Each pressure entry is a Dictionary with at least `status`, `severity`, `detail`, and `values`.
+- Existing sidebar code passes these entries to `draw_pressure_row(...)`.
+- Do not write logic such as `pressure_summary["food"] < 0`; pressure entries are dictionaries, not numbers.
 
 # Definition of Done
 
