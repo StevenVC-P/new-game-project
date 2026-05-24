@@ -53,6 +53,18 @@ var simulation_clock: SimulationClock = SimulationClock.new()
 var building_placement: BuildingPlacement = BuildingPlacement.new(CITY_MAP_WIDTH, CITY_MAP_HEIGHT, WOODCUTTER_TREE_RADIUS)
 var city_building_overlay: CityBuildingOverlay = CityBuildingOverlay.new(CITY_TILE_SIZE, CITY_VIEW_TOP, CITY_MAP_WIDTH, CITY_MAP_HEIGHT)
 
+var city_pressure_debug_panel: Control = null
+
+func get_city_pressure_debug_city() -> City:
+	if selected_city_index >= 0 and selected_city_index < cities.size():
+		return cities[selected_city_index]
+	return null
+
+func _ensure_city_pressure_debug_panel() -> void:
+	if city_pressure_debug_panel == null:
+		city_pressure_debug_panel = preload("res://scripts/ui/city_pressure_debug_panel.gd").new()
+		add_child(city_pressure_debug_panel)
+		city_pressure_debug_panel.visible = false
 func _ready():
 	rng.randomize()
 	world_calendar.season_changed.connect(on_calendar_season_changed)
@@ -92,6 +104,17 @@ func _process(_delta: float):
 		queue_redraw()
 
 func _input(event: InputEvent):
+	if event is InputEventKey:
+		if event.pressed and not event.echo and event.keycode == KEY_F4:
+			if current_view != VIEW_CITY:
+				if city_pressure_debug_panel != null:
+					city_pressure_debug_panel.visible = false
+				get_viewport().set_input_as_handled()
+				return
+			_ensure_city_pressure_debug_panel()
+			city_pressure_debug_panel.set_city(get_city_pressure_debug_city())
+			city_pressure_debug_panel.visible = not city_pressure_debug_panel.visible
+			get_viewport().set_input_as_handled()
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F3:
 		if current_view != VIEW_CITY:
 			if household_debug_inspector != null:
