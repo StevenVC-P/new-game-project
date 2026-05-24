@@ -18,7 +18,7 @@ func _ready():
 
 	title_label = Label.new()
 	title_label.text = "Household Settlement Debug Inspector"
-	title_label.add_theme_style_override("font_size", 16)
+	title_label.add_theme_font_size_override("font_size", 16)
 	root_box.add_child(title_label)
 
 	household_label = Label.new()
@@ -57,12 +57,14 @@ func update_from_city(city):
 	var pressure_summary = _call_city_method(city, "get_pressure_summary", {})
 
 	var household_count = _read_city_resource(city, "household_count")
-	if household_count == "unavailable" and "households" in city:
-		household_count = city.households.size()
+	if _is_unavailable(household_count):
+		var households = _read_city_property(city, "households", null)
+		if households is Array:
+			household_count = households.size()
 	household_label.text = "Households: " + _format_value(household_count)
 
 	var total_population = _call_city_method(city, "get_total_population")
-	if total_population == "unavailable":
+	if _is_unavailable(total_population):
 		total_population = _read_city_resource(city, "total_population")
 	population_label.text = "Population: " + _format_value(total_population)
 
@@ -76,7 +78,7 @@ func update_from_city(city):
 
 	var assigned_workers = _read_city_resource(city, "assigned_workers")
 	var total_labor_capacity = _call_city_method(city, "get_total_labor_capacity")
-	if total_labor_capacity == "unavailable":
+	if _is_unavailable(total_labor_capacity):
 		total_labor_capacity = _read_city_resource(city, "total_labor_capacity")
 	var idle_workers = _read_city_resource(city, "idle_workers")
 	responsibility_label.text = "Responsibilities: assigned " + _format_value(assigned_workers) + " / capacity " + _format_value(total_labor_capacity) + ", idle " + _format_value(idle_workers)
@@ -95,16 +97,27 @@ func _set_fallback_labels():
 	resource_label.text = "Resources: unavailable"
 
 func _read_city_resource(city, key: String, fallback = "unavailable"):
-	if city == null:
+	var resources = _read_city_property(city, "resources", null)
+	if not (resources is Dictionary):
 		return fallback
-	if not ("resources" in city):
-		return fallback
-	if not (city.resources is Dictionary):
-		return fallback
-	if not city.resources.has(key):
+	if not resources.has(key):
 		return fallback
 
-	return city.resources[key]
+	return resources[key]
+
+func _read_city_property(target, property_name: String, fallback = "unavailable"):
+	if target == null:
+		return fallback
+	if target is Dictionary:
+		if target.has(property_name):
+			return target[property_name]
+		return fallback
+	if target is Object:
+		var value = target.get(property_name)
+		if value != null:
+			return value
+
+	return fallback
 
 func _call_city_method(city, method_name: String, fallback = "unavailable"):
 	if city == null:
@@ -133,18 +146,22 @@ func _read_pressure_status(pressure_summary, key: String, fallback = "unavailabl
 	return pressure["status"]
 
 func _format_suffix(value, fallback = "unavailable"):
-	if value == fallback:
+	var formatted_value = _format_value(value, fallback)
+	if formatted_value == fallback:
 		return ""
 
-	return " (" + _format_value(value, fallback) + ")"
+	return " (" + formatted_value + ")"
 
 func _format_value(value, fallback = "unavailable"):
 	if value == null:
 		return fallback
-	if value == "":
+	if value is String and value == "":
 		return fallback
 
 	return str(value)
+
+func _is_unavailable(value) -> bool:
+	return value is String and value == "unavailable"
 
 func _safe_get(target, property_name, fallback = "unavailable"):
 	if target == null:

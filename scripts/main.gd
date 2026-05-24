@@ -43,6 +43,7 @@ var hovered_city_index: int = -1
 var city_hovered_tile: Vector2i = Vector2i(-1, -1)
 var current_view: String = VIEW_REGION
 var selected_city_index: int = -1
+var household_debug_inspector: Control = null
 var trade_menu: TradeMenu = TradeMenu.new()
 var selected_building_type: String = BUILDING_HOUSE
 var is_placing_building: bool = true
@@ -61,6 +62,7 @@ func _ready():
 	generate_city_local_maps()
 	generate_roads()
 	analyze_city_site_profiles()
+	_ensure_household_debug_inspector()
 	queue_redraw()
 
 func _process(_delta: float):
@@ -90,6 +92,13 @@ func _process(_delta: float):
 		queue_redraw()
 
 func _input(event: InputEvent):
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F3:
+		_ensure_household_debug_inspector()
+		household_debug_inspector.set_city(get_household_debug_city())
+		household_debug_inspector.visible = not household_debug_inspector.visible
+		get_viewport().set_input_as_handled()
+		return
+
 	if event is InputEventMouseButton:
 		var mouse_event: InputEventMouseButton = event as InputEventMouseButton
 		var local_mouse_pos: Vector2 = get_local_mouse_position()
@@ -552,6 +561,24 @@ func get_new_house_work_preference(building_type: String) -> String:
 	if rng.randi_range(0, 1) == 0:
 		return WORK_PREF_AGRARIAN
 	return WORK_PREF_INDUSTRIAL
+
+func _ensure_household_debug_inspector() -> void:
+	if household_debug_inspector != null:
+		return
+
+	var inspector_script: Script = preload("res://scripts/ui/household_debug_inspector.gd")
+	household_debug_inspector = inspector_script.new() as Control
+	add_child(household_debug_inspector)
+	household_debug_inspector.visible = false
+	household_debug_inspector.set_city(get_household_debug_city())
+
+func get_household_debug_city():
+	if selected_city_index >= 0 and selected_city_index < cities.size():
+		return cities[selected_city_index]
+	if cities.size() > 0:
+		return cities[0]
+
+	return null
 
 func _draw():
 	if current_view == VIEW_CITY:
