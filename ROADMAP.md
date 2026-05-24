@@ -22,8 +22,10 @@ This roadmap is intentionally lightweight. Replace placeholders with scoped task
 
 ## UI
 
-- TODO: Inventory current UI flows.
 - UI should make households, city population, food pressure, housing pressure, responsibility coverage, and basic production legible.
+- City Overview now includes pressure rows and Action Hints that translate current pressure states into concise next-step guidance.
+- F3/F4 debug panels provide household and pressure diagnostics, but player-facing guidance should continue moving into the City Overview.
+- TODO: Inventory remaining UI flows that are still debug-only or unclear to players.
 
 ## Enemies/NPCs
 
