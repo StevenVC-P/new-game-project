@@ -20,6 +20,15 @@ allow_replacements: false
 allow_deletes: false
 allow_renames: false
 required_content:
+  - "# Resource, Household, Labor, and Trade Model"
+  - "## Observed Behavior"
+  - "## Household-First Labor Semantics"
+  - "## Resources"
+  - "## Production"
+  - "## Food and Housing Pressure"
+  - "## Trade"
+  - "## Design Intent"
+  - "## Open Questions"
   - "Observed Behavior"
   - "Design Intent"
   - "Open Questions"
@@ -30,7 +39,7 @@ blocked_content:
   - "TODO only"
   - "placeholder only"
 min_lines:
-  docs/RESOURCE_HOUSEHOLD_LABOR_TRADE_MODEL.md: 80
+  docs/RESOURCE_HOUSEHOLD_LABOR_TRADE_MODEL.md: 60
 validation_command: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_project.ps1
 commit_message: "docs: document household labor and trade model"
 ---
@@ -42,6 +51,8 @@ Draft a documentation-only model reference for the current resource, household, 
 # Scope
 
 Create `docs/RESOURCE_HOUSEHOLD_LABOR_TRADE_MODEL.md`.
+
+Use a `create` JSON edit for `docs/RESOURCE_HOUSEHOLD_LABOR_TRADE_MODEL.md`. The target document does not exist yet, so do not use `replace_entire_file`.
 
 Inspect the current code and docs as source material, especially:
 
@@ -62,6 +73,16 @@ Inspect the current code and docs as source material, especially:
 
 The document must:
 
+- Use these headings exactly:
+  - `# Resource, Household, Labor, and Trade Model`
+  - `## Observed Behavior`
+  - `## Household-First Labor Semantics`
+  - `## Resources`
+  - `## Production`
+  - `## Food and Housing Pressure`
+  - `## Trade`
+  - `## Design Intent`
+  - `## Open Questions`
 - List current resources and what they appear to represent.
 - Document household-first labor semantics.
 - Explain that a household is not a generic worker slot.
@@ -72,6 +93,17 @@ The document must:
 - Separate observed behavior from design intent.
 - Include open questions and design tensions.
 - Explicitly preserve the owner decision that one household represents a family-like unit and one baseline labor capacity means one primary responsibility, not one generic worker.
+
+Quality is section completeness and accuracy, not verbosity. It is acceptable for the document to be concise if every required section is present and grounded in the current code.
+
+Avoid inventing mechanics not visible in the code. For example, do not claim:
+
+- trade happens directly between households unless the code shows that
+- overpopulation directly reduces productivity unless the code shows that
+- maintenance consumes labor unless the code shows that
+- seasonal effects change production unless the code shows that
+
+If a behavior is design intent or future direction rather than current code, put it under `## Design Intent` or `## Open Questions`, not under `## Observed Behavior`.
 
 # Forbidden
 
