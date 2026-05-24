@@ -31,7 +31,7 @@ required_content_by_path:
     - "class_name SelectedBuildingActionHintHelper"
     - "static func get_hints"
     - "assigned"
-    - "unassigned"
+    - "Assign an idle household"
     - "maintenance"
     - "tools"
     - "household"
@@ -50,6 +50,7 @@ blocked_content_by_path:
     - "obligation"
     - "debt"
     - "currency"
+    - "get_resource_amount"
   scripts/main.gd:
     - "replace_entire_file"
     - ".tscn"
@@ -64,6 +65,10 @@ blocked_content_by_path:
     - "obligation"
     - "debt"
     - "currency"
+    - "selected_building)"
+    - "var hints :="
+    - "draw_sidebar_section_title(font, font_size"
+    - "draw_sidebar_line(font, font_size, city"
 preserve_content:
   - "func _ready():"
   - "func _input(event: InputEvent):"
@@ -125,6 +130,10 @@ Create:
 
 - `scripts/ui/selected_building_action_hint_helper.gd`
 
+Use a `create` action for `scripts/ui/selected_building_action_hint_helper.gd`. The file does not exist yet.
+
+Do not use `replace_entire_file` or other replacement actions for the helper unless a prior same-run create succeeded and the runner is asking for a repair.
+
 Wire it into:
 
 - `scripts/main.gd`
@@ -138,7 +147,7 @@ The helper should:
 - return a small `Array[String]` of concise player-facing hints
 - return no more than 1-3 useful hints
 - include a calm fallback such as `"No selected building action hints."`
-- mention or handle assigned, unassigned, maintenance, tools, household, and production states
+- mention or handle assigned labor, missing labor, maintenance, tools, household, and production states
 - never mutate city/resources/households/buildings/trade
 - never assign or unassign households
 - never toggle maintenance
@@ -151,6 +160,8 @@ Example hints:
 - "Maintenance is disabled; production may degrade when tools are needed."
 - "Tools are low; maintenance may become unreliable."
 - "No selected building action hints."
+
+The helper does not need to use the exact word `"unassigned"` if it uses clear player-facing language such as `"Assign an idle household to start production."`
 
 # Main Script Integration
 
@@ -166,11 +177,22 @@ Use exact anchors that exist in `scripts/main.gd`.
 Suggested anchors to inspect and confirm before using:
 
 - `func draw_selected_object_summary(font: Font, font_size: int, city: City, x: float, y: float) -> float:`
-- `if building.is_house():`
-- `else:`
-- `return y`
+- `y = draw_sidebar_label_value(font, font_size, "Worker", get_selected_building_worker_summary(city, building), x, y, VisualStyle.COLOR_POPULATION_LABOR)`
+- `y = draw_sidebar_label_value(font, font_size, "Upkeep", str(building.maintenance_level) + "%", x, y, get_maintenance_summary_color(building))`
+- the `return y` at the end of `draw_selected_object_summary(...)`
 
 Do not invent anchors.
+
+Do not insert hint code immediately after the `draw_selected_object_summary(...)` function signature. At that point the local `building` variable has not been declared yet.
+
+Do not reference a nonexistent variable named `selected_building`. Use the existing local `building` variable inside `draw_selected_object_summary(...)`.
+
+Use the existing sidebar helper signatures exactly:
+
+- `draw_sidebar_section_title(font, "Selected Building Hints", x, y)`
+- `draw_sidebar_line(font, font_size, hint_text, x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)`
+
+Do not call these helpers with `city` as an argument.
 
 Add a small "Selected Building Hints" or "Building Action Hints" section near the selected object/building details in the City Overview sidebar.
 
@@ -200,6 +222,8 @@ Use existing state and helpers where available:
 - `city.get_available_neutral_workers()`
 - `city.get_available_workers_from_household(...)` only if already safely available and useful
 - existing sidebar helpers such as `draw_sidebar_section_title(...)`, `draw_sidebar_line(...)`, and `draw_sidebar_label_value(...)`
+
+`city.resources` is a Dictionary. Use `city.resources.has("tools")` and `city.resources["tools"]` defensively. Do not call nonexistent methods like `city.resources.get_resource_amount(...)`.
 
 Avoid modifying existing assignment or maintenance controls.
 
