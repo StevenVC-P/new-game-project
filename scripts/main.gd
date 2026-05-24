@@ -804,6 +804,12 @@ func draw_city_sidebar(font: Font, font_size: int):
 	y = draw_pressure_row(font, font_size, "Maintenance", pressure_summary["maintenance"] as Dictionary, text_x, y)
 	y += 4.0
 
+	y = draw_sidebar_section_title(font, "Action Hints", text_x, y)
+	var action_hint_lines: Array[String] = CityPressureHintHelper.get_hints(pressure_summary, resources)
+	for action_hint: String in action_hint_lines:
+		y = draw_sidebar_line(font, font_size, action_hint, text_x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
+	y += 4.0
+
 	y = draw_sidebar_section_title(font, "Resources", text_x, y)
 	y = draw_sidebar_label_value(font, font_size, "Food", str(resources["food"]) + "  use " + str(resources["food_consumption_rate"]) + "/tick", text_x, y, VisualStyle.COLOR_RESOURCE_FOOD)
 	y = draw_sidebar_label_value(font, font_size, "Wood", str(resources["wood"]), text_x, y, VisualStyle.COLOR_RESOURCE_WOOD)
