@@ -37,6 +37,8 @@ required_content_by_path:
     - "household"
     - "production"
     - "No selected building action hints."
+  scripts/main.gd:
+    - "selected_building_hint_lines"
 blocked_content_by_path:
   scripts/ui/selected_building_action_hint_helper.gd:
     - "city.tick"
@@ -66,6 +68,7 @@ blocked_content_by_path:
     - "debt"
     - "currency"
     - "selected_building)"
+    - "var hints ="
     - "var hints :="
     - "draw_sidebar_section_title(font, font_size"
     - "draw_sidebar_line(font, font_size, city"
@@ -186,6 +189,12 @@ Do not invent anchors.
 Do not insert hint code immediately after the `draw_selected_object_summary(...)` function signature. At that point the local `building` variable has not been declared yet.
 
 Do not reference a nonexistent variable named `selected_building`. Use the existing local `building` variable inside `draw_selected_object_summary(...)`.
+
+Do not name the local hint array `hints`. Use this exact local variable name in `scripts/main.gd`:
+
+- `selected_building_hint_lines`
+
+This avoids collisions with other hint variables in nearby draw scopes.
 
 Use the existing sidebar helper signatures exactly:
 
