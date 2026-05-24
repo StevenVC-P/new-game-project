@@ -15,6 +15,40 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$RunStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+$ProgressLogPath = $null
+$ProgressLogBuffer = @()
+
+function Write-RunnerLog {
+	param([string]$Message)
+
+	$Timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+	$Elapsed = "{0:hh\:mm\:ss}" -f $RunStopwatch.Elapsed
+	$Line = "[$Timestamp +$Elapsed] $Message"
+	Write-Host $Line
+	if ($script:ProgressLogPath) {
+		Append-TextFile $script:ProgressLogPath ($Line + [Environment]::NewLine)
+	} else {
+		$script:ProgressLogBuffer += $Line
+	}
+}
+
+function Initialize-RunnerLogFile {
+	param([string]$Path)
+
+	$script:ProgressLogPath = $Path
+	Write-TextFile $script:ProgressLogPath ""
+	foreach ($Line in $script:ProgressLogBuffer) {
+		Append-TextFile $script:ProgressLogPath ($Line + [Environment]::NewLine)
+	}
+	$script:ProgressLogBuffer = @()
+}
+
+function Format-Duration {
+	param([TimeSpan]$Duration)
+
+	return "{0:hh\:mm\:ss\.fff}" -f $Duration
+}
 
 function Stop-Run {
 	param(
@@ -1193,12 +1227,14 @@ $($ResidualRisks -join "`n")
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = (Resolve-Path (Join-Path $ScriptDir "..")).Path
 Set-Location $RepoRoot
+Write-RunnerLog "Runner start."
 
 $ConfigPath = Join-Path $ScriptDir "agent_runner.config.json"
 if (-not (Test-Path -LiteralPath $ConfigPath)) {
 	Stop-Run "Config file not found: $ConfigPath"
 }
 $Config = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
+Write-RunnerLog "Config loaded: $ConfigPath"
 
 if ([string]::IsNullOrWhiteSpace($Task)) { Stop-Run "Pass -Task <path-to-task.md>." }
 if ([string]::IsNullOrWhiteSpace($Endpoint)) { $Endpoint = $Config.endpoint }
@@ -1214,11 +1250,13 @@ $DefaultMaxDeletedLinesRatio = if ($null -ne $Config.maxDeletedLinesRatio) { [do
 $GitCommand = Get-Command git -ErrorAction SilentlyContinue
 if (-not $GitCommand) { Stop-Run "Git was not found on PATH." }
 if (-not (Get-Command powershell -ErrorAction SilentlyContinue)) { Stop-Run "Windows PowerShell was not found on PATH." }
+Write-RunnerLog "Git preflight started."
 
 $GitRoot = (Invoke-Git @("rev-parse", "--show-toplevel")).Output
 if ([string]::IsNullOrWhiteSpace($GitRoot)) { Stop-Run "Not inside a Git repository." }
 $GitRoot = (Resolve-Path -LiteralPath $GitRoot).Path
 if ($GitRoot -ne $RepoRoot) { Set-Location $GitRoot; $RepoRoot = $GitRoot }
+Write-RunnerLog "Git preflight completed. Repo root: $RepoRoot"
 
 $TaskPath = $Task
 if (-not [System.IO.Path]::IsPathRooted($TaskPath)) {
@@ -1230,6 +1268,7 @@ if (-not (Test-Path -LiteralPath $TaskPath)) {
 
 $TaskData = Read-TaskFile $TaskPath
 $Meta = $TaskData.Metadata
+Write-RunnerLog "Task parsed: $TaskPath"
 
 $BaseBranch = Get-MetaValue $Meta "base_branch" $(if ($BaseBranch) { $BaseBranch } else { $Config.baseBranch })
 $BranchName = Get-MetaValue $Meta "branch_name" $BranchName
@@ -1264,9 +1303,13 @@ $GlobalBlockedPaths = @($Config.globalBlockedPaths)
 $BlockedGlobs = @($Config.defaultBlockedGlobs)
 $ArtifactRoot = $Config.artifactRoot
 
+Write-RunnerLog "LM Studio endpoint check started: $($Endpoint.TrimEnd('/'))/models"
+Write-RunnerLog "Model availability check started: $Model"
 if (-not (Test-ModelAvailable $Endpoint $Model)) {
 	Stop-Run "Endpoint responded, but model '$Model' was not listed at $($Endpoint.TrimEnd('/'))/models."
 }
+Write-RunnerLog "LM Studio endpoint check completed."
+Write-RunnerLog "Model availability check completed: $Model"
 
 $InitialDirty = @(Get-StatusPaths)
 if ($InitialDirty.Count -gt 0) {
@@ -1283,17 +1326,22 @@ if ($BranchExists -and -not $Resume) {
 	Stop-Run "Branch '$BranchName' already exists. Pass -Resume to continue on it."
 }
 
+Write-RunnerLog "Branch setup started. Base: $BaseBranch; feature: $BranchName; exists: $BranchExists"
 if ($BranchExists) {
 	Invoke-Git @("switch", $BranchName) | Out-Null
 } else {
 	Invoke-Git @("switch", $BaseBranch) | Out-Null
 	Invoke-Git @("switch", "-c", $BranchName) | Out-Null
 }
+Write-RunnerLog "Branch setup completed. Current branch: $BranchName"
 
 $RunId = Get-Date -Format "yyyyMMdd-HHmmss"
 $RunDirRel = (Join-Path $ArtifactRoot $RunId) -replace '\\', '/'
 $RunDir = Join-Path $RepoRoot $RunDirRel
 New-Item -ItemType Directory -Force -Path $RunDir | Out-Null
+$RunnerLogPath = Join-Path $RunDir "runner.log"
+Initialize-RunnerLogFile $RunnerLogPath
+Write-RunnerLog "Artifact directory created: $RunDirRel"
 
 $Started = (Get-Date).ToString("o")
 $PlanPath = Join-Path $RunDir "plan.md"
@@ -1353,9 +1401,17 @@ $($TaskData.Content)
 "@
 
 Write-TextFile $PromptPlanPath $PlanPrompt
+Write-RunnerLog "Planning prompt written: $RunDirRel/prompt-plan.txt"
+Write-RunnerLog "Sending planning request to LM Studio."
+Write-RunnerLog "Waiting for LM Studio response..."
+$PlanRequestStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 $Plan = Invoke-LocalChat -Endpoint $Endpoint -Model $Model -SystemPrompt "You are a careful local coding planner. You do not claim to run tools." -UserPrompt $PlanPrompt -MaxTokens 2048
+$PlanRequestStopwatch.Stop()
+Write-RunnerLog "LM Studio response received. Planning request duration: $(Format-Duration $PlanRequestStopwatch.Elapsed)"
+Write-RunnerLog "Planning response received."
 Write-TextFile $RawPlanPath $Plan
 Write-TextFile $PlanPath $Plan
+Write-RunnerLog "Plan written: $RunDirRel/plan.md"
 
 $PatchSystemPrompt = "You produce valid unified git diffs only. No Markdown, no code fences, no explanations, no prose. Always use explicit hunk ranges with comma counts, for example +1,1 instead of +1."
 $UnifiedDiffInstructions = @'
@@ -1453,6 +1509,7 @@ $($TaskData.Content)
 }
 
 Write-TextFile $PromptPatchPath $PatchPromptBase
+Write-RunnerLog "Edit prompt written: $RunDirRel/prompt-patch.txt"
 
 $AttemptLines = @()
 $SafetyLines = @(
@@ -1492,6 +1549,7 @@ $AppliedAnyPatch = $false
 $RunnerCreatedPaths = @()
 
 for ($Attempt = 1; $Attempt -le $MaxAttempts; $Attempt++) {
+	Write-RunnerLog "Edit attempt $Attempt started."
 	$RawPatchPath = Join-Path $RunDir ("raw-patch-attempt-{0}.txt" -f $Attempt)
 	$PatchPath = Join-Path $RunDir ("patch-attempt-{0}.diff" -f $Attempt)
 	$JsonPath = Join-Path $RunDir ("edits-attempt-{0}.json" -f $Attempt)
@@ -1569,10 +1627,22 @@ $ValidationText
 "@
 		}
 	}
+	Write-RunnerLog "Edit prompt prepared for attempt $Attempt."
 
+	$EditRequestStopwatch = $null
 	try {
+		Write-RunnerLog "Sending edit request to LM Studio for attempt $Attempt."
+		Write-RunnerLog "Waiting for LM Studio response..."
+		$EditRequestStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 		$RawPatch = Invoke-LocalChat -Endpoint $Endpoint -Model $Model -SystemPrompt $PatchSystemPrompt -UserPrompt $PatchPrompt -MaxTokens 4096
+		$EditRequestStopwatch.Stop()
+		Write-RunnerLog "LM Studio response received. Edit request attempt $Attempt duration: $(Format-Duration $EditRequestStopwatch.Elapsed)"
+		Write-RunnerLog "Edit response received for attempt $Attempt."
 	} catch {
+		if ($EditRequestStopwatch) {
+			$EditRequestStopwatch.Stop()
+			Write-RunnerLog "LM Studio request failed after $(Format-Duration $EditRequestStopwatch.Elapsed)."
+		}
 		$LastFailure = "Model/API request failed: $($_.Exception.Message)"
 		$AttemptLines += "- Attempt ${Attempt}: model/API request failed: $($_.Exception.Message)"
 		$ValidationExitCode = 1
@@ -1583,14 +1653,17 @@ $ValidationText
 	Write-TextFile $RawPatchPath $RawPatch
 
 	if ($EditMode -eq "json_file_ops") {
+		Write-RunnerLog "JSON sanitization started for attempt $Attempt."
 		$SanitizedJson = Convert-ModelOutputToJson $RawPatch
 		if ($SanitizedJson.Errors.Count -gt 0) {
 			Write-TextFile $JsonPath $RawPatch.Trim()
 			$LastRejectedPatch = $RawPatch.Trim()
 			$LastFailure = "JSON sanitization failed: $($SanitizedJson.Errors -join '; ')"
 			$AttemptLines += "- Attempt ${Attempt}: rejected during JSON sanitization: $($SanitizedJson.Errors -join '; ')"
+			Write-RunnerLog "JSON sanitization failed for attempt $Attempt."
 			continue
 		}
+		Write-RunnerLog "JSON sanitization completed for attempt $Attempt."
 		Write-TextFile $JsonPath $SanitizedJson.JsonText
 
 		try {
@@ -1599,6 +1672,7 @@ $ValidationText
 			$LastRejectedPatch = $SanitizedJson.JsonText
 			$LastFailure = $_.Exception.Message
 			$AttemptLines += "- Attempt ${Attempt}: rejected invalid JSON: $LastFailure"
+			Write-RunnerLog "Edit manifest JSON parse failed for attempt $Attempt."
 			continue
 		}
 		$NormalizationInfo = Normalize-JsonEditManifestText $Manifest
@@ -1607,14 +1681,20 @@ $ValidationText
 			$AttemptLines += "- Attempt ${Attempt}: whitespace normalization $($NormalizationLine.TrimStart('-').Trim())"
 		}
 
+		Write-RunnerLog "Edit manifest validation started for attempt $Attempt."
+		Write-RunnerLog "Content checks started for attempt $Attempt."
 		$ManifestInfo = Test-JsonEditManifest -Manifest $Manifest -AllowedPaths $AllowedPaths -BlockedPaths $TaskBlockedPaths -GlobalBlockedPaths $GlobalBlockedPaths -BlockedGlobs $BlockedGlobs -RequiredPaths $RequiredPaths -RequiredContent $RequiredContent -BlockedContent $BlockedContent -PreserveContent $PreserveContent -MinLines $MinLines -SameRunReplacePaths $RunnerCreatedPaths -AllowNewFiles $AllowNewFiles -AllowReplacements $AllowReplacements -MaxFilesChanged $MaxFilesChanged -AllowLargeReplacements $AllowLargeReplacements -MaxReplacedFileLines $MaxReplacedFileLines
 		if ($ManifestInfo.Errors.Count -gt 0) {
 			$JsonSanitizationStatus = if ($SanitizedJson.Sanitized) { "single fenced json extracted" } else { "raw JSON" }
 			$LastRejectedPatch = $SanitizedJson.JsonText
 			$LastFailure = "JSON edit manifest checks failed after sanitization '$JsonSanitizationStatus': $($ManifestInfo.Errors -join '; ')"
 			$AttemptLines += "- Attempt ${Attempt}: rejected JSON edit manifest after sanitization '$JsonSanitizationStatus': $($ManifestInfo.Errors -join '; ')"
+			Write-RunnerLog "Edit manifest validation failed for attempt $Attempt."
+			Write-RunnerLog "Content checks failed for attempt $Attempt."
 			continue
 		}
+		Write-RunnerLog "Edit manifest validation completed for attempt $Attempt."
+		Write-RunnerLog "Content checks completed for attempt $Attempt."
 		foreach ($ContentCheckLine in @($ManifestInfo.ContentCheckLines)) {
 			$AttemptLines += "- Attempt ${Attempt}: content check $($ContentCheckLine.TrimStart('-').Trim())"
 		}
@@ -1622,7 +1702,9 @@ $ValidationText
 			$AttemptLines += "- Attempt ${Attempt}: same-run repair replacement allowed for $SameRunPath."
 		}
 
+		Write-RunnerLog "File writes started for attempt $Attempt."
 		Apply-JsonEditManifest $Manifest
+		Write-RunnerLog "File writes completed for attempt $Attempt."
 		$AppliedAnyPatch = $true
 		$ApprovedPatchFiles = @($ApprovedPatchFiles + $ManifestInfo.Files) | Sort-Object -Unique
 		foreach ($ManifestPathItem in $ManifestInfo.Files) {
@@ -1635,6 +1717,7 @@ $ValidationText
 		$JsonSanitizationStatus = if ($SanitizedJson.Sanitized) { "single fenced json extracted" } else { "raw JSON" }
 		$AttemptLines += "- Attempt ${Attempt}: JSON edits applied to $($ManifestInfo.Files.Count) file(s); sanitization: $JsonSanitizationStatus."
 
+		Write-RunnerLog "Cumulative diff safety checks started for attempt $Attempt."
 		$DiffSafety = Test-CurrentDiffSafety -IgnorePrefixes @($ArtifactRoot) -MaxFilesChanged $MaxFilesChanged -MaxLinesAdded $MaxLinesAdded -MaxLinesDeleted $MaxLinesDeleted -MaxDeletedLinesRatio $MaxDeletedLinesRatio -PreserveContent $PreserveContent
 		$Budget = $DiffSafety.Budget
 		if ($DiffSafety.Errors.Count -gt 0) {
@@ -1643,9 +1726,12 @@ $ValidationText
 			$ValidationSummary = "Cumulative diff safety checks failed."
 			$LastRejectedPatch = (Invoke-Git @("diff", "--") ).Output
 			$LastFailure = "Cumulative diff safety checks failed: $($DiffSafety.Errors -join '; ')"
+			Write-RunnerLog "Cumulative diff safety checks failed for attempt $Attempt."
 			continue
 		}
+		Write-RunnerLog "Cumulative diff safety checks completed for attempt $Attempt."
 
+		Write-RunnerLog "git diff check started for attempt $Attempt."
 		$DiffCheck = Invoke-Git @("diff", "--check") -AllowFailure
 		if ($DiffCheck.ExitCode -ne 0) {
 			$AttemptLines += "- Attempt ${Attempt}: git diff --check failed: $($DiffCheck.Output)"
@@ -1653,10 +1739,16 @@ $ValidationText
 			$ValidationSummary = "git diff --check failed."
 			$LastRejectedPatch = (Invoke-Git @("diff", "--") ).Output
 			$LastFailure = "git diff --check failed after applying JSON edits: $($DiffCheck.Output)"
+			Write-RunnerLog "git diff check failed for attempt $Attempt."
 			continue
 		}
+		Write-RunnerLog "git diff check completed for attempt $Attempt."
 
+		Write-RunnerLog "Validation command started for attempt $Attempt."
+		$ValidationStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 		$Validation = Invoke-ValidationCommand -Command $ValidationCommand -LogPath $ValidationLogPath
+		$ValidationStopwatch.Stop()
+		Write-RunnerLog "Validation command completed for attempt $Attempt. Duration: $(Format-Duration $ValidationStopwatch.Elapsed)"
 		$ValidationExitCode = $Validation.ExitCode
 		$ValidationSummary = if ($Validation.ExitCode -eq 0) { "Validation passed." } elseif (@($Validation.SeriousLogLines).Count -gt 0) { "Validation failed because serious Godot log lines were detected. See validation.log." } else { "Validation failed. See validation.log." }
 		$AttemptLines += "- Attempt ${Attempt}: validation exit code $ValidationExitCode."
@@ -1683,6 +1775,7 @@ $ValidationText
 	$PatchText = $SanitizedPatch.PatchText
 	Write-TextFile $PatchPath $PatchText
 
+	Write-RunnerLog "Patch safety checks started for attempt $Attempt."
 	$PatchInfo = Get-PatchInfo -PatchText $PatchText -AllowedPaths $AllowedPaths -BlockedPaths $TaskBlockedPaths -GlobalBlockedPaths $GlobalBlockedPaths -BlockedGlobs $BlockedGlobs -AllowNewFiles $AllowNewFiles -AllowDeletes $AllowDeletes -AllowRenames $AllowRenames -MaxFilesChanged $MaxFilesChanged -MaxLinesAdded $MaxLinesAdded -MaxLinesDeleted $MaxLinesDeleted
 	$LastPatchInfo = $PatchInfo
 
@@ -1691,9 +1784,12 @@ $ValidationText
 		$LastRejectedPatch = $PatchText
 		$LastFailure = "Patch safety checks failed after sanitization '$SanitizationStatus': $($PatchInfo.Errors -join '; ')"
 		$AttemptLines += "- Attempt ${Attempt}: rejected before apply after sanitization '$SanitizationStatus': $($PatchInfo.Errors -join '; ')"
+		Write-RunnerLog "Patch safety checks failed for attempt $Attempt."
 		continue
 	}
+	Write-RunnerLog "Patch safety checks completed for attempt $Attempt."
 
+	Write-RunnerLog "git apply check started for attempt $Attempt."
 	$Check = Invoke-Git @("apply", "--check", "--whitespace=error", $PatchPath) -AllowFailure
 	if ($Check.ExitCode -ne 0) {
 		$SanitizationStatus = if ($SanitizedPatch.Sanitized) { "single fenced diff extracted" } else { "raw unified diff" }
@@ -1702,15 +1798,20 @@ $ValidationText
 		$DiagnosticSuffix = if ($PatchDiagnostic) { " Diagnostic: $PatchDiagnostic" } else { "" }
 		$LastFailure = "git apply --check --whitespace=error failed after sanitization '$SanitizationStatus': $($Check.Output)$DiagnosticSuffix"
 		$AttemptLines += "- Attempt ${Attempt}: git apply --check failed after sanitization '$SanitizationStatus': $($Check.Output)"
+		Write-RunnerLog "git apply check failed for attempt $Attempt."
 		continue
 	}
+	Write-RunnerLog "git apply check completed for attempt $Attempt."
 
+	Write-RunnerLog "File writes started for attempt $Attempt."
 	Invoke-Git @("apply", "--whitespace=error", $PatchPath) | Out-Null
+	Write-RunnerLog "File writes completed for attempt $Attempt."
 	$AppliedAnyPatch = $true
 	$ApprovedPatchFiles = @($ApprovedPatchFiles + $PatchInfo.Files) | Sort-Object -Unique
 	$SanitizationStatus = if ($SanitizedPatch.Sanitized) { "single fenced diff extracted" } else { "raw unified diff" }
 	$AttemptLines += "- Attempt ${Attempt}: patch applied to $($PatchInfo.Files.Count) file(s); sanitization: $SanitizationStatus."
 
+	Write-RunnerLog "Cumulative diff safety checks started for attempt $Attempt."
 	$DiffSafety = Test-CurrentDiffSafety -IgnorePrefixes @($ArtifactRoot) -MaxFilesChanged $MaxFilesChanged -MaxLinesAdded $MaxLinesAdded -MaxLinesDeleted $MaxLinesDeleted -MaxDeletedLinesRatio $MaxDeletedLinesRatio -PreserveContent $PreserveContent
 	$Budget = $DiffSafety.Budget
 	if ($DiffSafety.Errors.Count -gt 0) {
@@ -1719,9 +1820,12 @@ $ValidationText
 		$ValidationSummary = "Cumulative diff safety checks failed."
 		$LastRejectedPatch = (Invoke-Git @("diff", "--") ).Output
 		$LastFailure = "Cumulative diff safety checks failed: $($DiffSafety.Errors -join '; ')"
+		Write-RunnerLog "Cumulative diff safety checks failed for attempt $Attempt."
 		continue
 	}
+	Write-RunnerLog "Cumulative diff safety checks completed for attempt $Attempt."
 
+	Write-RunnerLog "git diff check started for attempt $Attempt."
 	$DiffCheck = Invoke-Git @("diff", "--check") -AllowFailure
 	if ($DiffCheck.ExitCode -ne 0) {
 		$AttemptLines += "- Attempt ${Attempt}: git diff --check failed: $($DiffCheck.Output)"
@@ -1729,10 +1833,16 @@ $ValidationText
 		$ValidationSummary = "git diff --check failed."
 		$LastRejectedPatch = (Invoke-Git @("diff", "--") ).Output
 		$LastFailure = "git diff --check failed after applying patch: $($DiffCheck.Output)"
+		Write-RunnerLog "git diff check failed for attempt $Attempt."
 		continue
 	}
+	Write-RunnerLog "git diff check completed for attempt $Attempt."
 
+	Write-RunnerLog "Validation command started for attempt $Attempt."
+	$ValidationStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 	$Validation = Invoke-ValidationCommand -Command $ValidationCommand -LogPath $ValidationLogPath
+	$ValidationStopwatch.Stop()
+	Write-RunnerLog "Validation command completed for attempt $Attempt. Duration: $(Format-Duration $ValidationStopwatch.Elapsed)"
 	$ValidationExitCode = $Validation.ExitCode
 	$ValidationSummary = if ($Validation.ExitCode -eq 0) { "Validation passed." } elseif (@($Validation.SeriousLogLines).Count -gt 0) { "Validation failed because serious Godot log lines were detected. See validation.log." } else { "Validation failed. See validation.log." }
 	$AttemptLines += "- Attempt ${Attempt}: validation exit code $ValidationExitCode."
@@ -1757,6 +1867,7 @@ $ArtifactRelPaths = @(
 	"$RunDirRel/prompt-plan.txt",
 	"$RunDirRel/raw-plan.txt",
 	"$RunDirRel/prompt-patch.txt",
+	"$RunDirRel/runner.log",
 	"$RunDirRel/validation.log",
 	"$RunDirRel/report.md"
 )
@@ -1792,7 +1903,9 @@ $ResidualRisks = @(
 )
 
 if ($FinalStatus -ne "passed" -and $AppliedAnyPatch -and -not $KeepFailedChanges) {
+	Write-RunnerLog "Rollback started."
 	Restore-RunnerChanges $ApprovedPatchFiles
+	Write-RunnerLog "Rollback completed."
 	$FilesChanged = @(Get-StatusPaths)
 	$StopReason = "attempts exhausted; runner-applied files rolled back"
 }
@@ -1803,6 +1916,7 @@ if ($FinalStatus -eq "passed" -and -not $NoCommit) {
 }
 
 New-Report -Path $ReportPath -TaskTitle $TaskTitle -RunId $RunId -Started $Started -Finished $Finished -BaseBranch $BaseBranch -BranchName $BranchName -Model $Model -Endpoint $Endpoint -MaxAttempts $MaxAttempts -FinalStatus $FinalStatus -StopReason $StopReason -CommitHash $ReportCommitHash -RequestedScope $RequestedScope -FilesChanged (@($ApprovedPatchFiles | ForEach-Object { "- $_" })) -DiffSummary $DiffSummary -ValidationCommand $ValidationCommand -ValidationExitCode $ValidationExitCode -ValidationSummary $ValidationSummary -AttemptLines $AttemptLines -SafetyLines $SafetyLines -ArtifactLines $ArtifactLines -ResidualRisks $ResidualRisks
+Write-RunnerLog "Report written: $RunDirRel/report.md"
 
 if ($FinalStatus -eq "passed" -and -not $NoCommit) {
 	$AllowedStatusPaths = @($ApprovedPatchFiles + $ArtifactRelPaths) | Sort-Object -Unique
@@ -1822,6 +1936,7 @@ if ($FinalStatus -eq "passed" -and -not $NoCommit) {
 	$CommitHash = (Invoke-Git @("rev-parse", "--short", "HEAD")).Output
 }
 
+Write-RunnerLog "Final status: $FinalStatus. Stop reason: $StopReason. Total duration: $(Format-Duration $RunStopwatch.Elapsed)"
 Write-Host "Run ID: $RunId"
 Write-Host "Status: $FinalStatus"
 Write-Host "Stop reason: $StopReason"

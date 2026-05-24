@@ -140,6 +140,33 @@ If the dry run is clean, restore or commit as appropriate, then run without `-No
 
 The runner starts from `develop`, creates the branch named in the task file, writes artifacts under `docs/agent-runs/<timestamp>/`, validates, and commits only after validation passes.
 
+## Monitoring A Run
+
+The runner prints timestamped progress lines to the terminal while it works. Long pauses after `Waiting for LM Studio response...` usually mean the request has been sent and LM Studio is generating or loading context.
+
+Each run also writes a live log at:
+
+```text
+docs/agent-runs/<timestamp>/runner.log
+```
+
+The log mirrors the major terminal progress messages, including preflight, branch setup, planning request/response, edit attempts, JSON sanitization, manifest checks, file writes, diff checks, validation, rollback, report writing, and final status.
+
+Typical artifact progression:
+
+- `task.md`: copied after the run directory is created.
+- `prompt-plan.txt`: planning prompt written before the planning model request.
+- `raw-plan.txt` and `plan.md`: planning response received and saved.
+- `prompt-patch.txt`: edit prompt written before implementation attempts.
+- `raw-patch-attempt-N.txt`: raw model response for attempt `N`.
+- `edits-attempt-N.json` and `edit-manifest-attempt-N.json`: sanitized JSON and parsed manifest for JSON mode.
+- `patch-attempt-N.diff`: sanitized patch for unified-diff mode.
+- `validation.log`: validation output after edits pass safety checks.
+- `report.md`: final run report.
+- `runner.log`: live progress log for the whole run.
+
+If a run stops before `report.md` exists, inspect `runner.log` first, then the newest prompt/raw output files. If the latest line is `Waiting for LM Studio response...`, the model request may still be running or LM Studio may have failed before returning a response. If `raw-patch-attempt-N.txt` is missing, the failure likely happened during the model edit request rather than during patch or JSON validation.
+
 ## Godot Validation Logs
 
 Godot can occasionally exit with code `0` even when scene, script, or resource parse errors appear in the output log. The repository validation script and the runner both scan validation output for serious Godot patterns such as `Parse Error`, `SCRIPT ERROR:`, `Failed loading resource`, `Cannot load`, `Invalid get index`, `Invalid call`, unexpected `ERROR:` lines, and unexpected `res://` resource error lines.
