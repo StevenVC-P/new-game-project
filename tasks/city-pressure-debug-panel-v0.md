@@ -39,6 +39,11 @@ required_content_by_path:
     - "unavailable"
 blocked_content_by_path:
   scripts/ui/city_pressure_debug_panel.gd:
+    - "t\tfor"
+    - "\nt\t"
+    - "None"
+    - "hasattr"
+    - "getattr"
     - "city.tick"
     - "pay_cost"
     - "add_resource"
@@ -46,6 +51,8 @@ blocked_content_by_path:
   scripts/main.gd:
     - "replace_entire_file"
     - ".tscn"
+    - "current_city"
+    - "current_view == \"city\""
     - "household_debug_inspector.tscn"
     - "city_pressure_debug_panel.tscn"
 preserve_content:
@@ -92,6 +99,7 @@ The panel should:
 - read city.resources defensively where needed
 - show "unavailable" for missing data
 - avoid guessing or inventing mechanics
+- contain valid GDScript only; do not emit stray characters such as `t\tfor` before loops
 
 # Main Script Wiring
 
@@ -110,11 +118,30 @@ Suggested anchors to inspect and confirm before using:
 
 Do not invent anchors.
 
+Reuse the existing household debug inspector wiring style exactly:
+
+- The city-view check is `current_view != VIEW_CITY` for rejection and `current_view == VIEW_CITY` for city-only behavior.
+- Do not use `current_view == "city"`; use the `VIEW_CITY` constant style already present in `scripts/main.gd`.
+- Do not invent or reference `current_city`; no such variable exists in `scripts/main.gd`.
+- Use `selected_city_index >= 0 and selected_city_index < cities.size()` before reading `cities[selected_city_index]`.
+- Prefer adding a helper like `get_city_pressure_debug_city()` that mirrors `get_household_debug_city()`.
+- Prefer adding an `_ensure_city_pressure_debug_panel()` helper that mirrors `_ensure_household_debug_inspector()`.
+- Instantiate the panel script with `preload("res://scripts/ui/city_pressure_debug_panel.gd")`, then `.new() as Control`.
+- Set the panel hidden by default after adding it as a child.
+
 F4 handling should use:
 - event is InputEventKey
 - event.pressed
 - not event.echo
 - event.keycode == KEY_F4
+
+F4 handling should mirror the successful F3 pattern:
+
+- if the current view is not `VIEW_CITY`, hide the panel if it exists, mark input handled, and return
+- call `_ensure_city_pressure_debug_panel()` before toggling
+- call `city_pressure_debug_panel.set_city(get_city_pressure_debug_city())` before showing or refreshing
+- toggle `city_pressure_debug_panel.visible`
+- call `get_viewport().set_input_as_handled()`
 
 The panel should hide or refuse to open outside city view.
 
