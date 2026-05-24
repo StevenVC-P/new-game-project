@@ -93,6 +93,13 @@ func _process(_delta: float):
 
 func _input(event: InputEvent):
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F3:
+		if current_view != VIEW_CITY:
+			if household_debug_inspector != null:
+				household_debug_inspector.visible = false
+			print("Household debug inspector is only available in city view.")
+			get_viewport().set_input_as_handled()
+			return
+
 		_ensure_household_debug_inspector()
 		household_debug_inspector.set_city(get_household_debug_city())
 		household_debug_inspector.visible = not household_debug_inspector.visible
@@ -389,6 +396,8 @@ func try_return_to_region(_mouse_pos: Vector2):
 	selected_city_index = -1
 	city_building_overlay.clear()
 	city_hovered_tile = Vector2i(-1, -1)
+	if household_debug_inspector != null:
+		household_debug_inspector.visible = false
 	queue_redraw()
 
 func is_inside_city_map(x: int, y: int) -> bool:
@@ -573,10 +582,10 @@ func _ensure_household_debug_inspector() -> void:
 	household_debug_inspector.set_city(get_household_debug_city())
 
 func get_household_debug_city():
+	if current_view != VIEW_CITY:
+		return null
 	if selected_city_index >= 0 and selected_city_index < cities.size():
 		return cities[selected_city_index]
-	if cities.size() > 0:
-		return cities[0]
 
 	return null
 

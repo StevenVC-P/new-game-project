@@ -10,11 +10,26 @@ var responsibility_label: Label
 var resource_label: Label
 
 var current_city = null
+var panel: PanelContainer
 
 func _ready():
+	panel = PanelContainer.new()
+	panel.name = "InspectorPanel"
+	panel.position = Vector2(18, 58)
+	panel.custom_minimum_size = Vector2(340, 0)
+	add_child(panel)
+
+	var margin = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_top", 10)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_bottom", 10)
+	panel.add_child(margin)
+
 	root_box = VBoxContainer.new()
 	root_box.name = "RootBox"
-	add_child(root_box)
+	root_box.add_theme_constant_override("separation", 6)
+	margin.add_child(root_box)
 
 	title_label = Label.new()
 	title_label.text = "Household Settlement Debug Inspector"
