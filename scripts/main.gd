@@ -914,6 +914,11 @@ func draw_selected_object_summary(font: Font, font_size: int, city: City, x: flo
 		y = draw_sidebar_section_title(font, "Selected Building Hints", x, y)
 		for hint_text in selected_building_hint_lines:
 			y = draw_sidebar_line(font, font_size, hint_text, x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
+	var household_link_lines: Array[String] = HouseholdHomeWorkLinkHelper.get_links(city, building_index)
+	if household_link_lines.size() > 0:
+		y = draw_sidebar_section_title(font, "Household Links", x, y)
+		for household_link_text: String in household_link_lines:
+			y = draw_sidebar_line(font, font_size, household_link_text, x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
 
 	return y
 
@@ -1001,6 +1006,37 @@ func draw_city_buildings():
 			draw_rect(rect, VisualStyle.COLOR_UNASSIGNED_BUILDING)
 		draw_worker_indicator(rect, building_type, building.assigned_workers, building.assigned_preference)
 		draw_maintenance_indicator(rect, building_type, maintenance_level, building.receives_maintenance)
+
+	draw_household_work_link_overlay()
+
+func draw_household_work_link_overlay():
+	if selected_city_index < 0 or selected_city_index >= cities.size():
+		return
+
+	var city: City = cities[selected_city_index]
+	var selected_building_index: int = city_building_overlay.inspected_building_index
+	if selected_building_index < 0 or selected_building_index >= city.buildings.size():
+		return
+
+	var related_building_indices: Array[int] = HouseholdHomeWorkLinkHelper.get_related_building_indices(city, selected_building_index)
+	if related_building_indices.is_empty():
+		return
+
+	var selected_building: Building = city.buildings[selected_building_index]
+	var start_pos: Vector2 = get_building_screen_center(selected_building)
+	var link_shadow: Color = Color(0.05, 0.05, 0.05, 0.8)
+	var link_color: Color = Color(0.95, 0.82, 0.28, 0.95)
+
+	for related_building_index: int in related_building_indices:
+		if related_building_index < 0 or related_building_index >= city.buildings.size():
+			continue
+
+		var related_building: Building = city.buildings[related_building_index]
+		var end_pos: Vector2 = get_building_screen_center(related_building)
+		draw_line(start_pos + Vector2(1, 1), end_pos + Vector2(1, 1), link_shadow, 4.0)
+		draw_line(start_pos, end_pos, link_color, 2.0)
+		draw_circle(start_pos, 4.0, link_color)
+		draw_circle(end_pos, 5.0, link_color)
 
 func draw_city_walkers():
 	if selected_city_index < 0 or selected_city_index >= cities.size():
