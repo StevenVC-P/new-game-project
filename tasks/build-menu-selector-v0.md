@@ -86,6 +86,10 @@ preserve_content:
 
 # Goal
 
+Superseded for local-agent use.
+
+Do not rerun this combined task as-is. Repeated local-agent runs failed on `scripts/main.gd` draw/input integration despite verified anchors. Use `tasks/build-menu-helper-catalog-v0.md` for the local-agent helper/catalog step, then do `scripts/main.gd` integration with Codex/manual repair.
+
 Add a scalable Build Menu / Building Selector v0.
 
 The current hotkey list is too cramped for expanded goods buildings. v0 should add a visible, toggleable build menu/list while preserving existing hotkeys as shortcuts.
