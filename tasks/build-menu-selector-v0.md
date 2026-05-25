@@ -7,7 +7,6 @@ edit_mode: json_file_ops
 allowed_paths:
   - scripts/main.gd
   - scripts/ui/build_menu_helper.gd
-  - docs/RESOURCE_HOUSEHOLD_LABOR_TRADE_MODEL.md
 blocked_paths:
   - project.godot
   - scenes/
@@ -20,7 +19,7 @@ blocked_paths:
 required_paths:
   - scripts/main.gd
   - scripts/ui/build_menu_helper.gd
-max_files_changed: 3
+max_files_changed: 2
 max_lines_added: 260
 max_lines_deleted: 40
 allow_new_files: true
@@ -48,7 +47,9 @@ required_content_by_path:
     - "Tileworks"
     - "Paver Yard"
   scripts/main.gd:
-    - "Build Menu"
+    - "BuildMenuHelper"
+    - "build_menu"
+    - "draw_build_menu"
 blocked_content:
   - "apply_building_production"
   - "consume_food"
@@ -59,6 +60,9 @@ blocked_content:
   - "obligation"
   - "debt"
   - "currency"
+  - "credit"
+  - "credits"
+  - "cost_label"
   - "replace_entire_file"
   - ".tscn"
 preserve_content:
@@ -77,6 +81,10 @@ preserve_content:
 Add a scalable Build Menu / Building Selector v0.
 
 The current hotkey list is too cramped for expanded goods buildings. v0 should add a visible, toggleable build menu/list while preserving existing hotkeys as shortcuts.
+
+The visible menu title should be exactly:
+
+- `Build Menu`
 
 # Expected Behavior
 
@@ -120,7 +128,8 @@ The helper should provide read-only building menu data:
 - readable name
 - category
 - optional sort order
-- optional cost label if safe
+
+Do not hardcode cost text in the helper. Costs must come from the existing `building_placement.get_building_cost(...)` and `building_placement.get_cost_text(...)` path in `scripts/main.gd`.
 
 Main integration should be minimal:
 
@@ -130,8 +139,34 @@ Main integration should be minimal:
 - preserve hotkeys
 - avoid broad `main.gd` rewrites
 
+Use existing `main.gd` symbols and patterns:
+
+- `selected_building_type`
+- `is_placing_building`
+- `city_action_options`
+- `draw_city_action_option(...)`
+- `draw_sidebar_section_title(...)`
+- `draw_sidebar_line(...)`
+- `draw_sidebar_label_value(...)`
+- `building_placement.get_building_cost(...)`
+- `building_placement.get_cost_text(...)`
+
+Use the existing `draw_string(...)` signature shown in `docs/MAIN_GD_INTEGRATION_MAP.md` and `docs/CITY_SIDEBAR_INTEGRATION_MAP.md`.
+
+Suggested safe state naming:
+
+- `var is_build_menu_open: bool = false`
+- `func draw_build_menu(...)`
+- `func try_handle_build_menu_click(...)`
+
+Declare new state near the existing top-level UI state variables. Do not initialize new top-level state inside `_ready()`.
+
 Use targeted `insert_after` / `insert_before` operations only for `scripts/main.gd`.
 Do not use `replace_entire_file`.
+
+Use `create` only for `scripts/ui/build_menu_helper.gd`.
+Use `insert_after` / `insert_before` only for `scripts/main.gd`.
+Do not create or edit existing docs in this task.
 
 # Definition of Done
 
