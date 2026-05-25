@@ -58,6 +58,8 @@ The primary material resources are `food`, `wood`, and `tools`. Other keys are d
 
 Basic v1 building production now exists for these keys. Household demand, UI display, trade pricing, prosperity effects, and settlement access rules for these goods are not implemented yet.
 
+Expanded-goods building types are recognized by the placement helper for size/cost validation and by the selected-building overlay for readable labels. The main city build selector still needs a separate integration pass before every expanded-goods building can be selected from the visible build controls.
+
 `City.record_resource_history()` tracks recent `food`, `wood`, and `tools` values. `City.get_resource_trends()` uses that history to estimate per-tick trends for pressure summaries.
 
 ## Household-First Labor Semantics

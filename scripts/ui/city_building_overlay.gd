@@ -5,6 +5,16 @@ const BUILDING_HOUSE: String = "house"
 const BUILDING_FARM: String = "farm"
 const BUILDING_WOODCUTTER: String = "woodcutter"
 const BUILDING_TOOLMAKER: String = "toolmaker"
+const BUILDING_QUARRY: String = "quarry"
+const BUILDING_STONECUTTER: String = "stonecutter"
+const BUILDING_BRICKWORKS: String = "brickworks"
+const BUILDING_LIME_KILN: String = "lime_kiln"
+const BUILDING_MORTAR_YARD: String = "mortar_yard"
+const BUILDING_MASON_YARD: String = "mason_yard"
+const BUILDING_SCULPTOR: String = "sculptor"
+const BUILDING_CARVER: String = "carver"
+const BUILDING_TILEWORKS: String = "tileworks"
+const BUILDING_PAVER_YARD: String = "paver_yard"
 const WORK_PREF_NEUTRAL: String = "neutral"
 const WORK_PREF_AGRARIAN: String = "agrarian"
 const WORK_PREF_INDUSTRIAL: String = "industrial"
@@ -253,6 +263,26 @@ func capitalize_building_name(building_type: String) -> String:
 		return "Woodcutter"
 	if building_type == BUILDING_TOOLMAKER:
 		return "Toolmaker"
+	if building_type == BUILDING_QUARRY:
+		return "Quarry"
+	if building_type == BUILDING_STONECUTTER:
+		return "Stonecutter"
+	if building_type == BUILDING_BRICKWORKS:
+		return "Brickworks"
+	if building_type == BUILDING_LIME_KILN:
+		return "Lime Kiln"
+	if building_type == BUILDING_MORTAR_YARD:
+		return "Mortar Yard"
+	if building_type == BUILDING_MASON_YARD:
+		return "Mason Yard"
+	if building_type == BUILDING_SCULPTOR:
+		return "Sculptor"
+	if building_type == BUILDING_CARVER:
+		return "Carver"
+	if building_type == BUILDING_TILEWORKS:
+		return "Tileworks"
+	if building_type == BUILDING_PAVER_YARD:
+		return "Paver Yard"
 
 	return building_type
 

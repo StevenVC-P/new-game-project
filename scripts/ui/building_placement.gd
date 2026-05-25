@@ -5,6 +5,16 @@ const BUILDING_HOUSE: String = "house"
 const BUILDING_FARM: String = "farm"
 const BUILDING_WOODCUTTER: String = "woodcutter"
 const BUILDING_TOOLMAKER: String = "toolmaker"
+const BUILDING_QUARRY: String = "quarry"
+const BUILDING_STONECUTTER: String = "stonecutter"
+const BUILDING_BRICKWORKS: String = "brickworks"
+const BUILDING_LIME_KILN: String = "lime_kiln"
+const BUILDING_MORTAR_YARD: String = "mortar_yard"
+const BUILDING_MASON_YARD: String = "mason_yard"
+const BUILDING_SCULPTOR: String = "sculptor"
+const BUILDING_CARVER: String = "carver"
+const BUILDING_TILEWORKS: String = "tileworks"
+const BUILDING_PAVER_YARD: String = "paver_yard"
 const RESOURCE_WOOD: String = "wood"
 const RESOURCE_TOOLS: String = "tools"
 
@@ -84,6 +94,12 @@ func get_building_size(building_type: String) -> Vector2i:
 		return Vector2i(3, 3)
 	if building_type == BUILDING_TOOLMAKER:
 		return Vector2i(3, 3)
+	if building_type == BUILDING_QUARRY:
+		return Vector2i(3, 3)
+	if building_type == BUILDING_LIME_KILN:
+		return Vector2i(3, 3)
+	if building_type == BUILDING_MASON_YARD:
+		return Vector2i(3, 3)
 
 	return Vector2i(2, 2)
 
@@ -96,6 +112,26 @@ func get_building_cost(building_type: String) -> Dictionary:
 		return {RESOURCE_WOOD: 6, RESOURCE_TOOLS: 1}
 	if building_type == BUILDING_TOOLMAKER:
 		return {RESOURCE_WOOD: 10, RESOURCE_TOOLS: 3}
+	if building_type == BUILDING_QUARRY:
+		return {RESOURCE_WOOD: 6, RESOURCE_TOOLS: 2}
+	if building_type == BUILDING_STONECUTTER:
+		return {RESOURCE_WOOD: 8, RESOURCE_TOOLS: 2}
+	if building_type == BUILDING_BRICKWORKS:
+		return {RESOURCE_WOOD: 8, RESOURCE_TOOLS: 2}
+	if building_type == BUILDING_LIME_KILN:
+		return {RESOURCE_WOOD: 10, RESOURCE_TOOLS: 2}
+	if building_type == BUILDING_MORTAR_YARD:
+		return {RESOURCE_WOOD: 8, RESOURCE_TOOLS: 2}
+	if building_type == BUILDING_MASON_YARD:
+		return {RESOURCE_WOOD: 10, RESOURCE_TOOLS: 3}
+	if building_type == BUILDING_SCULPTOR:
+		return {RESOURCE_WOOD: 8, RESOURCE_TOOLS: 3}
+	if building_type == BUILDING_CARVER:
+		return {RESOURCE_WOOD: 8, RESOURCE_TOOLS: 2}
+	if building_type == BUILDING_TILEWORKS:
+		return {RESOURCE_WOOD: 8, RESOURCE_TOOLS: 2}
+	if building_type == BUILDING_PAVER_YARD:
+		return {RESOURCE_WOOD: 8, RESOURCE_TOOLS: 2}
 
 	return {}
 
