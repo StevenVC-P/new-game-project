@@ -63,6 +63,14 @@ blocked_content:
   - "credit"
   - "credits"
   - "cost_label"
+  - "func draw_city_sidebar():"
+  - "# Draw sidebar content here"
+  - "func _draw():\n\t# Draw the city view"
+  - "func try_handle_city_action_option_click(mouse_pos: Vector2):"
+  - "var selected_building_type: String = \"\""
+  - "var is_placing_building: bool = false"
+  - "texture = preload"
+  - "placeholder.png"
   - "replace_entire_file"
   - ".tscn"
 preserve_content:
@@ -116,6 +124,145 @@ Include:
 - `tileworks`
 - `paver_yard`
 
+# Verified Project Context
+
+Use these exact real project symbols and anchors from `scripts/main.gd`. Do not invent placeholder versions.
+
+Current build-selection state exists as:
+
+```gdscript
+var city_action_options: Array[Dictionary] = []
+```
+
+```gdscript
+var selected_building_type: String = BUILDING_HOUSE
+var is_placing_building: bool = true
+```
+
+Safe top-level state insertion anchor:
+
+```gdscript
+var selected_building_type: String = BUILDING_HOUSE
+var is_placing_building: bool = true
+```
+
+Insert new build menu state after that anchor, for example:
+
+```gdscript
+var is_build_menu_open: bool = false
+```
+
+The actual city sidebar signature is:
+
+```gdscript
+func draw_city_sidebar(font: Font, font_size: int):
+```
+
+The actual city view draw flow contains:
+
+```gdscript
+draw_city_buildings()
+draw_city_walkers()
+draw_building_preview()
+draw_building_overlay(font, font_size)
+draw_top_bar()
+```
+
+Safe draw-call insertion anchor:
+
+```gdscript
+draw_building_overlay(font, font_size)
+```
+
+Insert the build menu draw call after that line and before `draw_top_bar()`.
+
+The actual city mouse click flow contains:
+
+```gdscript
+elif current_view == VIEW_CITY:
+	if try_handle_city_action_click(local_mouse_pos):
+		queue_redraw()
+```
+
+Safe click-handler insertion anchor:
+
+```gdscript
+elif current_view == VIEW_CITY:
+```
+
+Insert build-menu click handling immediately inside that branch, before `try_handle_city_action_click(local_mouse_pos)`.
+
+The actual keyboard input block contains:
+
+```gdscript
+elif event is InputEventKey:
+	var key_event: InputEventKey = event as InputEventKey
+	if handle_simulation_speed_key_event(key_event):
+```
+
+Safe keyboard-toggle insertion anchor:
+
+```gdscript
+elif event is InputEventKey:
+	var key_event: InputEventKey = event as InputEventKey
+```
+
+Insert the `KEY_B` city-view build-menu toggle after that anchor and before existing hotkey handlers.
+
+The existing building selection path is:
+
+```gdscript
+func select_building_type(building_type: String):
+	selected_building_type = building_type
+	is_placing_building = true
+	clear_selected_household()
+```
+
+Build-menu selection must call `select_building_type(building_id)`.
+
+The existing city action option pattern is:
+
+```gdscript
+func draw_city_action_option(font: Font, font_size: int, text: String, x: float, y: float, width: float, option_data: Dictionary, color: Color) -> float:
+```
+
+Use that pattern if storing clickable build-menu option rectangles in `city_action_options`, or create a separate `build_menu_action_options: Array[Dictionary]` top-level state if needed.
+
+Correct raw draw string signature:
+
+```gdscript
+draw_string(font, Vector2(x, y), text, HORIZONTAL_ALIGNMENT_LEFT, width, font_size, color)
+```
+
+Safe function insertion anchors:
+
+```gdscript
+func apply_time_control_action(action: String):
+```
+
+Insert `try_handle_build_menu_click(...)` before that function.
+
+```gdscript
+func draw_sidebar_section_title(font: Font, text: String, x: float, y: float) -> float:
+```
+
+Insert `draw_build_menu(...)` before that function.
+
+# Forbidden Fake Anchors And Symbols
+
+Do not use or anchor to any of these fake/stub snippets:
+
+- `func draw_city_sidebar():`
+- `# Draw sidebar content here`
+- `pass`
+- `var selected_building_type: String = ""`
+- `var is_placing_building: bool = false`
+- `var is_build_menu_open: bool = false` as part of a fake pre-existing block
+- `func _draw():` followed by `# Draw the city view`
+- `func try_handle_city_action_option_click(mouse_pos: Vector2):`
+- placeholder `_input(event: InputEvent)` blocks
+- any anchor text that is not copied from the current `scripts/main.gd`
+
 # Implementation Guidance
 
 Prefer a helper catalog:
@@ -168,6 +315,8 @@ Use `create` only for `scripts/ui/build_menu_helper.gd`.
 Use `insert_after` / `insert_before` only for `scripts/main.gd`.
 Do not create or edit existing docs in this task.
 
+This remains acceptable for local-agent drafting only because the task now provides verified anchors. If another run invents fake anchors or placeholder functions, stop and use Codex/manual integration for `scripts/main.gd` while keeping the helper catalog concept.
+
 # Definition of Done
 
 - Build menu displays all currently placeable building types.
@@ -205,5 +354,5 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_project.p
 
 ```powershell
 $env:GODOT_BIN = Get-Content .godot-exe -TotalCount 1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\agent_runner.ps1 -Task .\tasks\build-menu-selector-v0.md -Model "qwen/qwen3-coder-30b" -NoCommit
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\agent_runner.ps1 -Task .\tasks\build-menu-selector-v0.md -Model "qwen/qwen3-coder-30b" -NoCommit -Resume
 ```
