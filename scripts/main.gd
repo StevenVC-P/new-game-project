@@ -23,6 +23,16 @@ const BUILDING_HOUSE: String = "house"
 const BUILDING_FARM: String = "farm"
 const BUILDING_WOODCUTTER: String = "woodcutter"
 const BUILDING_TOOLMAKER: String = "toolmaker"
+const BUILDING_QUARRY: String = "quarry"
+const BUILDING_STONECUTTER: String = "stonecutter"
+const BUILDING_BRICKWORKS: String = "brickworks"
+const BUILDING_LIME_KILN: String = "lime_kiln"
+const BUILDING_MORTAR_YARD: String = "mortar_yard"
+const BUILDING_MASON_YARD: String = "mason_yard"
+const BUILDING_SCULPTOR: String = "sculptor"
+const BUILDING_CARVER: String = "carver"
+const BUILDING_TILEWORKS: String = "tileworks"
+const BUILDING_PAVER_YARD: String = "paver_yard"
 const WOODCUTTER_TREE_RADIUS: int = 5
 const CITY_WALKER_CYCLE_SECONDS: float = 12.0
 const WORK_PREF_NEUTRAL: String = "neutral"
@@ -478,26 +488,43 @@ func handle_building_selection_key_event(key_event: InputEventKey) -> bool:
 	var unicode_value: int = key_event.unicode
 
 	if is_building_key(keycode, physical_keycode, unicode_value, KEY_1, 49):
-		selected_building_type = BUILDING_HOUSE
-		is_placing_building = true
-		clear_selected_household()
+		select_building_type(BUILDING_HOUSE)
 	elif is_building_key(keycode, physical_keycode, unicode_value, KEY_2, 50):
-		selected_building_type = BUILDING_FARM
-		is_placing_building = true
-		clear_selected_household()
+		select_building_type(BUILDING_FARM)
 	elif is_building_key(keycode, physical_keycode, unicode_value, KEY_3, 51):
-		selected_building_type = BUILDING_WOODCUTTER
-		is_placing_building = true
-		clear_selected_household()
+		select_building_type(BUILDING_WOODCUTTER)
 	elif is_building_key(keycode, physical_keycode, unicode_value, KEY_4, 52):
-		selected_building_type = BUILDING_TOOLMAKER
-		is_placing_building = true
-		clear_selected_household()
+		select_building_type(BUILDING_TOOLMAKER)
+	elif is_building_key(keycode, physical_keycode, unicode_value, KEY_5, 53):
+		select_building_type(BUILDING_QUARRY)
+	elif is_building_key(keycode, physical_keycode, unicode_value, KEY_6, 54):
+		select_building_type(BUILDING_STONECUTTER)
+	elif is_building_key(keycode, physical_keycode, unicode_value, KEY_7, 55):
+		select_building_type(BUILDING_BRICKWORKS)
+	elif is_building_key(keycode, physical_keycode, unicode_value, KEY_8, 56):
+		select_building_type(BUILDING_LIME_KILN)
+	elif is_building_key(keycode, physical_keycode, unicode_value, KEY_9, 57):
+		select_building_type(BUILDING_MORTAR_YARD)
+	elif is_building_key(keycode, physical_keycode, unicode_value, KEY_0, 48):
+		select_building_type(BUILDING_MASON_YARD)
+	elif is_letter_key(keycode, physical_keycode, KEY_Q):
+		select_building_type(BUILDING_SCULPTOR)
+	elif is_letter_key(keycode, physical_keycode, KEY_W):
+		select_building_type(BUILDING_CARVER)
+	elif is_letter_key(keycode, physical_keycode, KEY_E):
+		select_building_type(BUILDING_TILEWORKS)
+	elif is_letter_key(keycode, physical_keycode, KEY_R):
+		select_building_type(BUILDING_PAVER_YARD)
 	else:
 		return false
 
 	queue_redraw()
 	return true
+
+func select_building_type(building_type: String):
+	selected_building_type = building_type
+	is_placing_building = true
+	clear_selected_household()
 
 func is_building_key(keycode: int, physical_keycode: int, unicode_value: int, number_key: int, expected_unicode: int) -> bool:
 	if keycode == number_key or physical_keycode == number_key:
@@ -506,6 +533,9 @@ func is_building_key(keycode: int, physical_keycode: int, unicode_value: int, nu
 		return true
 
 	return false
+
+func is_letter_key(keycode: int, physical_keycode: int, letter_key: int) -> bool:
+	return keycode == letter_key or physical_keycode == letter_key
 
 func try_place_selected_building():
 	if selected_city_index < 0 or selected_city_index >= cities.size():
@@ -835,12 +865,15 @@ func draw_city_sidebar(font: Font, font_size: int):
 
 	y = draw_sidebar_section_title(font, "Build Controls", text_x, y)
 	if is_placing_building:
-		y = draw_sidebar_label_value(font, font_size, "Building", selected_building_type, text_x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
+		y = draw_sidebar_label_value(font, font_size, "Building", get_building_display_name(selected_building_type), text_x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
 		y = draw_sidebar_label_value(font, font_size, "Cost", building_placement.get_cost_text(building_placement.get_building_cost(selected_building_type)), text_x, y, VisualStyle.COLOR_MUTED)
 	else:
 		y = draw_sidebar_label_value(font, font_size, "Building", "none", text_x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
-	y = draw_sidebar_line(font, font_size, "1 house, 2 farm", text_x, y, VisualStyle.COLOR_MUTED)
-	y = draw_sidebar_line(font, font_size, "3 woodcutter, 4 toolmaker", text_x, y, VisualStyle.COLOR_MUTED)
+	y = draw_sidebar_line(font, font_size, "1 house, 2 farm, 3 woodcutter", text_x, y, VisualStyle.COLOR_MUTED)
+	y = draw_sidebar_line(font, font_size, "4 toolmaker, 5 quarry, 6 stonecutter", text_x, y, VisualStyle.COLOR_MUTED)
+	y = draw_sidebar_line(font, font_size, "7 brickworks, 8 lime, 9 mortar", text_x, y, VisualStyle.COLOR_MUTED)
+	y = draw_sidebar_line(font, font_size, "0 mason, Q sculptor, W carver", text_x, y, VisualStyle.COLOR_MUTED)
+	y = draw_sidebar_line(font, font_size, "E tileworks, R paver yard", text_x, y, VisualStyle.COLOR_MUTED)
 	y = draw_sidebar_line(font, font_size, "Right click/Esc: clear", text_x, y, VisualStyle.COLOR_MUTED)
 	if int(resources["maintenance_grace_ticks"]) > 0:
 		y = draw_sidebar_line(font, font_size, "Grace: " + str(resources["maintenance_grace_ticks"]) + " ticks", text_x, y, VisualStyle.COLOR_MUTED)
@@ -859,6 +892,38 @@ func draw_sidebar_label_value(font: Font, font_size: int, label: String, value: 
 	draw_string(font, Vector2(x, y), label + ":", HORIZONTAL_ALIGNMENT_LEFT, 86.0, font_size, VisualStyle.COLOR_MUTED)
 	draw_string(font, Vector2(x + 88.0, y), value, HORIZONTAL_ALIGNMENT_LEFT, CITY_SIDEBAR_WIDTH - CITY_SIDEBAR_PADDING * 2 - 88.0, font_size, color)
 	return y + 15.0
+
+func get_building_display_name(building_type: String) -> String:
+	if building_type == BUILDING_HOUSE:
+		return "House"
+	if building_type == BUILDING_FARM:
+		return "Farm"
+	if building_type == BUILDING_WOODCUTTER:
+		return "Woodcutter"
+	if building_type == BUILDING_TOOLMAKER:
+		return "Toolmaker"
+	if building_type == BUILDING_QUARRY:
+		return "Quarry"
+	if building_type == BUILDING_STONECUTTER:
+		return "Stonecutter"
+	if building_type == BUILDING_BRICKWORKS:
+		return "Brickworks"
+	if building_type == BUILDING_LIME_KILN:
+		return "Lime Kiln"
+	if building_type == BUILDING_MORTAR_YARD:
+		return "Mortar Yard"
+	if building_type == BUILDING_MASON_YARD:
+		return "Mason Yard"
+	if building_type == BUILDING_SCULPTOR:
+		return "Sculptor"
+	if building_type == BUILDING_CARVER:
+		return "Carver"
+	if building_type == BUILDING_TILEWORKS:
+		return "Tileworks"
+	if building_type == BUILDING_PAVER_YARD:
+		return "Paver Yard"
+
+	return building_type
 
 func draw_pressure_row(font: Font, font_size: int, label: String, pressure: Dictionary, x: float, y: float) -> float:
 	var status: String = pressure["status"] as String
