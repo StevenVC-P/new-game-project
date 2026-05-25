@@ -29,11 +29,12 @@ required_content_by_path:
   scripts/ui/production_requirement_helper.gd:
     - "class_name ProductionRequirementHelper"
     - "static func get_requirement_lines"
-    - "assigned labor"
+    - "var lines: Array[String]"
+    - "Assigned labor"
     - "maintenance"
     - "inputs"
-    - "food shortage"
-    - "fit"
+    - "Food shortage"
+    - "Fit"
     - "No production requirement details."
 blocked_content:
   - "add_resource"
@@ -52,8 +53,13 @@ blocked_content:
   - "select_building_type"
   - "preload"
   - "texture"
-  - ".tscn"
   - "replace_entire_file"
+  - "household.has"
+  - "match building.maintenance_level"
+  - "match match_quality"
+  - "mortart"
+  - "var lines := []"
+  - ".tscn"
 ---
 
 # Goal
@@ -74,10 +80,10 @@ Provide read-only requirement/status lines for a selected production building.
 
 The helper should inspect the current city/building state defensively and return short player-facing lines about:
 
-- assigned labor
+- Assigned labor
 - maintenance
 - inputs
-- food shortage
+- Food shortage
 - household fit
 - fallback when not applicable
 
@@ -94,6 +100,14 @@ Expose:
 ```gdscript
 static func get_requirement_lines(city, building) -> Array[String]
 ```
+
+Use a typed local array so Godot does not infer a generic `Array` return:
+
+```gdscript
+var lines: Array[String] = []
+```
+
+Use `create` for `scripts/ui/production_requirement_helper.gd`. The helper file does not exist yet. Do not use `replace_entire_file` or any replacement action unless a same-run create has already succeeded and a repair attempt is required.
 
 # Expected Behavior
 
@@ -129,6 +143,15 @@ The current code already has these relevant concepts:
 - household `get_match_quality(building.type)`
 
 Use these defensively. If a property or method is unavailable, return honest fallback text instead of throwing.
+
+Important implementation details:
+
+- `building.maintenance_level` is an integer percentage-like value from `0` to `100`, not an enum. Use threshold comparisons such as `<= 0`, `< 50`, `< 100`, and `>= 100`; do not match it against `0`, `1`, `2`, `3`.
+- `household.get_match_quality(building.type)` returns strings such as `"good match"`, `"neutral"`, and `"poor match"`, not numeric enum values. Compare strings directly.
+- Do not call `household.has("preference")`; households are objects, not dictionaries.
+- Check `building.assigned_workers > 0` for assigned labor status. `assigned_household_id` may be `-1` for non-household neutral assignment cases, but assigned labor can still exist.
+- Keep output lines player-facing and consistently capitalized, including `Assigned labor`, `Food shortage`, and `Fit`.
+- Use `mortar`, not `mortart`.
 
 # Input Checks
 
