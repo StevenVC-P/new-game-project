@@ -48,6 +48,7 @@ var trade_routes: Array[TradeRoute] = []
 var top_bar_action_options: Array[Dictionary] = []
 var region_action_options: Array[Dictionary] = []
 var city_action_options: Array[Dictionary] = []
+var build_menu_options: Array[Dictionary] = []
 var hovered_tile: Vector2i = Vector2i(-1, -1)
 var hovered_city_index: int = -1
 var city_hovered_tile: Vector2i = Vector2i(-1, -1)
@@ -57,6 +58,7 @@ var household_debug_inspector: Control = null
 var trade_menu: TradeMenu = TradeMenu.new()
 var selected_building_type: String = BUILDING_HOUSE
 var is_placing_building: bool = true
+var is_build_menu_open: bool = false
 var city_walker_time: float = 0.0
 var world_calendar: Calendar = Calendar.new()
 var simulation_clock: SimulationClock = SimulationClock.new()
@@ -155,6 +157,7 @@ func _input(event: InputEvent):
 			return
 		if current_view == VIEW_CITY and mouse_event.button_index == MOUSE_BUTTON_RIGHT:
 			is_placing_building = false
+			is_build_menu_open = false
 			clear_selected_household()
 			queue_redraw()
 			return
@@ -174,7 +177,9 @@ func _input(event: InputEvent):
 			else:
 				try_open_city_at_position(local_mouse_pos)
 		elif current_view == VIEW_CITY:
-			if try_handle_city_action_click(local_mouse_pos):
+			if try_handle_build_menu_click(local_mouse_pos):
+				queue_redraw()
+			elif try_handle_city_action_click(local_mouse_pos):
 				queue_redraw()
 			elif try_handle_building_action_click(local_mouse_pos):
 				queue_redraw()
@@ -204,6 +209,9 @@ func _input(event: InputEvent):
 		if handle_clear_selection_key(key_event):
 			get_viewport().set_input_as_handled()
 			return
+		if handle_build_menu_toggle_key_event(key_event):
+			get_viewport().set_input_as_handled()
+			return
 		if handle_building_selection_key_event(key_event):
 			get_viewport().set_input_as_handled()
 
@@ -217,6 +225,9 @@ func _unhandled_input(event: InputEvent):
 			get_viewport().set_input_as_handled()
 			return
 		if handle_clear_selection_key(key_event):
+			get_viewport().set_input_as_handled()
+			return
+		if handle_build_menu_toggle_key_event(key_event):
 			get_viewport().set_input_as_handled()
 			return
 		if handle_building_selection_key_event(key_event):
@@ -358,6 +369,24 @@ func try_handle_city_action_click(mouse_pos: Vector2) -> bool:
 
 	return false
 
+func try_handle_build_menu_click(mouse_pos: Vector2) -> bool:
+	if not is_build_menu_open:
+		return false
+	if not get_build_menu_rect().has_point(mouse_pos):
+		return false
+
+	for option_data: Dictionary in build_menu_options:
+		var option_rect: Rect2 = option_data["rect"] as Rect2
+		if not option_rect.has_point(mouse_pos):
+			continue
+
+		var building_id: String = option_data["building_id"] as String
+		select_building_type(building_id)
+		is_build_menu_open = false
+		return true
+
+	return true
+
 func apply_time_control_action(action: String):
 	if action == "toggle_pause":
 		simulation_clock.toggle_pause()
@@ -473,7 +502,20 @@ func handle_clear_selection_key(key_event: InputEventKey) -> bool:
 		return false
 
 	is_placing_building = false
+	is_build_menu_open = false
 	clear_selected_household()
+	queue_redraw()
+	return true
+
+func handle_build_menu_toggle_key_event(key_event: InputEventKey) -> bool:
+	if current_view != VIEW_CITY:
+		return false
+	if not key_event.pressed or key_event.echo:
+		return false
+	if not is_letter_key(key_event.keycode, key_event.physical_keycode, KEY_B):
+		return false
+
+	is_build_menu_open = not is_build_menu_open
 	queue_redraw()
 	return true
 
@@ -784,6 +826,7 @@ func draw_city_view():
 	draw_city_walkers()
 	draw_building_preview()
 	draw_building_overlay(font, font_size)
+	draw_build_menu(font, font_size)
 	draw_top_bar()
 
 func get_placement_status_message() -> String:
@@ -874,11 +917,55 @@ func draw_city_sidebar(font: Font, font_size: int):
 	y = draw_sidebar_line(font, font_size, "7 brickworks, 8 lime, 9 mortar", text_x, y, VisualStyle.COLOR_MUTED)
 	y = draw_sidebar_line(font, font_size, "0 mason, Q sculptor, W carver", text_x, y, VisualStyle.COLOR_MUTED)
 	y = draw_sidebar_line(font, font_size, "E tileworks, R paver yard", text_x, y, VisualStyle.COLOR_MUTED)
-	y = draw_sidebar_line(font, font_size, "Right click/Esc: clear", text_x, y, VisualStyle.COLOR_MUTED)
+	y = draw_sidebar_line(font, font_size, "B: build menu, Right click/Esc: clear", text_x, y, VisualStyle.COLOR_MUTED)
 	if int(resources["maintenance_grace_ticks"]) > 0:
 		y = draw_sidebar_line(font, font_size, "Grace: " + str(resources["maintenance_grace_ticks"]) + " ticks", text_x, y, VisualStyle.COLOR_MUTED)
 	y += 4.0
 	draw_sidebar_line(font, font_size, placement_status, text_x, y, placement_color)
+
+func get_build_menu_rect() -> Rect2:
+	return Rect2(Vector2(16.0, CITY_VIEW_TOP + 16.0), Vector2(330.0, 460.0))
+
+func draw_build_menu(font: Font, font_size: int):
+	build_menu_options.clear()
+	if not is_build_menu_open:
+		return
+
+	var menu_rect: Rect2 = get_build_menu_rect()
+	var text_x: float = menu_rect.position.x + 12.0
+	var y: float = menu_rect.position.y + 24.0
+	var current_category: String = ""
+
+	draw_rect(menu_rect, VisualStyle.COLOR_UI_POPUP_BACKGROUND)
+	draw_rect(menu_rect, VisualStyle.COLOR_UI_OVERLAY_BORDER, false, VisualStyle.PANEL_BORDER_WIDTH)
+	draw_string(font, Vector2(text_x, y), "Build Menu", HORIZONTAL_ALIGNMENT_LEFT, menu_rect.size.x - 24.0, 16, VisualStyle.COLOR_UI_SECTION_HEADER)
+	y += 24.0
+
+	for building_data: Dictionary in BuildMenuHelper.get_building_catalog():
+		var category: String = str(building_data["category"])
+		if category != current_category:
+			current_category = category
+			draw_string(font, Vector2(text_x, y), category, HORIZONTAL_ALIGNMENT_LEFT, menu_rect.size.x - 24.0, max(10, font_size - 1), VisualStyle.COLOR_MUTED)
+			y += 17.0
+
+		var building_id: String = str(building_data["id"])
+		var display_name: String = str(building_data["display_name"])
+		var option_rect: Rect2 = Rect2(Vector2(text_x, y - 13.0), Vector2(menu_rect.size.x - 24.0, 19.0))
+		var option_color: Color = VisualStyle.COLOR_UI_BUTTON_DISABLED
+		var label_color: Color = VisualStyle.COLOR_UI_TEXT
+		if building_id == selected_building_type and is_placing_building:
+			option_color = VisualStyle.COLOR_UI_BUTTON_ACTIVE
+			label_color = VisualStyle.COLOR_UI_TITLE
+
+		var cost_text: String = building_placement.get_cost_text(building_placement.get_building_cost(building_id))
+		var label: String = display_name + "  " + cost_text
+		var stored_option: Dictionary = {"rect": option_rect, "building_id": building_id}
+		build_menu_options.append(stored_option)
+
+		draw_rect(option_rect, option_color)
+		draw_rect(option_rect, VisualStyle.COLOR_UI_OPTION_BORDER, false, VisualStyle.OPTION_BORDER_WIDTH)
+		draw_string(font, Vector2(text_x + 5.0, y), label, HORIZONTAL_ALIGNMENT_LEFT, menu_rect.size.x - 34.0, font_size, label_color)
+		y += 22.0
 
 func draw_sidebar_section_title(font: Font, text: String, x: float, y: float) -> float:
 	draw_string(font, Vector2(x, y), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 15, VisualStyle.COLOR_UI_SECTION_HEADER)
