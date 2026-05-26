@@ -174,6 +174,8 @@ Expanded-goods buildings cap or skip output when required inputs are unavailable
 
 Food consumption is population based. `City.consume_food()` calculates consumption as `ceil(total_population / FOOD_PER_POPULATION_DIVISOR)` and stores it in `resources["food_consumption_rate"]`. It now consumes from the `food` need bucket through `GoodsNeedBucketHelper` and `City.consume_need_bucket()`. With current resources, the `food` bucket contains only the abstract `food` key, so behavior remains equivalent. If food-category goods are insufficient, available food-category stock is consumed down to zero without going negative and `resources["food_shortage"]` becomes `true`.
 
+`City.get_need_pressure_summary()` exposes category need pressure for the City Overview. Food is the active demand bucket and reports demand, available stock, shortage, and status. Tools, construction materials, maintenance materials, household goods, and civic goods report stockpile readiness as inactive pressure-only buckets until later branches add consumption rules. This is still city-stockpile pressure, not household inventory.
+
 Population can grow from the external population pool after sustained food surplus, available housing capacity, and no shortage. Growth either adds one person to an existing eligible household or creates a new neutral household. Existing external population growth represents adult arrival for compatibility and may update `working_adults`; future household births should add dependent young children without increasing `working_adults`.
 
 Housing behavior currently includes:

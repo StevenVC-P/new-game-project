@@ -254,14 +254,17 @@ Food consumption now keeps the existing population-based demand formula, but con
 
 ### 3. Need Pressure Display v0
 
-Add a city-level pressure summary for category demand:
+`City.get_need_pressure_summary()` exposes a city-level pressure summary for category demand:
 
 - demand amount
-- satisfied amount
+- available amount
 - shortage amount
-- days/periods stored where useful
+- status
+- active/inactive state
 
-Expose it in existing pressure/action hint patterns.
+The City Overview sidebar displays a compact Need Pressure section. Food is the only active consuming bucket in this slice. Tools, construction materials, maintenance materials, household goods, and civic goods show stockpile readiness as not active yet. This remains city-stockpile pressure, not household inventory.
+
+Action hints can use food need pressure for concise guidance, such as increasing production or importing food when demand is low or in shortage.
 
 ### 4. Clothing and Household-Goods Demand v0
 

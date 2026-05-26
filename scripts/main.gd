@@ -873,6 +873,7 @@ func draw_city_sidebar(font: Font, font_size: int):
 	var resources: Dictionary = city.resources
 	var placement_status: String = get_placement_status_message()
 	var pressure_summary: Dictionary = city.get_pressure_summary()
+	var need_pressure_summary: Dictionary = city.get_need_pressure_summary()
 	var placement_color: Color = VisualStyle.COLOR_MUTED
 	if placement_status == "Valid placement":
 		placement_color = VisualStyle.COLOR_POSITIVE
@@ -887,8 +888,17 @@ func draw_city_sidebar(font: Font, font_size: int):
 	y = draw_pressure_row(font, font_size, "Maintenance", pressure_summary["maintenance"] as Dictionary, text_x, y)
 	y += 4.0
 
+	y = draw_sidebar_section_title(font, "Need Pressure", text_x, y)
+	y = draw_need_pressure_row(font, font_size, need_pressure_summary["food"] as Dictionary, text_x, y)
+	y = draw_need_pressure_row(font, font_size, need_pressure_summary["tools"] as Dictionary, text_x, y)
+	y = draw_need_pressure_row(font, font_size, need_pressure_summary["construction_materials"] as Dictionary, text_x, y)
+	y = draw_need_pressure_row(font, font_size, need_pressure_summary["maintenance_materials"] as Dictionary, text_x, y)
+	y = draw_need_pressure_row(font, font_size, need_pressure_summary["household_goods"] as Dictionary, text_x, y)
+	y = draw_need_pressure_row(font, font_size, need_pressure_summary["civic_goods"] as Dictionary, text_x, y)
+	y += 4.0
+
 	y = draw_sidebar_section_title(font, "Action Hints", text_x, y)
-	var action_hint_lines: Array[String] = CityPressureHintHelper.get_hints(pressure_summary, resources)
+	var action_hint_lines: Array[String] = CityPressureHintHelper.get_hints(pressure_summary, resources, need_pressure_summary)
 	for action_hint: String in action_hint_lines:
 		y = draw_sidebar_line(font, font_size, action_hint, text_x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
 	y += 4.0
@@ -1031,6 +1041,30 @@ func draw_pressure_row(font: Font, font_size: int, label: String, pressure: Dict
 		y = draw_sidebar_detail_line(font, font_size, detail, x + 12.0, y - 1.0)
 
 	return y
+
+func draw_need_pressure_row(font: Font, font_size: int, need_pressure: Dictionary, x: float, y: float) -> float:
+	var label: String = str(need_pressure.get("display_name", "Need"))
+	var status: String = str(need_pressure.get("status", "not_implemented"))
+	var severity: String = str(need_pressure.get("severity", "neutral"))
+	var available: int = int(need_pressure.get("available", 0))
+	var demand: int = int(need_pressure.get("demand", 0))
+	var active: bool = bool(need_pressure.get("active", false))
+	var value_text: String = str(available) + " available"
+
+	if active:
+		value_text = format_need_status_label(status) + " - " + str(available) + " available, " + str(demand) + " demand"
+	else:
+		value_text += ", not active"
+
+	return draw_sidebar_label_value(font, font_size, label, value_text, x, y, get_pressure_color(severity))
+
+func format_need_status_label(status: String) -> String:
+	var words: PackedStringArray = status.replace("_", " ").split(" ")
+	for index in range(words.size()):
+		if words[index].length() > 0:
+			words[index] = words[index].substr(0, 1).to_upper() + words[index].substr(1).to_lower()
+
+	return " ".join(words)
 
 func get_pressure_color(severity: String) -> Color:
 	if severity == "positive":

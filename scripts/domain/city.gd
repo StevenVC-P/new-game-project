@@ -1333,6 +1333,48 @@ func get_pressure_summary() -> Dictionary:
 		"maintenance": get_maintenance_pressure()
 	}
 
+func get_need_pressure_summary() -> Dictionary:
+	return {
+		GoodsNeedBucketHelperScript.BUCKET_FOOD: get_food_need_pressure(),
+		GoodsNeedBucketHelperScript.BUCKET_TOOLS: get_inactive_need_pressure(GoodsNeedBucketHelperScript.BUCKET_TOOLS),
+		GoodsNeedBucketHelperScript.BUCKET_CONSTRUCTION_MATERIALS: get_inactive_need_pressure(GoodsNeedBucketHelperScript.BUCKET_CONSTRUCTION_MATERIALS),
+		GoodsNeedBucketHelperScript.BUCKET_MAINTENANCE_MATERIALS: get_inactive_need_pressure(GoodsNeedBucketHelperScript.BUCKET_MAINTENANCE_MATERIALS),
+		GoodsNeedBucketHelperScript.BUCKET_HOUSEHOLD_GOODS: get_inactive_need_pressure(GoodsNeedBucketHelperScript.BUCKET_HOUSEHOLD_GOODS),
+		GoodsNeedBucketHelperScript.BUCKET_CIVIC_GOODS: get_inactive_need_pressure(GoodsNeedBucketHelperScript.BUCKET_CIVIC_GOODS),
+	}
+
+func get_food_need_pressure() -> Dictionary:
+	var demand: int = max(0, int(resources["food_consumption_rate"]))
+	var available: int = get_available_need_bucket_amount(GoodsNeedBucketHelperScript.BUCKET_FOOD)
+	var shortage_amount: int = 0
+	var status: String = "met"
+	var severity: String = "positive"
+
+	if resources["food_shortage"] == true:
+		shortage_amount = demand
+		status = "shortage"
+		severity = "danger"
+	elif demand > 0 and available < demand:
+		status = "low"
+		severity = "warning"
+
+	return make_need_pressure(GoodsNeedBucketHelperScript.BUCKET_FOOD, status, severity, demand, available, shortage_amount, true)
+
+func get_inactive_need_pressure(bucket_id: String) -> Dictionary:
+	return make_need_pressure(bucket_id, "pressure_only", "neutral", 0, get_available_need_bucket_amount(bucket_id), 0, false)
+
+func make_need_pressure(bucket_id: String, status: String, severity: String, demand: int, available: int, shortage: int, active: bool) -> Dictionary:
+	return {
+		"bucket": bucket_id,
+		"display_name": GoodsNeedBucketHelperScript.get_bucket_display_name(bucket_id),
+		"status": status,
+		"severity": severity,
+		"demand": demand,
+		"available": available,
+		"shortage": shortage,
+		"active": active,
+	}
+
 func make_pressure(status: String, severity: String, detail: String = "", values: Dictionary = {}) -> Dictionary:
 	return {
 		"status": status,
