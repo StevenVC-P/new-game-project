@@ -351,6 +351,20 @@ Suggested first implementation slice after this doc:
 - Display stage/counters in debug or selected-household UI.
 - Keep existing production, food, housing, and assignment formulas unchanged.
 
+## Lifecycle Seeding v0
+
+Starting households should be seeded with deterministic lifecycle variety so the village does not begin as a set of identical `established_family` households. Seeding is not lifecycle ticking: it does not age families, split adult children, create new households, free houses, or apply succession pressure.
+
+The current starter pattern uses household index to assign a predictable sequence:
+
+- `young_family`: young children, no older-child support yet
+- `established_family`: young children plus older-child family support
+- `mature_family`: older-child family support and an adult child, with no succession pressure yet
+- `newlywed`: no children yet
+- `old_couple`: no child counters and no death/removal behavior yet
+
+The first three starter households currently show `young_family`, `established_family`, and `mature_family`. More households can reuse the same sequence. Family trade is seeded from broad preference: agrarian households become `farming`, industrial households become a craft trade such as `woodcraft` or `stonework`, and neutral households remain `general`.
+
 ## What Is Not Acceptable Yet
 
 - No individual-person simulation.

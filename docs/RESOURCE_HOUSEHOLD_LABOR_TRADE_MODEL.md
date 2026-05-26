@@ -84,6 +84,8 @@ Older-child production support is represented as household support power, not ad
 
 This v0 rule is intentionally simple. Larger families matter, but building-specific labor absorption, land or worksite scale, tools, supervision risk, adult-child succession pressure, and multi-household support are later systems.
 
+Starter households are seeded deterministically with varied lifecycle stages and child counters. This makes household state visible in normal play without adding lifecycle ticking. Seeding does not change population totals, labor capacity, assignment rules, family splitting, death, or housing behavior.
+
 ## Production
 
 Production runs during `City.tick()` after shelter counts, maintenance grace, worker counts, and food consumption are updated.

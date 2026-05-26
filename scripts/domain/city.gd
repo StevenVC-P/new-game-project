@@ -93,7 +93,54 @@ func create_starter_households():
 	for household_index in range(STARTING_HOUSEHOLD_COUNT):
 		var preference: String = preferences[household_index % preferences.size()]
 		var household: Household = Household.new(household_index, -1, preference, STARTING_HOUSEHOLD_POPULATION, Household.RESIDENCE_TEMPORARY)
+		seed_starter_household_lifecycle(household, household_index)
 		households.append(household)
+
+func seed_starter_household_lifecycle(household: Household, household_index: int):
+	var seed_index: int = household_index % 5
+	household.family_trade = get_seeded_family_trade(household.preference, household_index)
+	household.succession_pressure = 0
+
+	if seed_index == 0:
+		household.lifecycle_stage = "young_family"
+		household.young_children = 2
+		household.older_children = 0
+		household.adult_children = 0
+		household.age_in_stage = 1
+	elif seed_index == 1:
+		household.lifecycle_stage = "established_family"
+		household.young_children = 1
+		household.older_children = 1
+		household.adult_children = 0
+		household.age_in_stage = 2
+	elif seed_index == 2:
+		household.lifecycle_stage = "mature_family"
+		household.young_children = 0
+		household.older_children = 1
+		household.adult_children = 1
+		household.age_in_stage = 3
+	elif seed_index == 3:
+		household.lifecycle_stage = "newlywed"
+		household.young_children = 0
+		household.older_children = 0
+		household.adult_children = 0
+		household.age_in_stage = 0
+	else:
+		household.lifecycle_stage = "old_couple"
+		household.young_children = 0
+		household.older_children = 0
+		household.adult_children = 0
+		household.age_in_stage = 4
+
+func get_seeded_family_trade(preference: String, household_index: int) -> String:
+	if preference == WORK_PREF_AGRARIAN:
+		return "farming"
+	if preference == WORK_PREF_INDUSTRIAL:
+		if household_index % 2 == 0:
+			return "woodcraft"
+		return "stonework"
+
+	return "general"
 
 func add_building(building: Building, household: Household = null):
 	building.id = buildings.size()
