@@ -151,6 +151,9 @@ func draw(canvas: CanvasItem, font: Font, font_size: int, city: City):
 	y = draw_overlay_line(canvas, font, font_size, "Upkeep: " + enabled_text(building.receives_maintenance), text_x, y, overlay_size.x)
 	y = draw_overlay_line(canvas, font, font_size, "Worker: " + get_building_worker_text(city, inspected_building_index), text_x, y, overlay_size.x)
 	y = draw_overlay_line(canvas, font, font_size, "Assignment: " + get_assignment_source_text(building), text_x, y, overlay_size.x)
+	y = draw_overlay_section_title(canvas, font, font_size, "Production Requirements", text_x, y, overlay_size.x)
+	for requirement_text: String in ProductionRequirementHelper.get_requirement_lines(city, building):
+		y = draw_overlay_line(canvas, font, font_size, requirement_text, text_x, y, overlay_size.x)
 
 	if building.assigned_workers > 0:
 		y = draw_overlay_action_option(canvas, font, font_size, "Unassign worker", text_x, y, overlay_size.x, {"action": "unassign"}, VisualStyle.COLOR_UI_BUTTON_DANGER)
@@ -173,7 +176,7 @@ func get_building_overlay_size(city: City, building: Building) -> Vector2:
 	if building.is_house():
 		line_count = 4
 	else:
-		line_count = 5
+		line_count = 6 + ProductionRequirementHelper.get_requirement_lines(city, building).size()
 		if building.assigned_workers > 0:
 			option_count = 1
 		else:
@@ -199,6 +202,10 @@ func count_available_overlay_worker_options(city: City) -> int:
 
 func draw_overlay_line(canvas: CanvasItem, font: Font, font_size: int, text: String, x: float, y: float, overlay_width: float) -> float:
 	canvas.draw_string(font, Vector2(x, y), text, HORIZONTAL_ALIGNMENT_LEFT, overlay_width - 20.0, font_size, VisualStyle.COLOR_UI_TEXT_SOFT)
+	return y + 18.0
+
+func draw_overlay_section_title(canvas: CanvasItem, font: Font, font_size: int, text: String, x: float, y: float, overlay_width: float) -> float:
+	canvas.draw_string(font, Vector2(x, y), text, HORIZONTAL_ALIGNMENT_LEFT, overlay_width - 20.0, max(10, font_size - 1), VisualStyle.COLOR_UI_SECTION_HEADER)
 	return y + 18.0
 
 func draw_overlay_available_worker_options(canvas: CanvasItem, font: Font, font_size: int, x: float, y: float, overlay_width: float, city: City, building: Building) -> float:
