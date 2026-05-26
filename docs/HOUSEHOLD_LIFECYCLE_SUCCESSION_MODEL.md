@@ -365,6 +365,21 @@ The current starter pattern uses household index to assign a predictable sequenc
 
 The first three starter households currently show `young_family`, `established_family`, and `mature_family`. More households can reuse the same sequence. Family trade is seeded from broad preference: agrarian households become `farming`, industrial households become a craft trade such as `woodcraft` or `stonework`, and neutral households remain `general`.
 
+## Lifecycle Aging v0
+
+Household lifecycle aging uses the calendar month boundary, not production ticks. When `Calendar.month_changed` fires, each city advances household lifecycle age once, and each household increments `age_in_stage` by 1.
+
+This first aging slice is intentionally informational:
+
+- It does not change `lifecycle_stage`.
+- It does not move young children into older children.
+- It does not move older children into adult children.
+- It does not change succession pressure.
+- It does not change labor capacity, worker capacity, assignment, production formulas, household creation, or housing.
+- It does not remove old couples or free houses.
+
+The player can verify aging through the selected-household lifecycle popup. Stage and child transitions should be a later slice after the cadence feels clear and safe.
+
 ## What Is Not Acceptable Yet
 
 - No individual-person simulation.

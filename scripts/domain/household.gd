@@ -66,6 +66,9 @@ func update_labor_capacity():
 
 	worker_capacity = labor_capacity
 
+func advance_lifecycle_month():
+	age_in_stage += 1
+
 func get_family_support_power() -> int:
 	return max(0, older_children)
 

@@ -79,6 +79,7 @@ func _ensure_city_pressure_debug_panel() -> void:
 		city_pressure_debug_panel.visible = false
 func _ready():
 	rng.randomize()
+	world_calendar.month_changed.connect(on_calendar_month_changed)
 	world_calendar.season_changed.connect(on_calendar_season_changed)
 	generate_map()
 	place_cities()
@@ -618,6 +619,10 @@ func run_simulation_day():
 
 	if current_view == VIEW_CITY:
 		queue_redraw()
+
+func on_calendar_month_changed(_calendar: Calendar):
+	for city: City in cities:
+		city.advance_household_lifecycle_month()
 
 func on_calendar_season_changed(calendar: Calendar):
 	print("Season changed: ", calendar.get_current_season(), " - Year ", calendar.current_year)

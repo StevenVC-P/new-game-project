@@ -86,6 +86,8 @@ This v0 rule is intentionally simple. Larger families matter, but building-speci
 
 Starter households are seeded deterministically with varied lifecycle stages and child counters. This makes household state visible in normal play without adding lifecycle ticking. Seeding does not change population totals, labor capacity, assignment rules, family splitting, death, or housing behavior.
 
+Household lifecycle aging v0 advances only `age_in_stage` on the calendar `month_changed` signal. It does not change child counters, lifecycle stages, labor, assignments, housing, production, succession pressure, family formation, or death/removal behavior.
+
 ## Production
 
 Production runs during `City.tick()` after shelter counts, maintenance grace, worker counts, and food consumption are updated.

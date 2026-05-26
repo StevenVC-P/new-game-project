@@ -142,6 +142,10 @@ func get_seeded_family_trade(preference: String, household_index: int) -> String
 
 	return "general"
 
+func advance_household_lifecycle_month():
+	for household: Household in households:
+		household.advance_lifecycle_month()
+
 func add_building(building: Building, household: Household = null):
 	building.id = buildings.size()
 	buildings.append(building)
