@@ -86,7 +86,7 @@ This v0 rule is intentionally simple. Larger families matter, but building-speci
 
 Starter households are seeded deterministically with varied lifecycle stages and child counters. This makes household state visible in normal play without adding lifecycle ticking. Seeding does not change population totals, labor capacity, assignment rules, family splitting, death, or housing behavior.
 
-Household lifecycle aging v0 advances only `age_in_stage` on the calendar `month_changed` signal. It does not change child counters, lifecycle stages, labor, assignments, housing, production, succession pressure, family formation, or death/removal behavior.
+Household lifecycle transitions v0 advance on the calendar `month_changed` signal. `age_in_stage` increments monthly, and deterministic thresholds can move households from newlywed to young family, established family, mature family, and old couple. Child cohort aging uses a separate `child_age_months` counter: every 36 months, all older children become adult children and all young children become older children. Stage transitions that move child counters reset the child aging counter. Transitions do not create new children; future birth rolls should add young children based on family and city conditions such as food security, housing, overcrowding, household stage, stress, grief, risk, and city stability. This does not change labor, assignments, housing, production formulas, succession pressure, family formation, or death/removal behavior.
 
 ## Production
 

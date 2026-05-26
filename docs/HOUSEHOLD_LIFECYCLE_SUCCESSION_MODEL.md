@@ -365,20 +365,30 @@ The current starter pattern uses household index to assign a predictable sequenc
 
 The first three starter households currently show `young_family`, `established_family`, and `mature_family`. More households can reuse the same sequence. Family trade is seeded from broad preference: agrarian households become `farming`, industrial households become a craft trade such as `woodcraft` or `stonework`, and neutral households remain `general`.
 
-## Lifecycle Aging v0
+## Lifecycle Aging And Transitions v0
 
 Household lifecycle aging uses the calendar month boundary, not production ticks. When `Calendar.month_changed` fires, each city advances household lifecycle age once, and each household increments `age_in_stage` by 1.
 
-This first aging slice is intentionally informational:
+Lifecycle transitions are deterministic and happen when `age_in_stage` reaches a stage threshold:
 
-- It does not change `lifecycle_stage`.
-- It does not move young children into older children.
-- It does not move older children into adult children.
+- `newlywed` -> `young_family` after 6 months; does not create new children.
+- `young_family` -> `established_family` after 12 months; moves all young children to older children.
+- `established_family` -> `mature_family` after 24 months; moves all older children to adult children, then moves all young children to older children.
+- `mature_family` -> `old_couple` after 36 months; moves all older children to adult children, then moves all young children to older children.
+- `old_couple` remains `old_couple` in this slice.
+
+Child cohort aging is tracked separately from stage age. Every 36 months, existing child counters move up one band: older children become adult children, young children become older children, and young children reset to 0. Stage transitions that move child counters reset this child aging counter so the same cohort does not age twice in one month.
+
+Transitions and child cohort aging move existing child counters only. They do not represent births. Future household birth rolls should add young children based on food security, housing, overcrowding, household stage, stress, grief, risk, and city stability. Old couples cannot gain new children.
+
+This transition slice is still conservative:
+
 - It does not change succession pressure.
 - It does not change labor capacity, worker capacity, assignment, production formulas, household creation, or housing.
 - It does not remove old couples or free houses.
+- It does not create new families from adult children.
 
-The player can verify aging through the selected-household lifecycle popup. Stage and child transitions should be a later slice after the cadence feels clear and safe.
+The player can verify aging, stage changes, and child counter movement through the selected-household lifecycle popup. Succession pressure, new-family formation, and old-couple death/removal remain later systems.
 
 ## What Is Not Acceptable Yet
 

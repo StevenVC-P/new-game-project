@@ -7,6 +7,16 @@ const WORK_PREF_INDUSTRIAL: String = "industrial"
 const RESIDENCE_HOUSED: String = "housed"
 const RESIDENCE_TEMPORARY: String = "temporary"
 const RESIDENCE_UNSHELTERED: String = "unsheltered"
+const LIFECYCLE_NEWLYWED: String = "newlywed"
+const LIFECYCLE_YOUNG_FAMILY: String = "young_family"
+const LIFECYCLE_ESTABLISHED_FAMILY: String = "established_family"
+const LIFECYCLE_MATURE_FAMILY: String = "mature_family"
+const LIFECYCLE_OLD_COUPLE: String = "old_couple"
+const NEWLYWED_MONTHS_TO_YOUNG_FAMILY: int = 6
+const YOUNG_FAMILY_MONTHS_TO_ESTABLISHED: int = 12
+const ESTABLISHED_MONTHS_TO_MATURE: int = 24
+const MATURE_MONTHS_TO_OLD_COUPLE: int = 36
+const CHILD_COHORT_AGING_MONTHS: int = 36
 
 var id: int = -1
 var house_building_id: int = -1
@@ -15,13 +25,14 @@ var housing_status: String = RESIDENCE_TEMPORARY
 var preference: String = WORK_PREF_NEUTRAL
 var population_capacity: int = 4
 var total_population: int = 4
-var lifecycle_stage: String = "established_family"
+var lifecycle_stage: String = LIFECYCLE_ESTABLISHED_FAMILY
 var young_children: int = 0
 var older_children: int = 0
 var adult_children: int = 0
 var family_trade: String = "general"
 var succession_pressure: int = 0
 var age_in_stage: int = 0
+var child_age_months: int = 0
 var labor_capacity: int = 2
 var worker_capacity: int = 2
 var assigned_workers: int = 0
@@ -68,6 +79,65 @@ func update_labor_capacity():
 
 func advance_lifecycle_month():
 	age_in_stage += 1
+	child_age_months += 1
+	var did_stage_transition_age_children: bool = apply_lifecycle_transition_if_ready()
+	if not did_stage_transition_age_children and child_age_months >= CHILD_COHORT_AGING_MONTHS:
+		age_child_cohorts()
+
+func apply_lifecycle_transition_if_ready() -> bool:
+	if lifecycle_stage == LIFECYCLE_NEWLYWED and age_in_stage >= NEWLYWED_MONTHS_TO_YOUNG_FAMILY:
+		transition_to_young_family()
+		return false
+	elif lifecycle_stage == LIFECYCLE_YOUNG_FAMILY and age_in_stage >= YOUNG_FAMILY_MONTHS_TO_ESTABLISHED:
+		transition_to_established_family()
+		return true
+	elif lifecycle_stage == LIFECYCLE_ESTABLISHED_FAMILY and age_in_stage >= ESTABLISHED_MONTHS_TO_MATURE:
+		transition_to_mature_family()
+		return true
+	elif lifecycle_stage == LIFECYCLE_MATURE_FAMILY and age_in_stage >= MATURE_MONTHS_TO_OLD_COUPLE:
+		transition_to_old_couple()
+		return true
+
+	return false
+
+func transition_to_young_family():
+	lifecycle_stage = LIFECYCLE_YOUNG_FAMILY
+	reset_lifecycle_stage_age()
+
+func transition_to_established_family():
+	lifecycle_stage = LIFECYCLE_ESTABLISHED_FAMILY
+	older_children += young_children
+	young_children = 0
+	reset_child_cohort_age()
+	reset_lifecycle_stage_age()
+
+func transition_to_mature_family():
+	lifecycle_stage = LIFECYCLE_MATURE_FAMILY
+	adult_children += older_children
+	older_children = young_children
+	young_children = 0
+	reset_child_cohort_age()
+	reset_lifecycle_stage_age()
+
+func transition_to_old_couple():
+	lifecycle_stage = LIFECYCLE_OLD_COUPLE
+	adult_children += older_children
+	older_children = young_children
+	young_children = 0
+	reset_child_cohort_age()
+	reset_lifecycle_stage_age()
+
+func age_child_cohorts():
+	adult_children += older_children
+	older_children = young_children
+	young_children = 0
+	reset_child_cohort_age()
+
+func reset_lifecycle_stage_age():
+	age_in_stage = 0
+
+func reset_child_cohort_age():
+	child_age_months = 0
 
 func get_family_support_power() -> int:
 	return max(0, older_children)
