@@ -464,6 +464,28 @@ The new household begins as:
 
 The new household occupies the first available empty house. The system does not create a house, displace any household, or assign the new household to production work. Work matching, inherited job placement, multi-household building support, marriage matching, family names, inheritance, and wealth transfer remain future systems.
 
+## Household Lineage And Trait Inheritance v0
+
+Households now carry simple lineage fields:
+
+- `parent_household_id`
+- `origin_household_id`
+- `generation`
+
+Starter households are founder households with no parent, their own origin id, and generation 0. A new family formed from adult children records its parent household, keeps the founder origin from the parent line, and starts at parent generation + 1.
+
+New families inherit family work identity with deterministic variation. Most new households keep the parent `family_trade`; some receive a related trade, and rare cases fall back to `general`. Related trades are intentionally small and readable:
+
+- farming can branch toward food processing
+- woodcraft can branch toward construction or toolmaking
+- stonework can branch toward construction or masonry
+- claywork can branch toward construction
+- food processing can branch toward farming
+- toolmaking can branch toward woodcraft or stonework
+- construction can branch toward woodcraft or stonework
+
+This prepares future work succession priority without assigning the new household to work automatically. Family names, marriage matching, individual persons, inheritance or wealth transfer, and multi-household building support remain deferred.
+
 ## Old Couple Lifecycle Completion v0
 
 Old-couple lifecycle completion runs on the monthly household lifecycle path after lifecycle aging, succession pressure recalculation, and new-family formation. It does not run on production ticks and uses a deterministic age-weighted roll rather than map RNG.

@@ -12,12 +12,15 @@ static func get_lifecycle_lines(household, city = null) -> Array[String]:
 	var young_children: int = int(_read_household_property(household, "young_children", 0))
 	var older_children: int = int(_read_household_property(household, "older_children", 0))
 	var adult_children: int = int(_read_household_property(household, "adult_children", 0))
+	var parent_household_id: int = int(_read_household_property(household, "parent_household_id", -1))
+	var generation: int = int(_read_household_property(household, "generation", 0))
 
 	if lifecycle_stage == "" and family_trade == "":
 		return ["No household lifecycle details."]
 
 	lines.append("Stage: " + _format_lifecycle_label(str(lifecycle_stage), "Unknown"))
 	lines.append("Children: " + str(young_children) + " young, " + str(older_children) + " older, " + str(adult_children) + " adult")
+	lines.append(_get_lineage_text(parent_household_id, generation))
 	if older_children > 0:
 		lines.append("Family support: " + _get_family_support_text(household))
 	lines.append("Family trade: " + _format_lifecycle_label(str(family_trade), "General"))
@@ -27,6 +30,12 @@ static func get_lifecycle_lines(household, city = null) -> Array[String]:
 	lines.append("Age in stage: " + str(age_in_stage))
 
 	return lines
+
+static func _get_lineage_text(parent_household_id: int, generation: int) -> String:
+	if parent_household_id < 0:
+		return "Lineage: Founder household"
+
+	return "Lineage: Child of Household " + str(parent_household_id + 1) + ", generation " + str(generation)
 
 static func _get_family_growth_text(household, city) -> String:
 	if city is Object and city.has_method("get_family_growth_status_text"):

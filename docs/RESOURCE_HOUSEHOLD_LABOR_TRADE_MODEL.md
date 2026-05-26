@@ -107,7 +107,9 @@ The selected-household popup can show no pressure, a future family ready, or suc
 
 New Family Formation v0 consumes this status on the monthly household lifecycle path. If a parent household has at least 2 adult children and an empty house exists, one new household can form from that parent that month. The parent loses 2 adult children and 2 total population, then recalculates succession pressure. Parent `working_adults`, `labor_capacity`, and `worker_capacity` do not decrease because adult children are not part of current labor capacity.
 
-The new household starts as a housed `newlywed` household with `total_population = 2`, `working_adults = 2`, no child counters, age counters reset to 0, broad preference inherited from the parent, and `family_trade` inherited from the parent or set to `general`. It occupies the first empty house, but it is not automatically assigned to production work. Work-opportunity matching, family names, marriage matching, wealth transfer, penalties, and multi-household building support are deferred.
+The new household starts as a housed `newlywed` household with `total_population = 2`, `working_adults = 2`, no child counters, age counters reset to 0, broad preference inherited from the parent, and lineage fields set from the parent household. It occupies the first empty house, but it is not automatically assigned to production work. Work-opportunity matching, family names, marriage matching, wealth transfer, penalties, and multi-household building support are deferred.
+
+Lineage and Trait Inheritance v0 gives each household `parent_household_id`, `origin_household_id`, and `generation`. Starter households are founders. New families record the parent household, carry forward the origin household, and set generation to parent generation + 1. Family trade inheritance is deterministic: most new households keep the parent `family_trade`, some receive a related trade, and rare cases fall back to `general`. The selected-household popup can show founder or child-household lineage.
 
 Old Couple Lifecycle Completion v0 runs on the monthly lifecycle path after new-family formation. An `old_couple` household can complete its lifecycle only if no adult children remain. If adult children remain, removal is blocked and logged. Eligible old couples use a deterministic age-weighted monthly roll: 0% before 12 months in stage, 5% from 12-23 months, 10% from 24-35 months, 20% from 36-47 months, and 35% from 48+ months. When completion happens, assigned production buildings are unassigned, the household is removed from the active household list, and its house building remains available for later housing assignment. This does not create a new household, delete the house, run accident/risk/grief logic, or transfer inheritance.
 
@@ -117,6 +119,7 @@ Household lifecycle event logging v0 is controlled by `City.ENABLE_HOUSEHOLD_LIF
 [HouseholdLifecycle] City=0 Household=2 Event=MonthAged age_in_stage=7 child_age_months=7
 [HouseholdLifecycle] City=0 Household=2 Event=BirthBlocked reason=temporary_housing
 [HouseholdLifecycle] City=0 Household=3 Event=NewFamilyFormed child_household=7 house=12 parent_adult_children=0
+[HouseholdLifecycle] City=0 Household=7 Event=LineageAssigned parent=3 origin=3 generation=1 family_trade=stonework
 [HouseholdLifecycle] City=0 Household=4 Event=OldCoupleMortalityRoll roll=18 chance=20 age_in_stage=36
 [HouseholdLifecycle] City=0 Household=4 Event=HouseFreed house=12
 ```

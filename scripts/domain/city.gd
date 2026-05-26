@@ -107,6 +107,9 @@ func create_starter_households():
 func seed_starter_household_lifecycle(household: Household, household_index: int):
 	var seed_index: int = household_index % 5
 	household.family_trade = get_seeded_family_trade(household.preference, household_index)
+	household.parent_household_id = -1
+	household.origin_household_id = household.id
+	household.generation = 0
 	household.succession_pressure = 0
 
 	if seed_index == 0:
@@ -212,15 +215,64 @@ func form_new_family_from_parent(parent: Household, house_id: int, city_index: i
 	new_household.age_in_stage = 0
 	new_household.child_age_months = 0
 	new_household.working_adults = 2
-	new_household.family_trade = parent.family_trade
-	if new_household.family_trade.strip_edges() == "":
-		new_household.family_trade = "general"
+	new_household.parent_household_id = parent.id
+	if parent.origin_household_id >= 0:
+		new_household.origin_household_id = parent.origin_household_id
+	else:
+		new_household.origin_household_id = parent.id
+	new_household.generation = parent.generation + 1
+	new_household.family_trade = get_inherited_family_trade(parent, new_household, city_index)
 	new_household.succession_pressure = 0
 	new_household.move_to_house(house_id)
 	new_household.update_labor_capacity()
 	households.append(new_household)
 	log_household_lifecycle_event(city_index, parent.id, "NewFamilyFormed", "child_household=" + str(new_household.id) + " house=" + str(house_id) + " parent_adult_children=" + str(parent.adult_children))
 	log_household_lifecycle_event(city_index, new_household.id, "NewHouseholdCreated", "parent=" + str(parent.id) + " house=" + str(house_id) + " stage=" + new_household.lifecycle_stage + " total_population=" + str(new_household.total_population) + " working_adults=" + str(new_household.working_adults) + " family_trade=" + new_household.family_trade)
+	log_household_lifecycle_event(city_index, new_household.id, "LineageAssigned", "parent=" + str(new_household.parent_household_id) + " origin=" + str(new_household.origin_household_id) + " generation=" + str(new_household.generation) + " family_trade=" + new_household.family_trade)
+
+func get_inherited_family_trade(parent: Household, child: Household, city_index: int = 0) -> String:
+	var parent_trade: String = parent.family_trade
+	if parent_trade.strip_edges() == "":
+		parent_trade = "general"
+
+	var related_trades: Array[String] = get_related_family_trades(parent_trade)
+	var roll: int = get_family_trade_inheritance_roll(parent, child, city_index)
+	if roll < 75:
+		return parent_trade
+	if roll < 95 and related_trades.size() > 0:
+		return related_trades[roll % related_trades.size()]
+
+	return "general"
+
+func get_family_trade_inheritance_roll(parent: Household, child: Household, city_index: int = 0) -> int:
+	var seed_value: int = parent.id * 43
+	seed_value += child.id * 97
+	seed_value += city_index * 131
+	seed_value += child.generation * 29
+	seed_value += int(tile.x) * 17
+	seed_value += int(tile.y) * 19
+	var mixed_value: int = abs(seed_value * 1103515245 + 12345)
+	return mixed_value % 100
+
+func get_related_family_trades(family_trade: String) -> Array[String]:
+	if family_trade == "farming":
+		return ["food_processing"]
+	if family_trade == "woodcraft":
+		return ["construction", "toolmaking"]
+	if family_trade == "stonework":
+		return ["construction", "masonry"]
+	if family_trade == "claywork":
+		return ["construction"]
+	if family_trade == "textile":
+		return []
+	if family_trade == "food_processing":
+		return ["farming"]
+	if family_trade == "toolmaking":
+		return ["woodcraft", "stonework"]
+	if family_trade == "construction":
+		return ["woodcraft", "stonework"]
+
+	return []
 
 func advance_old_couple_lifecycle_completion_month(city_index: int = 0):
 	var active_households: Array[Household] = households.duplicate()
