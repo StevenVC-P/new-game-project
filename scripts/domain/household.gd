@@ -123,12 +123,28 @@ func add_young_child_from_birth():
 func get_total_child_count() -> int:
 	return young_children + older_children + adult_children
 
+func get_potential_new_family_count() -> int:
+	return int(floor(float(adult_children) / 2.0))
+
+func has_succession_pressure() -> bool:
+	return get_potential_new_family_count() > 0
+
+func get_succession_status() -> String:
+	if has_succession_pressure():
+		return "future_family_ready"
+
+	return "none"
+
+func recalculate_succession_pressure():
+	succession_pressure = get_potential_new_family_count()
+
 func advance_lifecycle_month():
 	age_in_stage += 1
 	child_age_months += 1
 	var did_stage_transition_age_children: bool = apply_lifecycle_transition_if_ready()
 	if not did_stage_transition_age_children and child_age_months >= CHILD_COHORT_AGING_MONTHS:
 		age_child_cohorts()
+	recalculate_succession_pressure()
 
 func apply_lifecycle_transition_if_ready() -> bool:
 	if lifecycle_stage == LIFECYCLE_NEWLYWED and age_in_stage >= NEWLYWED_MONTHS_TO_YOUNG_FAMILY:

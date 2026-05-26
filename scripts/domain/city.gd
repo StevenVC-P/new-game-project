@@ -54,6 +54,7 @@ func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO):
 	tile = city_tile
 	resources = make_starting_resources()
 	create_starter_households()
+	recalculate_household_succession_pressures()
 	update_shelter_counts()
 	record_resource_history()
 
@@ -137,6 +138,8 @@ func seed_starter_household_lifecycle(household: Household, household_index: int
 		household.adult_children = 0
 		household.age_in_stage = 4
 
+	household.recalculate_succession_pressure()
+
 func get_seeded_family_trade(preference: String, household_index: int) -> String:
 	if preference == WORK_PREF_AGRARIAN:
 		return "farming"
@@ -150,6 +153,33 @@ func get_seeded_family_trade(preference: String, household_index: int) -> String
 func advance_household_lifecycle_month():
 	for household: Household in households:
 		household.advance_lifecycle_month()
+	recalculate_household_succession_pressures()
+
+func recalculate_household_succession_pressures():
+	for household: Household in households:
+		household.recalculate_succession_pressure()
+
+func get_household_succession_status(household: Household) -> String:
+	if household == null:
+		return "none"
+	if not household.has_succession_pressure():
+		return "none"
+	if get_empty_house_building_ids().size() > 0:
+		return "ready_for_new_family"
+
+	return "blocked_no_house"
+
+func get_household_succession_status_text(household: Household) -> String:
+	var status: String = get_household_succession_status(household)
+	if status == "ready_for_new_family":
+		var family_count: int = household.get_potential_new_family_count()
+		if family_count == 1:
+			return "Succession: 1 future family ready"
+		return "Succession: " + str(family_count) + " future families ready"
+	if status == "blocked_no_house":
+		return "Succession: Blocked - no empty house"
+
+	return "Succession: No pressure"
 
 func advance_household_birth_rolls_season(calendar: Calendar, city_index: int = 0):
 	update_shelter_counts()

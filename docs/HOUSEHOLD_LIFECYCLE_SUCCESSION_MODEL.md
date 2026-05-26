@@ -415,6 +415,25 @@ On a successful birth, the household gains one young child, `total_population` i
 
 The selected-household lifecycle popup can show whether family growth is possible or blocked by food, housing, or eligibility. Succession pressure, new-family formation, old-couple death/removal, accidents, grief, risk, and individual-person simulation remain deferred.
 
+## Adult Children Succession Pressure v0
+
+Adult children now create visible succession pressure, but they do not leave the household yet.
+
+The v0 rule is:
+
+- `potential_new_families = floor(adult_children / 2)`
+- `succession_pressure = potential_new_families`
+
+This means:
+
+- 0-1 adult children: no succession pressure
+- 2-3 adult children: 1 potential future family
+- 4-5 adult children: 2 potential future families
+
+Housing is the first blocker. If a household has at least one potential future family and an empty house is available, the selected-household popup can show that a future family is ready. If no empty house is available, the popup shows that succession is blocked by housing.
+
+This is status and hook data only. It does not create a new household, move adult children out, occupy houses, assign work, apply penalties, or trigger migration. Work and trade-opportunity matching are deferred until the new-family formation branch can explain those requirements clearly.
+
 This transition slice is still conservative:
 
 - It does not change succession pressure.

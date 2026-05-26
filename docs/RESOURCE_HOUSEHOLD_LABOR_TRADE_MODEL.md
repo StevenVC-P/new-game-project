@@ -98,6 +98,13 @@ Birth rolls are blocked by food shortage, non-housed households, full housing ca
 
 On success, the household gains one `young_children`, `total_population` increases by 1, and `child_age_months` resets to 0. `working_adults`, `labor_capacity`, `worker_capacity`, idle labor, assigned worker count, and household count do not increase. Births therefore create real dependents and pressure first; older-child support and adult-child succession remain delayed lifecycle outcomes.
 
+Adult children succession pressure v0 is visible but non-operative. Each pair of adult children represents one potential future family:
+
+- `potential_new_families = floor(adult_children / 2)`
+- `succession_pressure = potential_new_families`
+
+The selected-household popup can show no pressure, a future family ready, or succession blocked because no empty house is available. This branch does not create households, move adult children, occupy houses, assign work, apply penalties, or model marriage. Work-opportunity matching is deferred.
+
 ## Production
 
 Production runs during `City.tick()` after shelter counts, maintenance grace, worker counts, and food consumption are updated.

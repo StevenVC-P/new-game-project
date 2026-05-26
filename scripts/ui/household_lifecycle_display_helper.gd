@@ -8,7 +8,6 @@ static func get_lifecycle_lines(household, city = null) -> Array[String]:
 
 	var lifecycle_stage = _read_household_property(household, "lifecycle_stage", "")
 	var family_trade = _read_household_property(household, "family_trade", "")
-	var succession_pressure: int = int(_read_household_property(household, "succession_pressure", 0))
 	var age_in_stage: int = int(_read_household_property(household, "age_in_stage", 0))
 	var young_children: int = int(_read_household_property(household, "young_children", 0))
 	var older_children: int = int(_read_household_property(household, "older_children", 0))
@@ -23,11 +22,7 @@ static func get_lifecycle_lines(household, city = null) -> Array[String]:
 		lines.append("Family support: " + _get_family_support_text(household))
 	lines.append("Family trade: " + _format_lifecycle_label(str(family_trade), "General"))
 	lines.append(_get_family_growth_text(household, city))
-
-	if succession_pressure > 0:
-		lines.append("Succession: Pressure " + str(succession_pressure))
-	else:
-		lines.append("Succession: No pressure")
+	lines.append(_get_succession_text(household, city))
 
 	lines.append("Age in stage: " + str(age_in_stage))
 
@@ -38,6 +33,17 @@ static func _get_family_growth_text(household, city) -> String:
 		return str(city.get_family_growth_status_text(household))
 
 	return "Family growth: not eligible"
+
+static func _get_succession_text(household, city) -> String:
+	if city is Object and city.has_method("get_household_succession_status_text"):
+		return str(city.get_household_succession_status_text(household))
+	if household is Object and household.has_method("has_succession_pressure") and household.has_succession_pressure():
+		var family_count: int = int(household.get_potential_new_family_count())
+		if family_count == 1:
+			return "Succession: 1 future family ready"
+		return "Succession: " + str(family_count) + " future families ready"
+
+	return "Succession: No pressure"
 
 static func _get_family_support_text(household) -> String:
 	if household is Object and household.has_method("get_older_child_support_bonus"):
