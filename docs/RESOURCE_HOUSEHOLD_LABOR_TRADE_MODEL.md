@@ -7,7 +7,7 @@ This document records the current code behavior for resources, households, labor
 The current model is centered on `City`, `Household`, `Building`, and `TradeRoute`.
 
 - `City` owns households, buildings, resources, resource history, production ticks, pressure summaries, and city-to-city resource transfer helpers.
-- `Household` owns population, labor capacity, residence status, work preference, assigned workers, and assigned building ids.
+- `Household` owns population, working adult count, labor capacity, residence status, work preference, assigned workers, and assigned building ids.
 - `Building` owns type, footprint, worker assignment, household assignment, maintenance state, and whether it can produce.
 - `TradeRoute` transfers one resource type from a source city to a destination city when active and affordable.
 
@@ -64,13 +64,15 @@ Expanded-goods building types are recognized by the placement helper for size/co
 
 ## Household-First Labor Semantics
 
-Observed code behavior in `Household.update_labor_capacity()` is:
+Observed code behavior in `Household.update_labor_capacity()` is now based on `working_adults`, not raw `total_population`:
 
-- population `<= 1`: labor capacity `0`
-- population `<= 3`: labor capacity `1`
-- population `> 3`: labor capacity `2`
+- working adults `0`: labor capacity `0`
+- working adults `1`: labor capacity `1`
+- working adults `2` or more: labor capacity `2`
 
 `worker_capacity` is then set to the same value as `labor_capacity`. The city sums household labor through `City.get_total_labor_capacity()` and writes the result into `resources["total_labor_capacity"]`.
+
+`working_adults` is a v0 compatibility bridge. Existing households initialize it from the old effective population thresholds so current labor capacity remains stable. `total_population` remains the source of household size, food demand, and shelter pressure. Future births should increase `young_children` and `total_population`, but not `working_adults`, `labor_capacity`, `worker_capacity`, idle labor, or assigned worker count.
 
 Households can be assigned to buildings through `City.assign_household_by_id_to_building()`. Assignment is blocked if the household has no available workers. Buildings store both `assigned_workers` and `assigned_household_id`, while households track assigned building ids and assigned worker count.
 
@@ -87,6 +89,8 @@ This v0 rule is intentionally simple. Larger families matter, but building-speci
 Starter households are seeded deterministically with varied lifecycle stages and child counters. This makes household state visible in normal play without adding lifecycle ticking. Seeding does not change population totals, labor capacity, assignment rules, family splitting, death, or housing behavior.
 
 Household lifecycle transitions v0 advance on the calendar `month_changed` signal. `age_in_stage` increments monthly, and deterministic thresholds can move households from newlywed to young family, established family, mature family, and old couple. Child cohort aging uses a separate `child_age_months` counter: every 36 months, all older children become adult children and all young children become older children. Stage transitions that move child counters reset the child aging counter. Transitions do not create new children; future birth rolls should add young children based on family and city conditions such as food security, housing, overcrowding, household stage, stress, grief, risk, and city stability. This does not change labor, assignments, housing, production formulas, succession pressure, family formation, or death/removal behavior.
+
+Adult children are also not automatic generic labor in this v0 model. They remain part of household population and future succession pressure until a later branch defines new-family formation or explicit adult-child labor behavior.
 
 ## Production
 
@@ -128,7 +132,7 @@ Expanded-goods buildings cap or skip output when required inputs are unavailable
 
 Food consumption is population based. `City.consume_food()` calculates consumption as `ceil(total_population / FOOD_PER_POPULATION_DIVISOR)` and stores it in `resources["food_consumption_rate"]`. If food is insufficient, food is reduced to zero and `resources["food_shortage"]` becomes `true`.
 
-Population can grow from the external population pool after sustained food surplus, available housing capacity, and no shortage. Growth either adds one person to an existing eligible household or creates a new neutral household.
+Population can grow from the external population pool after sustained food surplus, available housing capacity, and no shortage. Growth either adds one person to an existing eligible household or creates a new neutral household. Existing external population growth represents adult arrival for compatibility and may update `working_adults`; future household births should add dependent young children without increasing `working_adults`.
 
 Housing behavior currently includes:
 

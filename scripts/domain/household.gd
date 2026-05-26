@@ -25,6 +25,7 @@ var housing_status: String = RESIDENCE_TEMPORARY
 var preference: String = WORK_PREF_NEUTRAL
 var population_capacity: int = 4
 var total_population: int = 4
+var working_adults: int = 2
 var lifecycle_stage: String = LIFECYCLE_ESTABLISHED_FAMILY
 var young_children: int = 0
 var older_children: int = 0
@@ -44,6 +45,7 @@ func _init(household_id: int = -1, building_id: int = -1, work_preference: Strin
 	residence_building_id = building_id
 	preference = work_preference
 	total_population = population
+	working_adults = get_compatibility_working_adults_for_population(population)
 	housing_status = residence_status
 	update_labor_capacity()
 
@@ -68,14 +70,21 @@ func unassign_from_building(building_id: int, workers: int = 1):
 	assigned_workers = max(0, assigned_workers - workers)
 
 func update_labor_capacity():
-	if total_population <= 1:
-		labor_capacity = 0
-	elif total_population <= 3:
-		labor_capacity = 1
-	else:
-		labor_capacity = 2
-
+	labor_capacity = clampi(working_adults, 0, 2)
 	worker_capacity = labor_capacity
+
+func get_compatibility_working_adults_for_population(population: int) -> int:
+	if population <= 1:
+		return 0
+	if population <= 3:
+		return 1
+
+	return 2
+
+func add_external_population(amount: int = 1):
+	total_population += max(0, amount)
+	working_adults = max(working_adults, get_compatibility_working_adults_for_population(total_population))
+	update_labor_capacity()
 
 func advance_lifecycle_month():
 	age_in_stage += 1

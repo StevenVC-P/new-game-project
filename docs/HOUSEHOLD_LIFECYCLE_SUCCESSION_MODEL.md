@@ -23,18 +23,19 @@ Current code behavior centers on `Household`, `City`, and `Building`.
 - `preference`
 - `population_capacity`
 - `total_population`
+- `working_adults`
 - `labor_capacity`
 - `worker_capacity`
 - `assigned_workers`
 - `assigned_building_ids`
 
-Labor is derived from total population:
+Labor is derived from `working_adults`, a v0 compatibility bridge that preserves the previous population-threshold behavior for existing households while separating labor from total mouths to feed:
 
-- population `<= 1`: labor capacity `0`
-- population `<= 3`: labor capacity `1`
-- population `> 3`: labor capacity `2`
+- working adults `0`: labor capacity `0`
+- working adults `1`: labor capacity `1`
+- working adults `2` or more: labor capacity `2`
 
-This is functional but still too worker-like for the north star. The project direction says one household should usually mean one primary responsibility, not an anonymous pool of interchangeable workers. Larger households currently gain a second labor capacity point, which should eventually be reframed as household support or effectiveness rather than a second generic worker.
+`total_population` now means household size, food demand, and shelter pressure. `working_adults` means the adult labor source for current assignment rules. This is still functional but still too worker-like for the north star. The project direction says one household should usually mean one primary responsibility, not an anonymous pool of interchangeable workers. Larger households currently gain a second labor capacity point, which should eventually be reframed as household support or effectiveness rather than a second generic worker.
 
 Residence currently matters because households may be housed, temporarily sheltered, or unsheltered. City housing assignment moves eligible households into empty house buildings. Household population contributes to food consumption and shelter pressure.
 
@@ -380,6 +381,8 @@ Lifecycle transitions are deterministic and happen when `age_in_stage` reaches a
 Child cohort aging is tracked separately from stage age. Every 36 months, existing child counters move up one band: older children become adult children, young children become older children, and young children reset to 0. Stage transitions that move child counters reset this child aging counter so the same cohort does not age twice in one month.
 
 Transitions and child cohort aging move existing child counters only. They do not represent births. Future household birth rolls should add young children based on food security, housing, overcrowding, household stage, stress, grief, risk, and city stability. Old couples cannot gain new children.
+
+Household Labor / Population Decoupling v0 separates household size from labor source before birth rolls. Young children should increase `young_children` and `total_population` when births are implemented, but they should not increase `working_adults`, `labor_capacity`, `worker_capacity`, idle labor, or assigned worker count. Older children remain production support only. Adult children remain future succession pressure and do not automatically become generic labor in this slice.
 
 This transition slice is still conservative:
 

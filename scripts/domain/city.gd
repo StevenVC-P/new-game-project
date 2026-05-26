@@ -729,8 +729,7 @@ func add_population_from_external_pool():
 		households.append(household)
 		return
 
-	target.total_population += 1
-	target.update_labor_capacity()
+	target.add_external_population()
 
 func auto_assign_workers():
 	update_worker_counts()
