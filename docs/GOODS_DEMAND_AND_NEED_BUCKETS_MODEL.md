@@ -266,6 +266,15 @@ The City Overview sidebar displays a compact Need Pressure section. Food is the 
 
 Action hints can use food need pressure for concise guidance, such as increasing production or importing food when demand is low or in shortage.
 
+Manual owner retest checklist:
+
+1. Open City Overview.
+2. Confirm Need Pressure appears directly after City Health.
+3. Confirm Food displays the expected status and shows available stock plus demand.
+4. Confirm inactive buckets are visibly not active and are not framed as urgent shortages.
+5. Confirm low or shortage food creates helpful action hints.
+6. Confirm no duplicate or noisy inactive-bucket hints appear.
+
 ### 4. Clothing and Household-Goods Demand v0
 
 Add slow periodic demand, not daily drain:
