@@ -2,6 +2,8 @@
 
 This document records the current code behavior for resources, households, labor, buildings, production, housing, food, maintenance, and trade. It separates observed implementation from design intent so future changes do not accidentally flatten the household-first simulation into generic worker-slot logic.
 
+For the next demand-design layer, see `docs/GOODS_DEMAND_AND_NEED_BUCKETS_MODEL.md`. That model describes category-based household need buckets so goods can satisfy demand by type, such as food, tools, household goods, clothing, construction materials, and maintenance materials.
+
 ## Observed Behavior
 
 The current model is centered on `City`, `Household`, `Building`, and `TradeRoute`.
