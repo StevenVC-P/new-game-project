@@ -30,12 +30,14 @@ required_content_by_path:
     - "class_name ProductionRequirementHelper"
     - "static func get_requirement_lines"
     - "var lines: Array[String]"
-    - "Assigned labor"
     - "maintenance"
     - "inputs"
-    - "Food shortage"
     - "Fit"
     - "No production requirement details."
+required_phrase_or_terms_by_path:
+  scripts/ui/production_requirement_helper.gd:
+    - "Assigned labor => assigned|labor"
+    - "Food shortage => food|shortage"
 blocked_content:
   - "add_resource"
   - "remove_resource"

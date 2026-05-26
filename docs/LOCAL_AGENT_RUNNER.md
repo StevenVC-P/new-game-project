@@ -50,11 +50,22 @@ Supported content checks:
 - `required_content`: global literal text tokens that must appear in every changed required file.
 - `blocked_content`: global literal text tokens that must not appear in any changed text file.
 - `required_content_by_path`: per-file literal text tokens that must appear only in the listed file.
+- `required_all_by_path`: per-file flexible tokens where every listed token must appear. Matching is case-insensitive.
+- `required_any_by_path`: per-file flexible token groups where at least one token from each group must appear. Matching is case-insensitive.
+- `required_phrase_or_terms_by_path`: per-file flexible checks where either the exact phrase appears or all fallback terms appear. Matching is case-insensitive.
 - `blocked_content_by_path`: per-file literal text tokens that must not appear only in the listed file.
 - `min_lines`: per-path minimum line counts.
 - `preserve_content`: literal tokens that must remain in an existing changed file if they were present before the edit.
 
-Use global content checks for simple one-file tasks where every changed required file should contain the same tokens. Use path-specific content checks for multi-file tasks. For example, a new UI script can require `extends Control`, `func set_city`, and panel labels, while an integration edit in `scripts/main.gd` should instead preserve existing anchors and block unsafe references. Avoid applying UI-script tokens globally to integration files such as `scripts/main.gd`.
+Use global content checks for simple one-file tasks where every changed required file should contain the same tokens. Use exact path-specific checks when the code must contain a literal class name, method name, or label. Use flexible path-specific checks when the task needs intent coverage but the wording can reasonably vary. For example, a helper can require either `Assigned labor` or the terms `assigned` and `labor`, while an integration edit in `scripts/main.gd` should preserve existing anchors and block unsafe references. Avoid applying UI-script tokens globally to integration files such as `scripts/main.gd`.
+
+Flexible path checks support the runner's lightweight front matter parser:
+
+- `required_all_by_path` uses the same path-to-list shape as `required_content_by_path`.
+- `required_any_by_path` accepts inline JSON arrays such as `["Assigned labor", "assigned", "labor"]`, or compact strings such as `"Assigned labor|assigned|labor"`.
+- `required_phrase_or_terms_by_path` accepts compact strings such as `"Assigned labor => assigned|labor"` or inline JSON objects such as `{"phrase":"Assigned labor","terms":["assigned","labor"]}`.
+
+Prefer `required_content_by_path` for identifiers that must be exact, such as `class_name ProductionRequirementHelper`. Prefer `required_any_by_path` or `required_phrase_or_terms_by_path` for player-facing labels where title case, punctuation, or wording may vary.
 
 Replacement safety checks:
 
@@ -91,6 +102,14 @@ required_content_by_path:
   scripts/ui/example_panel.gd:
     - "extends Control"
     - "func set_city"
+required_any_by_path:
+  scripts/ui/production_requirement_helper.gd:
+    - ["Assigned labor", "assigned", "labor"]
+    - ["Food shortage", "food", "shortage"]
+required_phrase_or_terms_by_path:
+  scripts/ui/production_requirement_helper.gd:
+    - "Assigned labor => assigned|labor"
+    - '{"phrase":"Food shortage","terms":["food","shortage"]}'
 blocked_content_by_path:
   scripts/main.gd:
     - ".tscn"
@@ -248,7 +267,7 @@ Invalid JSON:
 - JSON mode rejects invalid JSON, unknown fields, unsupported actions, prose around JSON, multiple fenced blocks, absolute paths, `../` traversal, blocked paths, binary-looking content, creates over existing files, and replacements unless `allow_replacements: true`.
 - JSON mode rejects large whole-file replacements by default. If a task must modify a large existing file, use `insert_after` or `insert_before`, strict line budgets, `preserve_content`, and `blocked_content` instead of `replace_entire_file`.
 - If the model creates an irrelevant but safe file, such as `docs/example.md`, add exact `required_paths` for the expected outputs and block the junk path explicitly with `blocked_paths`.
-- If the model creates shape-correct but weak code, add `required_content`, `blocked_content`, path-specific content checks, and `min_lines` checks. For example, block tokens such as invalid top-level assignments or placeholder `pass` bodies, require helper method names in the target file, and require a minimum line count for that file.
+- If the model creates shape-correct but weak code, add `required_content`, `blocked_content`, path-specific content checks, and `min_lines` checks. For example, block tokens such as invalid top-level assignments or placeholder `pass` bodies, require helper method names in the target file, and require a minimum line count for that file. Use flexible checks such as `required_any_by_path` when an exact phrase would make the task brittle.
 - Inspect `raw-patch-attempt-*.txt`, `edits-attempt-*.json`, and `edit-manifest-attempt-*.json` in the run artifact directory.
 
 Validation failure:

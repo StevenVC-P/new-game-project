@@ -308,6 +308,13 @@ function Convert-Scalar {
 	if ($Trimmed.Length -ge 2 -and (($Trimmed.StartsWith('"') -and $Trimmed.EndsWith('"')) -or ($Trimmed.StartsWith("'") -and $Trimmed.EndsWith("'")))) {
 		$Trimmed = $Trimmed.Substring(1, $Trimmed.Length - 2)
 	}
+	if ($Trimmed.Length -ge 2 -and (($Trimmed.StartsWith("[") -and $Trimmed.EndsWith("]")) -or ($Trimmed.StartsWith("{") -and $Trimmed.EndsWith("}")))) {
+		try {
+			return ($Trimmed | ConvertFrom-Json)
+		} catch {
+			# Keep parser behavior forgiving; invalid inline JSON remains a string token.
+		}
+	}
 	if ($Trimmed -ieq "true") { return $true }
 	if ($Trimmed -ieq "false") { return $false }
 	$Number = 0
@@ -334,12 +341,14 @@ function Read-TaskFile {
 					if (-not $Meta[$CurrentKey].ContainsKey($CurrentMapKey)) {
 						$Meta[$CurrentKey][$CurrentMapKey] = @()
 					}
-					$Meta[$CurrentKey][$CurrentMapKey] = @($Meta[$CurrentKey][$CurrentMapKey]) + @((Convert-Scalar $Matches[1]))
+					$ConvertedValue = Convert-Scalar $Matches[1]
+					$Meta[$CurrentKey][$CurrentMapKey] = @($Meta[$CurrentKey][$CurrentMapKey]) + ,$ConvertedValue
 				} else {
 					if (-not $Meta.ContainsKey($CurrentKey)) {
 						$Meta[$CurrentKey] = @()
 					}
-					$Meta[$CurrentKey] = @($Meta[$CurrentKey]) + @((Convert-Scalar $Matches[1]))
+					$ConvertedValue = Convert-Scalar $Matches[1]
+					$Meta[$CurrentKey] = @($Meta[$CurrentKey]) + ,$ConvertedValue
 				}
 				continue
 			}
@@ -432,6 +441,74 @@ function Format-ListMapSummary {
 		return ""
 	}
 	return ((@($Map.Keys) | Sort-Object | ForEach-Object { "$_=$(@($Map[$_]).Count)" }) -join ', ')
+}
+
+function Test-ContentContainsFlexible {
+	param(
+		[string]$Content,
+		[string]$Token
+	)
+
+	if ([string]::IsNullOrEmpty($Token)) {
+		return $true
+	}
+	return $Content.IndexOf($Token, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+}
+
+function Convert-ContentTokenGroup {
+	param($Group)
+
+	if ($null -eq $Group) {
+		return @()
+	}
+	if ($Group -is [array]) {
+		return @($Group | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrEmpty($_) })
+	}
+	if ($Group -is [System.Collections.IEnumerable] -and -not ($Group -is [string])) {
+		return @($Group | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrEmpty($_) })
+	}
+	$Text = [string]$Group
+	if ($Text.Contains("|")) {
+		return @($Text -split "\|" | ForEach-Object { $_.Trim() } | Where-Object { -not [string]::IsNullOrEmpty($_) })
+	}
+	return @($Text)
+}
+
+function Convert-PhraseOrTermsCheck {
+	param($Check)
+
+	if ($null -eq $Check) {
+		return [pscustomobject]@{ Phrase = ""; Terms = @() }
+	}
+	if ($Check -is [string]) {
+		$Text = $Check.Trim()
+		if ($Text.StartsWith("{") -and $Text.EndsWith("}")) {
+			try {
+				$Check = $Text | ConvertFrom-Json
+			} catch {
+				# Fall through to compact string parsing below.
+			}
+		}
+		if ($Check -is [string]) {
+			if ($Text.Contains("=>")) {
+				$Parts = $Text -split "=>", 2
+				return [pscustomobject]@{
+					Phrase = $Parts[0].Trim()
+					Terms = @(Convert-ContentTokenGroup -Group $Parts[1])
+				}
+			}
+			return [pscustomobject]@{ Phrase = $Text; Terms = @() }
+		}
+	}
+	$Phrase = ""
+	$Terms = @()
+	if ($Check.PSObject.Properties["phrase"]) {
+		$Phrase = [string]$Check.phrase
+	}
+	if ($Check.PSObject.Properties["terms"]) {
+		$Terms = @(Convert-ContentTokenGroup -Group $Check.terms)
+	}
+	return [pscustomobject]@{ Phrase = $Phrase; Terms = @($Terms) }
 }
 
 function Get-StatusPaths {
@@ -764,6 +841,9 @@ function Test-JsonEditManifest {
 		[string[]]$RequiredContent,
 		[string[]]$BlockedContent,
 		[hashtable]$RequiredContentByPath,
+		[hashtable]$RequiredAllByPath,
+		[hashtable]$RequiredAnyByPath,
+		[hashtable]$RequiredPhraseOrTermsByPath,
 		[hashtable]$BlockedContentByPath,
 		[string[]]$PreserveContent,
 		[hashtable]$MinLines,
@@ -891,7 +971,7 @@ function Test-JsonEditManifest {
 			$Errors += "Missing required path in edit manifest: $($RequiredCheck.Path)"
 		}
 	}
-	$ContentInfo = Test-JsonEditContent -Manifest $Manifest -RequiredPaths $RequiredPaths -RequiredContent $RequiredContent -BlockedContent $BlockedContent -RequiredContentByPath $RequiredContentByPath -BlockedContentByPath $BlockedContentByPath -MinLines $MinLines
+	$ContentInfo = Test-JsonEditContent -Manifest $Manifest -RequiredPaths $RequiredPaths -RequiredContent $RequiredContent -BlockedContent $BlockedContent -RequiredContentByPath $RequiredContentByPath -RequiredAllByPath $RequiredAllByPath -RequiredAnyByPath $RequiredAnyByPath -RequiredPhraseOrTermsByPath $RequiredPhraseOrTermsByPath -BlockedContentByPath $BlockedContentByPath -MinLines $MinLines
 	$Errors += $ContentInfo.Errors
 	return [pscustomobject]@{
 		Errors = @($Errors | Sort-Object -Unique)
@@ -908,6 +988,9 @@ function Test-JsonEditContent {
 		[string[]]$RequiredContent,
 		[string[]]$BlockedContent,
 		[hashtable]$RequiredContentByPath,
+		[hashtable]$RequiredAllByPath,
+		[hashtable]$RequiredAnyByPath,
+		[hashtable]$RequiredPhraseOrTermsByPath,
 		[hashtable]$BlockedContentByPath,
 		[hashtable]$MinLines
 	)
@@ -937,16 +1020,62 @@ function Test-JsonEditContent {
 			foreach ($Token in @($RequiredContentByPath[$RepoPath])) {
 				if ([string]::IsNullOrEmpty($Token)) { continue }
 				if (-not $Content.Contains($Token)) {
-					$Errors += "Content check failed for ${RepoPath}: missing required_content_by_path token '$Token'."
+					$Errors += "Content check failed for ${RepoPath}: exact required_content_by_path token missing '$Token'."
 				}
 			}
 			$SummaryLines += "- ${RepoPath}: path-specific required content tokens checked: $(@($RequiredContentByPath[$RepoPath]).Count)."
+		}
+		if ($RequiredAllByPath.ContainsKey($RepoPath)) {
+			foreach ($Token in @($RequiredAllByPath[$RepoPath])) {
+				if ([string]::IsNullOrEmpty($Token)) { continue }
+				if (-not (Test-ContentContainsFlexible -Content $Content -Token $Token)) {
+					$Errors += "Content check failed for ${RepoPath}: required_all_by_path token missing '$Token'."
+				}
+			}
+			$SummaryLines += "- ${RepoPath}: path-specific required-all tokens checked: $(@($RequiredAllByPath[$RepoPath]).Count)."
+		}
+		if ($RequiredAnyByPath.ContainsKey($RepoPath)) {
+			foreach ($Group in @($RequiredAnyByPath[$RepoPath])) {
+				$Tokens = @(Convert-ContentTokenGroup $Group)
+				if ($Tokens.Count -eq 0) { continue }
+				$Matched = $false
+				foreach ($Token in $Tokens) {
+					if (Test-ContentContainsFlexible -Content $Content -Token $Token) {
+						$Matched = $true
+						break
+					}
+				}
+				if (-not $Matched) {
+					$Errors += "Content check failed for ${RepoPath}: required_any_by_path group missing; none of [$($Tokens -join ', ')] appeared."
+				}
+			}
+			$SummaryLines += "- ${RepoPath}: path-specific required-any groups checked: $(@($RequiredAnyByPath[$RepoPath]).Count)."
+		}
+		if ($RequiredPhraseOrTermsByPath.ContainsKey($RepoPath)) {
+			foreach ($Check in @($RequiredPhraseOrTermsByPath[$RepoPath])) {
+				$ParsedCheck = Convert-PhraseOrTermsCheck $Check
+				$Phrase = [string]$ParsedCheck.Phrase
+				$Terms = @($ParsedCheck.Terms)
+				$PhraseMatched = -not [string]::IsNullOrEmpty($Phrase) -and (Test-ContentContainsFlexible -Content $Content -Token $Phrase)
+				if ($PhraseMatched) { continue }
+				$MissingTerms = @()
+				foreach ($Term in $Terms) {
+					if ([string]::IsNullOrEmpty($Term)) { continue }
+					if (-not (Test-ContentContainsFlexible -Content $Content -Token $Term)) {
+						$MissingTerms += $Term
+					}
+				}
+				if ($Terms.Count -eq 0 -or $MissingTerms.Count -gt 0) {
+					$Errors += "Content check failed for ${RepoPath}: required_phrase_or_terms_by_path missing phrase '$Phrase' and missing required term(s): $($MissingTerms -join ', ')."
+				}
+			}
+			$SummaryLines += "- ${RepoPath}: path-specific phrase-or-terms checks checked: $(@($RequiredPhraseOrTermsByPath[$RepoPath]).Count)."
 		}
 		if ($BlockedContentByPath.ContainsKey($RepoPath)) {
 			foreach ($Token in @($BlockedContentByPath[$RepoPath])) {
 				if ([string]::IsNullOrEmpty($Token)) { continue }
 				if ($Content.Contains($Token)) {
-					$Errors += "Content check failed for ${RepoPath}: contains blocked_content_by_path token '$Token'."
+					$Errors += "Content check failed for ${RepoPath}: blocked_content_by_path token present '$Token'."
 				}
 			}
 			$SummaryLines += "- ${RepoPath}: path-specific blocked content tokens checked: $(@($BlockedContentByPath[$RepoPath]).Count)."
@@ -968,6 +1097,15 @@ function Test-JsonEditContent {
 	}
 	if ($RequiredContentByPath.Keys.Count -gt 0) {
 		$SummaryLines += "- Path-specific required content entries checked: $($RequiredContentByPath.Keys.Count)."
+	}
+	if ($RequiredAllByPath.Keys.Count -gt 0) {
+		$SummaryLines += "- Path-specific required-all content entries checked: $($RequiredAllByPath.Keys.Count)."
+	}
+	if ($RequiredAnyByPath.Keys.Count -gt 0) {
+		$SummaryLines += "- Path-specific required-any content entries checked: $($RequiredAnyByPath.Keys.Count)."
+	}
+	if ($RequiredPhraseOrTermsByPath.Keys.Count -gt 0) {
+		$SummaryLines += "- Path-specific phrase-or-terms content entries checked: $($RequiredPhraseOrTermsByPath.Keys.Count)."
 	}
 	if ($BlockedContentByPath.Keys.Count -gt 0) {
 		$SummaryLines += "- Path-specific blocked content entries checked: $($BlockedContentByPath.Keys.Count)."
@@ -1369,6 +1507,9 @@ $RequiredPaths = @((Get-MetaValue $Meta "required_paths" @()) | ForEach-Object {
 $RequiredContent = @(Get-MetaValue $Meta "required_content" @())
 $BlockedContent = @(Get-MetaValue $Meta "blocked_content" @())
 $RequiredContentByPath = Get-MetaListMap $Meta "required_content_by_path"
+$RequiredAllByPath = Get-MetaListMap $Meta "required_all_by_path"
+$RequiredAnyByPath = Get-MetaListMap $Meta "required_any_by_path"
+$RequiredPhraseOrTermsByPath = Get-MetaListMap $Meta "required_phrase_or_terms_by_path"
 $BlockedContentByPath = Get-MetaListMap $Meta "blocked_content_by_path"
 $PreserveContent = @(Get-MetaValue $Meta "preserve_content" @())
 $MinLines = Get-MetaMap $Meta "min_lines"
@@ -1448,6 +1589,9 @@ Runner constraints:
 - Required content: $($RequiredContent -join ', ')
 - Blocked content: $($BlockedContent -join ', ')
 - Required content by path: $(Format-ListMapSummary $RequiredContentByPath)
+- Required all by path: $(Format-ListMapSummary $RequiredAllByPath)
+- Required any by path: $(Format-ListMapSummary $RequiredAnyByPath)
+- Required phrase-or-terms by path: $(Format-ListMapSummary $RequiredPhraseOrTermsByPath)
 - Blocked content by path: $(Format-ListMapSummary $BlockedContentByPath)
 - Preserve content: $($PreserveContent -join ', ')
 - Min lines: $((@($MinLines.Keys) | ForEach-Object { "$_=$($MinLines[$_])" }) -join ', ')
@@ -1606,13 +1750,14 @@ if ($EditMode -eq "json_file_ops") {
 	$SafetyLines += "- Allowed same-run repair replacement only for files created earlier by this runner run."
 	$SafetyLines += "- Rejected destructive large-file replacement unless explicitly allowed by task."
 	$SafetyLines += "- Enforced preserve_content tokens for changed existing files."
-	if ($RequiredContent.Count -gt 0 -or $BlockedContent.Count -gt 0 -or $MinLines.Keys.Count -gt 0) {
+	if ($RequiredContent.Count -gt 0 -or $BlockedContent.Count -gt 0 -or $MinLines.Keys.Count -gt 0 -or $RequiredAllByPath.Keys.Count -gt 0 -or $RequiredAnyByPath.Keys.Count -gt 0 -or $RequiredPhraseOrTermsByPath.Keys.Count -gt 0) {
 		$SafetyLines += "- Enforced task content checks before writing JSON file-operation edits."
 		$SafetyLines += "- Global required content tokens: $($RequiredContent.Count); global blocked content tokens: $($BlockedContent.Count); min_lines entries: $($MinLines.Keys.Count)."
 	}
-	if ($RequiredContentByPath.Keys.Count -gt 0 -or $BlockedContentByPath.Keys.Count -gt 0) {
+	if ($RequiredContentByPath.Keys.Count -gt 0 -or $BlockedContentByPath.Keys.Count -gt 0 -or $RequiredAllByPath.Keys.Count -gt 0 -or $RequiredAnyByPath.Keys.Count -gt 0 -or $RequiredPhraseOrTermsByPath.Keys.Count -gt 0) {
 		$SafetyLines += "- Enforced path-specific content checks before writing JSON file-operation edits."
 		$SafetyLines += "- Path-specific required content entries: $($RequiredContentByPath.Keys.Count); path-specific blocked content entries: $($BlockedContentByPath.Keys.Count)."
+		$SafetyLines += "- Flexible path-specific content entries: required_all=$($RequiredAllByPath.Keys.Count); required_any=$($RequiredAnyByPath.Keys.Count); phrase_or_terms=$($RequiredPhraseOrTermsByPath.Keys.Count)."
 	}
 } else {
 	$SafetyLines += "- Accepted raw unified diffs or exactly one fenced diff/patch block with no surrounding prose."
@@ -1765,7 +1910,7 @@ $ValidationText
 
 		Write-RunnerLog "Edit manifest validation started for attempt $Attempt."
 		Write-RunnerLog "Content checks started for attempt $Attempt."
-		$ManifestInfo = Test-JsonEditManifest -Manifest $Manifest -AllowedPaths $AllowedPaths -BlockedPaths $TaskBlockedPaths -GlobalBlockedPaths $GlobalBlockedPaths -BlockedGlobs $BlockedGlobs -RequiredPaths $RequiredPaths -RequiredContent $RequiredContent -BlockedContent $BlockedContent -RequiredContentByPath $RequiredContentByPath -BlockedContentByPath $BlockedContentByPath -PreserveContent $PreserveContent -MinLines $MinLines -SameRunReplacePaths $RunnerCreatedPaths -AllowNewFiles $AllowNewFiles -AllowReplacements $AllowReplacements -MaxFilesChanged $MaxFilesChanged -AllowLargeReplacements $AllowLargeReplacements -MaxReplacedFileLines $MaxReplacedFileLines
+		$ManifestInfo = Test-JsonEditManifest -Manifest $Manifest -AllowedPaths $AllowedPaths -BlockedPaths $TaskBlockedPaths -GlobalBlockedPaths $GlobalBlockedPaths -BlockedGlobs $BlockedGlobs -RequiredPaths $RequiredPaths -RequiredContent $RequiredContent -BlockedContent $BlockedContent -RequiredContentByPath $RequiredContentByPath -RequiredAllByPath $RequiredAllByPath -RequiredAnyByPath $RequiredAnyByPath -RequiredPhraseOrTermsByPath $RequiredPhraseOrTermsByPath -BlockedContentByPath $BlockedContentByPath -PreserveContent $PreserveContent -MinLines $MinLines -SameRunReplacePaths $RunnerCreatedPaths -AllowNewFiles $AllowNewFiles -AllowReplacements $AllowReplacements -MaxFilesChanged $MaxFilesChanged -AllowLargeReplacements $AllowLargeReplacements -MaxReplacedFileLines $MaxReplacedFileLines
 		if ($ManifestInfo.Errors.Count -gt 0) {
 			$JsonSanitizationStatus = if ($SanitizedJson.Sanitized) { "single fenced json extracted" } else { "raw JSON" }
 			$LastRejectedPatch = $SanitizedJson.JsonText
@@ -1975,6 +2120,9 @@ $RequestedScope = @(
 	"- Global required content tokens: $($RequiredContent.Count)",
 	"- Global blocked content tokens: $($BlockedContent.Count)",
 	"- Path-specific required content: $(Format-ListMapSummary $RequiredContentByPath)",
+	"- Path-specific required-all content: $(Format-ListMapSummary $RequiredAllByPath)",
+	"- Path-specific required-any content: $(Format-ListMapSummary $RequiredAnyByPath)",
+	"- Path-specific phrase-or-terms content: $(Format-ListMapSummary $RequiredPhraseOrTermsByPath)",
 	"- Path-specific blocked content: $(Format-ListMapSummary $BlockedContentByPath)",
 	"- Deletes allowed: $AllowDeletes",
 	"- Renames allowed: $AllowRenames",
