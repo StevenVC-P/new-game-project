@@ -154,6 +154,10 @@ func draw(canvas: CanvasItem, font: Font, font_size: int, city: City):
 	y = draw_overlay_line(canvas, font, font_size, "Upkeep: " + enabled_text(building.receives_maintenance), text_x, y, overlay_size.x)
 	y = draw_overlay_line(canvas, font, font_size, "Worker: " + get_building_worker_text(city, inspected_building_index), text_x, y, overlay_size.x)
 	y = draw_overlay_line(canvas, font, font_size, "Assignment: " + get_assignment_source_text(building), text_x, y, overlay_size.x)
+	if building.assigned_workers <= 0:
+		var succession_hint: String = get_work_succession_hint(city, building)
+		if succession_hint != "":
+			y = draw_overlay_line(canvas, font, font_size, succession_hint, text_x, y, overlay_size.x)
 	y = draw_overlay_section_title(canvas, font, font_size, "Production Requirements", text_x, y, overlay_size.x)
 	for requirement_text: String in ProductionRequirementHelper.get_requirement_lines(city, building):
 		y = draw_overlay_line(canvas, font, font_size, requirement_text, text_x, y, overlay_size.x)
@@ -180,6 +184,8 @@ func get_building_overlay_size(city: City, building: Building) -> Vector2:
 		line_count = 5 + get_house_lifecycle_lines(city, building.id).size()
 	else:
 		line_count = 6 + ProductionRequirementHelper.get_requirement_lines(city, building).size()
+		if building.assigned_workers <= 0 and get_work_succession_hint(city, building) != "":
+			line_count += 1
 		if building.assigned_workers > 0:
 			option_count = 1
 		else:
@@ -363,6 +369,16 @@ func get_building_worker_text(city: City, building_index: int) -> String:
 		return city.get_household_label(household.id) + " (" + household.preference + ", " + household.housing_status + ")"
 
 	return "unknown household"
+
+func get_work_succession_hint(city: City, building: Building) -> String:
+	if building.preferred_successor_household_id < 0:
+		return ""
+
+	var successor: Household = city.get_household_by_id(building.preferred_successor_household_id)
+	if successor == null:
+		return ""
+
+	return "Family work succession: " + city.get_household_label(successor.id) + " preferred"
 
 func get_household_option_label(city: City, household: Household) -> String:
 	if household.residence_building_id >= 0:

@@ -486,6 +486,22 @@ New families inherit family work identity with deterministic variation. Most new
 
 This prepares future work succession priority without assigning the new household to work automatically. Family names, marriage matching, individual persons, inheritance or wealth transfer, and multi-household building support remain deferred.
 
+## Family Work Succession Priority v0
+
+When an old-couple household completes its lifecycle, any production buildings assigned to that household become vacant. The city now records a work succession preference for each vacated building and logs the preferred successor, but it does not automatically assign the work.
+
+Candidate priority is:
+
+1. Direct child household with the same `family_trade`.
+2. Direct child household.
+3. Later-generation descendant from the same origin with the same `family_trade`.
+4. Later-generation descendant from the same origin.
+5. Any housed, unassigned household with the same `family_trade`.
+
+Candidates must be housed, have available labor, and not already be assigned to another production building. The selected production-building popup can show a concise hint such as "Family work succession: Household 8 preferred" when a vacant building has a preferred successor.
+
+This preserves player authority. The player can assign that household or any other valid household through the existing assignment UI. Multi-household building support, automatic broad work matching, inheritance or wealth transfer, and family names remain deferred.
+
 ## Old Couple Lifecycle Completion v0
 
 Old-couple lifecycle completion runs on the monthly household lifecycle path after lifecycle aging, succession pressure recalculation, and new-family formation. It does not run on production ticks and uses a deterministic age-weighted roll rather than map RNG.

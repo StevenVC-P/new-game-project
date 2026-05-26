@@ -30,6 +30,8 @@ var assigned_preference: String = WORK_PREF_NEUTRAL
 var assigned_household_id: int = -1
 var assignment_source: String = ASSIGNMENT_NONE
 var auto_assignment_blocked: bool = false
+var preferred_successor_household_id: int = -1
+var succession_source_household_id: int = -1
 var maintenance_timer: int = 0
 var maintenance_level: int = 100
 var receives_maintenance: bool = true
@@ -63,6 +65,7 @@ func assign_household(household: Household, source: String = ASSIGNMENT_PLAYER):
 	assigned_household_id = household.id
 	assignment_source = source
 	auto_assignment_blocked = false
+	clear_work_succession_preference()
 
 func assign_neutral_worker():
 	assigned_workers = required_workers
@@ -70,6 +73,7 @@ func assign_neutral_worker():
 	assigned_household_id = -1
 	assignment_source = ASSIGNMENT_PLAYER
 	auto_assignment_blocked = false
+	clear_work_succession_preference()
 
 func unassign_worker(block_auto_assignment: bool = true):
 	assigned_workers = 0
@@ -77,6 +81,10 @@ func unassign_worker(block_auto_assignment: bool = true):
 	assigned_household_id = -1
 	assignment_source = ASSIGNMENT_NONE
 	auto_assignment_blocked = block_auto_assignment
+
+func clear_work_succession_preference():
+	preferred_successor_household_id = -1
+	succession_source_household_id = -1
 
 func toggle_maintenance():
 	if is_house():

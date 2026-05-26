@@ -329,8 +329,124 @@ func cleanup_removed_household_assignments(household: Household, city_index: int
 
 		log_household_lifecycle_event(city_index, household.id, "AssignmentCleared", "building=" + str(building.id))
 		building.unassign_worker(true)
+		record_work_succession_vacancy(household, building, city_index)
 	household.assigned_workers = 0
 	household.assigned_building_ids.clear()
+
+func record_work_succession_vacancy(removed_household: Household, building: Building, city_index: int = 0):
+	if building == null or not building.is_production_building():
+		return
+
+	building.succession_source_household_id = removed_household.id
+	building.preferred_successor_household_id = -1
+	log_household_lifecycle_event(city_index, removed_household.id, "WorkSuccessionVacancy", "building=" + str(building.id) + " trade=" + removed_household.family_trade)
+
+	var preferred_candidate: Dictionary = get_preferred_work_successor(removed_household, building)
+	if preferred_candidate.is_empty():
+		return
+
+	var successor: Household = preferred_candidate["household"] as Household
+	var priority: String = preferred_candidate["priority"] as String
+	building.preferred_successor_household_id = successor.id
+	log_household_lifecycle_event(city_index, successor.id, "WorkSuccessionCandidate", "building=" + str(building.id) + " source_household=" + str(removed_household.id) + " priority=" + priority)
+	log_household_lifecycle_event(city_index, successor.id, "WorkSuccessionPreferred", "building=" + str(building.id) + " reason=" + priority)
+
+func get_household_descendants(household_id: int) -> Array[Household]:
+	var result: Array[Household] = []
+	for household: Household in households:
+		if household.parent_household_id == household_id:
+			result.append(household)
+
+	return result
+
+func get_work_succession_candidates(removed_household: Household, building: Building) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for household: Household in households:
+		if household.id == removed_household.id:
+			continue
+		if not is_household_available_for_work_succession(household):
+			continue
+
+		var priority: String = get_work_succession_priority(removed_household, household)
+		if priority == "":
+			continue
+
+		result.append({
+			"household": household,
+			"priority": priority,
+			"score": get_work_succession_priority_score(priority)
+		})
+
+	sort_work_succession_candidates(result)
+	return result
+
+func get_preferred_work_successor(removed_household: Household, building: Building) -> Dictionary:
+	var candidates: Array[Dictionary] = get_work_succession_candidates(removed_household, building)
+	if candidates.is_empty():
+		return {}
+
+	return candidates[0]
+
+func is_household_available_for_work_succession(household: Household) -> bool:
+	if household.housing_status != Household.RESIDENCE_HOUSED:
+		return false
+	if household.get_available_workers() <= 0:
+		return false
+	for building: Building in buildings:
+		if building.assigned_household_id == household.id:
+			return false
+
+	return true
+
+func get_work_succession_priority(removed_household: Household, candidate: Household) -> String:
+	var same_trade: bool = candidate.family_trade == removed_household.family_trade
+	if candidate.parent_household_id == removed_household.id:
+		if same_trade:
+			return "direct_child_same_trade"
+		return "direct_child"
+	if removed_household.origin_household_id >= 0 and candidate.origin_household_id == removed_household.origin_household_id and candidate.generation > removed_household.generation:
+		if same_trade:
+			return "origin_descendant_same_trade"
+		return "origin_descendant"
+	if same_trade:
+		return "same_family_trade"
+
+	return ""
+
+func get_work_succession_priority_score(priority: String) -> int:
+	if priority == "direct_child_same_trade":
+		return 0
+	if priority == "direct_child":
+		return 1
+	if priority == "origin_descendant_same_trade":
+		return 2
+	if priority == "origin_descendant":
+		return 3
+	if priority == "same_family_trade":
+		return 4
+
+	return 99
+
+func sort_work_succession_candidates(candidates: Array[Dictionary]):
+	for outer_index in range(candidates.size()):
+		for inner_index in range(outer_index + 1, candidates.size()):
+			var outer_candidate: Dictionary = candidates[outer_index]
+			var inner_candidate: Dictionary = candidates[inner_index]
+			if should_swap_work_succession_candidates(outer_candidate, inner_candidate):
+				candidates[outer_index] = inner_candidate
+				candidates[inner_index] = outer_candidate
+
+func should_swap_work_succession_candidates(left: Dictionary, right: Dictionary) -> bool:
+	var left_score: int = int(left["score"])
+	var right_score: int = int(right["score"])
+	if right_score < left_score:
+		return true
+	if right_score > left_score:
+		return false
+
+	var left_household: Household = left["household"] as Household
+	var right_household: Household = right["household"] as Household
+	return right_household.id < left_household.id
 
 func get_household_succession_status(household: Household) -> String:
 	if household == null:

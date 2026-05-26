@@ -111,6 +111,8 @@ The new household starts as a housed `newlywed` household with `total_population
 
 Lineage and Trait Inheritance v0 gives each household `parent_household_id`, `origin_household_id`, and `generation`. Starter households are founders. New families record the parent household, carry forward the origin household, and set generation to parent generation + 1. Family trade inheritance is deterministic: most new households keep the parent `family_trade`, some receive a related trade, and rare cases fall back to `general`. The selected-household popup can show founder or child-household lineage.
 
+Family Work Succession Priority v0 records a preferred successor when old-couple lifecycle completion clears a production building assignment. The building stores the removed source household id and preferred successor household id. Candidate priority is direct child with same trade, direct child, same-origin descendant with same trade, same-origin descendant, then same-trade household. Candidates must be housed, available, and unassigned. The selected production-building popup can show the preferred successor, but no automatic assignment occurs.
+
 Old Couple Lifecycle Completion v0 runs on the monthly lifecycle path after new-family formation. An `old_couple` household can complete its lifecycle only if no adult children remain. If adult children remain, removal is blocked and logged. Eligible old couples use a deterministic age-weighted monthly roll: 0% before 12 months in stage, 5% from 12-23 months, 10% from 24-35 months, 20% from 36-47 months, and 35% from 48+ months. When completion happens, assigned production buildings are unassigned, the household is removed from the active household list, and its house building remains available for later housing assignment. This does not create a new household, delete the house, run accident/risk/grief logic, or transfer inheritance.
 
 Household lifecycle event logging v0 is controlled by `City.ENABLE_HOUSEHOLD_LIFECYCLE_LOGS`. When enabled, it prints structured diagnostic lines such as:
@@ -121,6 +123,8 @@ Household lifecycle event logging v0 is controlled by `City.ENABLE_HOUSEHOLD_LIF
 [HouseholdLifecycle] City=0 Household=3 Event=NewFamilyFormed child_household=7 house=12 parent_adult_children=0
 [HouseholdLifecycle] City=0 Household=7 Event=LineageAssigned parent=3 origin=3 generation=1 family_trade=stonework
 [HouseholdLifecycle] City=0 Household=4 Event=OldCoupleMortalityRoll roll=18 chance=20 age_in_stage=36
+[HouseholdLifecycle] City=0 Household=4 Event=WorkSuccessionVacancy building=12 trade=farming
+[HouseholdLifecycle] City=0 Household=8 Event=WorkSuccessionPreferred building=12 reason=direct_child_same_trade
 [HouseholdLifecycle] City=0 Household=4 Event=HouseFreed house=12
 ```
 
