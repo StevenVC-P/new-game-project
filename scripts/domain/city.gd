@@ -39,6 +39,7 @@ const BIRTH_MIN_FOOD_DAYS: float = 5.0
 const BIRTH_FOOD_SURPLUS_BONUS: int = 5
 const BIRTH_HOUSING_HEADROOM_BONUS: int = 5
 const BIRTH_REQUIRED_HOUSING_HEADROOM: int = 2
+const OLD_COUPLE_MIN_MORTALITY_MONTHS: int = 12
 const ENABLE_HOUSEHOLD_LIFECYCLE_LOGS: bool = true
 
 var name: String = "City"
@@ -161,6 +162,8 @@ func advance_household_lifecycle_month(city_index: int = 0):
 	recalculate_household_succession_pressures(city_index)
 	advance_new_family_formation_month(city_index)
 	recalculate_household_succession_pressures(city_index)
+	advance_old_couple_lifecycle_completion_month(city_index)
+	recalculate_household_succession_pressures(city_index)
 	update_shelter_counts()
 	update_worker_counts()
 
@@ -218,6 +221,64 @@ func form_new_family_from_parent(parent: Household, house_id: int, city_index: i
 	households.append(new_household)
 	log_household_lifecycle_event(city_index, parent.id, "NewFamilyFormed", "child_household=" + str(new_household.id) + " house=" + str(house_id) + " parent_adult_children=" + str(parent.adult_children))
 	log_household_lifecycle_event(city_index, new_household.id, "NewHouseholdCreated", "parent=" + str(parent.id) + " house=" + str(house_id) + " stage=" + new_household.lifecycle_stage + " total_population=" + str(new_household.total_population) + " working_adults=" + str(new_household.working_adults) + " family_trade=" + new_household.family_trade)
+
+func advance_old_couple_lifecycle_completion_month(city_index: int = 0):
+	var active_households: Array[Household] = households.duplicate()
+	for household: Household in active_households:
+		if household.lifecycle_stage != Household.LIFECYCLE_OLD_COUPLE:
+			continue
+		if household.adult_children > 0:
+			log_household_lifecycle_event(city_index, household.id, "OldCoupleRemovalBlocked", "reason=adult_children_remaining adult_children=" + str(household.adult_children))
+			continue
+		var chance: int = get_old_couple_lifecycle_completion_chance(household)
+		if chance <= 0:
+			continue
+		var roll: int = get_old_couple_lifecycle_completion_roll(household, city_index)
+		log_household_lifecycle_event(city_index, household.id, "OldCoupleMortalityRoll", "roll=" + str(roll) + " chance=" + str(chance) + " age_in_stage=" + str(household.age_in_stage))
+		if roll >= chance:
+			continue
+
+		complete_old_couple_lifecycle(household, city_index)
+
+func get_old_couple_lifecycle_completion_chance(household: Household) -> int:
+	if household.age_in_stage < OLD_COUPLE_MIN_MORTALITY_MONTHS:
+		return 0
+	if household.age_in_stage < 24:
+		return 5
+	if household.age_in_stage < 36:
+		return 10
+	if household.age_in_stage < 48:
+		return 20
+
+	return 35
+
+func get_old_couple_lifecycle_completion_roll(household: Household, city_index: int = 0) -> int:
+	var seed_value: int = household.id * 41
+	seed_value += city_index * 109
+	seed_value += household.age_in_stage * 31
+	seed_value += int(tile.x) * 11
+	seed_value += int(tile.y) * 17
+	var mixed_value: int = abs(seed_value * 1103515245 + 12345)
+	return mixed_value % 100
+
+func complete_old_couple_lifecycle(household: Household, city_index: int = 0):
+	var house_id: int = household.residence_building_id
+	log_household_lifecycle_event(city_index, household.id, "OldCoupleLifecycleComplete", "age_in_stage=" + str(household.age_in_stage))
+	cleanup_removed_household_assignments(household, city_index)
+	if house_id >= 0:
+		log_household_lifecycle_event(city_index, household.id, "HouseFreed", "house=" + str(house_id))
+	households.erase(household)
+	log_household_lifecycle_event(city_index, household.id, "HouseholdRemoved", "reason=old_couple_lifecycle_complete")
+
+func cleanup_removed_household_assignments(household: Household, city_index: int = 0):
+	for building: Building in buildings:
+		if building.assigned_household_id != household.id:
+			continue
+
+		log_household_lifecycle_event(city_index, household.id, "AssignmentCleared", "building=" + str(building.id))
+		building.unassign_worker(true)
+	household.assigned_workers = 0
+	household.assigned_building_ids.clear()
 
 func get_household_succession_status(household: Household) -> String:
 	if household == null:

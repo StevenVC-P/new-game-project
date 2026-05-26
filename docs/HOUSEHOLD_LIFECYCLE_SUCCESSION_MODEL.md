@@ -464,6 +464,29 @@ The new household begins as:
 
 The new household occupies the first available empty house. The system does not create a house, displace any household, or assign the new household to production work. Work matching, inherited job placement, multi-household building support, marriage matching, family names, inheritance, and wealth transfer remain future systems.
 
+## Old Couple Lifecycle Completion v0
+
+Old-couple lifecycle completion runs on the monthly household lifecycle path after lifecycle aging, succession pressure recalculation, and new-family formation. It does not run on production ticks and uses a deterministic age-weighted roll rather than map RNG.
+
+The v0 rule is:
+
+- only `old_couple` households are eligible
+- old couples younger than 12 months in stage do not roll
+- 12-23 months: 5% monthly chance
+- 24-35 months: 10% monthly chance
+- 36-47 months: 20% monthly chance
+- 48+ months: 35% monthly chance
+- if adult children remain, removal is blocked
+
+When an old-couple household completes:
+
+- any production buildings assigned to that household are safely unassigned
+- the household is removed from the active household list
+- the occupied house building remains in place and becomes empty/available
+- no new household is created by the removal operation itself
+
+This is age-weighted lifecycle completion, not a fixed death date, accident, grief, inheritance, or wealth transfer. The deterministic roll is derived from household, city, age, and city tile values. Unresolved adult children block removal so the system does not erase unresolved succession pressure.
+
 ## Household Lifecycle Event Logging v0
 
 Household lifecycle logging is diagnostic only. It is controlled by `City.ENABLE_HOUSEHOLD_LIFECYCLE_LOGS` and prints concise structured lines when enabled.
@@ -474,7 +497,7 @@ Format:
 [HouseholdLifecycle] City=<city_index> Household=<id> Event=<event_name> <short key=value details>
 ```
 
-Logged events include monthly aging passes, per-household age updates, stage transitions, child cohort movement, seasonal birth roll blockers and outcomes, succession pressure recalculation, new-family formation attempts, blocked formation due to no empty house, parent counter/population changes, and new household creation.
+Logged events include monthly aging passes, per-household age updates, stage transitions, child cohort movement, seasonal birth roll blockers and outcomes, succession pressure recalculation, new-family formation attempts, blocked formation due to no empty house, parent counter/population changes, new household creation, old-couple lifecycle completion, removal blocks, house freeing, and assignment cleanup.
 
 Birth blocker logs use specific diagnostic reason codes, such as `old_couple`, `temporary_housing`, `food_shortage`, `food_stored_below_5_days`, `housing_full`, `too_many_young_children`, or `too_many_total_children`. The selected-household UI can summarize these as shorter player-facing messages like "blocked by age", "blocked by food", "blocked by housing", or "child limit reached".
 

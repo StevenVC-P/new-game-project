@@ -109,12 +109,16 @@ New Family Formation v0 consumes this status on the monthly household lifecycle 
 
 The new household starts as a housed `newlywed` household with `total_population = 2`, `working_adults = 2`, no child counters, age counters reset to 0, broad preference inherited from the parent, and `family_trade` inherited from the parent or set to `general`. It occupies the first empty house, but it is not automatically assigned to production work. Work-opportunity matching, family names, marriage matching, wealth transfer, penalties, and multi-household building support are deferred.
 
+Old Couple Lifecycle Completion v0 runs on the monthly lifecycle path after new-family formation. An `old_couple` household can complete its lifecycle only if no adult children remain. If adult children remain, removal is blocked and logged. Eligible old couples use a deterministic age-weighted monthly roll: 0% before 12 months in stage, 5% from 12-23 months, 10% from 24-35 months, 20% from 36-47 months, and 35% from 48+ months. When completion happens, assigned production buildings are unassigned, the household is removed from the active household list, and its house building remains available for later housing assignment. This does not create a new household, delete the house, run accident/risk/grief logic, or transfer inheritance.
+
 Household lifecycle event logging v0 is controlled by `City.ENABLE_HOUSEHOLD_LIFECYCLE_LOGS`. When enabled, it prints structured diagnostic lines such as:
 
 ```text
 [HouseholdLifecycle] City=0 Household=2 Event=MonthAged age_in_stage=7 child_age_months=7
 [HouseholdLifecycle] City=0 Household=2 Event=BirthBlocked reason=temporary_housing
 [HouseholdLifecycle] City=0 Household=3 Event=NewFamilyFormed child_household=7 house=12 parent_adult_children=0
+[HouseholdLifecycle] City=0 Household=4 Event=OldCoupleMortalityRoll roll=18 chance=20 age_in_stage=36
+[HouseholdLifecycle] City=0 Household=4 Event=HouseFreed house=12
 ```
 
 Birth blocker reasons are intentionally specific for diagnostics: examples include `old_couple`, `temporary_housing`, `not_housed`, `food_shortage`, `food_stored_below_5_days`, `housing_full`, `too_many_young_children`, and `too_many_total_children`. The UI maps these to shorter readable messages such as blocked by age, food, housing, or child limit.
