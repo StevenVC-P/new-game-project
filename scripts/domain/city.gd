@@ -34,6 +34,11 @@ const OLDER_CHILD_SUPPORT_TICK_INTERVAL: int = 4
 const FOOD_SURPLUS_TICKS_FOR_GROWTH: int = 8
 const STARTING_MAINTENANCE_GRACE_TICKS: int = 20
 const RESOURCE_HISTORY_LIMIT: int = 16
+const BIRTH_FOOD_SURPLUS_DAYS: float = 10.0
+const BIRTH_MIN_FOOD_DAYS: float = 5.0
+const BIRTH_FOOD_SURPLUS_BONUS: int = 5
+const BIRTH_HOUSING_HEADROOM_BONUS: int = 5
+const BIRTH_REQUIRED_HOUSING_HEADROOM: int = 2
 
 var name: String = "City"
 var tile: Vector2 = Vector2.ZERO
@@ -145,6 +150,84 @@ func get_seeded_family_trade(preference: String, household_index: int) -> String
 func advance_household_lifecycle_month():
 	for household: Household in households:
 		household.advance_lifecycle_month()
+
+func advance_household_birth_rolls_season(calendar: Calendar, city_index: int = 0):
+	update_shelter_counts()
+	for household: Household in households:
+		if has_birth_blocker(household):
+			continue
+
+		var chance: int = get_birth_roll_chance(household)
+		if chance <= 0:
+			continue
+
+		var roll: int = get_birth_roll_for_household(household, calendar, city_index)
+		if roll < chance:
+			household.add_young_child_from_birth()
+
+	update_shelter_counts()
+	update_worker_counts()
+
+func get_birth_roll_for_household(household: Household, calendar: Calendar, city_index: int = 0) -> int:
+	var seed_value: int = household.id * 37
+	seed_value += city_index * 101
+	seed_value += calendar.current_year * 503
+	seed_value += calendar.current_month * 29
+	seed_value += int(tile.x) * 7
+	seed_value += int(tile.y) * 13
+	var mixed_value: int = abs(seed_value * 1103515245 + 12345)
+	return mixed_value % 100
+
+func get_birth_roll_chance(household: Household) -> int:
+	if has_birth_blocker(household):
+		return 0
+
+	var chance: int = household.get_birth_base_chance()
+	if get_food_days_stored() >= BIRTH_FOOD_SURPLUS_DAYS:
+		chance += BIRTH_FOOD_SURPLUS_BONUS
+	if get_housing_headroom() >= BIRTH_REQUIRED_HOUSING_HEADROOM:
+		chance += BIRTH_HOUSING_HEADROOM_BONUS
+
+	return clampi(chance, 0, 30)
+
+func has_birth_blocker(household: Household) -> bool:
+	return get_birth_blocker_reason(household) != ""
+
+func get_birth_blocker_reason(household: Household) -> String:
+	if household == null:
+		return "not eligible"
+	if resources["food_shortage"] == true:
+		return "blocked by food shortage"
+	if household.lifecycle_stage == Household.LIFECYCLE_OLD_COUPLE:
+		return "not eligible"
+	if household.housing_status != Household.RESIDENCE_HOUSED:
+		return "blocked by housing"
+	if get_total_population() >= int(resources["housing_capacity"]):
+		return "blocked by housing"
+	if household.young_children >= 2:
+		return "not eligible"
+	if household.get_total_child_count() >= 4:
+		return "not eligible"
+	if get_food_days_stored() < BIRTH_MIN_FOOD_DAYS:
+		return "blocked by low food"
+	if not household.can_receive_birth():
+		return "not eligible"
+
+	return ""
+
+func get_family_growth_status_text(household: Household) -> String:
+	var blocker: String = get_birth_blocker_reason(household)
+	if blocker != "":
+		return "Family growth: " + blocker
+
+	return "Family growth: possible"
+
+func get_food_days_stored() -> float:
+	var consumption_rate: int = max(1, int(resources["food_consumption_rate"]))
+	return float(int(resources["food"])) / float(consumption_rate)
+
+func get_housing_headroom() -> int:
+	return int(resources["housing_capacity"]) - get_total_population()
 
 func add_building(building: Building, household: Household = null):
 	building.id = buildings.size()

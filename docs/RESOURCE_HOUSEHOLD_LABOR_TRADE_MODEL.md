@@ -92,6 +92,12 @@ Household lifecycle transitions v0 advance on the calendar `month_changed` signa
 
 Adult children are also not automatic generic labor in this v0 model. They remain part of household population and future succession pressure until a later branch defines new-family formation or explicit adult-child labor behavior.
 
+Household birth rolls v0 run on the calendar `season_changed` signal. The roll is deterministic and derived from stable city, household, and calendar values, not map-generation RNG state. Eligible stage base chances are `newlywed` 15%, `young_family` 20%, `established_family` 8%, `mature_family` 2%, and `old_couple` 0%.
+
+Birth rolls are blocked by food shortage, non-housed households, full housing capacity, old couples, at least 2 young children, at least 4 total child counters, or fewer than 5 days of stored food. Stable conditions add small bonuses: at least 10 days of food adds 5%, and housing headroom of at least 2 adds 5%.
+
+On success, the household gains one `young_children`, `total_population` increases by 1, and `child_age_months` resets to 0. `working_adults`, `labor_capacity`, `worker_capacity`, idle labor, assigned worker count, and household count do not increase. Births therefore create real dependents and pressure first; older-child support and adult-child succession remain delayed lifecycle outcomes.
+
 ## Production
 
 Production runs during `City.tick()` after shelter counts, maintenance grace, worker counts, and food consumption are updated.

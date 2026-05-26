@@ -341,7 +341,7 @@ func get_house_lifecycle_lines(city: City, house_index: int) -> Array[String]:
 	if household == null:
 		return ["No resident household."]
 
-	return HouseholdLifecycleDisplayHelper.get_lifecycle_lines(household)
+	return HouseholdLifecycleDisplayHelper.get_lifecycle_lines(household, city)
 
 func get_building_worker_text(city: City, building_index: int) -> String:
 	var buildings: Array = city.buildings

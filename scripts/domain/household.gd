@@ -17,6 +17,10 @@ const YOUNG_FAMILY_MONTHS_TO_ESTABLISHED: int = 12
 const ESTABLISHED_MONTHS_TO_MATURE: int = 24
 const MATURE_MONTHS_TO_OLD_COUPLE: int = 36
 const CHILD_COHORT_AGING_MONTHS: int = 36
+const BIRTH_CHANCE_NEWLYWED: int = 15
+const BIRTH_CHANCE_YOUNG_FAMILY: int = 20
+const BIRTH_CHANCE_ESTABLISHED_FAMILY: int = 8
+const BIRTH_CHANCE_MATURE_FAMILY: int = 2
 
 var id: int = -1
 var house_building_id: int = -1
@@ -85,6 +89,39 @@ func add_external_population(amount: int = 1):
 	total_population += max(0, amount)
 	working_adults = max(working_adults, get_compatibility_working_adults_for_population(total_population))
 	update_labor_capacity()
+
+func can_receive_birth() -> bool:
+	if lifecycle_stage == LIFECYCLE_OLD_COUPLE:
+		return false
+	if housing_status != RESIDENCE_HOUSED:
+		return false
+	if young_children >= 2:
+		return false
+	if get_total_child_count() >= 4:
+		return false
+
+	return get_birth_base_chance() > 0
+
+func get_birth_base_chance() -> int:
+	if lifecycle_stage == LIFECYCLE_NEWLYWED:
+		return BIRTH_CHANCE_NEWLYWED
+	if lifecycle_stage == LIFECYCLE_YOUNG_FAMILY:
+		return BIRTH_CHANCE_YOUNG_FAMILY
+	if lifecycle_stage == LIFECYCLE_ESTABLISHED_FAMILY:
+		return BIRTH_CHANCE_ESTABLISHED_FAMILY
+	if lifecycle_stage == LIFECYCLE_MATURE_FAMILY:
+		return BIRTH_CHANCE_MATURE_FAMILY
+
+	return 0
+
+func add_young_child_from_birth():
+	young_children += 1
+	total_population += 1
+	child_age_months = 0
+	update_labor_capacity()
+
+func get_total_child_count() -> int:
+	return young_children + older_children + adult_children
 
 func advance_lifecycle_month():
 	age_in_stage += 1

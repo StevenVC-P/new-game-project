@@ -1,6 +1,6 @@
 class_name HouseholdLifecycleDisplayHelper
 
-static func get_lifecycle_lines(household) -> Array[String]:
+static func get_lifecycle_lines(household, city = null) -> Array[String]:
 	if household == null:
 		return ["No household lifecycle details."]
 
@@ -22,6 +22,7 @@ static func get_lifecycle_lines(household) -> Array[String]:
 	if older_children > 0:
 		lines.append("Family support: " + _get_family_support_text(household))
 	lines.append("Family trade: " + _format_lifecycle_label(str(family_trade), "General"))
+	lines.append(_get_family_growth_text(household, city))
 
 	if succession_pressure > 0:
 		lines.append("Succession: Pressure " + str(succession_pressure))
@@ -31,6 +32,12 @@ static func get_lifecycle_lines(household) -> Array[String]:
 	lines.append("Age in stage: " + str(age_in_stage))
 
 	return lines
+
+static func _get_family_growth_text(household, city) -> String:
+	if city is Object and city.has_method("get_family_growth_status_text"):
+		return str(city.get_family_growth_status_text(household))
+
+	return "Family growth: not eligible"
 
 static func _get_family_support_text(household) -> String:
 	if household is Object and household.has_method("get_older_child_support_bonus"):

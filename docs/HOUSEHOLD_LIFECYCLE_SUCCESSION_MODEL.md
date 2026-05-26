@@ -384,6 +384,37 @@ Transitions and child cohort aging move existing child counters only. They do no
 
 Household Labor / Population Decoupling v0 separates household size from labor source before birth rolls. Young children should increase `young_children` and `total_population` when births are implemented, but they should not increase `working_adults`, `labor_capacity`, `worker_capacity`, idle labor, or assigned worker count. Older children remain production support only. Adult children remain future succession pressure and do not automatically become generic labor in this slice.
 
+## Household Birth Rolls v0
+
+Birth rolls happen on calendar `season_changed`, not daily, monthly, or production ticks. The roll is deterministic for v0: it is derived from household id, city index, city tile, current year, and current month so the same state produces the same outcome.
+
+Base seasonal chances are intentionally conservative:
+
+- `newlywed`: 15%
+- `young_family`: 20%
+- `established_family`: 8%
+- `mature_family`: 2%
+- `old_couple`: 0%
+
+Hard blockers prevent a roll when:
+
+- the city has food shortage
+- the household is an old couple
+- the household is not housed
+- city population is at or above housing capacity
+- the household already has 2 young children
+- the household has 4 or more total child counters
+- stored food is below 5 days
+
+Small positive modifiers apply when conditions are strong:
+
+- stored food is at least 10 days: +5%
+- housing headroom is at least 2: +5%
+
+On a successful birth, the household gains one young child, `total_population` increases by 1, and `child_age_months` resets to 0. `working_adults`, `labor_capacity`, `worker_capacity`, idle labor, and assigned worker count do not increase. Births are therefore delayed-growth rewards and immediate food/housing pressure, not free labor.
+
+The selected-household lifecycle popup can show whether family growth is possible or blocked by food, housing, or eligibility. Succession pressure, new-family formation, old-couple death/removal, accidents, grief, risk, and individual-person simulation remain deferred.
+
 This transition slice is still conservative:
 
 - It does not change succession pressure.
