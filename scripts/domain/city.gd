@@ -1,6 +1,7 @@
 class_name City
 extends RefCounted
 
+const GoodsNeedBucketHelperScript = preload("res://scripts/domain/goods_need_bucket_helper.gd")
 const BUILDING_HOUSE: String = "house"
 const BUILDING_FARM: String = "farm"
 const BUILDING_WOODCUTTER: String = "woodcutter"
@@ -850,17 +851,47 @@ func toggle_building_maintenance(building_index: int):
 	var building: Building = buildings[building_index]
 	building.toggle_maintenance()
 
+func get_available_need_bucket_amount(bucket_id: String) -> int:
+	var available_amount: int = 0
+	for good_id in GoodsNeedBucketHelperScript.get_current_goods_for_need_bucket(bucket_id):
+		if resources.has(good_id):
+			available_amount += max(0, int(resources[good_id]))
+
+	return available_amount
+
+func consume_need_bucket(bucket_id: String, amount: int) -> int:
+	if amount <= 0:
+		return 0
+
+	var remaining_amount: int = amount
+	var consumed_amount: int = 0
+	for good_id in GoodsNeedBucketHelperScript.get_current_goods_for_need_bucket(bucket_id):
+		if remaining_amount <= 0:
+			break
+		if not resources.has(good_id):
+			continue
+
+		var available_good_amount: int = max(0, int(resources[good_id]))
+		if available_good_amount <= 0:
+			continue
+
+		var consumed_good_amount: int = min(remaining_amount, available_good_amount)
+		resources[good_id] = available_good_amount - consumed_good_amount
+		remaining_amount -= consumed_good_amount
+		consumed_amount += consumed_good_amount
+
+	return consumed_amount
+
 func consume_food():
 	update_shelter_counts()
 	var population: int = get_total_population()
 	var consumption_rate: int = int(ceil(float(population) / float(FOOD_PER_POPULATION_DIVISOR)))
 	resources["food_consumption_rate"] = consumption_rate
 
-	if int(resources["food"]) >= consumption_rate:
-		resources["food"] = int(resources["food"]) - consumption_rate
+	var consumed_food: int = consume_need_bucket(GoodsNeedBucketHelperScript.BUCKET_FOOD, consumption_rate)
+	if consumed_food >= consumption_rate:
 		resources["food_shortage"] = false
 	else:
-		resources["food"] = 0
 		resources["food_shortage"] = true
 
 func should_skip_for_food_shortage() -> bool:

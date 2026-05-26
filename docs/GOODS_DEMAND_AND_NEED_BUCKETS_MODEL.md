@@ -248,7 +248,9 @@ This now lives in `scripts/domain/goods_need_bucket_helper.gd` as `GoodsNeedBuck
 
 ### 2. Household Food Demand by Category v0
 
-Keep population-based demand, but consume from any goods in the `food` bucket. With current resources, this still consumes `food`; future goods can be added to the mapping without changing the demand formula.
+Food consumption now keeps the existing population-based demand formula, but consumes from any current resource goods in the `food` bucket through `City.consume_need_bucket()`. With current resources, this still consumes only the abstract `food` stockpile. Future goods can be added to `GoodsNeedBucketHelper` and the resource dictionary without changing the demand formula.
+
+`City.get_available_need_bucket_amount()` and `City.consume_need_bucket()` are generic bucket helpers. They iterate current goods in deterministic helper order, skip missing resource keys safely, do not mutate unmapped resources, and never drive resource values below zero.
 
 ### 3. Need Pressure Display v0
 
