@@ -103,7 +103,21 @@ Adult children succession pressure v0 is visible but non-operative. Each pair of
 - `potential_new_families = floor(adult_children / 2)`
 - `succession_pressure = potential_new_families`
 
-The selected-household popup can show no pressure, a future family ready, or succession blocked because no empty house is available. This branch does not create households, move adult children, occupy houses, assign work, apply penalties, or model marriage. Work-opportunity matching is deferred.
+The selected-household popup can show no pressure, a future family ready, or succession blocked because no empty house is available.
+
+New Family Formation v0 consumes this status on the monthly household lifecycle path. If a parent household has at least 2 adult children and an empty house exists, one new household can form from that parent that month. The parent loses 2 adult children and 2 total population, then recalculates succession pressure. Parent `working_adults`, `labor_capacity`, and `worker_capacity` do not decrease because adult children are not part of current labor capacity.
+
+The new household starts as a housed `newlywed` household with `total_population = 2`, `working_adults = 2`, no child counters, age counters reset to 0, broad preference inherited from the parent, and `family_trade` inherited from the parent or set to `general`. It occupies the first empty house, but it is not automatically assigned to production work. Work-opportunity matching, family names, marriage matching, wealth transfer, penalties, and multi-household building support are deferred.
+
+Household lifecycle event logging v0 is controlled by `City.ENABLE_HOUSEHOLD_LIFECYCLE_LOGS`. When enabled, it prints structured diagnostic lines such as:
+
+```text
+[HouseholdLifecycle] City=0 Household=2 Event=MonthAged age_in_stage=7 child_age_months=7
+[HouseholdLifecycle] City=0 Household=2 Event=BirthBlocked reason=blocked by housing
+[HouseholdLifecycle] City=0 Household=3 Event=NewFamilyFormed child_household=7 house=12 parent_adult_children=0
+```
+
+These logs are for retesting and debugging only. They do not change simulation state or add lifecycle rules.
 
 ## Production
 

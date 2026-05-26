@@ -432,16 +432,60 @@ This means:
 
 Housing is the first blocker. If a household has at least one potential future family and an empty house is available, the selected-household popup can show that a future family is ready. If no empty house is available, the popup shows that succession is blocked by housing.
 
-This is status and hook data only. It does not create a new household, move adult children out, occupy houses, assign work, apply penalties, or trigger migration. Work and trade-opportunity matching are deferred until the new-family formation branch can explain those requirements clearly.
+This status is consumed by New Family Formation v0 when housing exists. Work and trade-opportunity matching are deferred until a later branch can explain those requirements clearly.
+
+## New Family Formation v0
+
+New family formation runs on the monthly household lifecycle path, after lifecycle aging, child counter transitions, and succession pressure recalculation. It does not run on production ticks.
+
+The v0 rule is:
+
+- at most one new family per parent household per month
+- parent must have at least 2 adult children
+- an empty house must exist
+
+On success:
+
+- the parent spends 2 adult children
+- the parent `total_population` decreases by 2
+- the parent `succession_pressure` recalculates
+- parent `working_adults`, `labor_capacity`, and `worker_capacity` do not decrease because adult children are not part of the current labor source
+
+The new household begins as:
+
+- `lifecycle_stage = newlywed`
+- `total_population = 2`
+- `working_adults = 2`
+- no young, older, or adult children
+- `age_in_stage = 0`
+- `child_age_months = 0`
+- `family_trade` inherited from the parent, or `general` if no parent trade is set
+- parent work preference inherited as the broad assignment preference
+
+The new household occupies the first available empty house. The system does not create a house, displace any household, or assign the new household to production work. Work matching, inherited job placement, multi-household building support, marriage matching, family names, inheritance, and wealth transfer remain future systems.
+
+## Household Lifecycle Event Logging v0
+
+Household lifecycle logging is diagnostic only. It is controlled by `City.ENABLE_HOUSEHOLD_LIFECYCLE_LOGS` and prints concise structured lines when enabled.
+
+Format:
+
+```text
+[HouseholdLifecycle] City=<city_index> Household=<id> Event=<event_name> <short key=value details>
+```
+
+Logged events include monthly aging passes, per-household age updates, stage transitions, child cohort movement, seasonal birth roll blockers and outcomes, succession pressure recalculation, new-family formation attempts, blocked formation due to no empty house, parent counter/population changes, and new household creation.
+
+The logs are meant to make owner retesting easier. They do not alter lifecycle rules, production, assignment, housing, birth chances, succession pressure, or new-family formation behavior.
 
 This transition slice is still conservative:
 
 - It does not change succession pressure.
-- It does not change labor capacity, worker capacity, assignment, production formulas, household creation, or housing.
+- It does not change labor capacity, worker capacity, assignment, production formulas, or housing rules outside the explicit new-family formation path.
 - It does not remove old couples or free houses.
-- It does not create new families from adult children.
+- It creates new families from adult children only through the conservative monthly formation rule when an empty house exists.
 
-The player can verify aging, stage changes, and child counter movement through the selected-household lifecycle popup. Succession pressure, new-family formation, and old-couple death/removal remain later systems.
+The player can verify aging, stage changes, child counter movement, succession pressure, and newly formed households through the selected-household lifecycle popup. Work matching, richer succession pressure, and old-couple death/removal remain later systems.
 
 ## What Is Not Acceptable Yet
 

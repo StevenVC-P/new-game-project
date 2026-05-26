@@ -39,6 +39,7 @@ const BIRTH_MIN_FOOD_DAYS: float = 5.0
 const BIRTH_FOOD_SURPLUS_BONUS: int = 5
 const BIRTH_HOUSING_HEADROOM_BONUS: int = 5
 const BIRTH_REQUIRED_HOUSING_HEADROOM: int = 2
+const ENABLE_HOUSEHOLD_LIFECYCLE_LOGS: bool = true
 
 var name: String = "City"
 var tile: Vector2 = Vector2.ZERO
@@ -150,14 +151,73 @@ func get_seeded_family_trade(preference: String, household_index: int) -> String
 
 	return "general"
 
-func advance_household_lifecycle_month():
+func advance_household_lifecycle_month(city_index: int = 0):
+	log_household_lifecycle_event(city_index, -1, "MonthAgingPass", "households=" + str(households.size()))
 	for household: Household in households:
+		var before_state: Dictionary = get_household_lifecycle_log_state(household)
 		household.advance_lifecycle_month()
-	recalculate_household_succession_pressures()
+		log_household_lifecycle_event(city_index, household.id, "MonthAged", "age_in_stage=" + str(household.age_in_stage) + " child_age_months=" + str(household.child_age_months))
+		log_household_lifecycle_state_changes(city_index, household, before_state)
+	recalculate_household_succession_pressures(city_index)
+	advance_new_family_formation_month(city_index)
+	recalculate_household_succession_pressures(city_index)
+	update_shelter_counts()
+	update_worker_counts()
 
-func recalculate_household_succession_pressures():
+func recalculate_household_succession_pressures(city_index: int = 0):
 	for household: Household in households:
+		var previous_pressure: int = household.succession_pressure
 		household.recalculate_succession_pressure()
+		if household.succession_pressure != previous_pressure:
+			log_household_lifecycle_event(city_index, household.id, "SuccessionPressureRecalculated", "from=" + str(previous_pressure) + " to=" + str(household.succession_pressure) + " potential_new_families=" + str(household.get_potential_new_family_count()))
+		elif household.has_succession_pressure():
+			log_household_lifecycle_event(city_index, household.id, "SuccessionReady", "potential_new_families=" + str(household.get_potential_new_family_count()))
+
+func advance_new_family_formation_month(city_index: int = 0):
+	var parent_households: Array[Household] = households.duplicate()
+	for parent: Household in parent_households:
+		if not parent.can_form_new_family():
+			continue
+
+		log_household_lifecycle_event(city_index, parent.id, "NewFamilyFormationAttempted", "adult_children=" + str(parent.adult_children) + " potential_new_families=" + str(parent.get_potential_new_family_count()))
+		var house_id: int = find_empty_house_building_id()
+		if house_id < 0:
+			log_household_lifecycle_event(city_index, parent.id, "NewFamilyFormationBlocked", "reason=no_empty_house adult_children=" + str(parent.adult_children))
+			return
+
+		form_new_family_from_parent(parent, house_id, city_index)
+
+func find_empty_house_building_id() -> int:
+	var open_house_ids: Array[int] = get_empty_house_building_ids()
+	if open_house_ids.is_empty():
+		return -1
+
+	return int(open_house_ids[0])
+
+func form_new_family_from_parent(parent: Household, house_id: int, city_index: int = 0):
+	var parent_adult_children_before: int = parent.adult_children
+	var parent_population_before: int = parent.total_population
+	parent.spend_adult_children_for_new_family()
+	log_household_lifecycle_event(city_index, parent.id, "NewFamilyParentUpdated", "adult_children=" + str(parent_adult_children_before) + "->" + str(parent.adult_children) + " total_population=" + str(parent_population_before) + "->" + str(parent.total_population))
+
+	var household_id: int = households.size()
+	var new_household: Household = Household.new(household_id, house_id, parent.preference, 2, Household.RESIDENCE_HOUSED)
+	new_household.lifecycle_stage = Household.LIFECYCLE_NEWLYWED
+	new_household.young_children = 0
+	new_household.older_children = 0
+	new_household.adult_children = 0
+	new_household.age_in_stage = 0
+	new_household.child_age_months = 0
+	new_household.working_adults = 2
+	new_household.family_trade = parent.family_trade
+	if new_household.family_trade.strip_edges() == "":
+		new_household.family_trade = "general"
+	new_household.succession_pressure = 0
+	new_household.move_to_house(house_id)
+	new_household.update_labor_capacity()
+	households.append(new_household)
+	log_household_lifecycle_event(city_index, parent.id, "NewFamilyFormed", "child_household=" + str(new_household.id) + " house=" + str(house_id) + " parent_adult_children=" + str(parent.adult_children))
+	log_household_lifecycle_event(city_index, new_household.id, "NewHouseholdCreated", "parent=" + str(parent.id) + " house=" + str(house_id) + " stage=" + new_household.lifecycle_stage + " total_population=" + str(new_household.total_population) + " working_adults=" + str(new_household.working_adults) + " family_trade=" + new_household.family_trade)
 
 func get_household_succession_status(household: Household) -> String:
 	if household == null:
@@ -185,6 +245,7 @@ func advance_household_birth_rolls_season(calendar: Calendar, city_index: int = 
 	update_shelter_counts()
 	for household: Household in households:
 		if has_birth_blocker(household):
+			log_household_lifecycle_event(city_index, household.id, "BirthBlocked", "reason=" + get_birth_blocker_reason(household))
 			continue
 
 		var chance: int = get_birth_roll_chance(household)
@@ -192,8 +253,10 @@ func advance_household_birth_rolls_season(calendar: Calendar, city_index: int = 
 			continue
 
 		var roll: int = get_birth_roll_for_household(household, calendar, city_index)
+		log_household_lifecycle_event(city_index, household.id, "BirthRollEvaluated", "roll=" + str(roll) + " chance=" + str(chance) + " season=" + calendar.get_current_season() + " year=" + str(calendar.current_year))
 		if roll < chance:
 			household.add_young_child_from_birth()
+			log_household_lifecycle_event(city_index, household.id, "BirthSucceeded", "young_children=" + str(household.young_children) + " total_population=" + str(household.total_population) + " working_adults=" + str(household.working_adults) + " labor_capacity=" + str(household.labor_capacity))
 
 	update_shelter_counts()
 	update_worker_counts()
@@ -258,6 +321,38 @@ func get_food_days_stored() -> float:
 
 func get_housing_headroom() -> int:
 	return int(resources["housing_capacity"]) - get_total_population()
+
+func get_household_lifecycle_log_state(household: Household) -> Dictionary:
+	return {
+		"lifecycle_stage": household.lifecycle_stage,
+		"age_in_stage": household.age_in_stage,
+		"child_age_months": household.child_age_months,
+		"young_children": household.young_children,
+		"older_children": household.older_children,
+		"adult_children": household.adult_children,
+		"succession_pressure": household.succession_pressure,
+		"total_population": household.total_population
+	}
+
+func log_household_lifecycle_state_changes(city_index: int, household: Household, before_state: Dictionary):
+	var before_stage: String = before_state["lifecycle_stage"] as String
+	if before_stage != household.lifecycle_stage:
+		log_household_lifecycle_event(city_index, household.id, "StageTransition", "from=" + before_stage + " to=" + household.lifecycle_stage)
+
+	var before_young: int = int(before_state["young_children"])
+	var before_older: int = int(before_state["older_children"])
+	var before_adult: int = int(before_state["adult_children"])
+	if before_young != household.young_children or before_older != household.older_children or before_adult != household.adult_children:
+		log_household_lifecycle_event(city_index, household.id, "ChildCohortsMoved", "young=" + str(before_young) + "->" + str(household.young_children) + " older=" + str(before_older) + "->" + str(household.older_children) + " adult=" + str(before_adult) + "->" + str(household.adult_children))
+
+func log_household_lifecycle_event(city_index: int, household_id: int, event_name: String, detail: String = ""):
+	if not ENABLE_HOUSEHOLD_LIFECYCLE_LOGS:
+		return
+
+	var line: String = "[HouseholdLifecycle] City=" + str(city_index) + " Household=" + str(household_id) + " Event=" + event_name
+	if detail.strip_edges() != "":
+		line += " " + detail
+	print(line)
 
 func add_building(building: Building, household: Household = null):
 	building.id = buildings.size()

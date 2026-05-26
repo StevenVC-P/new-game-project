@@ -138,6 +138,15 @@ func get_succession_status() -> String:
 func recalculate_succession_pressure():
 	succession_pressure = get_potential_new_family_count()
 
+func can_form_new_family() -> bool:
+	return adult_children >= 2
+
+func spend_adult_children_for_new_family():
+	adult_children = max(0, adult_children - 2)
+	total_population = max(0, total_population - 2)
+	recalculate_succession_pressure()
+	update_labor_capacity()
+
 func advance_lifecycle_month():
 	age_in_stage += 1
 	child_age_months += 1
