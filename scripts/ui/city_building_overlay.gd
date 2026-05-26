@@ -144,7 +144,10 @@ func draw(canvas: CanvasItem, font: Font, font_size: int, city: City):
 	if building.is_house():
 		y = draw_overlay_line(canvas, font, font_size, "Resident: " + get_house_resident_text(city, inspected_building_index), text_x, y, overlay_size.x)
 		y = draw_overlay_line(canvas, font, font_size, "Available labor: " + get_house_available_worker_text(city, inspected_building_index), text_x, y, overlay_size.x)
-		draw_overlay_line(canvas, font, font_size, "Assigned: " + get_house_assignment_text(city, inspected_building_index), text_x, y, overlay_size.x)
+		y = draw_overlay_line(canvas, font, font_size, "Assigned: " + get_house_assignment_text(city, inspected_building_index), text_x, y, overlay_size.x)
+		y = draw_overlay_section_title(canvas, font, font_size, "Household Lifecycle", text_x, y, overlay_size.x)
+		for lifecycle_text: String in get_house_lifecycle_lines(city, inspected_building_index):
+			y = draw_overlay_line(canvas, font, font_size, lifecycle_text, text_x, y, overlay_size.x)
 		return
 
 	y = draw_overlay_line(canvas, font, font_size, "Maintenance: " + str(building.maintenance_level) + "%", text_x, y, overlay_size.x)
@@ -174,7 +177,7 @@ func get_building_overlay_size(city: City, building: Building) -> Vector2:
 	var option_count: int = 0
 
 	if building.is_house():
-		line_count = 4
+		line_count = 5 + get_house_lifecycle_lines(city, building.id).size()
 	else:
 		line_count = 6 + ProductionRequirementHelper.get_requirement_lines(city, building).size()
 		if building.assigned_workers > 0:
@@ -332,6 +335,13 @@ func get_house_assignment_text(city: City, house_index: int) -> String:
 		text += ", " + assigned_jobs[job_index]
 
 	return text
+
+func get_house_lifecycle_lines(city: City, house_index: int) -> Array[String]:
+	var household: Household = city.get_household_for_building_id(house_index)
+	if household == null:
+		return ["No resident household."]
+
+	return HouseholdLifecycleDisplayHelper.get_lifecycle_lines(household)
 
 func get_building_worker_text(city: City, building_index: int) -> String:
 	var buildings: Array = city.buildings

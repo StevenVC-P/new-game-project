@@ -30,6 +30,7 @@ const STARTING_HOUSEHOLD_POPULATION: int = 4
 const STARTING_POPULATION: int = STARTING_HOUSEHOLD_COUNT * STARTING_HOUSEHOLD_POPULATION
 const HOUSE_CAPACITY: int = 4
 const FOOD_PER_POPULATION_DIVISOR: int = 2
+const OLDER_CHILD_SUPPORT_TICK_INTERVAL: int = 4
 const FOOD_SURPLUS_TICKS_FOR_GROWTH: int = 8
 const STARTING_MAINTENANCE_GRACE_TICKS: int = 20
 const RESOURCE_HISTORY_LIMIT: int = 16
@@ -430,18 +431,18 @@ func get_current_building_output_amount(building: Building) -> int:
 	if maintenance_level <= 0:
 		return 0
 	if maintenance_level >= 100:
-		return apply_worker_preference_output_modifier(base_output, tick_count, building)
+		return apply_building_output_modifiers(base_output, tick_count, building)
 	if maintenance_level >= 75:
 		if tick_count % 4 == 0:
 			return 0
-		return apply_worker_preference_output_modifier(base_output, tick_count, building)
+		return apply_building_output_modifiers(base_output, tick_count, building)
 	if maintenance_level >= 50:
 		if tick_count % 2 == 1:
 			return 0
-		return apply_worker_preference_output_modifier(base_output, tick_count, building)
+		return apply_building_output_modifiers(base_output, tick_count, building)
 	if maintenance_level >= 25:
 		if tick_count % 4 == 0:
-			return apply_worker_preference_output_modifier(base_output, tick_count, building)
+			return apply_building_output_modifiers(base_output, tick_count, building)
 		return 0
 
 	return 0
@@ -476,6 +477,10 @@ func get_base_building_output_amount(building_type: String) -> int:
 
 	return 0
 
+func apply_building_output_modifiers(base_output: int, tick_count: int, building: Building) -> int:
+	var output_amount: int = apply_worker_preference_output_modifier(base_output, tick_count, building)
+	return apply_older_child_support_output_modifier(output_amount, tick_count, building)
+
 func apply_worker_preference_output_modifier(base_output: int, tick_count: int, building: Building) -> int:
 	var assigned_preference: String = get_household_preference_for_worker_modifier(building)
 	var preferred_worker: String = get_preferred_worker_for_building(building.type)
@@ -490,6 +495,20 @@ func apply_worker_preference_output_modifier(base_output: int, tick_count: int, 
 		return max(0, base_output - 1)
 
 	return base_output
+
+func apply_older_child_support_output_modifier(output_amount: int, tick_count: int, building: Building) -> int:
+	if output_amount <= 0:
+		return output_amount
+	if building.assigned_household_id < 0:
+		return output_amount
+	if tick_count % OLDER_CHILD_SUPPORT_TICK_INTERVAL != 0:
+		return output_amount
+
+	var household: Household = get_household_by_id(building.assigned_household_id)
+	if household == null:
+		return output_amount
+
+	return output_amount + household.get_older_child_support_bonus()
 
 func should_apply_preference_adjustment(base_output: int, tick_count: int) -> bool:
 	if base_output >= 2:

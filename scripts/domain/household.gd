@@ -15,6 +15,13 @@ var housing_status: String = RESIDENCE_TEMPORARY
 var preference: String = WORK_PREF_NEUTRAL
 var population_capacity: int = 4
 var total_population: int = 4
+var lifecycle_stage: String = "established_family"
+var young_children: int = 0
+var older_children: int = 0
+var adult_children: int = 0
+var family_trade: String = "general"
+var succession_pressure: int = 0
+var age_in_stage: int = 0
 var labor_capacity: int = 2
 var worker_capacity: int = 2
 var assigned_workers: int = 0
@@ -58,6 +65,12 @@ func update_labor_capacity():
 		labor_capacity = 2
 
 	worker_capacity = labor_capacity
+
+func get_family_support_power() -> int:
+	return max(0, older_children)
+
+func get_older_child_support_bonus() -> int:
+	return int(floor(sqrt(float(get_family_support_power()))))
 
 func move_to_house(building_id: int):
 	housing_status = RESIDENCE_HOUSED

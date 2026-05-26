@@ -74,4 +74,11 @@ static func get_requirement_lines(city, building) -> Array[String]:
 			elif match_quality == "poor match":
 				lines.append("Fit: poor match")
 
+			var family_support_power: int = household.get_family_support_power()
+			var family_support_bonus: int = household.get_older_child_support_bonus()
+			if family_support_power > 0 and family_support_bonus > 0:
+				lines.append("Family support: +" + str(family_support_bonus) + " periodic output")
+			else:
+				lines.append("Family support: no older-child support")
+
 	return lines

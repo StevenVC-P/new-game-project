@@ -221,17 +221,18 @@ Options:
 
 Recommended v0:
 
-- Add a visible support line first, such as "Older children are helping with production."
-- Use a simple support power modifier when formulas are introduced.
+- Add a visible support line, such as "Older children are helping with production."
+- Use a simple support power modifier.
 - Avoid making older children separate workers.
 - Apply support only to the household's assigned building.
 
-A simple v0 formula could be:
+A simple v0 formula:
 
-- no older children: no support bonus
-- one or more older children: small support bonus or occasional extra output
+- `support_power = older_children`
+- `support_bonus = floor(sqrt(support_power))`
+- apply `support_bonus` as occasional extra output on a slow production cadence
 
-The exact formula should wait until the UI can explain it. The important design decision is that older children strengthen the family responsibility, not the city's generic labor pool.
+This is not a hard child cap. Larger families continue to create more support power, but v0 uses diminishing returns until building absorption, land, tools, worksite scale, risk, and succession pressure systems exist. The important design decision is that older children strengthen the family responsibility, not the city's generic labor pool.
 
 ## Adult Children and Succession Pressure
 

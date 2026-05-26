@@ -76,6 +76,14 @@ Households can be assigned to buildings through `City.assign_household_by_id_to_
 
 Design tension: the project north star says one household should usually mean one primary responsibility, not a generic worker slot. The current code allows larger households to have labor capacity `2`, so future design decisions should decide whether that is intended, temporary, or should be reframed as household capability rather than two anonymous workers.
 
+Older-child production support is represented as household support power, not additional workers. `older_children` do not increase `labor_capacity`, `worker_capacity`, idle labor, assigned worker count, or the number of buildings a household can support. When a household is assigned to a producing building, older children can add a small periodic output bonus using conservative diminishing returns:
+
+- `support_power = older_children`
+- `support_bonus = floor(sqrt(support_power))`
+- the bonus applies only on periodic production ticks after normal labor, food shortage, maintenance, and fit checks
+
+This v0 rule is intentionally simple. Larger families matter, but building-specific labor absorption, land or worksite scale, tools, supervision risk, adult-child succession pressure, and multi-household support are later systems.
+
 ## Production
 
 Production runs during `City.tick()` after shelter counts, maintenance grace, worker counts, and food consumption are updated.

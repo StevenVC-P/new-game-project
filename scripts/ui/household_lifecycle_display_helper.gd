@@ -19,6 +19,8 @@ static func get_lifecycle_lines(household) -> Array[String]:
 
 	lines.append("Stage: " + _format_lifecycle_label(str(lifecycle_stage), "Unknown"))
 	lines.append("Children: " + str(young_children) + " young, " + str(older_children) + " older, " + str(adult_children) + " adult")
+	if older_children > 0:
+		lines.append("Family support: " + _get_family_support_text(household))
 	lines.append("Family trade: " + _format_lifecycle_label(str(family_trade), "General"))
 
 	if succession_pressure > 0:
@@ -29,6 +31,14 @@ static func get_lifecycle_lines(household) -> Array[String]:
 	lines.append("Age in stage: " + str(age_in_stage))
 
 	return lines
+
+static func _get_family_support_text(household) -> String:
+	if household is Object and household.has_method("get_older_child_support_bonus"):
+		var support_bonus: int = int(household.get_older_child_support_bonus())
+		if support_bonus > 0:
+			return "+" + str(support_bonus) + " periodic output"
+
+	return "older children helping production"
 
 static func _read_household_property(household, property_name: String, fallback):
 	if household == null:
