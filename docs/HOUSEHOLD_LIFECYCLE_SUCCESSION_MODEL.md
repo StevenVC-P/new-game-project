@@ -476,6 +476,8 @@ Format:
 
 Logged events include monthly aging passes, per-household age updates, stage transitions, child cohort movement, seasonal birth roll blockers and outcomes, succession pressure recalculation, new-family formation attempts, blocked formation due to no empty house, parent counter/population changes, and new household creation.
 
+Birth blocker logs use specific diagnostic reason codes, such as `old_couple`, `temporary_housing`, `food_shortage`, `food_stored_below_5_days`, `housing_full`, `too_many_young_children`, or `too_many_total_children`. The selected-household UI can summarize these as shorter player-facing messages like "blocked by age", "blocked by food", "blocked by housing", or "child limit reached".
+
 The logs are meant to make owner retesting easier. They do not alter lifecycle rules, production, assignment, housing, birth chances, succession pressure, or new-family formation behavior.
 
 This transition slice is still conservative:

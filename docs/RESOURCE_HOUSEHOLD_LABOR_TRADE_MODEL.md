@@ -113,9 +113,11 @@ Household lifecycle event logging v0 is controlled by `City.ENABLE_HOUSEHOLD_LIF
 
 ```text
 [HouseholdLifecycle] City=0 Household=2 Event=MonthAged age_in_stage=7 child_age_months=7
-[HouseholdLifecycle] City=0 Household=2 Event=BirthBlocked reason=blocked by housing
+[HouseholdLifecycle] City=0 Household=2 Event=BirthBlocked reason=temporary_housing
 [HouseholdLifecycle] City=0 Household=3 Event=NewFamilyFormed child_household=7 house=12 parent_adult_children=0
 ```
+
+Birth blocker reasons are intentionally specific for diagnostics: examples include `old_couple`, `temporary_housing`, `not_housed`, `food_shortage`, `food_stored_below_5_days`, `housing_full`, `too_many_young_children`, and `too_many_total_children`. The UI maps these to shorter readable messages such as blocked by age, food, housing, or child limit.
 
 These logs are for retesting and debugging only. They do not change simulation state or add lifecycle rules.
 

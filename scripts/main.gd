@@ -621,8 +621,9 @@ func run_simulation_day():
 		queue_redraw()
 
 func on_calendar_month_changed(_calendar: Calendar):
-	for city: City in cities:
-		city.advance_household_lifecycle_month()
+	for city_index in range(cities.size()):
+		var city: City = cities[city_index]
+		city.advance_household_lifecycle_month(city_index)
 
 func on_calendar_season_changed(calendar: Calendar):
 	for city_index in range(cities.size()):

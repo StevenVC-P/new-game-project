@@ -288,32 +288,48 @@ func has_birth_blocker(household: Household) -> bool:
 
 func get_birth_blocker_reason(household: Household) -> String:
 	if household == null:
-		return "not eligible"
+		return "unknown_birth_blocker"
 	if resources["food_shortage"] == true:
-		return "blocked by food shortage"
+		return "food_shortage"
 	if household.lifecycle_stage == Household.LIFECYCLE_OLD_COUPLE:
-		return "not eligible"
+		return "old_couple"
 	if household.housing_status != Household.RESIDENCE_HOUSED:
-		return "blocked by housing"
+		if household.housing_status == Household.RESIDENCE_TEMPORARY:
+			return "temporary_housing"
+		return "not_housed"
 	if get_total_population() >= int(resources["housing_capacity"]):
-		return "blocked by housing"
+		return "housing_full"
 	if household.young_children >= 2:
-		return "not eligible"
+		return "too_many_young_children"
 	if household.get_total_child_count() >= 4:
-		return "not eligible"
+		return "too_many_total_children"
 	if get_food_days_stored() < BIRTH_MIN_FOOD_DAYS:
-		return "blocked by low food"
+		return "food_stored_below_5_days"
 	if not household.can_receive_birth():
-		return "not eligible"
+		if household.get_birth_base_chance() <= 0:
+			return "stage_not_eligible"
+		return "unknown_birth_blocker"
 
 	return ""
 
 func get_family_growth_status_text(household: Household) -> String:
 	var blocker: String = get_birth_blocker_reason(household)
 	if blocker != "":
-		return "Family growth: " + blocker
+		return "Family growth: " + get_birth_blocker_player_text(blocker)
 
 	return "Family growth: possible"
+
+func get_birth_blocker_player_text(blocker: String) -> String:
+	if blocker == "old_couple" or blocker == "stage_not_eligible":
+		return "blocked by age"
+	if blocker == "food_shortage" or blocker == "food_stored_below_5_days":
+		return "blocked by food"
+	if blocker == "not_housed" or blocker == "temporary_housing" or blocker == "housing_full" or blocker == "no_housing_headroom":
+		return "blocked by housing"
+	if blocker == "too_many_young_children" or blocker == "too_many_total_children":
+		return "child limit reached"
+
+	return "not eligible"
 
 func get_food_days_stored() -> float:
 	var consumption_rate: int = max(1, int(resources["food_consumption_rate"]))
