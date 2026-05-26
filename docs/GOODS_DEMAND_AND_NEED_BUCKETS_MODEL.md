@@ -244,7 +244,7 @@ Add a read-only helper that maps goods to need buckets:
 - `get_goods_for_need_bucket(bucket_id)`
 - `is_good_in_need_bucket(good_id, bucket_id)`
 
-This can live in a resource/need helper script or a small city-domain helper. It should not mutate resources.
+This now lives in `scripts/domain/goods_need_bucket_helper.gd` as `GoodsNeedBucketHelper`. It is read-only and does not mutate resources.
 
 ### 2. Household Food Demand by Category v0
 
