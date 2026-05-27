@@ -176,6 +176,8 @@ Food consumption is population based. `City.consume_food()` calculates consumpti
 
 `City.get_need_pressure_summary()` exposes category need pressure for the City Overview. Food is the active consuming demand bucket and reports demand, available stock, shortage, and status. Household goods are active as display-only family/home pressure: each housed household creates one household goods demand, and availability comes from the `household_goods` bucket (`carved_goods`, `tiles`, and `statues`). Household goods are not consumed, do not create penalties, and do not use household inventory yet. Tools, construction materials, maintenance materials, and civic goods report stockpile readiness as inactive pressure-only buckets until later branches add rules.
 
+The selected house popup can show a read-only Family Demand section for the resident household. It displays food as population pressure, household goods as either `contributes 1 home-life demand` for housed households or no full home-life demand for temporary/unsheltered households, and shelter as the current residence state. This explains the family contribution to aggregate pressure without adding household inventory, household goods consumption, penalties, or new formulas.
+
 Population can grow from the external population pool after sustained food surplus, available housing capacity, and no shortage. Growth either adds one person to an existing eligible household or creates a new neutral household. Existing external population growth represents adult arrival for compatibility and may update `working_adults`; future household births should add dependent young children without increasing `working_adults`.
 
 Housing behavior currently includes:

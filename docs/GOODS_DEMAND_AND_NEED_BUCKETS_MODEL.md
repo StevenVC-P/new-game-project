@@ -302,7 +302,31 @@ Statuses are:
 
 Action hints appear only for `low` or `unmet` household goods pressure. This is quality-of-life pressure and readiness feedback, not a survival failure.
 
-### 5. Clothing Demand v0
+### 5. Family Demand Status Display v0
+
+Inspected homes/families can show a compact Family Demand section. This makes the family source of city-level pressure legible without adding mechanics.
+
+Current display lines:
+
+- food as population pressure, such as `Food: 5 population`
+- household goods contribution for housed families, such as `Household goods: contributes 1 home-life demand`
+- no full household goods home-life demand for temporary or unsheltered families
+- shelter status as housed, temporary shelter, or unsheltered
+
+This display is read-only. It does not calculate a new food formula, consume household goods, create household inventory, apply penalties, add clothing demand, or change production. The city still aggregates pressure from family/home state.
+
+Manual owner retest checklist:
+
+1. Select a house with a resident household.
+2. Confirm the selected house popup shows Family Demand.
+3. Confirm food pressure reflects household population.
+4. Confirm a housed household shows `Household goods: contributes 1 home-life demand`.
+5. Confirm shelter status shows housed.
+6. If practical, inspect a temporary or unsheltered household state and confirm food still appears while household goods say no full home-life demand.
+7. Confirm City Overview Need Pressure still works.
+8. Confirm no resources are consumed and no penalties occur from this display.
+
+### 6. Clothing Demand v0
 
 Add slow periodic demand, not daily drain:
 
@@ -310,7 +334,7 @@ Add slow periodic demand, not daily drain:
 
 Start as pressure warnings before hard consumption penalties.
 
-### 6. Quality and Preference Modifiers
+### 7. Quality and Preference Modifiers
 
 Let exact goods matter after categories are stable:
 
@@ -319,7 +343,7 @@ Let exact goods matter after categories are stable:
 - clothing improves winter stability
 - family trade can create preference or production affinity
 
-### 7. Household/Home-Level Inventory
+### 8. Household/Home-Level Inventory
 
 Move some needs from city stockpile to households later:
 

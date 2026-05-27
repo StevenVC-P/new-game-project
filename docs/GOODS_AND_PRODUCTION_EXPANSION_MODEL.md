@@ -53,6 +53,8 @@ Food and shelter are hard survival and retention needs. Most other home-life nee
 
 Household Goods Pressure v0 follows this boundary. Housed families create display-only household goods demand, while temporary or unsheltered families do not create full soft home-life demand yet. The city aggregates this family/home pressure and compares it against the `household_goods` bucket. Current satisfying goods are `carved_goods`, `tiles`, and `statues`. No household goods are consumed, no penalties are applied, and no household inventory is created in this slice.
 
+Family Demand Status Display v0 makes this source visible on inspected homes/families. It shows food as household population pressure, household goods as a housed-home contribution, and shelter as the current residence state. This is a read-only explanation of what the family contributes to city pressure, not a household inventory or consumption system.
+
 ### Family-Operated Workplaces
 
 Workplaces are family-operated. For now, one family can operate one workplace. This matches the current one-household responsibility model and avoids turning households into anonymous worker pools.
