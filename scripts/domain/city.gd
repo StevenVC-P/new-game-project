@@ -1339,7 +1339,7 @@ func get_need_pressure_summary() -> Dictionary:
 		GoodsNeedBucketHelperScript.BUCKET_TOOLS: get_inactive_need_pressure(GoodsNeedBucketHelperScript.BUCKET_TOOLS),
 		GoodsNeedBucketHelperScript.BUCKET_CONSTRUCTION_MATERIALS: get_inactive_need_pressure(GoodsNeedBucketHelperScript.BUCKET_CONSTRUCTION_MATERIALS),
 		GoodsNeedBucketHelperScript.BUCKET_MAINTENANCE_MATERIALS: get_inactive_need_pressure(GoodsNeedBucketHelperScript.BUCKET_MAINTENANCE_MATERIALS),
-		GoodsNeedBucketHelperScript.BUCKET_HOUSEHOLD_GOODS: get_inactive_need_pressure(GoodsNeedBucketHelperScript.BUCKET_HOUSEHOLD_GOODS),
+		GoodsNeedBucketHelperScript.BUCKET_HOUSEHOLD_GOODS: get_household_goods_need_pressure(),
 		GoodsNeedBucketHelperScript.BUCKET_CIVIC_GOODS: get_inactive_need_pressure(GoodsNeedBucketHelperScript.BUCKET_CIVIC_GOODS),
 	}
 
@@ -1359,6 +1359,33 @@ func get_food_need_pressure() -> Dictionary:
 		severity = "warning"
 
 	return make_need_pressure(GoodsNeedBucketHelperScript.BUCKET_FOOD, status, severity, demand, available, shortage_amount, true)
+
+func get_household_goods_need_pressure() -> Dictionary:
+	var demand: int = get_household_goods_need_demand()
+	var available: int = get_available_need_bucket_amount(GoodsNeedBucketHelperScript.BUCKET_HOUSEHOLD_GOODS)
+	var shortage_amount: int = max(0, demand - available)
+	var status: String = "none"
+	var severity: String = "neutral"
+
+	if demand > 0 and available >= demand:
+		status = "met"
+		severity = "positive"
+	elif demand > 0 and available > 0:
+		status = "low"
+		severity = "warning"
+	elif demand > 0:
+		status = "unmet"
+		severity = "warning"
+
+	return make_need_pressure(GoodsNeedBucketHelperScript.BUCKET_HOUSEHOLD_GOODS, status, severity, demand, available, shortage_amount, true)
+
+func get_household_goods_need_demand() -> int:
+	var demand: int = 0
+	for household: Household in households:
+		if household.housing_status == Household.RESIDENCE_HOUSED:
+			demand += 1
+
+	return demand
 
 func get_inactive_need_pressure(bucket_id: String) -> Dictionary:
 	return make_need_pressure(bucket_id, "pressure_only", "neutral", 0, get_available_need_bucket_amount(bucket_id), 0, false)

@@ -51,6 +51,8 @@ Home-life needs include:
 
 Food and shelter are hard survival and retention needs. Most other home-life needs should begin as quality-of-life pressure, not immediate failure states.
 
+Household Goods Pressure v0 follows this boundary. Housed families create display-only household goods demand, while temporary or unsheltered families do not create full soft home-life demand yet. The city aggregates this family/home pressure and compares it against the `household_goods` bucket. Current satisfying goods are `carved_goods`, `tiles`, and `statues`. No household goods are consumed, no penalties are applied, and no household inventory is created in this slice.
+
 ### Family-Operated Workplaces
 
 Workplaces are family-operated. For now, one family can operate one workplace. This matches the current one-household responsibility model and avoids turning households into anonymous worker pools.
@@ -291,7 +293,7 @@ Only revisit obligation pressure, city credit, and accepted currency after goods
 
 - Should prosperity be a simple household status ladder, a score, or a set of named conditions?
 - Should unsheltered workplace weakness reduce output amount, cadence, assignment eligibility, or fit quality?
-- Which soft home-life need should become active first: household goods, clothing, or home improvement?
+- After household goods pressure, should the next soft home-life need be clothing or home improvement?
 - Should tools and maintenance remain city/building-level at first, or should homes also create small upkeep demand?
 - How should civic buildings emit demand without feeling like arbitrary city upkeep?
 - When families can operate more than one workplace, what player-facing condition makes that feel earned and legible?

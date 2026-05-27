@@ -262,7 +262,7 @@ Food consumption now keeps the existing population-based demand formula, but con
 - status
 - active/inactive state
 
-The City Overview sidebar displays a compact Need Pressure section. Food is the only active consuming bucket in this slice. Tools, construction materials, maintenance materials, household goods, and civic goods show stockpile readiness as not active yet. This remains city-stockpile pressure, not household inventory.
+The City Overview sidebar displays a compact Need Pressure section. Food is the only active consuming bucket in this slice. Household goods pressure is active as display-only family/home pressure: housed households create demand, and current `household_goods` bucket stockpile counts toward availability. Tools, construction materials, maintenance materials, and civic goods show stockpile readiness as not active yet. This remains city-stockpile pressure, not household inventory.
 
 Action hints can use food need pressure for concise guidance, such as increasing production or importing food when demand is low or in shortage.
 
@@ -271,20 +271,46 @@ Manual owner retest checklist:
 1. Open City Overview.
 2. Confirm Need Pressure appears directly after City Health.
 3. Confirm Food displays the expected status and shows available stock plus demand.
-4. Confirm inactive buckets are visibly not active and are not framed as urgent shortages.
-5. Confirm low or shortage food creates helpful action hints.
-6. Confirm no duplicate or noisy inactive-bucket hints appear.
+4. Confirm Household Goods displays available stock plus demand from housed households.
+5. Confirm inactive buckets are visibly not active and are not framed as urgent shortages.
+6. Confirm low or shortage food creates helpful action hints.
+7. Confirm low or unmet household goods creates one concise domestic-goods hint.
+8. Confirm no duplicate or noisy inactive-bucket hints appear.
 
-### 4. Clothing and Household-Goods Demand v0
+### 4. Household Goods Pressure v0
+
+Household goods pressure is active as display-only pressure. It does not consume resources, apply penalties, or create household inventory.
+
+V0 demand is aggregated from families with stable homes:
+
+- each housed household creates `1` household goods demand
+- temporary or unsheltered households do not create full soft home-life household goods demand yet
+- the city aggregates this pressure rather than inventing a direct city demand
+
+Availability uses the `household_goods` need bucket through `GoodsNeedBucketHelper`. Current satisfying goods are:
+
+- `carved_goods`
+- `tiles`
+- `statues`
+
+Statuses are:
+
+- `none`: no housed-household demand
+- `met`: available household goods cover demand
+- `low`: some household goods exist, but less than demand
+- `unmet`: demand exists and no household goods are available
+
+Action hints appear only for `low` or `unmet` household goods pressure. This is quality-of-life pressure and readiness feedback, not a survival failure.
+
+### 5. Clothing Demand v0
 
 Add slow periodic demand, not daily drain:
 
 - Clothing: population and season influenced later.
-- Household goods: household count and lifecycle influenced later.
 
 Start as pressure warnings before hard consumption penalties.
 
-### 5. Quality and Preference Modifiers
+### 6. Quality and Preference Modifiers
 
 Let exact goods matter after categories are stable:
 
@@ -293,7 +319,7 @@ Let exact goods matter after categories are stable:
 - clothing improves winter stability
 - family trade can create preference or production affinity
 
-### 6. Household/Home-Level Inventory
+### 7. Household/Home-Level Inventory
 
 Move some needs from city stockpile to households later:
 

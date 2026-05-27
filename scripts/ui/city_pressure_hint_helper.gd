@@ -8,6 +8,7 @@ static func get_hints(pressure_summary: Dictionary, resources: Dictionary, need_
 	var action_hint_lines: Array[String] = []
 
 	_add_food_need_hint(action_hint_lines, need_pressure_summary)
+	_add_household_goods_need_hint(action_hint_lines, need_pressure_summary)
 	_add_pressure_hint(action_hint_lines, pressure_summary, "food", "Assign a household to food production or build another farm.")
 	_add_pressure_hint(action_hint_lines, pressure_summary, "shelter", "Build housing or reduce unhoused shelter pressure.")
 	_add_pressure_hint(action_hint_lines, pressure_summary, "labor", "Assign idle household labor to production buildings.")
@@ -34,6 +35,22 @@ static func _add_food_need_hint(action_hint_lines: Array[String], need_pressure_
 		action_hint_lines.append("Food shortage: assign households to farms or import food.")
 	elif status == "low":
 		action_hint_lines.append("Food demand rising: increase food production or trade for food.")
+
+static func _add_household_goods_need_hint(action_hint_lines: Array[String], need_pressure_summary: Dictionary) -> void:
+	if action_hint_lines.size() >= MAX_HINTS:
+		return
+	if not need_pressure_summary.has("household_goods"):
+		return
+
+	var household_goods_need = need_pressure_summary["household_goods"]
+	if not (household_goods_need is Dictionary):
+		return
+
+	var status: String = _read_string(household_goods_need, "status")
+	if status == "unmet":
+		action_hint_lines.append("Household goods demand unmet: produce domestic goods.")
+	elif status == "low":
+		action_hint_lines.append("Household goods low: produce carved goods, tiles, or statues.")
 
 static func _add_pressure_hint(action_hint_lines: Array[String], pressure_summary: Dictionary, key: String, hint: String) -> void:
 	if action_hint_lines.size() >= MAX_HINTS:

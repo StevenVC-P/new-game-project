@@ -1052,7 +1052,7 @@ func draw_need_pressure_row(font: Font, font_size: int, need_pressure: Dictionar
 	var value_text: String = str(available) + " available"
 
 	if active:
-		value_text = format_need_status_label(status) + " - " + str(available) + " available, " + str(demand) + " demand"
+		value_text = format_need_status_label(status) + " - " + str(available) + " available / " + str(demand) + " demand"
 	else:
 		value_text += ", not active"
 
