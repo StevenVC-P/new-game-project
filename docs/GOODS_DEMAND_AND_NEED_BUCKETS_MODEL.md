@@ -326,7 +326,28 @@ Manual owner retest checklist:
 7. Confirm City Overview Need Pressure still works.
 8. Confirm no resources are consumed and no penalties occur from this display.
 
-### 6. Clothing Demand v0
+### 6. Unsheltered Workplace Warning v0
+
+Selected production buildings can show a warning when their assigned household is temporarily sheltered or unsheltered:
+
+- `Workplace stability: assigned household is temporarily sheltered`
+- `Workplace stability: assigned household is unsheltered`
+- `Housing instability may reduce reliability later`
+
+This is display-only. Temporary and unsheltered families still consume food and can still operate workplaces. The warning does not change production output, production cadence, assignment validity, labor capacity, food demand, maintenance, lifecycle, or household goods pressure.
+
+Future mechanical effects should prefer reliability or production cadence over a raw output penalty if that better represents instability, fatigue, and irregular attendance.
+
+Manual owner retest checklist:
+
+1. Assign a housed household to a production building and confirm no workplace stability warning appears.
+2. Assign or inspect a temporary/unsheltered household on a production building if practical.
+3. Confirm the production building popup shows the workplace stability warning.
+4. Confirm the selected-building action hints include housing the assigned household.
+5. Confirm the building still produces and assignment remains valid.
+6. Confirm no output, cadence, labor, maintenance, or demand calculation changes occur.
+
+### 7. Clothing Demand v0
 
 Add slow periodic demand, not daily drain:
 
@@ -334,7 +355,7 @@ Add slow periodic demand, not daily drain:
 
 Start as pressure warnings before hard consumption penalties.
 
-### 7. Quality and Preference Modifiers
+### 8. Quality and Preference Modifiers
 
 Let exact goods matter after categories are stable:
 
@@ -343,7 +364,7 @@ Let exact goods matter after categories are stable:
 - clothing improves winter stability
 - family trade can create preference or production affinity
 
-### 8. Household/Home-Level Inventory
+### 9. Household/Home-Level Inventory
 
 Move some needs from city stockpile to households later:
 

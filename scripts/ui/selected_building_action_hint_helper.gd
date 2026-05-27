@@ -1,6 +1,8 @@
 class_name SelectedBuildingActionHintHelper
 extends RefCounted
 
+const WorkplaceStabilityDisplayHelperScript = preload("res://scripts/ui/workplace_stability_display_helper.gd")
+
 static func get_hints(building, city) -> Array[String]:
 	var hints: Array[String] = []
 
@@ -14,6 +16,9 @@ static func get_hints(building, city) -> Array[String]:
 			hints.append("Assign an idle household to start production.")
 		else:
 			hints.append("This building has assigned labor.")
+
+		for workplace_stability_hint: String in WorkplaceStabilityDisplayHelperScript.get_action_hints(city, building):
+			hints.append(workplace_stability_hint)
 
 		# Check maintenance status
 		if not building.receives_maintenance:

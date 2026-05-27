@@ -55,6 +55,8 @@ Household Goods Pressure v0 follows this boundary. Housed families create displa
 
 Family Demand Status Display v0 makes this source visible on inspected homes/families. It shows food as household population pressure, household goods as a housed-home contribution, and shelter as the current residence state. This is a read-only explanation of what the family contributes to city pressure, not a household inventory or consumption system.
 
+Unsheltered Workplace Warning v0 makes workplace instability visible without applying a mechanical penalty. Temporary or unsheltered families can still operate assigned workplaces, still consume food, and still remain valid assignments, but selected production-building information can warn that housing instability may reduce reliability later. Production output, cadence, labor capacity, assignment rules, maintenance, and demand calculations are unchanged in this slice.
+
 ### Family-Operated Workplaces
 
 Workplaces are family-operated. For now, one family can operate one workplace. This matches the current one-household responsibility model and avoids turning households into anonymous worker pools.
@@ -294,7 +296,7 @@ Only revisit obligation pressure, city credit, and accepted currency after goods
 ## Open Questions
 
 - Should prosperity be a simple household status ladder, a score, or a set of named conditions?
-- Should unsheltered workplace weakness reduce output amount, cadence, assignment eligibility, or fit quality?
+- When unsheltered workplace weakness becomes mechanical, should it reduce output amount, cadence, assignment eligibility, or fit quality?
 - After household goods pressure, should the next soft home-life need be clothing or home improvement?
 - Should tools and maintenance remain city/building-level at first, or should homes also create small upkeep demand?
 - How should civic buildings emit demand without feeling like arbitrary city upkeep?

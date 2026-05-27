@@ -178,6 +178,8 @@ Food consumption is population based. `City.consume_food()` calculates consumpti
 
 The selected house popup can show a read-only Family Demand section for the resident household. It displays food as population pressure, household goods as either `contributes 1 home-life demand` for housed households or no full home-life demand for temporary/unsheltered households, and shelter as the current residence state. This explains the family contribution to aggregate pressure without adding household inventory, household goods consumption, penalties, or new formulas.
 
+Selected production-building information can show a display-only workplace stability warning when the assigned household is temporarily sheltered or unsheltered. The warning text is informational: temporary/unsheltered households still consume food, remain valid worker assignments, and do not receive production output, cadence, labor, maintenance, or demand penalties in this branch. A later branch may turn housing instability into slower cadence or reliability effects.
+
 Population can grow from the external population pool after sustained food surplus, available housing capacity, and no shortage. Growth either adds one person to an existing eligible household or creates a new neutral household. Existing external population growth represents adult arrival for compatibility and may update `working_adults`; future household births should add dependent young children without increasing `working_adults`.
 
 Housing behavior currently includes:
