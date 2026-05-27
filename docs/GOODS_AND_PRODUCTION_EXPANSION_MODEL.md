@@ -19,6 +19,108 @@ Goods should answer at least one of these questions:
 
 Money and city credit should wait until the game has enough meaningful goods, needs, household traits, and production relationships for obligations to emerge from real material pressure.
 
+## Family-Driven Demand Architecture
+
+Families are the core economic actors. The city should aggregate demand; it should not invent demand directly.
+
+Demand should come from four sources:
+
+- families, through food, shelter, home life, lifecycle stage, dependents, prosperity, and status
+- homes, through shelter quality, maintenance, future storage, and future home-improvement needs
+- workplaces, through production inputs, tools, maintenance, and upkeep goods
+- civic buildings, through future upkeep and quality-of-life effects that improve the city without necessarily producing goods
+
+The city pressure summary should eventually add these sources together and show the resulting pressure. This keeps pressure grounded in real settlement life rather than abstract city-wide meters.
+
+### Families, Homes, And Shelter
+
+A family can live in a home object, but it can also be temporarily sheltered or unsheltered. Shelter state changes the family's demand profile:
+
+- Food demand remains active even when a family is unsheltered.
+- Unsheltered families create strong shelter pressure.
+- Unsheltered families should create little or no soft home-life demand because they do not have a stable home context for domestic goods.
+- Unsheltered families should operate workplaces weakly because housing instability should affect reliability, not create free labor.
+
+Home-life needs include:
+
+- food
+- shelter
+- household goods
+- clothing
+- future home-improvement goods
+
+Food and shelter are hard survival and retention needs. Most other home-life needs should begin as quality-of-life pressure, not immediate failure states.
+
+### Family-Operated Workplaces
+
+Workplaces are family-operated. For now, one family can operate one workplace. This matches the current one-household responsibility model and avoids turning households into anonymous worker pools.
+
+A workplace defines:
+
+- production outputs
+- production inputs
+- tools required for operation
+- maintenance and upkeep requirements
+- future building quality or equipment needs
+
+The family provides:
+
+- labor and operation
+- household preference or trade fit
+- older-child support where implemented
+- future prosperity, ownership, lineage, and succession context
+
+Later, higher-status or prosperous families may be allowed to operate additional workplaces or coordinate larger operations. That is future scope and should not be implemented until the player can understand why a family has that expanded capacity.
+
+Workplace needs include:
+
+- production inputs
+- tools
+- maintenance materials
+- upkeep goods
+
+Workplace shortages should usually reduce production, but the exact consequence should depend on the missing need. Missing input goods should block or cap output. Missing tools or upkeep should reduce reliability, maintenance, or production cadence.
+
+### Household Prosperity Without Money
+
+Prosperity should be household-level, but not exact savings yet. Do not track money, coins, exact savings, debt, credit, or currency in this layer.
+
+Use an abstract prosperity or status concept when the model needs richer demand:
+
+- Stable families need basics.
+- Comfortable families begin wanting household goods.
+- Prosperous families begin wanting refined goods and home-improvement goods.
+
+In this stage, prosperity changes the type of goods demanded, not exact quality. Quality, variety, brands, prestige, and cultural preference can come later.
+
+### Category Demand Before Exact Goods
+
+Goods satisfy demand by category first. Exact goods matter only as members of categories until later quality or preference systems exist.
+
+Examples:
+
+- A family needs food; different cities may satisfy that through generic food, wheat, bread, fish, or other edible goods.
+- A household-goods need may be satisfied by pottery, carved goods, or future local domestic goods.
+- A maintenance need may be satisfied by tools, wood, masonry materials, or later specialized upkeep goods depending on the building.
+
+Different cities should be able to satisfy the same need through different local goods. Variety bonuses may come later, but are out of scope for the next implementation slices.
+
+### Bridge To Money Later
+
+Money, trade value, obligation, credit, and debt should emerge later from recurring demand, surplus, shortage, production reliability, household prosperity, and inter-city exchange.
+
+Do not implement:
+
+- prices
+- wages
+- household savings
+- debt
+- city credit
+- accepted currency
+- obligation ledgers
+
+The material loop should become believable first. Money can then explain exchange and trust rather than papering over missing demand.
+
 ## Current Model
 
 The current code tracks `food`, `wood`, and `tools` as the primary material resources.
@@ -182,3 +284,14 @@ Only revisit obligation pressure, city credit, and accepted currency after goods
 - Do not give every city every resource chain by default long-term.
 - Do not add household skills or traits without player-facing explanation.
 - Do not change production, food consumption, maintenance, or trade formulas as part of resource-key groundwork.
+- Do not make city-level demand appear from nowhere; demand should be aggregated from families, homes, workplaces, and later civic buildings.
+- Do not add exact savings, money, prices, debt, credit, or currency before recurring material demand is established.
+
+## Open Questions
+
+- Should prosperity be a simple household status ladder, a score, or a set of named conditions?
+- Should unsheltered workplace weakness reduce output amount, cadence, assignment eligibility, or fit quality?
+- Which soft home-life need should become active first: household goods, clothing, or home improvement?
+- Should tools and maintenance remain city/building-level at first, or should homes also create small upkeep demand?
+- How should civic buildings emit demand without feeling like arbitrary city upkeep?
+- When families can operate more than one workplace, what player-facing condition makes that feel earned and legible?

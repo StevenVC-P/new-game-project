@@ -226,6 +226,27 @@ The intended first playable loop is survival and growth:
 
 Future design ideas such as seasons, values, prosperity, health, traits, household maturity, dependents, fertility, and richer assignment fit should be treated as future systems unless current code implements them.
 
+## Demand Architecture Direction
+
+Future demand should be family-driven rather than invented by the city directly. The city should aggregate pressure from families, homes, workplaces, and later civic buildings.
+
+Families create demand through:
+
+- food needs from population and dependents
+- shelter pressure from housing state
+- home-life needs such as household goods, clothing, and future home improvements
+- lifecycle stage, prosperity/status, and family continuity
+
+Families consume food even when unsheltered. Unsheltered families should create strong shelter pressure, little or no soft home-life demand, and weaker workplace operation.
+
+Workplaces are family-operated. The current model allows one household/family to operate a production building. That should remain the baseline. Later, prosperous or higher-status families may operate additional workplaces, but that is future scope and should require player-facing explanation.
+
+The workplace should define production inputs, tools, maintenance, and upkeep requirements. The family should provide labor/operation, fit, lineage, ownership context, and eventually prosperity. Workplace shortages should usually affect production, while home-life shortages should usually begin as quality-of-life pressure unless they are hard survival needs like food or shelter.
+
+Prosperity should remain abstract at this stage. Do not track exact money, household savings, prices, debt, credit, or currency yet. A future household prosperity/status model can make stable families demand basics, comfortable families demand household goods, and prosperous families demand refined or home-improvement goods.
+
+Goods should satisfy demand by category first. Exact goods are category members, not separate household recipes yet. This allows different cities to satisfy the same need through local goods, such as generic food, wheat, bread, or fish for food demand. Variety, quality, cultural preference, and exact-good bonuses are later systems.
+
 ## Open Questions
 
 - Should larger households keep labor capacity `2`, or should the design enforce one primary responsibility per household more strictly?
@@ -235,3 +256,6 @@ Future design ideas such as seasons, values, prosperity, health, traits, househo
 - Should future trade include household-level or market-level behavior, or remain city-to-city for the first playable loop?
 - How should seasonal effects influence production, food pressure, and labor availability?
 - Should maintenance remain tools-only, or eventually involve labor, skill, building quality, or prosperity?
+- How should family prosperity/status be represented without exact savings or money?
+- What is the cleanest first consequence for unsheltered families operating workplaces weakly?
+- Which soft home-life demand should become active first once food and shelter are stable?
