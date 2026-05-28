@@ -180,6 +180,8 @@ The selected house popup can show a read-only Family Demand section for the resi
 
 Selected production-building information can show a display-only workplace stability warning when the assigned household is temporarily sheltered or unsheltered. The warning text is informational: temporary/unsheltered households still consume food, remain valid worker assignments, and do not receive production output, cadence, labor, maintenance, or demand penalties in this branch. A later branch may turn housing instability into slower cadence or reliability effects.
 
+The selected house popup can also show a read-only household prosperity status. Current statuses are `struggling`, `stable`, `comfortable`, and future-facing `prosperous`. V0 derives the status from visible need conditions only: unstable shelter or city food shortage is struggling, housed/no-shortage basics are stable, and housed/no-shortage with met household goods pressure is comfortable. This does not track money, savings, exact wealth, prices, credit, debt, household inventory, bonuses, or penalties.
+
 Population can grow from the external population pool after sustained food surplus, available housing capacity, and no shortage. Growth either adds one person to an existing eligible household or creates a new neutral household. Existing external population growth represents adult arrival for compatibility and may update `working_adults`; future household births should add dependent young children without increasing `working_adults`.
 
 Housing behavior currently includes:

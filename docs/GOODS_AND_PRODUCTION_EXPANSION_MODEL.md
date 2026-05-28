@@ -57,6 +57,8 @@ Family Demand Status Display v0 makes this source visible on inspected homes/fam
 
 Unsheltered Workplace Warning v0 makes workplace instability visible without applying a mechanical penalty. Temporary or unsheltered families can still operate assigned workplaces, still consume food, and still remain valid assignments, but selected production-building information can warn that housing instability may reduce reliability later. Production output, cadence, labor capacity, assignment rules, maintenance, and demand calculations are unchanged in this slice.
 
+Household Prosperity Status v0 is an abstract inspected-household status, not money or exact wealth. It summarizes current need conditions as struggling, stable, comfortable, or eventually prosperous. V0 derives struggling from food shortage or unstable shelter, stable from housed/no-shortage basics, and comfortable from housed/no-shortage households when household goods pressure is met. Prosperous remains future-facing until quality, variety, luxury, or home-improvement systems exist. No bonuses, penalties, consumption, savings, prices, credit, or debt are implemented.
+
 ### Family-Operated Workplaces
 
 Workplaces are family-operated. For now, one family can operate one workplace. This matches the current one-household responsibility model and avoids turning households into anonymous worker pools.
@@ -93,9 +95,10 @@ Prosperity should be household-level, but not exact savings yet. Do not track mo
 
 Use an abstract prosperity or status concept when the model needs richer demand:
 
-- Stable families need basics.
-- Comfortable families begin wanting household goods.
-- Prosperous families begin wanting refined goods and home-improvement goods.
+- Struggling families have unmet basic needs or unstable shelter.
+- Stable families have basics met.
+- Comfortable families have basics met and household goods available.
+- Prosperous families later want refined goods and home-improvement goods.
 
 In this stage, prosperity changes the type of goods demanded, not exact quality. Quality, variety, brands, prestige, and cultural preference can come later.
 

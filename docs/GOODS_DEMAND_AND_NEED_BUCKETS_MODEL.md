@@ -347,7 +347,43 @@ Manual owner retest checklist:
 5. Confirm the building still produces and assignment remains valid.
 6. Confirm no output, cadence, labor, maintenance, or demand calculation changes occur.
 
-### 7. Clothing Demand v0
+### 7. Household Prosperity Status v0
+
+Inspected homes/families can show an abstract household prosperity status:
+
+- `struggling`
+- `stable`
+- `comfortable`
+- `prosperous`
+
+This is not money, exact savings, debt, credit, wealth, or prices. V0 is display-only and applies no bonuses, penalties, consumption, inventory, production changes, or lifecycle changes.
+
+Conservative v0 rules:
+
+- unsheltered households are `struggling`
+- temporarily sheltered households are `struggling`
+- households in a city food shortage are `struggling`
+- housed households with no food shortage are `stable`
+- housed households with no food shortage and met household-goods pressure are `comfortable`
+- `prosperous` is future-facing until quality, variety, luxury, or home-improvement systems exist
+
+The selected house popup can show:
+
+- `Prosperity: Struggling`
+- `Prosperity: Stable`
+- `Prosperity: Comfortable`
+
+This status summarizes current need conditions. It does not create a city-wide prosperity panel yet.
+
+Manual owner retest checklist:
+
+1. Select a housed household with no food shortage and confirm Prosperity shows Stable.
+2. Trigger or observe food shortage and confirm Prosperity shows Struggling.
+3. Inspect a temporary or unsheltered household state if practical and confirm Prosperity shows Struggling.
+4. Provide enough household goods to meet household goods pressure if practical and confirm Prosperity can show Comfortable.
+5. Confirm no resources are consumed and no production, lifecycle, demand, or assignment mechanics change.
+
+### 8. Clothing Demand v0
 
 Add slow periodic demand, not daily drain:
 
@@ -355,7 +391,7 @@ Add slow periodic demand, not daily drain:
 
 Start as pressure warnings before hard consumption penalties.
 
-### 8. Quality and Preference Modifiers
+### 9. Quality and Preference Modifiers
 
 Let exact goods matter after categories are stable:
 
@@ -364,7 +400,7 @@ Let exact goods matter after categories are stable:
 - clothing improves winter stability
 - family trade can create preference or production affinity
 
-### 9. Household/Home-Level Inventory
+### 10. Household/Home-Level Inventory
 
 Move some needs from city stockpile to households later:
 
