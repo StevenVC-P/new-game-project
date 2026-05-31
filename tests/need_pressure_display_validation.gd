@@ -175,20 +175,20 @@ func test_inactive_buckets_do_not_generate_hints() -> void:
 func test_food_need_hints_are_specific() -> void:
 	var low_city = _make_city_with_food_state(2, 3, false)
 	var low_hints: Array[String] = CityPressureHintHelperScript.get_hints({}, low_city.resources, low_city.get_need_pressure_summary())
-	_check(low_hints.has("Food demand rising: increase food production or trade for food."), "low food need should create a food demand hint")
+	_check(low_hints.has("Food low: add farms or import food."), "low food need should create a food demand hint")
 
 	var shortage_city = _make_city_with_food_state(0, 3, true)
 	var shortage_hints: Array[String] = CityPressureHintHelperScript.get_hints({}, shortage_city.resources, shortage_city.get_need_pressure_summary())
-	_check(shortage_hints.has("Food shortage: assign households to farms or import food."), "shortage food need should create a shortage hint")
+	_check(shortage_hints.has("Food shortage: assign farms or import food."), "shortage food need should create a shortage hint")
 
 func test_household_goods_need_hints_are_specific() -> void:
 	var unmet_city = _make_city_with_household_goods_state(3, 0)
 	var unmet_hints: Array[String] = CityPressureHintHelperScript.get_hints({}, unmet_city.resources, unmet_city.get_need_pressure_summary())
-	_check(unmet_hints.has("Household goods demand unmet: produce domestic goods."), "unmet household goods should create a domestic goods hint")
+	_check(unmet_hints.has("House goods unmet: make domestic goods."), "unmet household goods should create a domestic goods hint")
 
 	var low_city = _make_city_with_household_goods_state(3, 1)
 	var low_hints: Array[String] = CityPressureHintHelperScript.get_hints({}, low_city.resources, low_city.get_need_pressure_summary())
-	_check(low_hints.has("Household goods low: produce carved goods, tiles, or statues."), "low household goods should create a specific goods hint")
+	_check(low_hints.has("House goods low: make carved goods."), "low household goods should create a specific goods hint")
 
 func _assert_need_entry_shape(entry: Dictionary, key: String) -> void:
 	_check(entry.has("bucket"), key + " need entry should include bucket")
