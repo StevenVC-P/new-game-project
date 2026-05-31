@@ -264,7 +264,7 @@ Food consumption now keeps the existing population-based demand formula, but con
 - status
 - active/inactive state
 
-The City Overview sidebar displays a compact Need Pressure section. Food is the only active consuming bucket in this slice. Household goods pressure is active as display-only family/home pressure: housed households create demand, and current `household_goods` bucket stockpile counts toward availability. Tools, construction materials, maintenance materials, and civic goods show stockpile readiness as not active yet. This remains city-stockpile pressure, not household inventory.
+The City Overview sidebar displays a compact Need Pressure section. Food is the hard consuming bucket. Household goods and clothing are soft consuming buckets: they resolve against city stockpiles, report satisfaction ratios, and do not create penalties or prosperity changes in v0. Tools, construction materials, maintenance materials, and civic goods show stockpile readiness as not active yet. This remains city-stockpile pressure, not household inventory.
 
 Action hints can use food need pressure for concise guidance, such as increasing production or importing food when demand is low or in shortage.
 
@@ -279,9 +279,9 @@ Manual owner retest checklist:
 7. Confirm low or unmet household goods creates one concise domestic-goods hint.
 8. Confirm no duplicate or noisy inactive-bucket hints appear.
 
-### 4. Household Goods Pressure v0
+### 4. Household Goods Pressure and Consumption v0
 
-Household goods pressure is active as display-only pressure. It does not consume resources, apply penalties, or create household inventory.
+Household goods pressure is active as soft-need pressure. In Soft Need Consumption v0, it consumes recognized `household_goods` stockpile up to demand, records satisfaction, and still does not apply penalties, alter prosperity, or create household inventory.
 
 V0 demand is aggregated from families with stable homes:
 
@@ -295,12 +295,16 @@ Availability uses the `household_goods` need bucket through `GoodsNeedBucketHelp
 - `tiles`
 - `statues`
 
-Statuses are:
+Resolution fields include:
 
 - `none`: no housed-household demand
-- `met`: available household goods cover demand
-- `low`: some household goods exist, but less than demand
-- `unmet`: demand exists and no household goods are available
+- `unavailable`: no current goods can satisfy the bucket
+- `unmet`: demand exists and no household goods were supplied
+- `low`: some household goods were supplied, but less than demand
+- `met`: supplied household goods cover demand
+- `consumed_last_period`: amount consumed during the soft-need resolution pass
+- `satisfaction_ratio`: consumed divided by demand
+- `remaining`: bucket stockpile left after consumption
 
 Action hints appear only for `low` or `unmet` household goods pressure. This is quality-of-life pressure and readiness feedback, not a survival failure.
 
@@ -385,9 +389,9 @@ Manual owner retest checklist:
 4. Provide enough household goods to meet household goods pressure if practical and confirm Prosperity can show Comfortable.
 5. Confirm no resources are consumed and no production, lifecycle, demand, or assignment mechanics change.
 
-### 8. Clothing Pressure v0
+### 8. Clothing Pressure and Consumption v0
 
-Clothing pressure is active as display-only pressure. It does not consume resources, apply penalties, change prosperity, create household inventory, add winter effects, or add textile production.
+Clothing pressure is active as soft-need pressure. In Soft Need Consumption v0, it consumes recognized `clothing` stockpile up to demand, records satisfaction, and still does not apply penalties, change prosperity, create household inventory, add winter effects, or add textile production.
 
 V0 demand is aggregated from family population:
 
@@ -395,7 +399,7 @@ V0 demand is aggregated from family population:
 - housed, temporary, and unsheltered households all show clothing pressure because clothing is a personal/family need
 - this pressure remains soft and future-facing until textile production exists
 
-The `clothing` need bucket exists, and the final `clothing` good is scaffolded as a current stockpile key that can satisfy it. No production or consumption exists yet. Future textile inputs may include:
+The `clothing` need bucket exists, and the final `clothing` good is scaffolded as a current stockpile key that can satisfy it. No production exists yet. Future textile inputs may include:
 
 - `wool`
 
@@ -403,27 +407,27 @@ Wool does not satisfy the final clothing need in scaffold v0; it is an input to 
 
 Because `clothing` is a recognized bucket-satisfying good but starts at zero, the expected V0 city status is usually:
 
-- `unmet`: demand exists and no clothing stockpile is available
+- `unmet`: demand exists and no clothing stockpile was supplied
 
 Other status values remain available:
 
 - `none`: no clothing demand
-- `met`: available clothing goods cover demand
-- `low`: some clothing goods exist, but less than demand
+- `met`: supplied clothing covers demand
+- `low`: some clothing was supplied, but less than demand
 - `unavailable`: no current goods can supply the bucket
 
 The selected house Family Demand display can show:
 
 - `Clothing: N population pressure, not supplied yet`
 
-No action hint is added in this slice. The need is visible, but the player cannot solve it until textile production exists.
+No action hint is added in this slice. The need is visible and can be satisfied by stocked `clothing`, but the player cannot produce clothing until textile production exists.
 
 Manual owner retest checklist:
 
 1. Open City Overview and confirm Clothing appears in Need Pressure.
 2. Confirm Clothing reads as unmet/future-facing when clothing stockpile is zero.
 3. Select a house and confirm Family Demand includes a clothing line.
-4. Confirm no clothing resources are consumed.
+4. Confirm stocked clothing can be consumed up to demand without going negative.
 5. Confirm no penalties occur.
 6. Confirm household prosperity does not drop to Struggling solely because clothing is unmet.
 

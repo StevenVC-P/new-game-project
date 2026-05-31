@@ -21,7 +21,7 @@ func run_all() -> void:
 	test_clothing_pressure_unmet()
 	test_clothing_pressure_low()
 	test_clothing_pressure_met()
-	test_clothing_pressure_does_not_consume_resources()
+	test_clothing_pressure_read_does_not_consume_resources()
 	test_need_pressure_summary_shape()
 	test_inactive_buckets_do_not_generate_hints()
 	test_food_need_hints_are_specific()
@@ -133,7 +133,7 @@ func test_clothing_pressure_met() -> void:
 	_check(int(clothing_need["available"]) == 12, "met clothing should report available clothing")
 	_check(int(clothing_need["demand"]) == 12, "met clothing should report demand")
 
-func test_clothing_pressure_does_not_consume_resources() -> void:
+func test_clothing_pressure_read_does_not_consume_resources() -> void:
 	var city = _make_city_with_population(3, 4)
 	var food_before: int = int(city.resources["food"])
 	var household_goods_before: int = int(city.resources["carved_goods"])
@@ -142,7 +142,7 @@ func test_clothing_pressure_does_not_consume_resources() -> void:
 
 	_check(int(city.resources["food"]) == food_before, "clothing pressure should not consume food")
 	_check(int(city.resources["carved_goods"]) == household_goods_before, "clothing pressure should not consume household goods")
-	_check(int(city.resources["clothing"]) == clothing_before, "clothing pressure should not consume clothing in scaffold v0")
+	_check(int(city.resources["clothing"]) == clothing_before, "reading clothing pressure should not consume clothing")
 
 func test_need_pressure_summary_shape() -> void:
 	var city = _make_city_with_food_state(12, 3, false)
@@ -199,6 +199,9 @@ func _assert_need_entry_shape(entry: Dictionary, key: String) -> void:
 	_check(entry.has("available"), key + " need entry should include available")
 	_check(entry.has("shortage"), key + " need entry should include shortage")
 	_check(entry.has("active"), key + " need entry should include active")
+	_check(entry.has("remaining"), key + " need entry should include remaining")
+	_check(entry.has("consumed_last_period"), key + " need entry should include consumed_last_period")
+	_check(entry.has("satisfaction_ratio"), key + " need entry should include satisfaction_ratio")
 
 	if key == "household_goods":
 		_check(bool(entry["active"]) == true, "household_goods should be active display pressure in v0")
