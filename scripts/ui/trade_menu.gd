@@ -89,8 +89,10 @@ func handle_menu_click(mouse_pos: Vector2, cities: Array[City]) -> bool:
 
 	return false
 
-func handle_city_selection(city_index: int):
+func handle_city_selection(city_index: int, cities: Array[City] = []):
 	if city_index == -1:
+		return
+	if not is_valid_trade_city(cities, city_index):
 		return
 
 	if source_city_index == -1:
@@ -120,6 +122,10 @@ func try_confirm_route(cities: Array[City]):
 	if source_city_index >= cities.size() or destination_city_index >= cities.size():
 		return
 	if source_city_index == destination_city_index:
+		return
+	if not is_valid_trade_city(cities, source_city_index):
+		return
+	if not is_valid_trade_city(cities, destination_city_index):
 		return
 
 	pending_route_data = {
@@ -196,7 +202,20 @@ func get_trade_city_label(cities: Array[City], city_index: int) -> String:
 		return "click city"
 
 	var city: City = cities[city_index]
+	if not is_valid_trade_city(cities, city_index):
+		return city.name + " (neutral)"
 	return city.name
+
+func is_valid_trade_city(cities: Array[City], city_index: int) -> bool:
+	if city_index < 0:
+		return false
+	if cities.is_empty():
+		return true
+	if city_index >= cities.size():
+		return false
+
+	var city: City = cities[city_index]
+	return city.is_controllable_city()
 
 func resource_button_label(resource_name: String) -> String:
 	var label: String = resource_name

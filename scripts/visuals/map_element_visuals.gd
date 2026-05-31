@@ -24,17 +24,22 @@ static func draw_ford(canvas: CanvasItem, tile_rect: Rect2):
 	)
 	canvas.draw_rect(ford_rect, VisualStyle.COLOR_FORD)
 
-static func draw_city_marker(canvas: CanvasItem, center: Vector2, tile_size: int, is_hovered: bool = false, is_selected: bool = false):
+static func draw_city_marker(canvas: CanvasItem, center: Vector2, tile_size: int, is_hovered: bool = false, is_selected: bool = false, city_role: String = "player"):
 	var outer_radius: float = float(tile_size) * 0.85
 	var inner_radius: float = float(tile_size) * 0.40
+	var outer_color: Color = VisualStyle.COLOR_CITY_MARKER_OUTER
+	var inner_color: Color = VisualStyle.COLOR_CITY_MARKER_INNER
+	if city_role == "neutral":
+		outer_color = VisualStyle.COLOR_MUTED
+		inner_color = VisualStyle.COLOR_UI_PANEL_BORDER
 
 	if is_selected:
 		canvas.draw_circle(center, outer_radius + 3.0, VisualStyle.COLOR_SELECTION_OUTLINE)
 	elif is_hovered:
 		canvas.draw_circle(center, outer_radius + 2.0, VisualStyle.COLOR_HOVER_OUTLINE)
 
-	canvas.draw_circle(center, outer_radius, VisualStyle.COLOR_CITY_MARKER_OUTER)
-	canvas.draw_circle(center, inner_radius, VisualStyle.COLOR_CITY_MARKER_INNER)
+	canvas.draw_circle(center, outer_radius, outer_color)
+	canvas.draw_circle(center, inner_radius, inner_color)
 
 static func draw_tile_hover_outline(canvas: CanvasItem, tile_rect: Rect2):
 	canvas.draw_rect(tile_rect, VisualStyle.COLOR_HOVER_OUTLINE, false, VisualStyle.PANEL_BORDER_WIDTH)

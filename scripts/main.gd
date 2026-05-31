@@ -302,6 +302,10 @@ func try_open_city_at_position(mouse_pos: Vector2):
 	var city_index: int = get_city_index_at_position(mouse_pos)
 	if city_index == -1:
 		return
+	var city: City = cities[city_index]
+	if not city.is_controllable_city():
+		print(city.name, " is neutral and cannot be controlled yet.")
+		return
 
 	selected_city_index = city_index
 	current_view = VIEW_CITY
@@ -438,7 +442,7 @@ func try_handle_trade_city_click(mouse_pos: Vector2):
 		queue_redraw()
 		return
 
-	trade_menu.handle_city_selection(city_index)
+	trade_menu.handle_city_selection(city_index, cities)
 
 	queue_redraw()
 
@@ -611,11 +615,13 @@ func run_simulation_day():
 	world_calendar.advance_day()
 
 	for city: City in cities:
-		city.tick()
+		if city.should_tick_simulation():
+			city.tick()
 
 	apply_trade_routes()
 	for city: City in cities:
-		city.record_resource_history()
+		if city.should_tick_simulation():
+			city.record_resource_history()
 
 	if current_view == VIEW_CITY:
 		queue_redraw()
@@ -623,12 +629,14 @@ func run_simulation_day():
 func on_calendar_month_changed(_calendar: Calendar):
 	for city_index in range(cities.size()):
 		var city: City = cities[city_index]
-		city.advance_household_lifecycle_month(city_index)
+		if city.should_tick_simulation():
+			city.advance_household_lifecycle_month(city_index)
 
 func on_calendar_season_changed(calendar: Calendar):
 	for city_index in range(cities.size()):
 		var city: City = cities[city_index]
-		city.advance_household_birth_rolls_season(calendar, city_index)
+		if city.should_tick_simulation():
+			city.advance_household_birth_rolls_season(calendar, city_index)
 
 	print("Season changed: ", calendar.get_current_season(), " - Year ", calendar.current_year)
 
@@ -644,6 +652,8 @@ func apply_trade_routes():
 
 		var source_city: City = cities[source_index]
 		var destination_city: City = cities[destination_index]
+		if not source_city.is_controllable_city() or not destination_city.is_controllable_city():
+			continue
 		route.transfer_tick(source_city, destination_city)
 
 func get_preferred_worker_for_building(building_type: String) -> String:
@@ -766,7 +776,7 @@ func draw_cities():
 		var city: City = cities[city_index]
 		var tile_pos: Vector2 = city.tile
 		var center: Vector2 = tile_to_center(tile_pos)
-		MapElementVisuals.draw_city_marker(self, center, TILE_SIZE, city_index == hovered_city_index, city_index == selected_city_index)
+		MapElementVisuals.draw_city_marker(self, center, TILE_SIZE, city_index == hovered_city_index, city_index == selected_city_index, city.role)
 
 func draw_top_bar():
 	top_bar_action_options.clear()
@@ -1465,6 +1475,7 @@ func draw_region_hover_summary(font: Font, font_size: int, x: float, y: float, w
 		y = draw_region_label_value(font, font_size, "City", city_name, x, y, width, VisualStyle.COLOR_UI_TITLE)
 		var city: City = get_city_at_tile(hovered_tile.x, hovered_tile.y)
 		if city != null:
+			y = draw_region_label_value(font, font_size, "Role", get_city_role_display_name(city), x, y, width, VisualStyle.COLOR_UI_TEXT_NORMAL)
 			y = draw_region_label_value(font, font_size, "Site", city.site_profile.get_tag_text(), x, y, width, VisualStyle.COLOR_UI_TEXT_NORMAL)
 	y = draw_region_label_value(font, font_size, "Forest", yes_no(tile["has_forest"] == true), x, y, width, VisualStyle.COLOR_UI_TEXT_NORMAL)
 	y = draw_region_label_value(font, font_size, "Fertile", yes_no(tile["is_fertile"] == true), x, y, width, VisualStyle.COLOR_UI_TEXT_NORMAL)
@@ -1541,6 +1552,16 @@ func get_trade_city_label(city_index: int) -> String:
 
 	var city: City = cities[city_index]
 	return city.name
+
+func get_city_role_display_name(city: City) -> String:
+	if city == null:
+		return "unknown"
+	if city.is_neutral_city():
+		return "neutral town"
+	if city.is_debug_city():
+		return "debug city"
+
+	return "player town"
 
 func get_trade_route_summary(route: TradeRoute) -> String:
 	var source_label: String = get_trade_city_label(route.source_city_id)

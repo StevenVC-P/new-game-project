@@ -14,6 +14,7 @@ func run_all() -> void:
 	test_debug_city_helpers()
 	test_invalid_role_falls_back_to_player()
 	test_set_role_normalizes_values()
+	test_neutral_city_tick_guard_keeps_resources_stable()
 
 	if failure_count > 0:
 		push_error("City role model validation failed: " + str(failure_count) + " failure(s)")
@@ -74,6 +75,15 @@ func test_set_role_normalizes_values() -> void:
 	city.set_role("unknown")
 	_check(city.role == CityScript.ROLE_PLAYER, "set_role should normalize unknown values to player")
 	_check(city.is_player_city(), "set_role unknown fallback should be player")
+
+func test_neutral_city_tick_guard_keeps_resources_stable() -> void:
+	var city = CityScript.new("Neutral Town", Vector2.ZERO, CityScript.ROLE_NEUTRAL)
+	var starting_food: int = int(city.resources["food"])
+
+	if city.should_tick_simulation():
+		city.tick()
+
+	_check(int(city.resources["food"]) == starting_food, "neutral city should not tick through role-gated simulation paths")
 
 func _check(condition: bool, message: String) -> void:
 	if condition:
