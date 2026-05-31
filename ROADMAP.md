@@ -25,6 +25,7 @@ This roadmap is intentionally lightweight. Replace placeholders with scoped task
 - UI should make households, city population, food pressure, housing pressure, responsibility coverage, and basic production legible.
 - City Overview now includes pressure rows and Action Hints that translate current pressure states into concise next-step guidance.
 - F3/F4 debug panels provide household and pressure diagnostics, but player-facing guidance should continue moving into the City Overview.
+- Current sidebar and selected-panel UI is functional but temporary. It is acceptable for current testing, but should receive a broader layout overhaul after the first-playable loop, start flow, and core industry/resource systems stabilize.
 - TODO: Inventory remaining UI flows that are still debug-only or unclear to players.
 
 ## Enemies/NPCs

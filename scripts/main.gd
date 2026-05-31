@@ -890,11 +890,11 @@ func draw_city_sidebar(font: Font, font_size: int):
 
 	y = draw_sidebar_section_title(font, "Need Pressure", text_x, y)
 	y = draw_need_pressure_row(font, font_size, need_pressure_summary["food"] as Dictionary, text_x, y)
+	y = draw_need_pressure_row(font, font_size, need_pressure_summary["household_goods"] as Dictionary, text_x, y)
+	y = draw_need_pressure_row(font, font_size, need_pressure_summary["clothing"] as Dictionary, text_x, y)
 	y = draw_need_pressure_row(font, font_size, need_pressure_summary["tools"] as Dictionary, text_x, y)
 	y = draw_need_pressure_row(font, font_size, need_pressure_summary["construction_materials"] as Dictionary, text_x, y)
 	y = draw_need_pressure_row(font, font_size, need_pressure_summary["maintenance_materials"] as Dictionary, text_x, y)
-	y = draw_need_pressure_row(font, font_size, need_pressure_summary["household_goods"] as Dictionary, text_x, y)
-	y = draw_need_pressure_row(font, font_size, need_pressure_summary["clothing"] as Dictionary, text_x, y)
 	y = draw_need_pressure_row(font, font_size, need_pressure_summary["civic_goods"] as Dictionary, text_x, y)
 	y += 4.0
 
@@ -1044,20 +1044,33 @@ func draw_pressure_row(font: Font, font_size: int, label: String, pressure: Dict
 	return y
 
 func draw_need_pressure_row(font: Font, font_size: int, need_pressure: Dictionary, x: float, y: float) -> float:
-	var label: String = str(need_pressure.get("display_name", "Need"))
+	var label: String = get_need_pressure_display_label(need_pressure)
 	var status: String = str(need_pressure.get("status", "not_implemented"))
 	var severity: String = str(need_pressure.get("severity", "neutral"))
 	var available: int = int(need_pressure.get("available", 0))
 	var demand: int = int(need_pressure.get("demand", 0))
 	var active: bool = bool(need_pressure.get("active", false))
-	var value_text: String = str(available) + " available"
 
 	if active:
-		value_text = format_need_status_label(status) + " - " + str(available) + " available / " + str(demand) + " demand"
-	else:
-		value_text += ", not active"
+		y = draw_sidebar_line(font, font_size, label + ": " + format_need_status_label(status), x, y, get_pressure_color(severity))
+		return draw_sidebar_detail_line(font, font_size, str(available) + " available / " + str(demand) + " demand", x + 12.0, y - 1.0)
 
+	var value_text: String = str(available) + " available, not active"
 	return draw_sidebar_label_value(font, font_size, label, value_text, x, y, get_pressure_color(severity))
+
+func get_need_pressure_display_label(need_pressure: Dictionary) -> String:
+	var bucket: String = str(need_pressure.get("bucket", ""))
+	var active: bool = bool(need_pressure.get("active", false))
+	if active:
+		return str(need_pressure.get("display_name", "Need"))
+	if bucket == "construction_materials":
+		return "Construct."
+	if bucket == "maintenance_materials":
+		return "Maint."
+	if bucket == "civic_goods":
+		return "Civic"
+
+	return str(need_pressure.get("display_name", "Need"))
 
 func format_need_status_label(status: String) -> String:
 	var words: PackedStringArray = status.replace("_", " ").split(" ")

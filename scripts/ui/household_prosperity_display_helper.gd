@@ -53,13 +53,13 @@ static func _household_goods_pressure_is_met(city) -> bool:
 
 static func _get_status_detail(status: String) -> String:
 	if status == STATUS_STRUGGLING:
-		return "Basic needs under pressure"
+		return "Reason: Basic needs under pressure"
 	if status == STATUS_COMFORTABLE:
-		return "Basic needs met; household goods available"
+		return "Reason: Household goods available"
 	if status == STATUS_PROSPEROUS:
-		return "Prosperity: future quality and variety status"
+		return "Reason: Future quality/variety status"
 
-	return "Basic needs met"
+	return "Reason: Basic needs met"
 
 static func _format_status(status: String) -> String:
 	if status == "":

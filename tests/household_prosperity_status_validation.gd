@@ -50,7 +50,7 @@ func test_housed_basic_needs_met_is_stable() -> void:
 
 	_check(status == "stable", "housed household with no food shortage and no household goods should be stable")
 	_check(lines.has("Prosperity: Stable"), "stable prosperity line should be display-ready")
-	_check(lines.has("Basic needs met"), "stable prosperity should explain basic needs are met")
+	_check(lines.has("Reason: Basic needs met"), "stable prosperity should explain basic needs are met")
 
 func test_housed_household_goods_met_is_comfortable() -> void:
 	var city = _make_city(HouseholdScript.RESIDENCE_HOUSED, false, 3)
@@ -59,7 +59,7 @@ func test_housed_household_goods_met_is_comfortable() -> void:
 
 	_check(status == "comfortable", "housed household should be comfortable when household goods pressure is met")
 	_check(lines.has("Prosperity: Comfortable"), "comfortable prosperity line should be display-ready")
-	_check(lines.has("Basic needs met; household goods available"), "comfortable prosperity should explain household goods availability")
+	_check(lines.has("Reason: Household goods available"), "comfortable prosperity should explain household goods availability")
 
 func test_clothing_unmet_does_not_change_prosperity() -> void:
 	var city = _make_city(HouseholdScript.RESIDENCE_HOUSED, false, 0)
