@@ -2,6 +2,8 @@
 
 This document records the current code behavior for resources, households, labor, buildings, production, housing, food, maintenance, and trade. It separates observed implementation from design intent so future changes do not accidentally flatten the household-first simulation into generic worker-slot logic.
 
+For the next demand-design layer, see `docs/GOODS_DEMAND_AND_NEED_BUCKETS_MODEL.md`. That model describes category-based household need buckets so goods can satisfy demand by type, such as food, tools, household goods, clothing, construction materials, and maintenance materials.
+
 ## Observed Behavior
 
 The current model is centered on `City`, `Household`, `Building`, and `TradeRoute`.
@@ -55,6 +57,7 @@ The primary material resources are `food`, `wood`, and `tools`. Other keys are d
 - `carved_goods`
 - `tiles`
 - `paving_stones`
+- `clothing`
 
 Basic v1 building production now exists for these keys. Household demand, UI display, trade pricing, prosperity effects, and settlement access rules for these goods are not implemented yet.
 
@@ -170,7 +173,17 @@ Expanded-goods buildings cap or skip output when required inputs are unavailable
 
 ## Food, Housing, and Maintenance Pressure
 
-Food consumption is population based. `City.consume_food()` calculates consumption as `ceil(total_population / FOOD_PER_POPULATION_DIVISOR)` and stores it in `resources["food_consumption_rate"]`. If food is insufficient, food is reduced to zero and `resources["food_shortage"]` becomes `true`.
+Food consumption is population based. `City.consume_food()` calculates consumption as `ceil(total_population / FOOD_PER_POPULATION_DIVISOR)` and stores it in `resources["food_consumption_rate"]`. It now consumes from the `food` need bucket through `GoodsNeedBucketHelper` and `City.consume_need_bucket()`. With current resources, the `food` bucket contains only the abstract `food` key, so behavior remains equivalent. If food-category goods are insufficient, available food-category stock is consumed down to zero without going negative and `resources["food_shortage"]` becomes `true`.
+
+`City.get_need_pressure_summary()` exposes category need pressure for the City Overview. Food is the active hard consuming demand bucket and reports demand, available stock, shortage, and status. Household goods are active as soft family/home demand: each housed household creates one household goods demand, and supply comes from the `household_goods` bucket (`carved_goods`, `tiles`, and `statues`). Soft Need Consumption v0 consumes household goods up to demand, records `consumed_last_period` and `satisfaction_ratio`, and does not create penalties or household inventory yet. Tools, construction materials, maintenance materials, and civic goods report stockpile readiness as inactive pressure-only buckets until later branches add rules.
+
+The selected house popup can show a read-only Family Demand section for the resident household. It displays food as population pressure, household goods as either `contributes 1 home-life demand` for housed households or no full home-life demand for temporary/unsheltered households, and shelter as the current residence state. This explains the family contribution to aggregate pressure without adding household inventory, household goods consumption, penalties, or new formulas.
+
+Selected production-building information can show a display-only workplace stability warning when the assigned household is temporarily sheltered or unsheltered. The warning text is informational: temporary/unsheltered households still consume food, remain valid worker assignments, and do not receive production output, cadence, labor, maintenance, or demand penalties in this branch. A later branch may turn housing instability into slower cadence or reliability effects.
+
+The selected house popup can also show a read-only household prosperity status. Current statuses are `struggling`, `stable`, `comfortable`, and future-facing `prosperous`. V0 derives the status from visible need conditions only: unstable shelter or city food shortage is struggling, housed/no-shortage basics are stable, and housed/no-shortage with met household goods pressure is comfortable. This does not track money, savings, exact wealth, prices, credit, debt, household inventory, bonuses, or penalties.
+
+Clothing pressure is visible as a soft need bucket and selected-family demand line. `City.get_clothing_need_pressure()` derives demand from total household population. The final `clothing` good is scaffolded as a current stockpile key and maps to the `clothing` bucket, so clothing pressure can report `unmet` when demand exists and stockpile is zero. Soft Need Consumption v0 consumes stocked `clothing` up to demand and records satisfaction, but still does not affect prosperity, create penalties, add textile production, or change seasonal behavior. `wool` is intentionally not mapped as a satisfying good because it is a future textile input. The selected house popup can show `Clothing: N population pressure, not supplied yet`.
 
 Population can grow from the external population pool after sustained food surplus, available housing capacity, and no shortage. Growth either adds one person to an existing eligible household or creates a new neutral household. Existing external population growth represents adult arrival for compatibility and may update `working_adults`; future household births should add dependent young children without increasing `working_adults`.
 
@@ -222,6 +235,27 @@ The intended first playable loop is survival and growth:
 
 Future design ideas such as seasons, values, prosperity, health, traits, household maturity, dependents, fertility, and richer assignment fit should be treated as future systems unless current code implements them.
 
+## Demand Architecture Direction
+
+Future demand should be family-driven rather than invented by the city directly. The city should aggregate pressure from families, homes, workplaces, and later civic buildings.
+
+Families create demand through:
+
+- food needs from population and dependents
+- shelter pressure from housing state
+- home-life needs such as household goods, clothing, and future home improvements
+- lifecycle stage, prosperity/status, and family continuity
+
+Families consume food even when unsheltered. Unsheltered families should create strong shelter pressure, little or no soft home-life demand, and weaker workplace operation.
+
+Workplaces are family-operated. The current model allows one household/family to operate a production building. That should remain the baseline. Later, prosperous or higher-status families may operate additional workplaces, but that is future scope and should require player-facing explanation.
+
+The workplace should define production inputs, tools, maintenance, and upkeep requirements. The family should provide labor/operation, fit, lineage, ownership context, and eventually prosperity. Workplace shortages should usually affect production, while home-life shortages should usually begin as quality-of-life pressure unless they are hard survival needs like food or shelter.
+
+Prosperity should remain abstract at this stage. Do not track exact money, household savings, prices, debt, credit, or currency yet. A future household prosperity/status model can make stable families demand basics, comfortable families demand household goods, and prosperous families demand refined or home-improvement goods.
+
+Goods should satisfy demand by category first. Exact goods are category members, not separate household recipes yet. This allows different cities to satisfy the same need through local goods, such as generic food, wheat, bread, or fish for food demand. Variety, quality, cultural preference, and exact-good bonuses are later systems.
+
 ## Open Questions
 
 - Should larger households keep labor capacity `2`, or should the design enforce one primary responsibility per household more strictly?
@@ -231,3 +265,6 @@ Future design ideas such as seasons, values, prosperity, health, traits, househo
 - Should future trade include household-level or market-level behavior, or remain city-to-city for the first playable loop?
 - How should seasonal effects influence production, food pressure, and labor availability?
 - Should maintenance remain tools-only, or eventually involve labor, skill, building quality, or prosperity?
+- How should family prosperity/status be represented without exact savings or money?
+- What is the cleanest first consequence for unsheltered families operating workplaces weakly?
+- Which soft home-life demand should become active first once food and shelter are stable?

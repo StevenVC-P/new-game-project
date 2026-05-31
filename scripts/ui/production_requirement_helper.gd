@@ -1,5 +1,7 @@
 class_name ProductionRequirementHelper
 
+const WorkplaceStabilityDisplayHelperScript = preload("res://scripts/ui/workplace_stability_display_helper.gd")
+
 static func get_requirement_lines(city, building) -> Array[String]:
 	var lines: Array[String] = []
 
@@ -12,6 +14,9 @@ static func get_requirement_lines(city, building) -> Array[String]:
 		lines.append("Assigned labor: satisfied")
 	else:
 		lines.append("Assigned labor: missing")
+
+	for warning_line: String in WorkplaceStabilityDisplayHelperScript.get_warning_lines(city, building):
+		lines.append(warning_line)
 
 	# Maintenance level
 	var maintenance_level = building.maintenance_level

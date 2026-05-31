@@ -1,6 +1,9 @@
 class_name CityBuildingOverlay
 extends RefCounted
 
+const HouseholdDemandDisplayHelperScript = preload("res://scripts/ui/household_demand_display_helper.gd")
+const HouseholdProsperityDisplayHelperScript = preload("res://scripts/ui/household_prosperity_display_helper.gd")
+
 const BUILDING_HOUSE: String = "house"
 const BUILDING_FARM: String = "farm"
 const BUILDING_WOODCUTTER: String = "woodcutter"
@@ -148,6 +151,12 @@ func draw(canvas: CanvasItem, font: Font, font_size: int, city: City):
 		y = draw_overlay_section_title(canvas, font, font_size, "Household Lifecycle", text_x, y, overlay_size.x)
 		for lifecycle_text: String in get_house_lifecycle_lines(city, inspected_building_index):
 			y = draw_overlay_line(canvas, font, font_size, lifecycle_text, text_x, y, overlay_size.x)
+		y = draw_overlay_section_title(canvas, font, font_size, "Family Demand", text_x, y, overlay_size.x)
+		for demand_text: String in get_house_demand_lines(city, inspected_building_index):
+			y = draw_overlay_line(canvas, font, font_size, demand_text, text_x, y, overlay_size.x)
+		y = draw_overlay_section_title(canvas, font, font_size, "Household Status", text_x, y, overlay_size.x)
+		for prosperity_text: String in get_house_prosperity_lines(city, inspected_building_index):
+			y = draw_overlay_line(canvas, font, font_size, prosperity_text, text_x, y, overlay_size.x)
 		return
 
 	y = draw_overlay_line(canvas, font, font_size, "Maintenance: " + str(building.maintenance_level) + "%", text_x, y, overlay_size.x)
@@ -181,7 +190,7 @@ func get_building_overlay_size(city: City, building: Building) -> Vector2:
 	var option_count: int = 0
 
 	if building.is_house():
-		line_count = 5 + get_house_lifecycle_lines(city, building.id).size()
+		line_count = 7 + get_house_lifecycle_lines(city, building.id).size() + get_house_demand_lines(city, building.id).size() + get_house_prosperity_lines(city, building.id).size()
 	else:
 		line_count = 6 + ProductionRequirementHelper.get_requirement_lines(city, building).size()
 		if building.assigned_workers <= 0 and get_work_succession_hint(city, building) != "":
@@ -348,6 +357,20 @@ func get_house_lifecycle_lines(city: City, house_index: int) -> Array[String]:
 		return ["No resident household."]
 
 	return HouseholdLifecycleDisplayHelper.get_lifecycle_lines(household, city)
+
+func get_house_demand_lines(city: City, house_index: int) -> Array[String]:
+	var household: Household = city.get_household_for_building_id(house_index)
+	if household == null:
+		return ["No resident household demand."]
+
+	return HouseholdDemandDisplayHelperScript.get_demand_lines(city, household)
+
+func get_house_prosperity_lines(city: City, house_index: int) -> Array[String]:
+	var household: Household = city.get_household_for_building_id(house_index)
+	if household == null:
+		return ["Prosperity: no resident household"]
+
+	return HouseholdProsperityDisplayHelperScript.get_prosperity_lines(city, household)
 
 func get_building_worker_text(city: City, building_index: int) -> String:
 	var buildings: Array = city.buildings

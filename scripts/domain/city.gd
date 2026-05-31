@@ -1,6 +1,7 @@
 class_name City
 extends RefCounted
 
+const GoodsNeedBucketHelperScript = preload("res://scripts/domain/goods_need_bucket_helper.gd")
 const BUILDING_HOUSE: String = "house"
 const BUILDING_FARM: String = "farm"
 const BUILDING_WOODCUTTER: String = "woodcutter"
@@ -49,6 +50,7 @@ var buildings: Array[Building] = []
 var households: Array[Household] = []
 var resources: Dictionary = {}
 var resource_history: Array = []
+var soft_need_results: Dictionary = {}
 var site_profile: SettlementSiteProfile = SettlementSiteProfile.new()
 
 func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO):
@@ -75,6 +77,7 @@ func make_starting_resources() -> Dictionary:
 		"carved_goods": 0,
 		"tiles": 0,
 		"paving_stones": 0,
+		"clothing": 0,
 		"house_shelter_capacity": 0,
 		"temporary_shelter_capacity": STARTING_POPULATION,
 		"housing_capacity": STARTING_POPULATION,
@@ -625,6 +628,7 @@ func tick():
 		if building.can_produce():
 			apply_building_production(building)
 
+	resolve_soft_needs()
 	update_population_from_external_pool()
 
 func update_worker_counts():
@@ -850,17 +854,96 @@ func toggle_building_maintenance(building_index: int):
 	var building: Building = buildings[building_index]
 	building.toggle_maintenance()
 
+func get_available_need_bucket_amount(bucket_id: String) -> int:
+	var available_amount: int = 0
+	for good_id in GoodsNeedBucketHelperScript.get_current_goods_for_need_bucket(bucket_id):
+		if resources.has(good_id):
+			available_amount += max(0, int(resources[good_id]))
+
+	return available_amount
+
+func consume_need_bucket(bucket_id: String, amount: int) -> int:
+	if amount <= 0:
+		return 0
+
+	var remaining_amount: int = amount
+	var consumed_amount: int = 0
+	for good_id in GoodsNeedBucketHelperScript.get_current_goods_for_need_bucket(bucket_id):
+		if remaining_amount <= 0:
+			break
+		if not resources.has(good_id):
+			continue
+
+		var available_good_amount: int = max(0, int(resources[good_id]))
+		if available_good_amount <= 0:
+			continue
+
+		var consumed_good_amount: int = min(remaining_amount, available_good_amount)
+		resources[good_id] = available_good_amount - consumed_good_amount
+		remaining_amount -= consumed_good_amount
+		consumed_amount += consumed_good_amount
+
+	return consumed_amount
+
+func resolve_soft_needs() -> Dictionary:
+	var results: Dictionary = {}
+	results[GoodsNeedBucketHelperScript.BUCKET_HOUSEHOLD_GOODS] = resolve_soft_need_bucket(
+		GoodsNeedBucketHelperScript.BUCKET_HOUSEHOLD_GOODS,
+		get_household_goods_need_demand()
+	)
+	results[GoodsNeedBucketHelperScript.BUCKET_CLOTHING] = resolve_soft_need_bucket(
+		GoodsNeedBucketHelperScript.BUCKET_CLOTHING,
+		get_clothing_need_demand()
+	)
+	soft_need_results = results
+	return results
+
+func resolve_soft_need_bucket(bucket_id: String, demand: int) -> Dictionary:
+	var safe_demand: int = max(0, demand)
+	var available_before: int = get_available_need_bucket_amount(bucket_id)
+	var current_goods: Array[String] = GoodsNeedBucketHelperScript.get_current_goods_for_need_bucket(bucket_id)
+
+	if safe_demand <= 0:
+		return make_soft_need_result(bucket_id, "none", "neutral", safe_demand, available_before, available_before, 0)
+	if current_goods.is_empty():
+		return make_soft_need_result(bucket_id, "unavailable", "neutral", safe_demand, available_before, available_before, 0)
+
+	var consumed_amount: int = consume_need_bucket(bucket_id, safe_demand)
+	var remaining_amount: int = get_available_need_bucket_amount(bucket_id)
+	var status: String = "unmet"
+	var severity: String = "warning"
+	if consumed_amount >= safe_demand:
+		status = "met"
+		severity = "positive"
+	elif consumed_amount > 0:
+		status = "low"
+
+	return make_soft_need_result(bucket_id, status, severity, safe_demand, available_before, remaining_amount, consumed_amount)
+
+func make_soft_need_result(bucket_id: String, status: String, severity: String, demand: int, available: int, remaining: int, consumed: int) -> Dictionary:
+	var shortage_amount: int = max(0, demand - consumed)
+	var result: Dictionary = make_need_pressure(bucket_id, status, severity, demand, available, shortage_amount, true)
+	result["remaining"] = max(0, remaining)
+	result["consumed_last_period"] = max(0, consumed)
+	result["satisfaction_ratio"] = get_satisfaction_ratio(consumed, demand)
+	return result
+
+func get_satisfaction_ratio(consumed: int, demand: int) -> float:
+	if demand <= 0:
+		return 0.0
+
+	return clamp(float(max(0, consumed)) / float(demand), 0.0, 1.0)
+
 func consume_food():
 	update_shelter_counts()
 	var population: int = get_total_population()
 	var consumption_rate: int = int(ceil(float(population) / float(FOOD_PER_POPULATION_DIVISOR)))
 	resources["food_consumption_rate"] = consumption_rate
 
-	if int(resources["food"]) >= consumption_rate:
-		resources["food"] = int(resources["food"]) - consumption_rate
+	var consumed_food: int = consume_need_bucket(GoodsNeedBucketHelperScript.BUCKET_FOOD, consumption_rate)
+	if consumed_food >= consumption_rate:
 		resources["food_shortage"] = false
 	else:
-		resources["food"] = 0
 		resources["food_shortage"] = true
 
 func should_skip_for_food_shortage() -> bool:
@@ -1300,6 +1383,114 @@ func get_pressure_summary() -> Dictionary:
 		"labor": get_labor_pressure(),
 		"tools": get_tool_pressure(float(trends["tools"])),
 		"maintenance": get_maintenance_pressure()
+	}
+
+func get_need_pressure_summary() -> Dictionary:
+	return {
+		GoodsNeedBucketHelperScript.BUCKET_FOOD: get_food_need_pressure(),
+		GoodsNeedBucketHelperScript.BUCKET_TOOLS: get_inactive_need_pressure(GoodsNeedBucketHelperScript.BUCKET_TOOLS),
+		GoodsNeedBucketHelperScript.BUCKET_CONSTRUCTION_MATERIALS: get_inactive_need_pressure(GoodsNeedBucketHelperScript.BUCKET_CONSTRUCTION_MATERIALS),
+		GoodsNeedBucketHelperScript.BUCKET_MAINTENANCE_MATERIALS: get_inactive_need_pressure(GoodsNeedBucketHelperScript.BUCKET_MAINTENANCE_MATERIALS),
+		GoodsNeedBucketHelperScript.BUCKET_HOUSEHOLD_GOODS: get_household_goods_need_pressure(),
+		GoodsNeedBucketHelperScript.BUCKET_CLOTHING: get_clothing_need_pressure(),
+		GoodsNeedBucketHelperScript.BUCKET_CIVIC_GOODS: get_inactive_need_pressure(GoodsNeedBucketHelperScript.BUCKET_CIVIC_GOODS),
+	}
+
+func get_food_need_pressure() -> Dictionary:
+	var demand: int = max(0, int(resources["food_consumption_rate"]))
+	var available: int = get_available_need_bucket_amount(GoodsNeedBucketHelperScript.BUCKET_FOOD)
+	var shortage_amount: int = 0
+	var status: String = "met"
+	var severity: String = "positive"
+
+	if resources["food_shortage"] == true:
+		shortage_amount = demand
+		status = "shortage"
+		severity = "danger"
+	elif demand > 0 and available < demand:
+		status = "low"
+		severity = "warning"
+
+	return make_need_pressure(GoodsNeedBucketHelperScript.BUCKET_FOOD, status, severity, demand, available, shortage_amount, true)
+
+func get_household_goods_need_pressure() -> Dictionary:
+	if soft_need_results.has(GoodsNeedBucketHelperScript.BUCKET_HOUSEHOLD_GOODS):
+		return (soft_need_results[GoodsNeedBucketHelperScript.BUCKET_HOUSEHOLD_GOODS] as Dictionary).duplicate()
+
+	var demand: int = get_household_goods_need_demand()
+	var available: int = get_available_need_bucket_amount(GoodsNeedBucketHelperScript.BUCKET_HOUSEHOLD_GOODS)
+	var shortage_amount: int = max(0, demand - available)
+	var status: String = "none"
+	var severity: String = "neutral"
+
+	if demand > 0 and available >= demand:
+		status = "met"
+		severity = "positive"
+	elif demand > 0 and available > 0:
+		status = "low"
+		severity = "warning"
+	elif demand > 0:
+		status = "unmet"
+		severity = "warning"
+
+	return make_need_pressure(GoodsNeedBucketHelperScript.BUCKET_HOUSEHOLD_GOODS, status, severity, demand, available, shortage_amount, true)
+
+func get_household_goods_need_demand() -> int:
+	var demand: int = 0
+	for household: Household in households:
+		if household.housing_status == Household.RESIDENCE_HOUSED:
+			demand += 1
+
+	return demand
+
+func get_clothing_need_pressure() -> Dictionary:
+	if soft_need_results.has(GoodsNeedBucketHelperScript.BUCKET_CLOTHING):
+		return (soft_need_results[GoodsNeedBucketHelperScript.BUCKET_CLOTHING] as Dictionary).duplicate()
+
+	var demand: int = get_clothing_need_demand()
+	var available: int = get_available_need_bucket_amount(GoodsNeedBucketHelperScript.BUCKET_CLOTHING)
+	var shortage_amount: int = max(0, demand - available)
+	var status: String = "none"
+	var severity: String = "neutral"
+	var current_clothing_goods: Array[String] = GoodsNeedBucketHelperScript.get_current_goods_for_need_bucket(GoodsNeedBucketHelperScript.BUCKET_CLOTHING)
+
+	if demand > 0 and current_clothing_goods.is_empty():
+		status = "unavailable"
+	elif demand > 0 and available >= demand:
+		status = "met"
+		severity = "positive"
+	elif demand > 0 and available > 0:
+		status = "low"
+		severity = "warning"
+	elif demand > 0:
+		status = "unmet"
+		severity = "warning"
+
+	return make_need_pressure(GoodsNeedBucketHelperScript.BUCKET_CLOTHING, status, severity, demand, available, shortage_amount, true)
+
+func get_clothing_need_demand() -> int:
+	var demand: int = 0
+	for household: Household in households:
+		demand += max(0, household.total_population)
+
+	return demand
+
+func get_inactive_need_pressure(bucket_id: String) -> Dictionary:
+	return make_need_pressure(bucket_id, "pressure_only", "neutral", 0, get_available_need_bucket_amount(bucket_id), 0, false)
+
+func make_need_pressure(bucket_id: String, status: String, severity: String, demand: int, available: int, shortage: int, active: bool) -> Dictionary:
+	return {
+		"bucket": bucket_id,
+		"display_name": GoodsNeedBucketHelperScript.get_bucket_display_name(bucket_id),
+		"status": status,
+		"severity": severity,
+		"demand": demand,
+		"available": available,
+		"remaining": available,
+		"shortage": shortage,
+		"active": active,
+		"consumed_last_period": 0,
+		"satisfaction_ratio": 0.0,
 	}
 
 func make_pressure(status: String, severity: String, detail: String = "", values: Dictionary = {}) -> Dictionary:
