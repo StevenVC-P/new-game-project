@@ -52,6 +52,7 @@ var build_menu_options: Array[Dictionary] = []
 var hovered_tile: Vector2i = Vector2i(-1, -1)
 var hovered_city_index: int = -1
 var city_hovered_tile: Vector2i = Vector2i(-1, -1)
+var pending_founding_tile: Vector2i = Vector2i(-1, -1)
 var current_view: String = VIEW_REGION
 var selected_city_index: int = -1
 var household_debug_inspector: Control = null
@@ -154,6 +155,7 @@ func _input(event: InputEvent):
 
 		if current_view == VIEW_REGION and mouse_event.button_index == MOUSE_BUTTON_RIGHT:
 			trade_menu.close()
+			clear_pending_founding_tile()
 			queue_redraw()
 			return
 		if current_view == VIEW_CITY and mouse_event.button_index == MOUSE_BUTTON_RIGHT:
@@ -176,7 +178,8 @@ func _input(event: InputEvent):
 			elif trade_menu.is_open():
 				try_handle_trade_city_click(local_mouse_pos)
 			else:
-				try_open_city_at_position(local_mouse_pos)
+				if not try_open_city_at_position(local_mouse_pos):
+					try_select_founding_tile_at_position(local_mouse_pos)
 		elif current_view == VIEW_CITY:
 			if try_handle_build_menu_click(local_mouse_pos):
 				queue_redraw()
@@ -298,20 +301,53 @@ func generate_city_local_maps():
 func is_inside_map(x: int, y: int) -> bool:
 	return x >= 0 and x < MAP_WIDTH and y >= 0 and y < MAP_HEIGHT
 
-func try_open_city_at_position(mouse_pos: Vector2):
+func try_open_city_at_position(mouse_pos: Vector2) -> bool:
 	var city_index: int = get_city_index_at_position(mouse_pos)
 	if city_index == -1:
-		return
+		return false
 	var city: City = cities[city_index]
 	if not city.is_controllable_city():
 		print(city.name, " is neutral and cannot be controlled yet.")
-		return
+		return true
 
 	selected_city_index = city_index
 	current_view = VIEW_CITY
 	hovered_tile = Vector2i(-1, -1)
 	hovered_city_index = -1
 	queue_redraw()
+	return true
+
+func try_select_founding_tile_at_position(mouse_pos: Vector2) -> bool:
+	var tile_pos: Vector2i = get_region_tile_at_position(mouse_pos)
+	if not is_inside_map(tile_pos.x, tile_pos.y):
+		return false
+	if set_pending_founding_tile(tile_pos):
+		print("Pending founding site: ", tile_pos)
+	else:
+		print(get_founding_tile_invalid_reason(tile_pos))
+	queue_redraw()
+	return true
+
+func get_region_tile_at_position(mouse_pos: Vector2) -> Vector2i:
+	return Vector2i(int(floor(mouse_pos.x / TILE_SIZE)), int(floor(mouse_pos.y / TILE_SIZE)))
+
+func is_valid_founding_tile(tile_pos: Vector2i) -> bool:
+	return FoundingSiteHelper.is_valid_founding_tile(tiles, cities, tile_pos, MIN_CITY_DISTANCE)
+
+func get_founding_tile_invalid_reason(tile_pos: Vector2i) -> String:
+	return FoundingSiteHelper.get_founding_tile_invalid_reason(tiles, cities, tile_pos, MIN_CITY_DISTANCE)
+
+func set_pending_founding_tile(tile_pos: Vector2i) -> bool:
+	if not is_valid_founding_tile(tile_pos):
+		return false
+	pending_founding_tile = tile_pos
+	return true
+
+func clear_pending_founding_tile() -> void:
+	pending_founding_tile = Vector2i(-1, -1)
+
+func has_pending_founding_tile() -> bool:
+	return is_inside_map(pending_founding_tile.x, pending_founding_tile.y)
 
 func get_city_index_at_position(mouse_pos: Vector2) -> int:
 	for city_index in range(cities.size()):
@@ -717,6 +753,7 @@ func _draw():
 	draw_trade_routes()
 	draw_fords()
 	draw_cities()
+	draw_pending_founding_site()
 	draw_hover()
 	draw_inspector_panel()
 	draw_trade_menu_popup()
@@ -777,6 +814,14 @@ func draw_cities():
 		var tile_pos: Vector2 = city.tile
 		var center: Vector2 = tile_to_center(tile_pos)
 		MapElementVisuals.draw_city_marker(self, center, TILE_SIZE, city_index == hovered_city_index, city_index == selected_city_index, city.role)
+
+func draw_pending_founding_site():
+	if not has_pending_founding_tile():
+		return
+
+	var marker_pos: Vector2 = Vector2(pending_founding_tile.x * TILE_SIZE, pending_founding_tile.y * TILE_SIZE)
+	var marker_rect: Rect2 = Rect2(marker_pos, Vector2(TILE_SIZE, TILE_SIZE))
+	MapElementVisuals.draw_founding_site_marker(self, marker_rect)
 
 func draw_top_bar():
 	top_bar_action_options.clear()
@@ -1431,6 +1476,8 @@ func draw_inspector_panel():
 		y = draw_region_hover_summary(font, font_size, text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2)
 	else:
 		y = draw_sidebar_like_line(font, font_size, "Hover a tile to inspect.", text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_MUTED)
+	if has_pending_founding_tile():
+		y = draw_region_label_value(font, font_size, "Pending", str(pending_founding_tile.x) + ", " + str(pending_founding_tile.y), text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_UI_TITLE)
 
 	y += 12.0
 	y = draw_region_section_title(font, "Trade / Routes", text_pos.x, y)
@@ -1481,6 +1528,13 @@ func draw_region_hover_summary(font: Font, font_size: int, x: float, y: float, w
 	y = draw_region_label_value(font, font_size, "Fertile", yes_no(tile["is_fertile"] == true), x, y, width, VisualStyle.COLOR_UI_TEXT_NORMAL)
 	if resource != "none":
 		y = draw_region_label_value(font, font_size, "Resource", resource, x, y, width, VisualStyle.COLOR_RESOURCE_TOOLS)
+	var founding_status: String = get_founding_tile_invalid_reason(hovered_tile)
+	var founding_color: Color = VisualStyle.COLOR_UI_TEXT_NORMAL
+	if founding_status == FoundingSiteHelper.VALID_FOUNDING_SITE:
+		founding_color = VisualStyle.COLOR_POSITIVE
+	else:
+		founding_color = VisualStyle.COLOR_WARNING
+	y = draw_region_label_value(font, font_size, "Founding", founding_status, x, y, width, founding_color)
 
 	return y
 
@@ -1647,6 +1701,7 @@ func get_hover_info_lines() -> Array[String]:
 	lines.append("Stone: " + yes_no(resource == "stone"))
 	lines.append("Iron: " + yes_no(resource == "iron"))
 	lines.append("City: " + city_name)
+	lines.append("Founding: " + get_founding_tile_invalid_reason(hovered_tile))
 
 	return lines
 
