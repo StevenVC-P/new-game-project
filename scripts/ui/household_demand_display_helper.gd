@@ -15,16 +15,16 @@ static func get_demand_lines(city, household) -> Array[String]:
 
 	lines.append("Food: " + str(total_population) + " population")
 	lines.append(_get_household_goods_text(housing_status))
-	lines.append("Clothing: " + str(total_population) + " population pressure, not supplied yet")
+	lines.append("Clothing: " + str(total_population) + " population")
 	lines.append("Shelter: " + _get_shelter_text(housing_status))
 
 	return lines
 
 static func _get_household_goods_text(housing_status: String) -> String:
 	if housing_status == RESIDENCE_HOUSED:
-		return "Household goods: contributes 1 home-life demand"
+		return "House Goods: +1 home demand"
 
-	return "Household goods: no full home-life demand while " + _get_shelter_text(housing_status)
+	return "House Goods: no full home demand"
 
 static func _get_shelter_text(housing_status: String) -> String:
 	if housing_status == RESIDENCE_HOUSED:

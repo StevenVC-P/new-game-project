@@ -26,8 +26,8 @@ func test_housed_family_demand_lines() -> void:
 	var lines: Array[String] = HouseholdDemandDisplayHelperScript.get_demand_lines(null, household)
 
 	_check(lines.has("Food: 5 population"), "housed household should show population food pressure")
-	_check(lines.has("Household goods: contributes 1 home-life demand"), "housed household should contribute household goods demand")
-	_check(lines.has("Clothing: 5 population pressure, not supplied yet"), "housed household should show future-facing clothing pressure")
+	_check(lines.has("House Goods: +1 home demand"), "housed household should contribute household goods demand")
+	_check(lines.has("Clothing: 5 population"), "housed household should show clothing pressure")
 	_check(lines.has("Shelter: housed"), "housed household should show housed shelter status")
 
 func test_unsheltered_family_demand_lines() -> void:
@@ -35,8 +35,8 @@ func test_unsheltered_family_demand_lines() -> void:
 	var lines: Array[String] = HouseholdDemandDisplayHelperScript.get_demand_lines(null, household)
 
 	_check(lines.has("Food: 4 population"), "unsheltered household should still show food pressure")
-	_check(lines.has("Household goods: no full home-life demand while unsheltered"), "unsheltered household should not show full household goods demand")
-	_check(lines.has("Clothing: 4 population pressure, not supplied yet"), "unsheltered household should show clothing pressure without penalty")
+	_check(lines.has("House Goods: no full home demand"), "unsheltered household should not show full household goods demand")
+	_check(lines.has("Clothing: 4 population"), "unsheltered household should show clothing pressure without penalty")
 	_check(lines.has("Shelter: unsheltered"), "unsheltered household should show shelter status")
 
 func test_temporary_family_demand_lines() -> void:
@@ -44,8 +44,8 @@ func test_temporary_family_demand_lines() -> void:
 	var lines: Array[String] = HouseholdDemandDisplayHelperScript.get_demand_lines(null, household)
 
 	_check(lines.has("Food: 3 population"), "temporary household should show population food pressure")
-	_check(lines.has("Household goods: no full home-life demand while temporary shelter"), "temporary household should not show full household goods demand")
-	_check(lines.has("Clothing: 3 population pressure, not supplied yet"), "temporary household should show clothing pressure without penalty")
+	_check(lines.has("House Goods: no full home demand"), "temporary household should not show full household goods demand")
+	_check(lines.has("Clothing: 3 population"), "temporary household should show clothing pressure without penalty")
 	_check(lines.has("Shelter: temporary shelter"), "temporary household should show temporary shelter status")
 
 func _check(condition: bool, message: String) -> void:
