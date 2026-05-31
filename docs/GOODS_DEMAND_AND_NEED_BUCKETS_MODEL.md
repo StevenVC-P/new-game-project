@@ -51,7 +51,7 @@ Current production creates:
 - Tileworks: `tiles`, from `bricks` and `wood`
 - Paver yards: `paving_stones`, from `stone_blocks`
 
-Design examples such as `wheat`, `bread`, `fish`, `planks`, `clay`, `pottery`, `wool`, and `wooden_tools` are useful future goods, but they are not current resource keys unless a later branch adds them. `clothing` is currently scaffolded as a final soft-need good with a default stockpile key, but no production chain or consumption.
+Design examples such as `wheat`, `bread`, `fish`, `planks`, `clay`, `pottery`, `wool`, and `wooden_tools` are useful future goods, but they are not current resource keys unless a later branch adds them. `clothing` is currently scaffolded as a final soft-need good with a default stockpile key. It can be consumed by Soft Need Consumption v0, but it has no production chain yet.
 
 ## Need Buckets
 
@@ -91,7 +91,7 @@ Current goods should map into buckets like this:
 | `paving_stones` | `construction_materials`, `civic_goods` | Civic infrastructure later. |
 | `carved_goods` | `household_goods`, `civic_goods` | Domestic goods or prestige goods. |
 | `statues` | `civic_goods`, `household_goods` | Mostly prestige/civic demand later. |
-| `clothing` | `clothing` | Final clothing good scaffold; no production or consumption yet. |
+| `clothing` | `clothing` | Final clothing good scaffold; can be consumed by soft-need resolution but has no production yet. |
 
 Future goods can map like this:
 
@@ -104,7 +104,7 @@ Future goods can map like this:
 | `clay` | `construction_materials` | Raw craft/construction input. |
 | `pottery` | `household_goods` | Domestic goods and storage quality. |
 | `wool` | future textile input | Raw textile input; does not satisfy final clothing need in scaffold v0. |
-| `clothing` | `clothing` | Finished clothing scaffold; no production or consumption yet. |
+| `clothing` | `clothing` | Finished clothing scaffold; consumable as a soft need once stocked, with production still deferred. |
 | `wooden_tools` | `tools` | Low-tier tool good. |
 
 Goods can satisfy more than one bucket, but a consumption pass should consume a unit for only one bucket at a time. Later quality scoring can decide whether using `tiles` for household goods is better or worse than preserving them for roof maintenance.
@@ -138,7 +138,7 @@ Recommended demand semantics:
 
 - Food demand scales primarily from `total_population`.
 - Shelter demand is mostly capacity/status based, not stockpile consumption in v0.
-- Clothing and household goods should begin as periodic pressure from population, then later become actual stockpile consumption.
+- Clothing and household goods began as visible pressure and now resolve through soft-need stockpile consumption without penalties or prosperity changes.
 - Tools and maintenance materials are city/building demand first, household demand later.
 
 This preserves the product decision that children increase pressure before supply. Births add young children and population, but do not create labor. Older children later offset some pressure through production support. New families increase housing and goods demand. Old-couple lifecycle completion reduces population pressure and frees houses.
@@ -151,7 +151,7 @@ Implement only one true demand consumption bucket first:
 
 Keep the current `City.consume_food()` behavior as the conceptual starting point, but route it through a goods-to-bucket helper before expanding beyond the abstract `food` key. This lets future goods such as `wheat`, `bread`, and `fish` satisfy the same food need without requiring exact household recipes.
 
-Do not consume `household_goods`, `clothing`, or `maintenance_materials` from household need in the first slice. Instead, display pressure/readiness once the category helper exists.
+The first slice displayed `household_goods` and `clothing` pressure without consumption. Soft Need Consumption v0 now consumes recognized household goods and clothing stockpiles up to demand, while `maintenance_materials` remains outside household soft-need consumption.
 
 Recommended first implementation sequence:
 
