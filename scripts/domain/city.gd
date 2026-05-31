@@ -16,6 +16,9 @@ const BUILDING_SCULPTOR: String = "sculptor"
 const BUILDING_CARVER: String = "carver"
 const BUILDING_TILEWORKS: String = "tileworks"
 const BUILDING_PAVER_YARD: String = "paver_yard"
+const ROLE_PLAYER: String = "player"
+const ROLE_NEUTRAL: String = "neutral"
+const ROLE_DEBUG: String = "debug"
 const WORK_PREF_NEUTRAL: String = "neutral"
 const WORK_PREF_AGRARIAN: String = "agrarian"
 const WORK_PREF_INDUSTRIAL: String = "industrial"
@@ -44,6 +47,7 @@ const OLD_COUPLE_MIN_MORTALITY_MONTHS: int = 12
 const ENABLE_HOUSEHOLD_LIFECYCLE_LOGS: bool = true
 
 var name: String = "City"
+var role: String = ROLE_PLAYER
 var tile: Vector2 = Vector2.ZERO
 var local_map: Array = []
 var buildings: Array[Building] = []
@@ -53,14 +57,39 @@ var resource_history: Array = []
 var soft_need_results: Dictionary = {}
 var site_profile: SettlementSiteProfile = SettlementSiteProfile.new()
 
-func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO):
+func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO, city_role: String = ROLE_PLAYER):
 	name = city_name
 	tile = city_tile
+	role = get_normalized_role(city_role)
 	resources = make_starting_resources()
 	create_starter_households()
 	recalculate_household_succession_pressures()
 	update_shelter_counts()
 	record_resource_history()
+
+func get_normalized_role(city_role: String) -> String:
+	if city_role == ROLE_PLAYER or city_role == ROLE_NEUTRAL or city_role == ROLE_DEBUG:
+		return city_role
+
+	return ROLE_PLAYER
+
+func set_role(city_role: String) -> void:
+	role = get_normalized_role(city_role)
+
+func is_player_city() -> bool:
+	return role == ROLE_PLAYER
+
+func is_neutral_city() -> bool:
+	return role == ROLE_NEUTRAL
+
+func is_debug_city() -> bool:
+	return role == ROLE_DEBUG
+
+func is_controllable_city() -> bool:
+	return is_player_city() or is_debug_city()
+
+func should_tick_simulation() -> bool:
+	return is_player_city() or is_debug_city()
 
 func make_starting_resources() -> Dictionary:
 	return {
