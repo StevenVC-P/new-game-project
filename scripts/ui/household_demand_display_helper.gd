@@ -15,6 +15,7 @@ static func get_demand_lines(city, household) -> Array[String]:
 
 	lines.append("Food: " + str(total_population) + " population")
 	lines.append(_get_household_goods_text(housing_status))
+	lines.append("Clothing: " + str(total_population) + " population pressure, not supplied yet")
 	lines.append("Shelter: " + _get_shelter_text(housing_status))
 
 	return lines

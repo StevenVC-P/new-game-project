@@ -59,6 +59,8 @@ Unsheltered Workplace Warning v0 makes workplace instability visible without app
 
 Household Prosperity Status v0 is an abstract inspected-household status, not money or exact wealth. It summarizes current need conditions as struggling, stable, comfortable, or eventually prosperous. V0 derives struggling from food shortage or unstable shelter, stable from housed/no-shortage basics, and comfortable from housed/no-shortage households when household goods pressure is met. Prosperous remains future-facing until quality, variety, luxury, or home-improvement systems exist. No bonuses, penalties, consumption, savings, prices, credit, or debt are implemented.
 
+Clothing Pressure v0 makes clothing visible as a soft family need without adding textile production. Demand is population-based and display-only. Clothing Goods Scaffold v0 adds `clothing` as a final-good stockpile key mapped to the `clothing` need bucket, so City Need Pressure can show clothing as unmet when demand exists and the stockpile is zero. Wool remains a future textile input and does not satisfy the final clothing need in this scaffold. This does not affect prosperity, consume resources, create penalties, add winter effects, or add textile production.
+
 ### Family-Operated Workplaces
 
 Workplaces are family-operated. For now, one family can operate one workplace. This matches the current one-household responsibility model and avoids turning households into anonymous worker pools.

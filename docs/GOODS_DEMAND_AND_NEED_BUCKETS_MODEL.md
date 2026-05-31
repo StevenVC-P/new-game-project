@@ -31,6 +31,7 @@ Example: a household needs `food`, not specifically bread. Wheat, bread, fish, a
 - `carved_goods`
 - `tiles`
 - `paving_stones`
+- `clothing`
 
 The same resource dictionary also contains state values such as population, labor, housing capacity, food consumption rate, food shortage, production tick count, maintenance grace, and external population pool. Those are not goods and should not be treated as need-bucket inputs.
 
@@ -50,7 +51,7 @@ Current production creates:
 - Tileworks: `tiles`, from `bricks` and `wood`
 - Paver yards: `paving_stones`, from `stone_blocks`
 
-Design examples such as `wheat`, `bread`, `fish`, `planks`, `clay`, `pottery`, `wool`, `clothing`, and `wooden_tools` are useful future goods, but they are not current resource keys unless a later branch adds them.
+Design examples such as `wheat`, `bread`, `fish`, `planks`, `clay`, `pottery`, `wool`, and `wooden_tools` are useful future goods, but they are not current resource keys unless a later branch adds them. `clothing` is currently scaffolded as a final soft-need good with a default stockpile key, but no production chain or consumption.
 
 ## Need Buckets
 
@@ -90,6 +91,7 @@ Current goods should map into buckets like this:
 | `paving_stones` | `construction_materials`, `civic_goods` | Civic infrastructure later. |
 | `carved_goods` | `household_goods`, `civic_goods` | Domestic goods or prestige goods. |
 | `statues` | `civic_goods`, `household_goods` | Mostly prestige/civic demand later. |
+| `clothing` | `clothing` | Final clothing good scaffold; no production or consumption yet. |
 
 Future goods can map like this:
 
@@ -101,8 +103,8 @@ Future goods can map like this:
 | `planks` | `construction_materials`, `maintenance_materials` | Refined wood construction input. |
 | `clay` | `construction_materials` | Raw craft/construction input. |
 | `pottery` | `household_goods` | Domestic goods and storage quality. |
-| `wool` | `clothing` | Raw textile input. |
-| `clothing` | `clothing` | Finished clothing. |
+| `wool` | future textile input | Raw textile input; does not satisfy final clothing need in scaffold v0. |
+| `clothing` | `clothing` | Finished clothing scaffold; no production or consumption yet. |
 | `wooden_tools` | `tools` | Low-tier tool good. |
 
 Goods can satisfy more than one bucket, but a consumption pass should consume a unit for only one bucket at a time. Later quality scoring can decide whether using `tiles` for household goods is better or worse than preserving them for roof maintenance.
@@ -383,13 +385,47 @@ Manual owner retest checklist:
 4. Provide enough household goods to meet household goods pressure if practical and confirm Prosperity can show Comfortable.
 5. Confirm no resources are consumed and no production, lifecycle, demand, or assignment mechanics change.
 
-### 8. Clothing Demand v0
+### 8. Clothing Pressure v0
 
-Add slow periodic demand, not daily drain:
+Clothing pressure is active as display-only pressure. It does not consume resources, apply penalties, change prosperity, create household inventory, add winter effects, or add textile production.
 
-- Clothing: population and season influenced later.
+V0 demand is aggregated from family population:
 
-Start as pressure warnings before hard consumption penalties.
+- each household contributes clothing pressure equal to `total_population`
+- housed, temporary, and unsheltered households all show clothing pressure because clothing is a personal/family need
+- this pressure remains soft and future-facing until textile production exists
+
+The `clothing` need bucket exists, and the final `clothing` good is scaffolded as a current stockpile key that can satisfy it. No production or consumption exists yet. Future textile inputs may include:
+
+- `wool`
+
+Wool does not satisfy the final clothing need in scaffold v0; it is an input to a later textile chain.
+
+Because `clothing` is a recognized bucket-satisfying good but starts at zero, the expected V0 city status is usually:
+
+- `unmet`: demand exists and no clothing stockpile is available
+
+Other status values remain available:
+
+- `none`: no clothing demand
+- `met`: available clothing goods cover demand
+- `low`: some clothing goods exist, but less than demand
+- `unavailable`: no current goods can supply the bucket
+
+The selected house Family Demand display can show:
+
+- `Clothing: N population pressure, not supplied yet`
+
+No action hint is added in this slice. The need is visible, but the player cannot solve it until textile production exists.
+
+Manual owner retest checklist:
+
+1. Open City Overview and confirm Clothing appears in Need Pressure.
+2. Confirm Clothing reads as unmet/future-facing when clothing stockpile is zero.
+3. Select a house and confirm Family Demand includes a clothing line.
+4. Confirm no clothing resources are consumed.
+5. Confirm no penalties occur.
+6. Confirm household prosperity does not drop to Struggling solely because clothing is unmet.
 
 ### 9. Quality and Preference Modifiers
 

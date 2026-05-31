@@ -76,6 +76,7 @@ func make_starting_resources() -> Dictionary:
 		"carved_goods": 0,
 		"tiles": 0,
 		"paving_stones": 0,
+		"clothing": 0,
 		"house_shelter_capacity": 0,
 		"temporary_shelter_capacity": STARTING_POPULATION,
 		"housing_capacity": STARTING_POPULATION,
@@ -1340,6 +1341,7 @@ func get_need_pressure_summary() -> Dictionary:
 		GoodsNeedBucketHelperScript.BUCKET_CONSTRUCTION_MATERIALS: get_inactive_need_pressure(GoodsNeedBucketHelperScript.BUCKET_CONSTRUCTION_MATERIALS),
 		GoodsNeedBucketHelperScript.BUCKET_MAINTENANCE_MATERIALS: get_inactive_need_pressure(GoodsNeedBucketHelperScript.BUCKET_MAINTENANCE_MATERIALS),
 		GoodsNeedBucketHelperScript.BUCKET_HOUSEHOLD_GOODS: get_household_goods_need_pressure(),
+		GoodsNeedBucketHelperScript.BUCKET_CLOTHING: get_clothing_need_pressure(),
 		GoodsNeedBucketHelperScript.BUCKET_CIVIC_GOODS: get_inactive_need_pressure(GoodsNeedBucketHelperScript.BUCKET_CIVIC_GOODS),
 	}
 
@@ -1384,6 +1386,35 @@ func get_household_goods_need_demand() -> int:
 	for household: Household in households:
 		if household.housing_status == Household.RESIDENCE_HOUSED:
 			demand += 1
+
+	return demand
+
+func get_clothing_need_pressure() -> Dictionary:
+	var demand: int = get_clothing_need_demand()
+	var available: int = get_available_need_bucket_amount(GoodsNeedBucketHelperScript.BUCKET_CLOTHING)
+	var shortage_amount: int = max(0, demand - available)
+	var status: String = "none"
+	var severity: String = "neutral"
+	var current_clothing_goods: Array[String] = GoodsNeedBucketHelperScript.get_current_goods_for_need_bucket(GoodsNeedBucketHelperScript.BUCKET_CLOTHING)
+
+	if demand > 0 and current_clothing_goods.is_empty():
+		status = "unavailable"
+	elif demand > 0 and available >= demand:
+		status = "met"
+		severity = "positive"
+	elif demand > 0 and available > 0:
+		status = "low"
+		severity = "warning"
+	elif demand > 0:
+		status = "unmet"
+		severity = "warning"
+
+	return make_need_pressure(GoodsNeedBucketHelperScript.BUCKET_CLOTHING, status, severity, demand, available, shortage_amount, true)
+
+func get_clothing_need_demand() -> int:
+	var demand: int = 0
+	for household: Household in households:
+		demand += max(0, household.total_population)
 
 	return demand
 

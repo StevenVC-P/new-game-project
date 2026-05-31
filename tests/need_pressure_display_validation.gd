@@ -2,6 +2,7 @@ extends SceneTree
 
 const CityScript = preload("res://scripts/domain/city.gd")
 const CityPressureHintHelperScript = preload("res://scripts/ui/city_pressure_hint_helper.gd")
+const GoodsNeedBucketHelperScript = preload("res://scripts/domain/goods_need_bucket_helper.gd")
 
 var failure_count: int = 0
 
@@ -15,6 +16,12 @@ func run_all() -> void:
 	test_household_goods_pressure_unmet()
 	test_household_goods_pressure_low()
 	test_household_goods_pressure_met()
+	test_clothing_bucket_mapping()
+	test_clothing_stockpile_scaffold()
+	test_clothing_pressure_unmet()
+	test_clothing_pressure_low()
+	test_clothing_pressure_met()
+	test_clothing_pressure_does_not_consume_resources()
 	test_need_pressure_summary_shape()
 	test_inactive_buckets_do_not_generate_hints()
 	test_food_need_hints_are_specific()
@@ -85,6 +92,58 @@ func test_household_goods_pressure_met() -> void:
 	_check(int(household_goods_need["available"]) == 4, "met household goods should report bucket availability")
 	_check(int(household_goods_need["demand"]) == 3, "met household goods should report demand")
 
+func test_clothing_bucket_mapping() -> void:
+	_check(GoodsNeedBucketHelperScript.BUCKET_CLOTHING == "clothing", "clothing bucket should be declared")
+	_check(GoodsNeedBucketHelperScript.get_need_buckets_for_good("clothing").has(GoodsNeedBucketHelperScript.BUCKET_CLOTHING), "clothing good should satisfy clothing bucket")
+	_check(not GoodsNeedBucketHelperScript.get_need_buckets_for_good("wool").has(GoodsNeedBucketHelperScript.BUCKET_CLOTHING), "wool should not satisfy clothing bucket in scaffold v0")
+	_check(GoodsNeedBucketHelperScript.get_current_goods_for_need_bucket(GoodsNeedBucketHelperScript.BUCKET_CLOTHING).has("clothing"), "current clothing bucket goods should include clothing")
+
+func test_clothing_stockpile_scaffold() -> void:
+	var city = CityScript.new("Clothing Stockpile Test City")
+
+	_check(city.resources.has("clothing"), "city resources should include scaffolded clothing stockpile")
+	_check(int(city.resources["clothing"]) == 0, "clothing stockpile should start at zero")
+
+func test_clothing_pressure_unmet() -> void:
+	var city = _make_city_with_population(3, 4)
+	var clothing_need: Dictionary = city.get_clothing_need_pressure()
+
+	_check(str(clothing_need["status"]) == "unmet", "clothing should be unmet when clothing is recognized but stockpile is zero")
+	_check(str(clothing_need["severity"]) == "warning", "unmet clothing should be warning display pressure")
+	_check(int(clothing_need["available"]) == 0, "unmet clothing should report zero current supply")
+	_check(int(clothing_need["demand"]) == 12, "clothing demand should follow household population")
+	_check(bool(clothing_need["active"]) == true, "clothing should be active as display pressure")
+
+func test_clothing_pressure_low() -> void:
+	var city = _make_city_with_population(3, 4)
+	city.resources["clothing"] = 5
+	var clothing_need: Dictionary = city.get_clothing_need_pressure()
+
+	_check(str(clothing_need["status"]) == "low", "clothing should be low when some stock exists below demand")
+	_check(int(clothing_need["available"]) == 5, "low clothing should report available clothing")
+	_check(int(clothing_need["demand"]) == 12, "low clothing should report demand")
+
+func test_clothing_pressure_met() -> void:
+	var city = _make_city_with_population(3, 4)
+	city.resources["clothing"] = 12
+	var clothing_need: Dictionary = city.get_clothing_need_pressure()
+
+	_check(str(clothing_need["status"]) == "met", "clothing should be met when clothing stock covers demand")
+	_check(str(clothing_need["severity"]) == "positive", "met clothing should be positive display pressure")
+	_check(int(clothing_need["available"]) == 12, "met clothing should report available clothing")
+	_check(int(clothing_need["demand"]) == 12, "met clothing should report demand")
+
+func test_clothing_pressure_does_not_consume_resources() -> void:
+	var city = _make_city_with_population(3, 4)
+	var food_before: int = int(city.resources["food"])
+	var household_goods_before: int = int(city.resources["carved_goods"])
+	var clothing_before: int = int(city.resources["clothing"])
+	city.get_clothing_need_pressure()
+
+	_check(int(city.resources["food"]) == food_before, "clothing pressure should not consume food")
+	_check(int(city.resources["carved_goods"]) == household_goods_before, "clothing pressure should not consume household goods")
+	_check(int(city.resources["clothing"]) == clothing_before, "clothing pressure should not consume clothing in scaffold v0")
+
 func test_need_pressure_summary_shape() -> void:
 	var city = _make_city_with_food_state(12, 3, false)
 	var summary: Dictionary = city.get_need_pressure_summary()
@@ -94,6 +153,7 @@ func test_need_pressure_summary_shape() -> void:
 		"construction_materials",
 		"maintenance_materials",
 		"household_goods",
+		"clothing",
 		"civic_goods",
 	]
 
@@ -142,6 +202,9 @@ func _assert_need_entry_shape(entry: Dictionary, key: String) -> void:
 
 	if key == "household_goods":
 		_check(bool(entry["active"]) == true, "household_goods should be active display pressure in v0")
+	elif key == "clothing":
+		_check(bool(entry["active"]) == true, "clothing should be active display pressure in v0")
+		_check(str(entry["status"]) == "unmet", "clothing should be unmet when clothing goods are recognized but stockpile is zero")
 	elif key != "food":
 		_check(str(entry["status"]) == "pressure_only", key + " should be pressure_only in v0")
 		_check(bool(entry["active"]) == false, key + " should be inactive in v0")
@@ -164,6 +227,16 @@ func _make_city_with_household_goods_state(housed_household_count: int, househol
 	city.resources["carved_goods"] = household_goods_amount
 	city.resources["tiles"] = 0
 	city.resources["statues"] = 0
+	return city
+
+func _make_city_with_population(household_count: int, population_per_household: int):
+	var city = CityScript.new("Clothing Need Test City")
+	for household in city.households:
+		household.total_population = population_per_household
+
+	while city.households.size() > household_count:
+		city.households.pop_back()
+
 	return city
 
 func _check(condition: bool, message: String) -> void:

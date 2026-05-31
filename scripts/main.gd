@@ -894,6 +894,7 @@ func draw_city_sidebar(font: Font, font_size: int):
 	y = draw_need_pressure_row(font, font_size, need_pressure_summary["construction_materials"] as Dictionary, text_x, y)
 	y = draw_need_pressure_row(font, font_size, need_pressure_summary["maintenance_materials"] as Dictionary, text_x, y)
 	y = draw_need_pressure_row(font, font_size, need_pressure_summary["household_goods"] as Dictionary, text_x, y)
+	y = draw_need_pressure_row(font, font_size, need_pressure_summary["clothing"] as Dictionary, text_x, y)
 	y = draw_need_pressure_row(font, font_size, need_pressure_summary["civic_goods"] as Dictionary, text_x, y)
 	y += 4.0
 

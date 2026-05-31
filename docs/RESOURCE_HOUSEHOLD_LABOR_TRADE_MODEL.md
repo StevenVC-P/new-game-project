@@ -57,6 +57,7 @@ The primary material resources are `food`, `wood`, and `tools`. Other keys are d
 - `carved_goods`
 - `tiles`
 - `paving_stones`
+- `clothing`
 
 Basic v1 building production now exists for these keys. Household demand, UI display, trade pricing, prosperity effects, and settlement access rules for these goods are not implemented yet.
 
@@ -181,6 +182,8 @@ The selected house popup can show a read-only Family Demand section for the resi
 Selected production-building information can show a display-only workplace stability warning when the assigned household is temporarily sheltered or unsheltered. The warning text is informational: temporary/unsheltered households still consume food, remain valid worker assignments, and do not receive production output, cadence, labor, maintenance, or demand penalties in this branch. A later branch may turn housing instability into slower cadence or reliability effects.
 
 The selected house popup can also show a read-only household prosperity status. Current statuses are `struggling`, `stable`, `comfortable`, and future-facing `prosperous`. V0 derives the status from visible need conditions only: unstable shelter or city food shortage is struggling, housed/no-shortage basics are stable, and housed/no-shortage with met household goods pressure is comfortable. This does not track money, savings, exact wealth, prices, credit, debt, household inventory, bonuses, or penalties.
+
+Clothing pressure is visible as a display-only need bucket and selected-family demand line. `City.get_clothing_need_pressure()` derives demand from total household population. The final `clothing` good is scaffolded as a current stockpile key and maps to the `clothing` bucket, so clothing pressure can report `unmet` when demand exists and stockpile is zero. `wool` is intentionally not mapped as a satisfying good because it is a future textile input. The selected house popup can show `Clothing: N population pressure, not supplied yet`. Clothing pressure does not consume resources, affect prosperity, create penalties, add textile production, or change seasonal behavior.
 
 Population can grow from the external population pool after sustained food surplus, available housing capacity, and no shortage. Growth either adds one person to an existing eligible household or creates a new neutral household. Existing external population growth represents adult arrival for compatibility and may update `working_adults`; future household births should add dependent young children without increasing `working_adults`.
 

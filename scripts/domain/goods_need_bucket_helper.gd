@@ -5,6 +5,7 @@ const BUCKET_TOOLS: String = "tools"
 const BUCKET_CONSTRUCTION_MATERIALS: String = "construction_materials"
 const BUCKET_MAINTENANCE_MATERIALS: String = "maintenance_materials"
 const BUCKET_HOUSEHOLD_GOODS: String = "household_goods"
+const BUCKET_CLOTHING: String = "clothing"
 const BUCKET_CIVIC_GOODS: String = "civic_goods"
 
 const CURRENT_GOOD_IDS: Array[String] = [
@@ -21,6 +22,7 @@ const CURRENT_GOOD_IDS: Array[String] = [
 	"carved_goods",
 	"tiles",
 	"paving_stones",
+	"clothing",
 ]
 
 const GOOD_TO_NEED_BUCKETS: Dictionary = {
@@ -37,6 +39,7 @@ const GOOD_TO_NEED_BUCKETS: Dictionary = {
 	"paving_stones": [BUCKET_CONSTRUCTION_MATERIALS, BUCKET_CIVIC_GOODS],
 	"carved_goods": [BUCKET_HOUSEHOLD_GOODS, BUCKET_CIVIC_GOODS],
 	"statues": [BUCKET_HOUSEHOLD_GOODS, BUCKET_CIVIC_GOODS],
+	"clothing": [BUCKET_CLOTHING],
 }
 
 const BUCKET_DISPLAY_NAMES: Dictionary = {
@@ -45,6 +48,7 @@ const BUCKET_DISPLAY_NAMES: Dictionary = {
 	BUCKET_CONSTRUCTION_MATERIALS: "Construction Materials",
 	BUCKET_MAINTENANCE_MATERIALS: "Maintenance Materials",
 	BUCKET_HOUSEHOLD_GOODS: "Household Goods",
+	BUCKET_CLOTHING: "Clothing",
 	BUCKET_CIVIC_GOODS: "Civic Goods",
 }
 
@@ -62,10 +66,11 @@ const GOOD_DISPLAY_NAMES: Dictionary = {
 	"carved_goods": "Carved Goods",
 	"tiles": "Tiles",
 	"paving_stones": "Paving Stones",
+	"clothing": "Clothing",
 }
 
 # Future goods planned in the demand model include wheat, bread, fish, planks,
-# clay, pottery, wool, clothing, and wooden_tools. They are intentionally not
+# clay, pottery, wool, and wooden_tools. They are intentionally not
 # mapped until they exist in the current city resource dictionary.
 
 static func get_need_buckets_for_good(good_id: String) -> Array[String]:
