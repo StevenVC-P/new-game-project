@@ -35,6 +35,7 @@ const BUILDING_TILEWORKS: String = "tileworks"
 const BUILDING_PAVER_YARD: String = "paver_yard"
 const WOODCUTTER_TREE_RADIUS: int = 5
 const CITY_WALKER_CYCLE_SECONDS: float = 12.0
+const FOUNDING_HOUSEHOLD_COUNT: int = 4
 const WORK_PREF_NEUTRAL: String = "neutral"
 const WORK_PREF_AGRARIAN: String = "agrarian"
 const WORK_PREF_INDUSTRIAL: String = "industrial"
@@ -349,6 +350,49 @@ func clear_pending_founding_tile() -> void:
 func has_pending_founding_tile() -> bool:
 	return is_inside_map(pending_founding_tile.x, pending_founding_tile.y)
 
+func can_found_player_city() -> bool:
+	if not has_pending_founding_tile():
+		return false
+	if has_player_city():
+		return false
+	return is_valid_founding_tile(pending_founding_tile)
+
+func has_player_city() -> bool:
+	return get_player_city_index() != -1
+
+func get_player_city_index() -> int:
+	for city_index in range(cities.size()):
+		var city: City = cities[city_index]
+		if city.is_player_city():
+			return city_index
+	return -1
+
+func found_player_city_at_pending_site() -> bool:
+	if not can_found_player_city():
+		return false
+
+	var founded_city: City = create_player_city_at_tile(pending_founding_tile)
+	cities.append(founded_city)
+	var founded_city_index: int = cities.size() - 1
+	configure_new_city_map(founded_city, founded_city_index)
+	clear_pending_founding_tile()
+	generate_roads()
+
+	selected_city_index = founded_city_index
+	current_view = VIEW_CITY
+	hovered_tile = Vector2i(-1, -1)
+	hovered_city_index = -1
+	queue_redraw()
+	return true
+
+func create_player_city_at_tile(tile_pos: Vector2i) -> City:
+	return City.new("Player Town", Vector2(tile_pos.x, tile_pos.y), City.ROLE_PLAYER, FOUNDING_HOUSEHOLD_COUNT)
+
+func configure_new_city_map(city: City, city_index: int) -> void:
+	city.site_profile = SettlementSiteProfile.analyze(city.tile, tiles, CITY_RESOURCE_RANGE)
+	var generator: LocalCityMapGenerator = LocalCityMapGenerator.new(rng, CITY_MAP_WIDTH, CITY_MAP_HEIGHT, MAP_WIDTH, MAP_HEIGHT, RIVER_NEAR_RANGE, CITY_RESOURCE_RANGE)
+	city.local_map = generator.generate(city, tiles, city_index)
+
 func get_city_index_at_position(mouse_pos: Vector2) -> int:
 	for city_index in range(cities.size()):
 		var city: City = cities[city_index]
@@ -395,6 +439,8 @@ func apply_region_action(option_data: Dictionary):
 
 	if action == "new_trade_route":
 		trade_menu.open(cities)
+	elif action == "found_player_city":
+		found_player_city_at_pending_site()
 	else:
 		apply_time_control_action(action)
 
@@ -1478,6 +1524,8 @@ func draw_inspector_panel():
 		y = draw_sidebar_like_line(font, font_size, "Hover a tile to inspect.", text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_MUTED)
 	if has_pending_founding_tile():
 		y = draw_region_label_value(font, font_size, "Pending", str(pending_founding_tile.x) + ", " + str(pending_founding_tile.y), text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_UI_TITLE)
+		if not has_player_city():
+			y = draw_region_action_option(font, font_size, "Found Town", text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, {"action": "found_player_city"}, VisualStyle.COLOR_UI_BUTTON_ACTIVE)
 
 	y += 12.0
 	y = draw_region_section_title(font, "Trade / Routes", text_pos.x, y)

@@ -57,12 +57,13 @@ var resource_history: Array = []
 var soft_need_results: Dictionary = {}
 var site_profile: SettlementSiteProfile = SettlementSiteProfile.new()
 
-func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO, city_role: String = ROLE_PLAYER):
+func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO, city_role: String = ROLE_PLAYER, starter_household_count: int = STARTING_HOUSEHOLD_COUNT):
 	name = city_name
 	tile = city_tile
 	role = get_normalized_role(city_role)
-	resources = make_starting_resources()
-	create_starter_households()
+	var normalized_household_count: int = max(0, starter_household_count)
+	resources = make_starting_resources(normalized_household_count)
+	create_starter_households(normalized_household_count)
 	recalculate_household_succession_pressures()
 	update_shelter_counts()
 	record_resource_history()
@@ -91,7 +92,8 @@ func is_controllable_city() -> bool:
 func should_tick_simulation() -> bool:
 	return is_player_city() or is_debug_city()
 
-func make_starting_resources() -> Dictionary:
+func make_starting_resources(starter_household_count: int = STARTING_HOUSEHOLD_COUNT) -> Dictionary:
+	var starting_population: int = starter_household_count * STARTING_HOUSEHOLD_POPULATION
 	return {
 		"food": 60,
 		"wood": 45,
@@ -108,11 +110,11 @@ func make_starting_resources() -> Dictionary:
 		"paving_stones": 0,
 		"clothing": 0,
 		"house_shelter_capacity": 0,
-		"temporary_shelter_capacity": STARTING_POPULATION,
-		"housing_capacity": STARTING_POPULATION,
+		"temporary_shelter_capacity": starting_population,
+		"housing_capacity": starting_population,
 		"housed_population": 0,
-		"temporary_sheltered_population": STARTING_POPULATION,
-		"sheltered_population": STARTING_POPULATION,
+		"temporary_sheltered_population": starting_population,
+		"sheltered_population": starting_population,
 		"unsheltered_population": 0,
 		"total_population": 0,
 		"household_count": 0,
@@ -127,10 +129,10 @@ func make_starting_resources() -> Dictionary:
 		"maintenance_grace_ticks": STARTING_MAINTENANCE_GRACE_TICKS
 	}
 
-func create_starter_households():
+func create_starter_households(starter_household_count: int = STARTING_HOUSEHOLD_COUNT):
 	var preferences: Array[String] = [WORK_PREF_AGRARIAN, WORK_PREF_INDUSTRIAL, WORK_PREF_NEUTRAL]
 
-	for household_index in range(STARTING_HOUSEHOLD_COUNT):
+	for household_index in range(starter_household_count):
 		var preference: String = preferences[household_index % preferences.size()]
 		var household: Household = Household.new(household_index, -1, preference, STARTING_HOUSEHOLD_POPULATION, Household.RESIDENCE_TEMPORARY)
 		seed_starter_household_lifecycle(household, household_index)
