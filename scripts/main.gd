@@ -855,11 +855,25 @@ func draw_fords():
 			MapElementVisuals.draw_ford(self, tile_rect)
 
 func draw_cities():
+	var font: Font = ThemeDB.fallback_font
 	for city_index in range(cities.size()):
 		var city: City = cities[city_index]
 		var tile_pos: Vector2 = city.tile
 		var center: Vector2 = tile_to_center(tile_pos)
 		MapElementVisuals.draw_city_marker(self, center, TILE_SIZE, city_index == hovered_city_index, city_index == selected_city_index, city.role)
+		draw_city_marker_label(font, city, center)
+
+func draw_city_marker_label(font: Font, city: City, center: Vector2) -> void:
+	var label: String = "Neutral"
+	var color: Color = VisualStyle.COLOR_MUTED
+	if city.is_player_city():
+		label = "Player"
+		color = VisualStyle.COLOR_UI_TITLE
+	elif city.is_debug_city():
+		label = "Debug"
+		color = VisualStyle.COLOR_WARNING
+
+	draw_string(font, center + Vector2(-22.0, TILE_SIZE * 1.55), label, HORIZONTAL_ALIGNMENT_CENTER, 44.0, 11, color)
 
 func draw_pending_founding_site():
 	if not has_pending_founding_tile():
@@ -1522,9 +1536,14 @@ func draw_inspector_panel():
 		y = draw_region_hover_summary(font, font_size, text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2)
 	else:
 		y = draw_sidebar_like_line(font, font_size, "Hover a tile to inspect.", text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_MUTED)
+
+	y += 12.0
+	y = draw_region_section_title(font, "Founding", text_pos.x, y)
+	y = draw_sidebar_like_line(font, font_size, get_founding_prompt_text(), text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, get_founding_prompt_color())
 	if has_pending_founding_tile():
 		y = draw_region_label_value(font, font_size, "Pending", str(pending_founding_tile.x) + ", " + str(pending_founding_tile.y), text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_UI_TITLE)
-		if not has_player_city():
+		y = draw_sidebar_like_line(font, font_size, "Right-click to clear.", text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_MUTED)
+		if can_found_player_city():
 			y = draw_region_action_option(font, font_size, "Found Town", text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, {"action": "found_player_city"}, VisualStyle.COLOR_UI_BUTTON_ACTIVE)
 
 	y += 12.0
@@ -1576,15 +1595,37 @@ func draw_region_hover_summary(font: Font, font_size: int, x: float, y: float, w
 	y = draw_region_label_value(font, font_size, "Fertile", yes_no(tile["is_fertile"] == true), x, y, width, VisualStyle.COLOR_UI_TEXT_NORMAL)
 	if resource != "none":
 		y = draw_region_label_value(font, font_size, "Resource", resource, x, y, width, VisualStyle.COLOR_RESOURCE_TOOLS)
-	var founding_status: String = get_founding_tile_invalid_reason(hovered_tile)
+	var founding_status: String = get_founding_hover_status_text(hovered_tile)
 	var founding_color: Color = VisualStyle.COLOR_UI_TEXT_NORMAL
-	if founding_status == FoundingSiteHelper.VALID_FOUNDING_SITE:
+	if is_valid_founding_tile(hovered_tile) and not has_player_city():
 		founding_color = VisualStyle.COLOR_POSITIVE
 	else:
 		founding_color = VisualStyle.COLOR_WARNING
 	y = draw_region_label_value(font, font_size, "Founding", founding_status, x, y, width, founding_color)
 
 	return y
+
+func get_founding_prompt_text() -> String:
+	if has_player_city():
+		return "Player town founded."
+	if has_pending_founding_tile():
+		return "Confirm the chosen site."
+	return "Choose a founding site."
+
+func get_founding_prompt_color() -> Color:
+	if has_player_city():
+		return VisualStyle.COLOR_POSITIVE
+	if has_pending_founding_tile():
+		return VisualStyle.COLOR_UI_TITLE
+	return VisualStyle.COLOR_UI_TEXT_NORMAL
+
+func get_founding_hover_status_text(tile_pos: Vector2i) -> String:
+	if has_player_city():
+		return "Player town already founded"
+	var reason: String = get_founding_tile_invalid_reason(tile_pos)
+	if reason == FoundingSiteHelper.VALID_FOUNDING_SITE:
+		return "Valid founding site"
+	return "Cannot found here: " + reason
 
 func draw_time_control_options(font: Font, font_size: int, x: float, y: float, width: float) -> float:
 	y = draw_region_action_option(font, font_size, "Pause", x, y, width, {"action": "toggle_pause"}, get_time_control_color("Paused"))
@@ -1749,7 +1790,7 @@ func get_hover_info_lines() -> Array[String]:
 	lines.append("Stone: " + yes_no(resource == "stone"))
 	lines.append("Iron: " + yes_no(resource == "iron"))
 	lines.append("City: " + city_name)
-	lines.append("Founding: " + get_founding_tile_invalid_reason(hovered_tile))
+	lines.append("Founding: " + get_founding_hover_status_text(hovered_tile))
 
 	return lines
 
