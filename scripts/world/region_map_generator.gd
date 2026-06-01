@@ -73,15 +73,10 @@ func make_base_tiles() -> Array:
 func place_cities() -> Array[City]:
 	var generated_cities: Array[City] = []
 
-	var city_a_pos: Vector2 = find_city_position("fertile")
-	if city_a_pos.x >= 0:
-		generated_cities.append(City.new("City A", city_a_pos))
-		print("City A tile position: ", city_a_pos)
-
-	var city_b_pos: Vector2 = find_city_position("resources", city_a_pos)
-	if city_b_pos.x >= 0:
-		generated_cities.append(City.new("City B", city_b_pos))
-		print("City B tile position: ", city_b_pos)
+	var neutral_town_pos: Vector2 = find_city_position("fertile")
+	if neutral_town_pos.x >= 0:
+		generated_cities.append(City.new("Neutral Town", neutral_town_pos, City.ROLE_NEUTRAL))
+		print("Neutral Town tile position: ", neutral_town_pos)
 
 	return generated_cities
 

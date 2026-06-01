@@ -35,6 +35,7 @@ const BUILDING_TILEWORKS: String = "tileworks"
 const BUILDING_PAVER_YARD: String = "paver_yard"
 const WOODCUTTER_TREE_RADIUS: int = 5
 const CITY_WALKER_CYCLE_SECONDS: float = 12.0
+const FOUNDING_HOUSEHOLD_COUNT: int = 4
 const WORK_PREF_NEUTRAL: String = "neutral"
 const WORK_PREF_AGRARIAN: String = "agrarian"
 const WORK_PREF_INDUSTRIAL: String = "industrial"
@@ -52,6 +53,7 @@ var build_menu_options: Array[Dictionary] = []
 var hovered_tile: Vector2i = Vector2i(-1, -1)
 var hovered_city_index: int = -1
 var city_hovered_tile: Vector2i = Vector2i(-1, -1)
+var pending_founding_tile: Vector2i = Vector2i(-1, -1)
 var current_view: String = VIEW_REGION
 var selected_city_index: int = -1
 var household_debug_inspector: Control = null
@@ -154,6 +156,7 @@ func _input(event: InputEvent):
 
 		if current_view == VIEW_REGION and mouse_event.button_index == MOUSE_BUTTON_RIGHT:
 			trade_menu.close()
+			clear_pending_founding_tile()
 			queue_redraw()
 			return
 		if current_view == VIEW_CITY and mouse_event.button_index == MOUSE_BUTTON_RIGHT:
@@ -176,7 +179,8 @@ func _input(event: InputEvent):
 			elif trade_menu.is_open():
 				try_handle_trade_city_click(local_mouse_pos)
 			else:
-				try_open_city_at_position(local_mouse_pos)
+				if not try_open_city_at_position(local_mouse_pos):
+					try_select_founding_tile_at_position(local_mouse_pos)
 		elif current_view == VIEW_CITY:
 			if try_handle_build_menu_click(local_mouse_pos):
 				queue_redraw()
@@ -298,16 +302,96 @@ func generate_city_local_maps():
 func is_inside_map(x: int, y: int) -> bool:
 	return x >= 0 and x < MAP_WIDTH and y >= 0 and y < MAP_HEIGHT
 
-func try_open_city_at_position(mouse_pos: Vector2):
+func try_open_city_at_position(mouse_pos: Vector2) -> bool:
 	var city_index: int = get_city_index_at_position(mouse_pos)
 	if city_index == -1:
-		return
+		return false
+	var city: City = cities[city_index]
+	if not city.is_controllable_city():
+		print(city.name, " is neutral and cannot be controlled yet.")
+		return true
 
 	selected_city_index = city_index
 	current_view = VIEW_CITY
 	hovered_tile = Vector2i(-1, -1)
 	hovered_city_index = -1
 	queue_redraw()
+	return true
+
+func try_select_founding_tile_at_position(mouse_pos: Vector2) -> bool:
+	var tile_pos: Vector2i = get_region_tile_at_position(mouse_pos)
+	if not is_inside_map(tile_pos.x, tile_pos.y):
+		return false
+	if set_pending_founding_tile(tile_pos):
+		print("Pending founding site: ", tile_pos)
+	else:
+		print(get_founding_tile_invalid_reason(tile_pos))
+	queue_redraw()
+	return true
+
+func get_region_tile_at_position(mouse_pos: Vector2) -> Vector2i:
+	return Vector2i(int(floor(mouse_pos.x / TILE_SIZE)), int(floor(mouse_pos.y / TILE_SIZE)))
+
+func is_valid_founding_tile(tile_pos: Vector2i) -> bool:
+	return FoundingSiteHelper.is_valid_founding_tile(tiles, cities, tile_pos, MIN_CITY_DISTANCE)
+
+func get_founding_tile_invalid_reason(tile_pos: Vector2i) -> String:
+	return FoundingSiteHelper.get_founding_tile_invalid_reason(tiles, cities, tile_pos, MIN_CITY_DISTANCE)
+
+func set_pending_founding_tile(tile_pos: Vector2i) -> bool:
+	if not is_valid_founding_tile(tile_pos):
+		return false
+	pending_founding_tile = tile_pos
+	return true
+
+func clear_pending_founding_tile() -> void:
+	pending_founding_tile = Vector2i(-1, -1)
+
+func has_pending_founding_tile() -> bool:
+	return is_inside_map(pending_founding_tile.x, pending_founding_tile.y)
+
+func can_found_player_city() -> bool:
+	if not has_pending_founding_tile():
+		return false
+	if has_player_city():
+		return false
+	return is_valid_founding_tile(pending_founding_tile)
+
+func has_player_city() -> bool:
+	return get_player_city_index() != -1
+
+func get_player_city_index() -> int:
+	for city_index in range(cities.size()):
+		var city: City = cities[city_index]
+		if city.is_player_city():
+			return city_index
+	return -1
+
+func found_player_city_at_pending_site() -> bool:
+	if not can_found_player_city():
+		return false
+
+	var founded_city: City = create_player_city_at_tile(pending_founding_tile)
+	cities.append(founded_city)
+	var founded_city_index: int = cities.size() - 1
+	configure_new_city_map(founded_city, founded_city_index)
+	clear_pending_founding_tile()
+	generate_roads()
+
+	selected_city_index = founded_city_index
+	current_view = VIEW_CITY
+	hovered_tile = Vector2i(-1, -1)
+	hovered_city_index = -1
+	queue_redraw()
+	return true
+
+func create_player_city_at_tile(tile_pos: Vector2i) -> City:
+	return City.new("Player Town", Vector2(tile_pos.x, tile_pos.y), City.ROLE_PLAYER, FOUNDING_HOUSEHOLD_COUNT)
+
+func configure_new_city_map(city: City, city_index: int) -> void:
+	city.site_profile = SettlementSiteProfile.analyze(city.tile, tiles, CITY_RESOURCE_RANGE)
+	var generator: LocalCityMapGenerator = LocalCityMapGenerator.new(rng, CITY_MAP_WIDTH, CITY_MAP_HEIGHT, MAP_WIDTH, MAP_HEIGHT, RIVER_NEAR_RANGE, CITY_RESOURCE_RANGE)
+	city.local_map = generator.generate(city, tiles, city_index)
 
 func get_city_index_at_position(mouse_pos: Vector2) -> int:
 	for city_index in range(cities.size()):
@@ -355,6 +439,8 @@ func apply_region_action(option_data: Dictionary):
 
 	if action == "new_trade_route":
 		trade_menu.open(cities)
+	elif action == "found_player_city":
+		found_player_city_at_pending_site()
 	else:
 		apply_time_control_action(action)
 
@@ -438,7 +524,7 @@ func try_handle_trade_city_click(mouse_pos: Vector2):
 		queue_redraw()
 		return
 
-	trade_menu.handle_city_selection(city_index)
+	trade_menu.handle_city_selection(city_index, cities)
 
 	queue_redraw()
 
@@ -611,11 +697,13 @@ func run_simulation_day():
 	world_calendar.advance_day()
 
 	for city: City in cities:
-		city.tick()
+		if city.should_tick_simulation():
+			city.tick()
 
 	apply_trade_routes()
 	for city: City in cities:
-		city.record_resource_history()
+		if city.should_tick_simulation():
+			city.record_resource_history()
 
 	if current_view == VIEW_CITY:
 		queue_redraw()
@@ -623,12 +711,14 @@ func run_simulation_day():
 func on_calendar_month_changed(_calendar: Calendar):
 	for city_index in range(cities.size()):
 		var city: City = cities[city_index]
-		city.advance_household_lifecycle_month(city_index)
+		if city.should_tick_simulation():
+			city.advance_household_lifecycle_month(city_index)
 
 func on_calendar_season_changed(calendar: Calendar):
 	for city_index in range(cities.size()):
 		var city: City = cities[city_index]
-		city.advance_household_birth_rolls_season(calendar, city_index)
+		if city.should_tick_simulation():
+			city.advance_household_birth_rolls_season(calendar, city_index)
 
 	print("Season changed: ", calendar.get_current_season(), " - Year ", calendar.current_year)
 
@@ -644,6 +734,8 @@ func apply_trade_routes():
 
 		var source_city: City = cities[source_index]
 		var destination_city: City = cities[destination_index]
+		if not source_city.is_controllable_city() or not destination_city.is_controllable_city():
+			continue
 		route.transfer_tick(source_city, destination_city)
 
 func get_preferred_worker_for_building(building_type: String) -> String:
@@ -707,6 +799,7 @@ func _draw():
 	draw_trade_routes()
 	draw_fords()
 	draw_cities()
+	draw_pending_founding_site()
 	draw_hover()
 	draw_inspector_panel()
 	draw_trade_menu_popup()
@@ -762,11 +855,33 @@ func draw_fords():
 			MapElementVisuals.draw_ford(self, tile_rect)
 
 func draw_cities():
+	var font: Font = ThemeDB.fallback_font
 	for city_index in range(cities.size()):
 		var city: City = cities[city_index]
 		var tile_pos: Vector2 = city.tile
 		var center: Vector2 = tile_to_center(tile_pos)
-		MapElementVisuals.draw_city_marker(self, center, TILE_SIZE, city_index == hovered_city_index, city_index == selected_city_index)
+		MapElementVisuals.draw_city_marker(self, center, TILE_SIZE, city_index == hovered_city_index, city_index == selected_city_index, city.role)
+		draw_city_marker_label(font, city, center)
+
+func draw_city_marker_label(font: Font, city: City, center: Vector2) -> void:
+	var label: String = "Neutral"
+	var color: Color = VisualStyle.COLOR_MUTED
+	if city.is_player_city():
+		label = "Player"
+		color = VisualStyle.COLOR_UI_TITLE
+	elif city.is_debug_city():
+		label = "Debug"
+		color = VisualStyle.COLOR_WARNING
+
+	draw_string(font, center + Vector2(-22.0, TILE_SIZE * 1.55), label, HORIZONTAL_ALIGNMENT_CENTER, 44.0, 11, color)
+
+func draw_pending_founding_site():
+	if not has_pending_founding_tile():
+		return
+
+	var marker_pos: Vector2 = Vector2(pending_founding_tile.x * TILE_SIZE, pending_founding_tile.y * TILE_SIZE)
+	var marker_rect: Rect2 = Rect2(marker_pos, Vector2(TILE_SIZE, TILE_SIZE))
+	MapElementVisuals.draw_founding_site_marker(self, marker_rect)
 
 func draw_top_bar():
 	top_bar_action_options.clear()
@@ -1423,6 +1538,15 @@ func draw_inspector_panel():
 		y = draw_sidebar_like_line(font, font_size, "Hover a tile to inspect.", text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_MUTED)
 
 	y += 12.0
+	y = draw_region_section_title(font, "Founding", text_pos.x, y)
+	y = draw_sidebar_like_line(font, font_size, get_founding_prompt_text(), text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, get_founding_prompt_color())
+	if has_pending_founding_tile():
+		y = draw_region_label_value(font, font_size, "Pending", str(pending_founding_tile.x) + ", " + str(pending_founding_tile.y), text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_UI_TITLE)
+		y = draw_sidebar_like_line(font, font_size, "Right-click to clear.", text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_MUTED)
+		if can_found_player_city():
+			y = draw_region_action_option(font, font_size, "Found Town", text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, {"action": "found_player_city"}, VisualStyle.COLOR_UI_BUTTON_ACTIVE)
+
+	y += 12.0
 	y = draw_region_section_title(font, "Trade / Routes", text_pos.x, y)
 	y = draw_region_action_option(font, font_size, "Trade", text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, {"action": "new_trade_route"}, VisualStyle.COLOR_UI_BUTTON_DISABLED)
 	y += 8.0
@@ -1465,13 +1589,43 @@ func draw_region_hover_summary(font: Font, font_size: int, x: float, y: float, w
 		y = draw_region_label_value(font, font_size, "City", city_name, x, y, width, VisualStyle.COLOR_UI_TITLE)
 		var city: City = get_city_at_tile(hovered_tile.x, hovered_tile.y)
 		if city != null:
+			y = draw_region_label_value(font, font_size, "Role", get_city_role_display_name(city), x, y, width, VisualStyle.COLOR_UI_TEXT_NORMAL)
 			y = draw_region_label_value(font, font_size, "Site", city.site_profile.get_tag_text(), x, y, width, VisualStyle.COLOR_UI_TEXT_NORMAL)
 	y = draw_region_label_value(font, font_size, "Forest", yes_no(tile["has_forest"] == true), x, y, width, VisualStyle.COLOR_UI_TEXT_NORMAL)
 	y = draw_region_label_value(font, font_size, "Fertile", yes_no(tile["is_fertile"] == true), x, y, width, VisualStyle.COLOR_UI_TEXT_NORMAL)
 	if resource != "none":
 		y = draw_region_label_value(font, font_size, "Resource", resource, x, y, width, VisualStyle.COLOR_RESOURCE_TOOLS)
+	var founding_status: String = get_founding_hover_status_text(hovered_tile)
+	var founding_color: Color = VisualStyle.COLOR_UI_TEXT_NORMAL
+	if is_valid_founding_tile(hovered_tile) and not has_player_city():
+		founding_color = VisualStyle.COLOR_POSITIVE
+	else:
+		founding_color = VisualStyle.COLOR_WARNING
+	y = draw_region_label_value(font, font_size, "Founding", founding_status, x, y, width, founding_color)
 
 	return y
+
+func get_founding_prompt_text() -> String:
+	if has_player_city():
+		return "Player town founded."
+	if has_pending_founding_tile():
+		return "Confirm the chosen site."
+	return "Choose a founding site."
+
+func get_founding_prompt_color() -> Color:
+	if has_player_city():
+		return VisualStyle.COLOR_POSITIVE
+	if has_pending_founding_tile():
+		return VisualStyle.COLOR_UI_TITLE
+	return VisualStyle.COLOR_UI_TEXT_NORMAL
+
+func get_founding_hover_status_text(tile_pos: Vector2i) -> String:
+	if has_player_city():
+		return "Player town already founded"
+	var reason: String = get_founding_tile_invalid_reason(tile_pos)
+	if reason == FoundingSiteHelper.VALID_FOUNDING_SITE:
+		return "Valid founding site"
+	return "Cannot found here: " + reason
 
 func draw_time_control_options(font: Font, font_size: int, x: float, y: float, width: float) -> float:
 	y = draw_region_action_option(font, font_size, "Pause", x, y, width, {"action": "toggle_pause"}, get_time_control_color("Paused"))
@@ -1541,6 +1695,16 @@ func get_trade_city_label(city_index: int) -> String:
 
 	var city: City = cities[city_index]
 	return city.name
+
+func get_city_role_display_name(city: City) -> String:
+	if city == null:
+		return "unknown"
+	if city.is_neutral_city():
+		return "neutral town"
+	if city.is_debug_city():
+		return "debug city"
+
+	return "player town"
 
 func get_trade_route_summary(route: TradeRoute) -> String:
 	var source_label: String = get_trade_city_label(route.source_city_id)
@@ -1626,6 +1790,7 @@ func get_hover_info_lines() -> Array[String]:
 	lines.append("Stone: " + yes_no(resource == "stone"))
 	lines.append("Iron: " + yes_no(resource == "iron"))
 	lines.append("City: " + city_name)
+	lines.append("Founding: " + get_founding_hover_status_text(hovered_tile))
 
 	return lines
 
