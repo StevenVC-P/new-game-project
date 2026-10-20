@@ -45,8 +45,11 @@ const BIRTH_FOOD_SURPLUS_BONUS: int = 5
 const BIRTH_HOUSING_HEADROOM_BONUS: int = 5
 const BIRTH_REQUIRED_HOUSING_HEADROOM: int = 2
 const OLD_COUPLE_MIN_MORTALITY_MONTHS: int = 12
-# Marriage (M3). A grown child with no partner in town marries an outsider after this long.
-const MARRIAGE_OUTSIDER_WAIT_MONTHS: int = 6
+# Production is skipped one tick in this many during a food shortage (25% loss).
+const FOOD_SHORTAGE_SKIP_TICK_INTERVAL: int = 4
+const SUCCESSION_AUTO_FILL_MONTHS: int = 2
+# Marriage (M3). How long a grown child waits before marrying an outsider is cultural:
+# CultureEffects.get_outsider_marriage_wait_months().
 const MARRIAGE_LINEAGE_PREFERENCE: int = 10
 const LINEAGE_RULES: Array[String] = ["fathers_line", "mothers_line", "strongest_line"]
 # Used when no family in the town holds a lineage rule.
@@ -247,6 +250,7 @@ func advance_household_lifecycle_month(city_index: int = 0):
 	recalculate_household_succession_pressures(city_index)
 	advance_old_couple_lifecycle_completion_month(city_index)
 	recalculate_household_succession_pressures(city_index)
+	advance_work_succession_vacancies(city_index)
 	HouseholdMigrationScript.advance_month(self, city_index)
 	update_shelter_counts()
 	update_worker_counts()
@@ -261,7 +265,7 @@ func recalculate_household_succession_pressures(city_index: int = 0):
 			log_household_lifecycle_event(city_index, household.id, "SuccessionReady", "potential_new_families=" + str(household.get_potential_new_family_count()))
 
 # M3: a grown child marries a grown child of another household (never a sibling). With no
-# partner in town for MARRIAGE_OUTSIDER_WAIT_MONTHS, they marry someone from outside.
+# partner in town for a culturally set wait, they marry someone from outside.
 # Each household marries off at most one child per month.
 func advance_new_family_formation_month(city_index: int = 0):
 	var ready: Array[Household] = []
@@ -279,7 +283,7 @@ func advance_new_family_formation_month(city_index: int = 0):
 			continue
 
 		var partner: Household = find_marriage_partner(household, ready, married_this_month)
-		var outsider_wait: int = CultureEffectsScript.get_family_formation_delay_months(household.values) + MARRIAGE_OUTSIDER_WAIT_MONTHS
+		var outsider_wait: int = CultureEffectsScript.get_family_formation_delay_months(household.values) + CultureEffectsScript.get_outsider_marriage_wait_months(household.values)
 		if partner == null and household.family_formation_wait_months <= outsider_wait:
 			continue
 
@@ -560,6 +564,15 @@ func record_work_succession_vacancy(removed_household: Household, building: Buil
 	building.preferred_successor_household_id = -1
 	log_household_lifecycle_event(city_index, removed_household.id, "WorkSuccessionVacancy", "building=" + str(building.id) + " trade=" + removed_household.family_trade)
 
+	var heir: Household = get_immediate_work_heir(removed_household)
+	if heir != null:
+		building.assign_household(heir, Building.ASSIGNMENT_AUTO)
+		# Keep labor counts current so one heir is not handed more work than it can do.
+		update_household_assignments()
+		log_household_lifecycle_event(city_index, heir.id, "WorkInherited", "building=" + str(building.id) + " from_household=" + str(removed_household.id))
+		return
+	building.succession_vacancy_months = 0
+
 	var preferred_candidate: Dictionary = get_preferred_work_successor(removed_household, building)
 	if preferred_candidate.is_empty():
 		return
@@ -569,6 +582,44 @@ func record_work_succession_vacancy(removed_household: Household, building: Buil
 	building.preferred_successor_household_id = successor.id
 	log_household_lifecycle_event(city_index, successor.id, "WorkSuccessionCandidate", "building=" + str(building.id) + " source_household=" + str(removed_household.id) + " priority=" + priority)
 	log_household_lifecycle_event(city_index, successor.id, "WorkSuccessionPreferred", "building=" + str(building.id) + " reason=" + priority)
+
+# A direct child's family with spare labor inherits the work with no gap. Same-trade heirs first.
+func get_immediate_work_heir(removed_household: Household) -> Household:
+	var heir: Household = null
+	for household: Household in households:
+		if household == removed_household or not household.is_child_of(removed_household.id):
+			continue
+		if household.housing_status == Household.RESIDENCE_UNSHELTERED or household.get_available_workers() <= 0:
+			continue
+		if heir == null or (household.family_trade == removed_household.family_trade and heir.family_trade != removed_household.family_trade):
+			heir = household
+	return heir
+
+# Workplaces with no heir wait for the player; after SUCCESSION_AUTO_FILL_MONTHS the game fills
+# them, preferring the suggested successor. Future: when Houses or rivals compete for control
+# of a workplace, this wait could lengthen (docs/IMPLEMENTATION_ROADMAP.md, Future Feature Notes).
+func advance_work_succession_vacancies(city_index: int = 0):
+	var filled_any: bool = false
+	for building: Building in buildings:
+		if building.succession_vacancy_months < 0 or building.assigned_workers > 0:
+			continue
+		building.succession_vacancy_months += 1
+		if building.succession_vacancy_months < SUCCESSION_AUTO_FILL_MONTHS:
+			continue
+
+		var successor: Household = get_household_by_id(building.preferred_successor_household_id)
+		if successor == null or successor.get_available_workers() <= 0:
+			successor = find_auto_assignment_household(building)
+		if successor == null:
+			# No one free yet: open it to ordinary auto-assignment instead of holding it.
+			building.auto_assignment_blocked = false
+			continue
+		building.assign_household(successor, Building.ASSIGNMENT_AUTO)
+		update_household_assignments()
+		filled_any = true
+		log_household_lifecycle_event(city_index, successor.id, "WorkSuccessionAutoFilled", "building=" + str(building.id))
+	if filled_any:
+		update_worker_counts()
 
 func get_household_descendants(household_id: int) -> Array[Household]:
 	var result: Array[Household] = []
@@ -1167,7 +1218,8 @@ func should_skip_for_food_shortage() -> bool:
 	if resources["food_shortage"] != true:
 		return false
 
-	return int(resources["production_tick_count"]) % 2 == 1
+	# Hungry families lose about a quarter of their working days.
+	return int(resources["production_tick_count"]) % FOOD_SHORTAGE_SKIP_TICK_INTERVAL == 0
 
 func apply_building_production(building: Building):
 	if should_skip_for_food_shortage():

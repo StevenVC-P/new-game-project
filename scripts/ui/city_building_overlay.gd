@@ -401,7 +401,11 @@ func get_work_succession_hint(city: City, building: Building) -> String:
 	if successor == null:
 		return ""
 
-	return "Family work succession: " + city.get_household_label(successor.id) + " preferred"
+	var hint: String = "Family work succession: " + city.get_household_label(successor.id) + " preferred"
+	if building.succession_vacancy_months >= 0:
+		var months_left: int = max(0, City.SUCCESSION_AUTO_FILL_MONTHS - building.succession_vacancy_months)
+		hint += " (filled automatically in " + str(months_left) + " mo)"
+	return hint
 
 func get_household_option_label(city: City, household: Household) -> String:
 	if household.residence_building_id >= 0:

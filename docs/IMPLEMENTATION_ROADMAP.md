@@ -167,6 +167,22 @@ Known gaps that block the vision:
 
 **Done when (R5):** in an owner playtest, a settlement reaches Village and holds it stable for about 5-10 game years, including at least one generational turnover (a founding couple passes and their trade is carried on by descendants), and the owner judges it fun.
 
+## Owner Tuning Decisions (2026-10-20)
+
+Made after M3, before the first owner playtest. Tested by `tests/succession_shortage_validation.gd`.
+
+- **Work succession.** When a family passes on or leaves, a direct child's family with spare labor inherits its workplaces immediately, same-trade heirs first, even when a better-suited family exists. With no heir, the workplace waits: the player can fill it at any point, and after 2 months the game fills it (the suggested successor first). Workplaces the player emptied on purpose are never auto-filled. The sidebar hint shows the countdown.
+- **Food shortage loss** is 25% (one production day in four is lost), down from 50%.
+- **Marrying outside the town** stays, with a culturally set wait: 6 months base, Clannish +12, Insular +6, Welcoming -3, Cosmopolitan -3, minimum 2.
+
+**Balance finding:** one toolmaker (about 1 tool a day) only just covers the upkeep of about 13 buildings. Because heirs now inherit regardless of fit, a poorly suited heir at the toolmaker tipped the 10-year sim into a tool collapse; with two toolmakers the same town stays healthy (15-17 families, a third generation, full famine recovery). Expect to need a second toolmaker as the town grows.
+
+## Future Feature Notes
+
+Ideas recorded for later design, not scheduled:
+
+- **Contested succession.** When more than one party has a claim to control a workplace (rival Houses, competing heirs, or another power), the wait before the game fills it could lengthen, turning succession into a contest the player can influence. Today the wait is a flat 2 months (`City.SUCCESSION_AUTO_FILL_MONTHS`).
+
 ## Gate Before Town Scale
 
 Before work on Houses, neighborhoods, coin, armies, or a larger world:
