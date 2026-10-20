@@ -127,7 +127,7 @@ The house is a family home, so housing pressure should be measured in households
 
 ## Pacing Targets
 
-At 1x (6 minutes per game year), provisional:
+The owner chose a fixed clock with player speed control and a slow, contemplative pace (`docs/GAME_VISION.md`), so these targets assume the current calendar. At 1x (6 minutes per game year), provisional:
 
 | Stage | Target game time | Real time at 1x |
 | --- | --- | --- |
@@ -155,22 +155,24 @@ Stage titles should not drop back once earned; they are history. Current stabili
 
 ## Recommended Implementation Order
 
-1. **`feature/settlement-stage-status-v0`** - recommended first.
-   - Computes the current stage and progress checklist from existing state (household count, generation, shelter, food shortage, calendar) and records milestones.
-   - Shows it in the City Overview.
-   - No formula changes. Read-only plus a milestone record. Low risk.
-   - Gives the first playable a visible goal immediately, and gives every later sprint a way to show its effect.
-2. **`feature/household-migration-v0`**
-   - Whole-household migrants driven by attractiveness, with a refilling regional pool.
-   - High-risk (`city.gd` growth formulas). Needs the owner decision above.
-   - Fixes findings 1-2 and the post-hamlet stall.
-3. **`feature/household-satisfaction-records-v0`**
-   - Per-household satisfaction snapshots; feeds the village exit condition and attractiveness.
-4. **`feature/clothing-textile-production-v0`**
-   - Gives the clothing soft need a production answer in the village stage.
-5. **Neutral-town trade reason** - after the village has real surplus or shortages to trade.
+Revised after `docs/GAME_VISION.md` (2026-10-19). The owner chose family ambitions, pressures and crises, neighbors and rivals, and self-chosen ambitions as what pulls the player forward, not a stage ladder. Stages stay as journey markers, so the stage display moves down; recoverable failure and family-driven motivation move up.
 
-Housing-in-households (finding 5) and the newlywed seed mismatch (finding 6) can be small fixes inside sprint 2 or their own `fix/` branch once decided.
+1. **`feature/household-migration-v0`** - recommended first.
+   - Arrivals: whole-household migrants driven by attractiveness, with a refilling regional pool.
+   - Departures: households leave after sustained hardship (food shortage, no shelter). This is the first "real but recoverable" failure state.
+   - High-risk (`city.gd` growth formulas). Needs owner decision 2 below.
+   - Fixes findings 1-2 and the post-hamlet stall.
+2. **`docs/family-ambitions-model`** then **`feature/family-ambitions-v0`**
+   - What households want, how they signal it, and what fulfilling or ignoring it does. Planning first because it touches values, satisfaction, and migration.
+3. **`feature/household-satisfaction-records-v0`**
+   - Per-household satisfaction snapshots; feeds ambitions, departures, and attractiveness.
+4. **`feature/settlement-stage-status-v0`**
+   - Stage, progress, and milestone chronicle in the City Overview. Read-only, low risk; can be slotted in at any point as a small supporting slice.
+5. **`feature/clothing-textile-production-v0`**
+   - Gives the clothing soft need a production answer in the village stage.
+6. **Neutral-town trade reason** - the first step toward living neighbors.
+
+Housing-in-households (finding 5) and the newlywed seed mismatch (finding 6) can be small fixes inside sprint 1 or their own `fix/` branch once decided.
 
 ## Owner Decisions Needed
 
@@ -188,7 +190,7 @@ This model does not implement or redesign:
 - realm or larger region maps
 - money, credit, markets, or a trade overhaul
 - labor capacity (the `working_adults` -> labor capacity 0/1/2 bridge in `HOUSEHOLD_LIFECYCLE_SUCCESSION_MODEL.md` stays as is)
-- politics, diplomacy, or military
+- politics, diplomacy, or military (in scope for the long arc per `docs/GAME_VISION.md`, but not part of this growth band)
 
 ## Validation
 

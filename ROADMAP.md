@@ -2,6 +2,8 @@
 
 This roadmap is intentionally lightweight. Replace placeholders with scoped tasks as the project direction becomes clearer.
 
+Objectives, pace, and player experience are set in `docs/GAME_VISION.md`. Growth stages and the next sprint order are in `docs/SETTLEMENT_GROWTH_SCALE_MODEL.md`.
+
 ## Core Loop
 
 - First playable loop: grow and stabilize a small settlement by placing/expanding housing, creating production responsibilities, assigning households, managing food/housing/resource pressure, and using trade or expansion to relieve shortages.
@@ -30,7 +32,8 @@ This roadmap is intentionally lightweight. Replace placeholders with scoped task
 
 ## Enemies/NPCs
 
-- TODO: Decide whether NPCs, agents, factions, or adversaries are in scope.
+- Neighbors and rivals are in scope for the long arc (`docs/GAME_VISION.md`): other settlements and cultures to trade with, compete with, or absorb, with conquest possible but long and drawn-out.
+- Near-term: the neutral town stays inert until the village loop is stable; giving it a trade reason is the first step toward living neighbors.
 
 ## Inventory/Items
 
