@@ -6,6 +6,8 @@ extends RefCounted
 
 const CultureValuesScript = preload("res://scripts/domain/culture_values.gd")
 const CultureEffectsScript = preload("res://scripts/domain/culture_effects.gd")
+const EconomyBalanceScript = preload("res://scripts/domain/economy_balance.gd")
+const BuildingTiersScript = preload("res://scripts/domain/building_tiers.gd")
 
 # Regional pool, counted in families. Departing families return to it.
 const POOL_START_FAMILIES: int = 5
@@ -63,10 +65,13 @@ static func advance_month(city, city_index: int = 0) -> void:
 	city.resources["households_considering_departure"] = get_households_considering_departure(city).size()
 	city.resources["shortage_days_this_month"] = 0
 
-# Temporary shelter is crowding for births but not hardship, so founders are not driven out
-# while the first houses go up. Overcrowded homes, no shelter, and food shortage are hardship.
-static func is_household_crowded(household: Household) -> bool:
+# Rough housing (temporary shelter or a hut) is crowding for births. It becomes hardship only
+# after ROUGH_HOUSING_GRACE_MONTHS, so founders have time to build. Overcrowded homes, no shelter,
+# and food shortage are hardship.
+static func is_household_crowded(household: Household, city = null) -> bool:
 	if household.housing_status == Household.RESIDENCE_TEMPORARY:
+		return true
+	if city != null and city.is_household_in_rough_housing(household):
 		return true
 	return household.housing_status == Household.RESIDENCE_HOUSED and household.total_population > CROWDED_ABOVE_POPULATION
 
@@ -78,12 +83,18 @@ static func get_monthly_hardship_points(city, household: Household) -> int:
 		points += HARDSHIP_UNSHELTERED_POINTS
 	if household.housing_status == Household.RESIDENCE_HOUSED and household.total_population > CROWDED_ABOVE_POPULATION:
 		points += CultureEffectsScript.get_crowding_hardship_points(household.values)
+	if household.rough_housing_months > EconomyBalanceScript.ROUGH_HOUSING_GRACE_MONTHS:
+		points += CultureEffectsScript.get_crowding_hardship_points(household.values)
 	return points
 
 # Hardship is capped just past the threshold, so once conditions improve a family recovers in a
 # few months instead of carrying an old crisis indefinitely.
 static func update_hardship(city) -> void:
 	for household: Household in city.households:
+		if city.is_household_in_rough_housing(household):
+			household.rough_housing_months += 1
+		else:
+			household.rough_housing_months = 0
 		var points: int = get_monthly_hardship_points(city, household)
 		household.suffered_hardship_this_month = points > 0
 		if points > 0:
@@ -184,13 +195,13 @@ static func get_attractiveness(city) -> int:
 static func estimate_daily_food_production(city) -> float:
 	var total: float = 0.0
 	for building: Building in city.buildings:
-		if building.type != Building.BUILDING_FARM or not building.can_produce():
+		if BuildingTiersScript.get_base_type(building.type) != Building.BUILDING_FARM or not building.can_produce():
 			continue
 		var percent: int = 0
 		var household: Household = city.get_household_by_id(building.assigned_household_id)
 		if household != null and household.has_values():
 			percent = CultureEffectsScript.get_work_output_percent(household.values, building.type)
-		total += float(city.get_base_building_output_amount(Building.BUILDING_FARM)) * city.get_family_labor_factor(household) * float(100 + percent) / 100.0 * get_maintenance_output_factor(building.maintenance_level)
+		total += float(city.get_base_building_output_amount(building.type)) * city.get_family_labor_factor(household) * float(100 + percent) / 100.0 * get_maintenance_output_factor(building.maintenance_level)
 	return total
 
 static func get_maintenance_output_factor(maintenance_level: int) -> float:

@@ -104,6 +104,8 @@ static func _count_buildings_of_type_through_index(buildings: Array[Building], b
 	return count
 
 static func _capitalize_building_type(building_type: String) -> String:
+	if BuildingTiers.is_tier0(building_type):
+		return BuildingTiers.get_display_name(building_type)
 	if building_type == Building.BUILDING_HOUSE:
 		return "House"
 	if building_type == Building.BUILDING_FARM:

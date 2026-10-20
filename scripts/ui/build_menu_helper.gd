@@ -2,6 +2,10 @@ class_name BuildMenuHelper
 
 static func get_building_catalog() -> Array[Dictionary]:
 	return [
+		{"id": "hut", "display_name": "Hut", "category": "Hand Work (Tier 0)"},
+		{"id": "forager_garden", "display_name": "Forager's Garden", "category": "Hand Work (Tier 0)"},
+		{"id": "gatherer_camp", "display_name": "Gatherer's Camp", "category": "Hand Work (Tier 0)"},
+		{"id": "tool_mender", "display_name": "Tool Mender", "category": "Hand Work (Tier 0)"},
 		{
 			"id": "house",
 			"display_name": "House",

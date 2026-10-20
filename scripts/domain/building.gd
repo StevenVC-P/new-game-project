@@ -2,6 +2,7 @@ class_name Building
 extends RefCounted
 
 const EconomyBalanceScript = preload("res://scripts/domain/economy_balance.gd")
+const BuildingTiersScript = preload("res://scripts/domain/building_tiers.gd")
 
 const BUILDING_HOUSE: String = "house"
 const BUILDING_FARM: String = "farm"
@@ -52,10 +53,16 @@ func _init(building_id: int = -1, building_type: String = BUILDING_HOUSE, tile_p
 		required_workers = 0
 
 func is_house() -> bool:
-	return type == BUILDING_HOUSE
+	return BuildingTiersScript.get_base_type(type) == BUILDING_HOUSE
 
 func is_production_building() -> bool:
-	return type != BUILDING_HOUSE
+	return not is_house()
+
+func is_tier0() -> bool:
+	return BuildingTiersScript.is_tier0(type)
+
+func needs_maintenance() -> bool:
+	return is_production_building() and not is_tier0()
 
 func contains_tile(tile_pos: Vector2i) -> bool:
 	return tile_pos.x >= tile.x and tile_pos.x < tile.x + size.x and tile_pos.y >= tile.y and tile_pos.y < tile.y + size.y

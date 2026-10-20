@@ -6,6 +6,7 @@ const CultureValuesScript = preload("res://scripts/domain/culture_values.gd")
 const CultureEffectsScript = preload("res://scripts/domain/culture_effects.gd")
 const HouseholdMigrationScript = preload("res://scripts/domain/household_migration.gd")
 const EconomyBalanceScript = preload("res://scripts/domain/economy_balance.gd")
+const BuildingTiersScript = preload("res://scripts/domain/building_tiers.gd")
 const BUILDING_HOUSE: String = "house"
 const BUILDING_FARM: String = "farm"
 const BUILDING_WOODCUTTER: String = "woodcutter"
@@ -782,7 +783,7 @@ func get_birth_roll_chance(household: Household) -> int:
 
 	var chance: int = household.get_birth_base_chance()
 	chance += CultureEffectsScript.get_birth_chance_bonus(household.values)
-	if HouseholdMigrationScript.is_household_crowded(household):
+	if HouseholdMigrationScript.is_household_crowded(household, self):
 		chance += CultureEffectsScript.get_crowding_birth_penalty(household.values)
 	if get_food_days_stored() >= BIRTH_FOOD_SURPLUS_DAYS:
 		chance += BIRTH_FOOD_SURPLUS_BONUS
@@ -896,7 +897,7 @@ func tick():
 	for building: Building in buildings:
 		if building.is_house():
 			continue
-		if int(resources["maintenance_grace_ticks"]) <= 0:
+		if building.needs_maintenance() and int(resources["maintenance_grace_ticks"]) <= 0:
 			update_building_maintenance(building)
 		if building.can_produce():
 			apply_building_production(building)
@@ -1236,6 +1237,8 @@ func apply_building_production(building: Building):
 	if output_amount <= 0:
 		return
 
+	# Tier 0 buildings produce the same goods as their tier 1 counterpart, at a lower rate.
+	building_type = BuildingTiersScript.get_base_type(building_type)
 	if building_type == BUILDING_FARM:
 		resources["food"] = int(resources["food"]) + output_amount
 	elif building_type == BUILDING_WOODCUTTER:
@@ -1310,6 +1313,8 @@ func get_current_building_output_amount(building: Building) -> int:
 	return 0
 
 func get_base_building_output_amount(building_type: String) -> float:
+	if BuildingTiersScript.is_tier0(building_type):
+		return get_base_building_output_amount(BuildingTiersScript.get_base_type(building_type)) * EconomyBalanceScript.TIER0_OUTPUT_FRACTION
 	if building_type == BUILDING_FARM:
 		return EconomyBalanceScript.FARM_FOOD_PER_DAY
 	if building_type == BUILDING_WOODCUTTER:
@@ -1383,6 +1388,7 @@ func apply_older_child_support_output_modifier(output_amount: int, tick_count: i
 	return output_amount + household.get_older_child_support_bonus()
 
 func get_preferred_worker_for_building(building_type: String) -> String:
+	building_type = BuildingTiersScript.get_base_type(building_type)
 	if building_type == BUILDING_FARM:
 		return WORK_PREF_AGRARIAN
 	if building_type == BUILDING_WOODCUTTER or building_type == BUILDING_TOOLMAKER:
@@ -1471,16 +1477,61 @@ func assign_households_to_housing():
 		var building_id: int = int(open_house_ids.pop_front())
 		household.move_to_house(building_id)
 
+# Proper houses are offered before huts, so families move into the better home first.
 func get_empty_house_building_ids() -> Array[int]:
 	var result: Array[int] = []
+	var huts: Array[int] = []
 
 	for building: Building in buildings:
 		if not building.is_house():
 			continue
-		if get_household_for_building_id(building.id) == null:
+		if get_household_for_building_id(building.id) != null:
+			continue
+		if building.is_tier0():
+			huts.append(building.id)
+		else:
 			result.append(building.id)
 
+	result.append_array(huts)
 	return result
+
+# Tier 0 housing: temporary shelter or a hut.
+func is_household_in_rough_housing(household: Household) -> bool:
+	if household.housing_status == Household.RESIDENCE_TEMPORARY:
+		return true
+	if household.housing_status != Household.RESIDENCE_HOUSED:
+		return false
+	var home_id: int = household.residence_building_id
+	return home_id >= 0 and home_id < buildings.size() and buildings[home_id].is_tier0()
+
+func get_upgrade_cost(building_index: int) -> Dictionary:
+	if building_index < 0 or building_index >= buildings.size():
+		return {}
+	var upgrade_type: String = BuildingTiersScript.get_upgrade_type(buildings[building_index].type)
+	if upgrade_type == "":
+		return {}
+	return EconomyBalanceScript.get_build_cost(upgrade_type)
+
+func can_upgrade_building(building_index: int) -> bool:
+	if building_index < 0 or building_index >= buildings.size():
+		return false
+	if BuildingTiersScript.get_upgrade_type(buildings[building_index].type) == "":
+		return false
+	return can_afford_cost(get_upgrade_cost(building_index))
+
+# Upgrades a tier 0 building in place into its tier 1 counterpart. The family working or living
+# in it stays; the footprint and terrain rules are shared, so no new placement is needed.
+func upgrade_building(building_index: int) -> bool:
+	if not can_upgrade_building(building_index):
+		return false
+	var building: Building = buildings[building_index]
+	pay_cost(get_upgrade_cost(building_index))
+	building.type = BuildingTiersScript.get_upgrade_type(building.type)
+	building.maintenance_level = 100
+	building.maintenance_timer = 0
+	update_shelter_counts()
+	update_worker_counts()
+	return true
 
 func get_unhoused_households_by_size() -> Array[Household]:
 	var result: Array[Household] = []

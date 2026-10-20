@@ -5,6 +5,7 @@ extends RefCounted
 # Design source: docs/CULTURE_AND_VALUES_MODEL.md. All numbers are tuning defaults.
 
 const CultureValuesScript = preload("res://scripts/domain/culture_values.gd")
+const BuildingTiersScript = preload("res://scripts/domain/building_tiers.gd")
 
 const MATCH_GOOD: String = "good match"
 const MATCH_NEUTRAL: String = "neutral"
@@ -74,7 +75,7 @@ static func get_calling_match(profile: Dictionary, building_type: String) -> Str
 	if callings.is_empty():
 		return MATCH_NEUTRAL
 
-	var drawn: Array = BUILDING_CALLINGS.get(building_type, [])
+	var drawn: Array = BUILDING_CALLINGS.get(BuildingTiersScript.get_base_type(building_type), [])
 	for calling in callings:
 		if drawn.has(calling):
 			return MATCH_GOOD
