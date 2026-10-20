@@ -37,6 +37,8 @@ Labor is derived from `working_adults`, a v0 compatibility bridge that preserves
 
 `total_population` now means household size, food demand, and shelter pressure. `working_adults` means the adult labor source for current assignment rules. This is still functional but still too worker-like for the north star. The project direction says one household should usually mean one primary responsibility, not an anonymous pool of interchangeable workers. Larger households currently gain a second labor capacity point, which should eventually be reframed as household support or effectiveness rather than a second generic worker.
 
+**Resolved 2026-10-20 (owner decision): a family runs one holding.** Labor capacity is now 1 for any family with a working adult (0 otherwise): one primary responsibility, a farmstead or workshop worked by the whole family. Family size changes output instead of the number of jobs: balance outputs assume a two-adult family, a one-adult family works at half, and older children add the periodic family-support bonus. Bigger operations at town scale come from Houses employing dependent families (`docs/HOUSES_AND_LINEAGE_MODEL.md`).
+
 Residence currently matters because households may be housed, temporarily sheltered, or unsheltered. City housing assignment moves eligible households into empty house buildings. Household population contributes to food consumption and shelter pressure.
 
 Assignment currently matters because production buildings need assigned workers and maintenance above zero. A building can store one assigned household id. A household tracks assigned building ids and assigned worker count. Assignment is blocked if the household has no available workers.

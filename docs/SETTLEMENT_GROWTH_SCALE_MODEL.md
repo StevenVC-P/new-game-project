@@ -200,7 +200,7 @@ This model does not implement or redesign:
 - neighborhoods, districts, or household aggregation
 - realm or larger region maps
 - money, credit, markets, or a trade overhaul
-- labor capacity (the `working_adults` -> labor capacity 0/1/2 bridge in `HOUSEHOLD_LIFECYCLE_SUCCESSION_MODEL.md` stays as is)
+- labor capacity (since 2026-10-20 a family runs one holding; see `HOUSEHOLD_LIFECYCLE_SUCCESSION_MODEL.md`)
 - politics, diplomacy, or military (in scope for the long arc per `docs/GAME_VISION.md`, but not part of this growth band)
 
 ## Validation

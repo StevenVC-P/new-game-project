@@ -42,7 +42,7 @@ func test_quarry_outputs_stone_blocks() -> void:
 
 	city.apply_building_production(building)
 
-	_check(int(city.resources["stone_blocks"]) == 1, "quarry should produce stone_blocks")
+	_check(int(city.resources["stone_blocks"]) == _first_day_output(EconomyBalance.EXPANDED_GOODS_PER_DAY), "quarry should produce stone_blocks")
 
 func test_stonecutter_consumes_stone_blocks_and_outputs_cut_stone() -> void:
 	_assert_chain(Building.BUILDING_STONECUTTER, {"stone_blocks": 2}, "cut_stone")
@@ -94,9 +94,13 @@ func _assert_chain(building_type: String, input_values: Dictionary, output_key: 
 
 	city.apply_building_production(building)
 
-	_check(int(city.resources[output_key]) == 1, building_type + " should produce " + output_key)
+	# One unit of each input per unit made, capped by the scarcest input.
+	var expected: int = _first_day_output(EconomyBalance.EXPANDED_GOODS_PER_DAY)
 	for input_key: String in input_values.keys():
-		_check(int(city.resources[input_key]) == int(before_inputs[input_key]) - 1, building_type + " should consume " + input_key)
+		expected = min(expected, int(before_inputs[input_key]))
+	_check(int(city.resources[output_key]) == expected, building_type + " should produce " + output_key)
+	for input_key: String in input_values.keys():
+		_check(int(city.resources[input_key]) == int(before_inputs[input_key]) - expected, building_type + " should consume " + input_key)
 		_check(int(city.resources[input_key]) >= 0, building_type + " should not make " + input_key + " negative")
 
 func _first_day_output(per_day: float) -> int:

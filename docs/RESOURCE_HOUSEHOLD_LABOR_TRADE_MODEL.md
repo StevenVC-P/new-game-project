@@ -81,6 +81,8 @@ Households can be assigned to buildings through `City.assign_household_by_id_to_
 
 Design tension: the project north star says one household should usually mean one primary responsibility, not a generic worker slot. The current code allows larger households to have labor capacity `2`, so future design decisions should decide whether that is intended, temporary, or should be reframed as household capability rather than two anonymous workers.
 
+**Resolved 2026-10-20 (owner decision): a family runs one holding.** Labor capacity is now 1 for any family with a working adult (0 otherwise): one primary responsibility, a farmstead or workshop worked by the whole family. Family size changes output instead of the number of jobs: balance outputs assume a two-adult family, a one-adult family works at half, and older children add the periodic family-support bonus. Bigger operations at town scale come from Houses employing dependent families (`docs/HOUSES_AND_LINEAGE_MODEL.md`).
+
 Older-child production support is represented as household support power, not additional workers. `older_children` do not increase `labor_capacity`, `worker_capacity`, idle labor, assigned worker count, or the number of buildings a household can support. When a household is assigned to a producing building, older children can add a small periodic output bonus using conservative diminishing returns:
 
 - `support_power = older_children`

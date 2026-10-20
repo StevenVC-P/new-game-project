@@ -100,7 +100,8 @@ func test_food_shortage_costs_a_quarter_of_production() -> void:
 		city.resources["production_tick_count"] = day
 		city.apply_building_production(farm)
 	var produced: int = int(city.resources["food"]) - before
-	_check(produced == 150, "a food shortage should cost a quarter of production (200 -> 150), got " + str(produced))
+	var expected: int = int(round(EconomyBalance.FARM_FOOD_PER_DAY * 100.0 * 0.75))
+	_check(abs(produced - expected) <= 1, "a food shortage should cost a quarter of production, expected " + str(expected) + ", got " + str(produced))
 
 func test_outsider_marriage_wait_depends_on_culture() -> void:
 	var clannish: int = CultureEffectsScript.get_outsider_marriage_wait_months(_profile(["clannish"], ["insular"]))

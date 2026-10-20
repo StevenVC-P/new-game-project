@@ -17,13 +17,18 @@ const STARTING_FOOD: int = 60
 const STARTING_WOOD: int = 45
 const STARTING_TOOLS: int = 14
 
-# --- Daily output of a worked building, before family values and upkeep ---
-const FARM_FOOD_PER_DAY: float = 2.0
-const WOODCUTTER_WOOD_PER_DAY: float = 3.0
-const TOOLMAKER_TOOLS_PER_DAY: float = 0.5
+# --- Daily output of a holding worked by a two-adult family, before values and upkeep ---
+# Since 2026-10-20 a family runs one holding, so these are per family (double the earlier
+# per-worker values: a family's total output is unchanged). A family with one working adult
+# produces half; older children add the periodic family-support bonus on top.
+const FARM_FOOD_PER_DAY: float = 4.0
+const WOODCUTTER_WOOD_PER_DAY: float = 6.0
+const TOOLMAKER_TOOLS_PER_DAY: float = 1.0
 # Wood the toolmaker consumes for each tool it makes.
 const TOOLMAKER_WOOD_PER_TOOL: int = 2
-const EXPANDED_GOODS_PER_DAY: float = 1.0
+const EXPANDED_GOODS_PER_DAY: float = 2.0
+# Working adults in the family the output values above assume.
+const FULL_FAMILY_WORKING_ADULTS: float = 2.0
 
 # --- Food ---
 # One unit of food feeds this many people per day.

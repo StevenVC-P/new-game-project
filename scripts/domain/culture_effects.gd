@@ -86,11 +86,17 @@ static func get_calling_match(profile: Dictionary, building_type: String) -> Str
 			return MATCH_NEUTRAL
 	return MATCH_POOR
 
+# Agrarian wins if any calling is agrarian, then industrial, so a farming family never shows
+# as neutral just because its other calling comes first.
 static func get_display_preference(profile: Dictionary) -> String:
-	var callings: Array = get_callings(profile)
-	if callings.is_empty():
-		return "neutral"
-	return str(CALLING_DISPLAY_PREFERENCE.get(callings[0], "neutral"))
+	var groups: Array = []
+	for calling in get_callings(profile):
+		groups.append(str(CALLING_DISPLAY_PREFERENCE.get(calling, "neutral")))
+	if groups.has("agrarian"):
+		return "agrarian"
+	if groups.has("industrial"):
+		return "industrial"
+	return "neutral"
 
 # context: {"food_shortage": bool, "same_type_operating_others": int}
 static func get_work_output_percent(profile: Dictionary, building_type: String, context: Dictionary = {}) -> int:

@@ -1322,8 +1322,16 @@ func get_base_building_output_amount(building_type: String) -> float:
 	return 0.0
 
 func apply_building_output_modifiers(base_output: float, tick_count: int, building: Building) -> int:
-	var output_amount: int = apply_output_percent(base_output, building, get_worker_output_percent(building))
+	var family_output: float = base_output * get_family_labor_factor(get_household_by_id(building.assigned_household_id))
+	var output_amount: int = apply_output_percent(family_output, building, get_worker_output_percent(building))
 	return apply_older_child_support_output_modifier(output_amount, tick_count, building)
+
+# Balance outputs assume a two-adult family; a family with one working adult works at half.
+# Workplaces without a household (starter neutral workers) work at full rate.
+func get_family_labor_factor(household: Household) -> float:
+	if household == null:
+		return 1.0
+	return clampf(float(household.working_adults) / EconomyBalanceScript.FULL_FAMILY_WORKING_ADULTS, 0.0, 1.0)
 
 # Values decide the percent; families without values (legacy) use the old preference match.
 func get_worker_output_percent(building: Building) -> int:
