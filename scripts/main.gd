@@ -140,6 +140,7 @@ func _input(event: InputEvent):
 
 		_ensure_household_debug_inspector()
 		household_debug_inspector.set_city(get_household_debug_city())
+		household_debug_inspector.set_selected_household(get_inspected_household())
 		household_debug_inspector.visible = not household_debug_inspector.visible
 		get_viewport().set_input_as_handled()
 		return
@@ -778,6 +779,17 @@ func _ensure_household_debug_inspector() -> void:
 	household_debug_inspector.visible = false
 	household_debug_inspector.set_city(get_household_debug_city())
 
+func get_inspected_household() -> Household:
+	var city: City = get_household_debug_city()
+	if city == null:
+		return null
+	var building_index: int = city_building_overlay.inspected_building_index
+	if building_index < 0 or building_index >= city.buildings.size():
+		return null
+	if not city.buildings[building_index].is_house():
+		return null
+	return city.get_household_for_building_id(building_index)
+
 func get_household_debug_city():
 	if current_view != VIEW_CITY:
 		return null
@@ -1229,7 +1241,11 @@ func draw_selected_object_summary(font: Font, font_size: int, city: City, x: flo
 			y = draw_sidebar_label_value(font, font_size, "Resident", "empty", x, y, VisualStyle.COLOR_MUTED)
 		else:
 			y = draw_sidebar_label_value(font, font_size, "Resident", city.get_household_label(household.id), x, y, VisualStyle.COLOR_POPULATION_LABOR)
-			y = draw_sidebar_label_value(font, font_size, "Preference", household.preference, x, y, VisualStyle.get_preference_color(household.preference))
+			if household.has_values():
+				y = draw_sidebar_label_value(font, font_size, "Calling", get_household_calling_text(household), x, y, VisualStyle.get_preference_color(household.preference))
+				y = draw_sidebar_label_value(font, font_size, "Defining", get_household_defining_text(city, household), x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
+			else:
+				y = draw_sidebar_label_value(font, font_size, "Preference", household.preference, x, y, VisualStyle.get_preference_color(household.preference))
 	else:
 		y = draw_sidebar_label_value(font, font_size, "Worker", get_selected_building_worker_summary(city, building), x, y, VisualStyle.COLOR_POPULATION_LABOR)
 		y = draw_sidebar_label_value(font, font_size, "Upkeep", str(building.maintenance_level) + "%", x, y, get_maintenance_summary_color(building))
@@ -1246,6 +1262,18 @@ func draw_selected_object_summary(font: Font, font_size: int, city: City, x: flo
 			y = draw_sidebar_line(font, font_size, household_link_text, x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
 
 	return y
+
+func get_household_calling_text(household: Household) -> String:
+	var names: Array[String] = []
+	for calling in household.values.get(CultureValues.CATEGORY_CALLING, []):
+		names.append(CultureValues.get_display_name(calling))
+	return ", ".join(names)
+
+func get_household_defining_text(city: City, household: Household) -> String:
+	var names: Array[String] = []
+	for value_id: String in city.get_household_defining_values(household):
+		names.append(CultureValues.get_display_name(value_id))
+	return ", ".join(names)
 
 func get_selected_building_worker_summary(city: City, building: Building) -> String:
 	if building.assigned_workers <= 0:

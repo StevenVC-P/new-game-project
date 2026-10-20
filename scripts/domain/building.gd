@@ -35,6 +35,8 @@ var succession_source_household_id: int = -1
 var maintenance_timer: int = 0
 var maintenance_level: int = 100
 var receives_maintenance: bool = true
+# Fractional output carried between days when values modify output; starts at 0.5 so it rounds.
+var output_carry: float = 0.5
 
 func _init(building_id: int = -1, building_type: String = BUILDING_HOUSE, tile_pos: Vector2i = Vector2i.ZERO, footprint_size: Vector2i = Vector2i(2, 2)):
 	id = building_id

@@ -1,6 +1,8 @@
 class_name Household
 extends RefCounted
 
+const CultureEffectsScript = preload("res://scripts/domain/culture_effects.gd")
+
 const WORK_PREF_NEUTRAL: String = "neutral"
 const WORK_PREF_AGRARIAN: String = "agrarian"
 const WORK_PREF_INDUSTRIAL: String = "industrial"
@@ -45,6 +47,10 @@ var labor_capacity: int = 2
 var worker_capacity: int = 2
 var assigned_workers: int = 0
 var assigned_building_ids: Array[int] = []
+# Category id -> held value ids (docs/CULTURE_AND_VALUES_MODEL.md). Empty for legacy households.
+var values: Dictionary = {}
+# Months this household has had children ready to form a family; Close-Knit families wait longer.
+var family_formation_wait_months: int = 0
 
 func _init(household_id: int = -1, building_id: int = -1, work_preference: String = WORK_PREF_NEUTRAL, population: int = 4, residence_status: String = RESIDENCE_TEMPORARY):
 	id = household_id
@@ -234,7 +240,19 @@ func move_to_unsheltered():
 	house_building_id = -1
 	residence_building_id = -1
 
+# Calling is the source of truth; `preference` is kept as a derived display category for UI
+# that groups families as agrarian / industrial / neutral.
+func set_values(new_values: Dictionary):
+	values = new_values
+	if not values.is_empty():
+		preference = CultureEffectsScript.get_display_preference(values)
+
+func has_values() -> bool:
+	return not values.is_empty()
+
 func get_match_quality(building_type: String) -> String:
+	if has_values():
+		return CultureEffectsScript.get_calling_match(values, building_type)
 	if preference == WORK_PREF_NEUTRAL:
 		return "neutral"
 

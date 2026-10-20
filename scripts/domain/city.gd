@@ -2,6 +2,8 @@ class_name City
 extends RefCounted
 
 const GoodsNeedBucketHelperScript = preload("res://scripts/domain/goods_need_bucket_helper.gd")
+const CultureValuesScript = preload("res://scripts/domain/culture_values.gd")
+const CultureEffectsScript = preload("res://scripts/domain/culture_effects.gd")
 const BUILDING_HOUSE: String = "house"
 const BUILDING_FARM: String = "farm"
 const BUILDING_WOODCUTTER: String = "woodcutter"
@@ -55,6 +57,8 @@ var households: Array[Household] = []
 var resources: Dictionary = {}
 var resource_history: Array = []
 var soft_need_results: Dictionary = {}
+# Producing buildings by type, refreshed each tick; read by Communal Labor.
+var operating_building_counts: Dictionary = {}
 var site_profile: SettlementSiteProfile = SettlementSiteProfile.new()
 
 func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO, city_role: String = ROLE_PLAYER, starter_household_count: int = STARTING_HOUSEHOLD_COUNT):
@@ -177,11 +181,42 @@ func seed_starter_household_lifecycle(household: Household, household_index: int
 		household.adult_children = 0
 		household.age_in_stage = 4
 
+	household.set_values(CultureValuesScript.make_random_profile(make_values_rng(household, "seed"), {
+		CultureValuesScript.CATEGORY_CALLING: get_seeded_callings(household.family_trade)
+	}))
+
 	# Seeds are constructed at a flat starting population; derive it from the seeded family so
 	# couples without children (newlywed, old couple) are not counted as four people.
 	household.total_population = household.working_adults + household.get_total_child_count()
 	household.update_labor_capacity()
 	household.recalculate_succession_pressure()
+
+func get_seeded_callings(family_trade: String) -> Array[String]:
+	if family_trade == "farming":
+		return ["soil"]
+	if family_trade == "woodcraft":
+		return ["forest", "forge_bench"]
+	if family_trade == "stonework":
+		return ["stone"]
+	return ["hearth"]
+
+# Deterministic per household and purpose, so the same world seed reproduces the same culture.
+func make_values_rng(household: Household, purpose: String) -> RandomNumberGenerator:
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = hash([household.id, household.generation, int(tile.x), int(tile.y), purpose])
+	return rng
+
+func get_settlement_value_counts() -> Dictionary:
+	var profiles: Array = []
+	for household: Household in households:
+		if household.has_values():
+			profiles.append(household.values)
+	return CultureValuesScript.count_values(profiles)
+
+func get_household_defining_values(household: Household, limit: int = 3) -> Array[String]:
+	if household == null or not household.has_values():
+		return []
+	return CultureValuesScript.get_defining_values(household.values, get_settlement_value_counts(), households.size(), limit)
 
 func get_seeded_family_trade(preference: String, household_index: int) -> String:
 	if preference == WORK_PREF_AGRARIAN:
@@ -218,9 +253,13 @@ func recalculate_household_succession_pressures(city_index: int = 0):
 			log_household_lifecycle_event(city_index, household.id, "SuccessionReady", "potential_new_families=" + str(household.get_potential_new_family_count()))
 
 func advance_new_family_formation_month(city_index: int = 0):
-	var parent_households: Array[Household] = households.duplicate()
+	var parent_households: Array[Household] = get_family_formation_order()
 	for parent: Household in parent_households:
 		if not parent.can_form_new_family():
+			parent.family_formation_wait_months = 0
+			continue
+		parent.family_formation_wait_months += 1
+		if parent.family_formation_wait_months <= CultureEffectsScript.get_family_formation_delay_months(parent.values):
 			continue
 
 		log_household_lifecycle_event(city_index, parent.id, "NewFamilyFormationAttempted", "adult_children=" + str(parent.adult_children) + " potential_new_families=" + str(parent.get_potential_new_family_count()))
@@ -230,6 +269,18 @@ func advance_new_family_formation_month(city_index: int = 0):
 			return
 
 		form_new_family_from_parent(parent, house_id, city_index)
+
+# Leave the Nest families get first claim on empty houses; otherwise the existing order is kept.
+func get_family_formation_order() -> Array[Household]:
+	var first: Array[Household] = []
+	var rest: Array[Household] = []
+	for household: Household in households:
+		if CultureEffectsScript.has_family_formation_priority(household.values):
+			first.append(household)
+		else:
+			rest.append(household)
+	first.append_array(rest)
+	return first
 
 func find_empty_house_building_id() -> int:
 	var open_house_ids: Array[int] = get_empty_house_building_ids()
@@ -242,6 +293,7 @@ func form_new_family_from_parent(parent: Household, house_id: int, city_index: i
 	var parent_adult_children_before: int = parent.adult_children
 	var parent_population_before: int = parent.total_population
 	parent.spend_adult_children_for_new_family()
+	parent.family_formation_wait_months = 0
 	log_household_lifecycle_event(city_index, parent.id, "NewFamilyParentUpdated", "adult_children=" + str(parent_adult_children_before) + "->" + str(parent.adult_children) + " total_population=" + str(parent_population_before) + "->" + str(parent.total_population))
 
 	var household_id: int = households.size()
@@ -260,6 +312,8 @@ func form_new_family_from_parent(parent: Household, house_id: int, city_index: i
 		new_household.origin_household_id = parent.id
 	new_household.generation = parent.generation + 1
 	new_household.family_trade = get_inherited_family_trade(parent, new_household, city_index)
+	if parent.has_values():
+		new_household.set_values(CultureValuesScript.inherit_profile([parent.values], make_values_rng(new_household, "inherit"), get_settlement_value_counts()))
 	new_household.succession_pressure = 0
 	new_household.move_to_house(house_id)
 	new_household.update_labor_capacity()
@@ -543,6 +597,7 @@ func get_birth_roll_chance(household: Household) -> int:
 		return 0
 
 	var chance: int = household.get_birth_base_chance()
+	chance += CultureEffectsScript.get_birth_chance_bonus(household.values)
 	if get_food_days_stored() >= BIRTH_FOOD_SURPLUS_DAYS:
 		chance += BIRTH_FOOD_SURPLUS_BONUS
 	if get_housing_headroom() >= BIRTH_REQUIRED_HOUSING_HEADROOM:
@@ -654,6 +709,7 @@ func tick():
 	resources["production_tick_count"] = int(resources["production_tick_count"]) + 1
 	update_worker_counts()
 	consume_food()
+	refresh_operating_building_counts()
 
 	for building: Building in buildings:
 		if building.is_house():
@@ -1100,8 +1156,35 @@ func get_base_building_output_amount(building_type: String) -> int:
 	return 0
 
 func apply_building_output_modifiers(base_output: int, tick_count: int, building: Building) -> int:
-	var output_amount: int = apply_worker_preference_output_modifier(base_output, tick_count, building)
+	var output_amount: int = base_output
+	var household: Household = get_household_by_id(building.assigned_household_id) if building.assigned_household_id >= 0 else null
+	if household != null and household.has_values():
+		output_amount = apply_culture_output_modifier(base_output, building, household)
+	else:
+		output_amount = apply_worker_preference_output_modifier(base_output, tick_count, building)
 	return apply_older_child_support_output_modifier(output_amount, tick_count, building)
+
+# Values change output by a percentage; the fraction carries over on the building so small
+# integer outputs (1-2 per day) still average out to the intended rate.
+func apply_culture_output_modifier(base_output: int, building: Building, household: Household) -> int:
+	if base_output <= 0:
+		return base_output
+
+	var context: Dictionary = {
+		"food_shortage": bool(resources.get("food_shortage", false)),
+		"same_type_operating_others": max(0, int(operating_building_counts.get(building.type, 0)) - 1)
+	}
+	var percent: int = CultureEffectsScript.get_work_output_percent(household.values, building.type, context)
+	var exact_output: float = float(base_output) * float(100 + percent) / 100.0 + building.output_carry
+	var whole_output: int = int(floor(exact_output))
+	building.output_carry = exact_output - float(whole_output)
+	return max(0, whole_output)
+
+func refresh_operating_building_counts():
+	operating_building_counts.clear()
+	for building: Building in buildings:
+		if building.can_produce():
+			operating_building_counts[building.type] = int(operating_building_counts.get(building.type, 0)) + 1
 
 func apply_worker_preference_output_modifier(base_output: int, tick_count: int, building: Building) -> int:
 	var assigned_preference: String = get_household_preference_for_worker_modifier(building)
@@ -1297,6 +1380,7 @@ func add_population_from_external_pool():
 	if target == null:
 		var household_id: int = households.size()
 		var household: Household = Household.new(household_id, -1, WORK_PREF_NEUTRAL, 1, Household.RESIDENCE_TEMPORARY)
+		household.set_values(CultureValuesScript.inherit_profile([], make_values_rng(household, "migrant"), get_settlement_value_counts()))
 		households.append(household)
 		return
 
