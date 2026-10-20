@@ -177,6 +177,32 @@ Made after M3, before the first owner playtest. Tested by `tests/succession_shor
 
 **Balance finding:** one toolmaker (about 1 tool a day) only just covers the upkeep of about 13 buildings. Because heirs now inherit regardless of fit, a poorly suited heir at the toolmaker tipped the 10-year sim into a tool collapse; with two toolmakers the same town stays healthy (15-17 families, a third generation, full famine recovery). Expect to need a second toolmaker as the town grows.
 
+## Economy Balance Pass (2026-10-20)
+
+All economy numbers now live in `scripts/domain/economy_balance.gd`. `tests/sim/opening_check.gd` founds 20 towns (each with different founding families) and plays two years, once with the owner's first-playtest opening (3 houses, 1 farm, 1 woodcutter, 1 toolmaker) and once with a simple stand-in player.
+
+**What the first playtest exposed:** with the original numbers, one woodcutter (2 wood/day) and one toolmaker (2 wood per tool, 1 tool/day) net zero wood, so a town could not afford another farm. Worse, every building cost tools, including the toolmaker, so a town that spent its 14 starting tools before running a toolmaker could never build again and emptied within a year.
+
+**First pass, following owner direction** (tools are a slow, valuable craft; running short should be more common than having too many; every town must be able to start):
+
+| Number | Before | Now |
+| --- | --- | --- |
+| Woodcutter output | 2 wood/day | 3 wood/day |
+| Toolmaker output | 1 tool/day | 0.5 tool/day (still 2 wood per tool) |
+| Tool upkeep per workplace | every 8-12 days | every 16-24 days |
+| House cost | 8 wood + 1 tool | 6 wood + 0 tools |
+| Toolmaker cost | 10 wood + 3 tools | 10 wood + 0 tools, so a town can always rebuild its tool supply |
+| Stone and craft buildings | 2-3 tools | 1-2 tools |
+
+| Opening check (20 towns, 2 years) | Before | Now |
+| --- | --- | --- |
+| Owner's opening | 4/20 off the ground, 20 stuck on wood | 20/20, none stuck |
+| Stand-in player | 0/20, all out of tools | 20/20 |
+
+Over ten years with one toolmaker, small towns build a tool buffer (about 166 by year 4); as the town reaches about 13 workplaces, one toolmaker no longer keeps up, tools run out in year 8, and the town shrinks to 31-42 people and carries on. A second toolmaker is what a growing town needs. Wood is now plentiful (about 1,300 by year 2 in the opening check), which may be too generous once more wood consumers exist.
+
+These are a starting point for owner tuning, not final values.
+
 ## Future Feature Notes
 
 Ideas recorded for later design, not scheduled:
