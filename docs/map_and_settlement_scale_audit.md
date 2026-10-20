@@ -145,7 +145,7 @@ Starting settlement:
 
 - `Player Town` starts with 4 households.
 - Each starter household has population 4.
-- Starting population is therefore 16.
+- Starting population is therefore 16. (Since 2026-10-19 seed population is derived from family structure, so founding starts at 14: the newlywed seed is a couple of 2.)
 - Starter households begin in temporary shelter.
 - Houses have `HOUSE_CAPACITY = 4`.
 
