@@ -79,15 +79,14 @@ The world does not wait for the player. Rivals, established powers, and bandits 
 - **Resource and industry control** - you hold key deposits, the best workshops, or goods others cannot make.
 - **Economic dependency** - rivals cannot feed or supply themselves without you, so leverage replaces conquest.
 
-### Money (proposed, pending owner confirmation)
+### Money
 
-No universal gold. **Money belongs to someone.**
+Decided; full model in `docs/ECONOMY_MODEL.md`. In short:
 
-- **Inside the player's settlement**, money emerges over time, following `docs/MONEY_OBLIGATION_AND_CITY_CREDIT_MODEL.md`: shared storehouse, then tracked obligations, then city credit, then accepted currency.
-- **Established civilizations already have their own coin** at game start, each backed by its issuer's wealth and trustworthiness. To a frontier town, foreign coin is a valuable good earned and spent through trade.
-- **Adopting a neighbor's coin** is convenient but creates economic dependency and gives the issuer influence. **Building your own credit** is slower but keeps independence. If the player's currency becomes widely used, that is a path to economic dominance.
-- Why not generic gold: one universal store of value would erase dependency, influence, and cultural difference, which are the levers this game is about. Tying money to an issuer makes money a form of influence.
-- Guardrails: one currency per civilization, value shown as plain-language trust ("Traders discount your credit"), and no money in the first playable; early neighbor trade is barter.
+- No universal gold. Money is mined metal stamped by an issuer; a coin is worth its metal plus trust in whoever minted it.
+- Established civilizations have their own coin from the start. The player can use a neighbor's coin (easy, creates dependency and gives the issuer influence) or mint their own (needs metal, a mint, and trust; keeps independence).
+- Inside the settlement, shared stores and in-kind tithes come first. No credit or debt.
+- Coin is adopted because it makes life simpler and more stable, not because a feature unlocks.
 
 ## Knowledge And Technology
 
@@ -132,7 +131,6 @@ These follow from the vision and should guide upcoming sprints:
 
 ## Open Questions
 
-- Confirm the proposed money model (money belongs to someone; no universal gold).
 
 - What is the first value or cultural trait that should have a real economic effect?
 - How long, in game years, should the climb from founding to the first nation-level structure take?
