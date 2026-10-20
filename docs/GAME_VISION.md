@@ -35,6 +35,38 @@ The defining overlap is **culture x economics**: how families live shapes the ec
 - **Neighbors and rivals** - other settlements and cultures to trade with, compete with, or absorb.
 - **The player's own chosen ambition** - conquest, economic dominance, or cultural legacy.
 
+## Player Role
+
+**Guiding hand.** The player is an unseen will behind the settlement, not an in-world character or dynasty. The families are the characters.
+
+## Starting Situation
+
+**Independent frontier.** The player's founding families are free settlers on unclaimed land at the edge of established powers, independent from day one.
+
+## Expansion And Acknowledgement
+
+Ambitions are acknowledged through what the player can do on the map, not through epilogues or victory screens.
+
+- **Influence comes before territory.** A settlement first extends its influence; visible expansion on the map follows.
+- **With enough resources and influence**, the player can found a new town or attempt to capture another city.
+- The map itself is the record of achievement: towns founded, cities taken, reach extended.
+
+### Influence
+
+Influence is both soft and hard:
+
+- **Soft and relational:** trade reach (where your goods and routes go), reputation and culture (prosperity and stability that attract and sway), and kinship and lineage (families from your town who settle or marry elsewhere carry your influence with them).
+- **Hard:** military presence (patrols, garrisons, safe roads).
+- **Hard borders exist.** Influence is a gradient that can overlap and be contested, but territory is ultimately claimed with clear borders.
+
+## Rivals And Threats
+
+The world is not empty and not level:
+
+- **Non-state threats** - highwaymen, gangs of looters, bandits. Present from the start, and their danger depends on the region: some areas are lawless, others are already policed. As the player's society develops, bandits can be driven off the map, which is itself visible progress.
+- **Rival towns** - settlements of similar scale competing for land, trade, and people.
+- **Established civilizations** - some rivals may already be expanded powers when the player founds their first town. The player starts small in a world that already has big players.
+
 ## Pace
 
 - **Slow and contemplative.** Long stretches of watching families live, occasional decisions, frequent pausing to inspect.
@@ -60,9 +92,11 @@ These follow from the vision and should guide upcoming sprints:
 5. **A world-scale map is required eventually.** The current regional map reads as one valley (see `docs/map_and_settlement_scale_audit.md`).
 6. **A fixed clock has costs at scale.** At 6 minutes per game year at 1x, centuries of history need higher speed options later, and household-by-household simulation must give way to grouped simulation as the audit describes, or late-game ticks will be too slow.
 
+7. **Influence is a core system** with two layers: a soft, overlapping influence gradient and hard claimed borders. It gates founding new towns and capturing cities. Founding a second town is currently blocked in code; it should unlock through influence and resources rather than stay blocked.
+8. **Defense matters early.** Bandits and looters can threaten a hamlet, so some defensive response (militia is already a listed household responsibility in `docs/PROJECT_OWNER_QUESTIONS.md`) belongs earlier than full military systems.
+9. **World generation must place established powers and bandit regions.** Some rivals exist at full scale from day one, and regions need a lawlessness level, so the world needs pre-built civilizations and contested frontier, not only empty land and one neutral town.
+
 ## Open Questions
 
-- Should the game recognize when a player achieves a chosen ambition (a chronicle entry, an epilogue), or stay silent?
-- What do rivals look like early: other founding settlements, the neutral town waking up, or regional cultures?
 - What is the first value or cultural trait that should have a real economic effect?
 - How long, in game years, should the climb from founding to the first nation-level structure take?
