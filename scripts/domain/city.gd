@@ -31,6 +31,8 @@ const TOOLMAKER_WOOD_INPUT: int = EconomyBalanceScript.TOOLMAKER_WOOD_PER_TOOL
 const STARTER_NEUTRAL_WORKERS: int = 0
 const STARTING_HOUSEHOLD_COUNT: int = 3
 const STARTING_HOUSEHOLD_POPULATION: int = 4
+# Founders draw their life stage from the first this-many seed shapes (excludes old couples).
+const FOUNDING_LIFE_STAGE_SHAPES: int = 4
 const STARTING_POPULATION: int = STARTING_HOUSEHOLD_COUNT * STARTING_HOUSEHOLD_POPULATION
 const HOUSE_CAPACITY: int = 4
 const FOOD_PER_POPULATION_DIVISOR: int = EconomyBalanceScript.PEOPLE_FED_PER_FOOD
@@ -63,16 +65,21 @@ var households: Array[Household] = []
 var resources: Dictionary = {}
 var resource_history: Array = []
 var soft_need_results: Dictionary = {}
+# Mixed into every random roll the town makes (founders, values, newcomers, marriages).
+var founding_seed: int = 0
 # Value counts of the region newcomers come from; generated on first arrival.
 var regional_value_counts: Dictionary = {}
 # Producing buildings by type, refreshed each tick; read by Communal Labor.
 var operating_building_counts: Dictionary = {}
 var site_profile: SettlementSiteProfile = SettlementSiteProfile.new()
 
-func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO, city_role: String = ROLE_PLAYER, starter_household_count: int = STARTING_HOUSEHOLD_COUNT):
+# `random_seed` makes each founding differ between games; 0 (the default, used by tests and
+# tools) keeps a town reproducible from its tile alone.
+func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO, city_role: String = ROLE_PLAYER, starter_household_count: int = STARTING_HOUSEHOLD_COUNT, random_seed: int = 0):
 	name = city_name
 	tile = city_tile
 	role = get_normalized_role(city_role)
+	founding_seed = random_seed
 	var normalized_household_count: int = max(0, starter_household_count)
 	resources = make_starting_resources(normalized_household_count)
 	create_starter_households(normalized_household_count)
@@ -141,18 +148,21 @@ func make_starting_resources(starter_household_count: int = STARTING_HOUSEHOLD_C
 	starting.merge(HouseholdMigrationScript.make_starting_resources())
 	return starting
 
+# Founding families are random: each gets a random life stage (never an old couple, so founders
+# do not pass on in the first year) and a fully random value profile, calling included; its
+# family trade follows its calling.
 func create_starter_households(starter_household_count: int = STARTING_HOUSEHOLD_COUNT):
-	var preferences: Array[String] = [WORK_PREF_AGRARIAN, WORK_PREF_INDUSTRIAL, WORK_PREF_NEUTRAL]
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = hash([founding_seed, int(tile.x), int(tile.y), "founders"])
 
 	for household_index in range(starter_household_count):
-		var preference: String = preferences[household_index % preferences.size()]
-		var household: Household = Household.new(household_index, -1, preference, STARTING_HOUSEHOLD_POPULATION, Household.RESIDENCE_TEMPORARY)
-		seed_starter_household_lifecycle(household, household_index)
+		var household: Household = Household.new(household_index, -1, WORK_PREF_NEUTRAL, STARTING_HOUSEHOLD_POPULATION, Household.RESIDENCE_TEMPORARY)
+		seed_starter_household_lifecycle(household, rng.randi_range(0, FOUNDING_LIFE_STAGE_SHAPES - 1))
 		households.append(household)
 
-func seed_starter_household_lifecycle(household: Household, household_index: int):
-	var seed_index: int = household_index % 5
-	household.family_trade = get_seeded_family_trade(household.preference, household_index)
+# `shape_index` picks the family's life stage and children (0-3; 4 is an old couple).
+func seed_starter_household_lifecycle(household: Household, shape_index: int):
+	var seed_index: int = shape_index % 5
 	household.parent_household_id = -1
 	household.origin_household_id = household.id
 	household.generation = 0
@@ -189,9 +199,8 @@ func seed_starter_household_lifecycle(household: Household, household_index: int
 		household.adult_children = 0
 		household.age_in_stage = 4
 
-	household.set_values(CultureValuesScript.make_random_profile(make_values_rng(household, "seed"), {
-		CultureValuesScript.CATEGORY_CALLING: get_seeded_callings(household.family_trade)
-	}))
+	household.set_values(CultureValuesScript.make_random_profile(make_values_rng(household, "seed")))
+	household.family_trade = HouseholdMigrationScript.get_family_trade_for_calling(household.values)
 
 	# Seeds are constructed at a flat starting population; derive it from the seeded family so
 	# couples without children (newlywed, old couple) are not counted as four people.
@@ -199,19 +208,10 @@ func seed_starter_household_lifecycle(household: Household, household_index: int
 	household.update_labor_capacity()
 	household.recalculate_succession_pressure()
 
-func get_seeded_callings(family_trade: String) -> Array[String]:
-	if family_trade == "farming":
-		return ["soil"]
-	if family_trade == "woodcraft":
-		return ["forest", "forge_bench"]
-	if family_trade == "stonework":
-		return ["stone"]
-	return ["hearth"]
-
 # Deterministic per household and purpose, so the same world seed reproduces the same culture.
 func make_values_rng(household: Household, purpose: String) -> RandomNumberGenerator:
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
-	rng.seed = hash([household.id, household.generation, int(tile.x), int(tile.y), purpose])
+	rng.seed = hash([founding_seed, household.id, household.generation, int(tile.x), int(tile.y), purpose])
 	return rng
 
 func get_settlement_value_counts() -> Dictionary:
@@ -225,16 +225,6 @@ func get_household_defining_values(household: Household, limit: int = 3) -> Arra
 	if household == null or not household.has_values():
 		return []
 	return CultureValuesScript.get_defining_values(household.values, get_settlement_value_counts(), households.size(), limit)
-
-func get_seeded_family_trade(preference: String, household_index: int) -> String:
-	if preference == WORK_PREF_AGRARIAN:
-		return "farming"
-	if preference == WORK_PREF_INDUSTRIAL:
-		if household_index % 2 == 0:
-			return "woodcraft"
-		return "stonework"
-
-	return "general"
 
 func advance_household_lifecycle_month(city_index: int = 0):
 	log_household_lifecycle_event(city_index, -1, "MonthAgingPass", "households=" + str(households.size()))
@@ -395,7 +385,7 @@ func form_family_by_marriage(household: Household, partner: Household, house_id:
 	if partner != null:
 		partner_id = partner.id
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
-	rng.seed = hash([household.id, partner_id, household.generation, int(tile.x), int(tile.y), "marriage"])
+	rng.seed = hash([founding_seed, household.id, partner_id, household.generation, int(tile.x), int(tile.y), "marriage"])
 
 	var lineage_parent: Household = household
 	var other_parent: Household = partner

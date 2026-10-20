@@ -206,7 +206,7 @@ static func get_maintenance_output_factor(maintenance_level: int) -> float:
 
 static func resolve_arrival(city, city_index: int, month_index: int) -> void:
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
-	rng.seed = hash([int(city.tile.x), int(city.tile.y), month_index, "arrival"])
+	rng.seed = hash([city.founding_seed, int(city.tile.x), int(city.tile.y), month_index, "arrival"])
 	var newlywed: bool = rng.randi_range(0, 99) < NEWLYWED_ARRIVAL_CHANCE
 	var young_children: int = 0 if newlywed else rng.randi_range(1, 2)
 	var family_size: int = 2 + young_children
@@ -241,7 +241,7 @@ static func get_regional_value_counts(city) -> Dictionary:
 	if not city.regional_value_counts.is_empty():
 		return city.regional_value_counts
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
-	rng.seed = hash([int(city.tile.x), int(city.tile.y), "region"])
+	rng.seed = hash([city.founding_seed, int(city.tile.x), int(city.tile.y), "region"])
 	var profiles: Array = []
 	for index in range(REGIONAL_CULTURE_SAMPLE):
 		profiles.append(CultureValuesScript.make_random_profile(rng))
