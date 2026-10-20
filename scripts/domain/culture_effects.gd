@@ -126,3 +126,66 @@ static func get_family_formation_delay_months(profile: Dictionary) -> int:
 # Leave the Nest families claim empty houses for their children first.
 static func has_family_formation_priority(profile: Dictionary) -> bool:
 	return CultureValuesScript.has_value(profile, "leave_the_nest")
+
+# --- M2: departures, crowding, and community attraction ---
+
+# Hardship points a family tolerates before leaving (docs/SETTLEMENT_GROWTH_SCALE_MODEL.md).
+const DEPARTURE_BASE_THRESHOLD: int = 6
+const DEPARTURE_MIN_THRESHOLD: int = 3
+const DEPARTURE_THRESHOLD_MODIFIERS: Dictionary = {
+	"rooted": 4,
+	"wanderlust": -2,
+	"hopeful": 2,
+	"fatalistic": 2,
+	"close_knit": 1,
+	"leave_the_nest": -1
+}
+
+const CROWDING_SENSITIVE: String = "sensitive"
+const CROWDING_NORMAL: String = "normal"
+const CROWDING_TOLERANT: String = "tolerant"
+const CROWDING_BIRTH_PENALTY: Dictionary = {
+	CROWDING_SENSITIVE: -10,
+	CROWDING_NORMAL: -5,
+	CROWDING_TOLERANT: -2
+}
+const CROWDING_HARDSHIP_POINTS: Dictionary = {
+	CROWDING_SENSITIVE: 2,
+	CROWDING_NORMAL: 1,
+	CROWDING_TOLERANT: 0
+}
+
+# Share of Welcoming minus Clannish families scales how attractive the town is to newcomers.
+const COMMUNITY_ATTRACTION_PERCENT: int = 15
+
+static func get_departure_threshold(profile: Dictionary) -> int:
+	var threshold: int = DEPARTURE_BASE_THRESHOLD
+	for category in profile.keys():
+		for value_id in profile[category]:
+			threshold += int(DEPARTURE_THRESHOLD_MODIFIERS.get(value_id, 0))
+	return max(DEPARTURE_MIN_THRESHOLD, threshold)
+
+static func get_crowding_tolerance(profile: Dictionary) -> String:
+	if CultureValuesScript.has_value(profile, "hearth_proud"):
+		return CROWDING_SENSITIVE
+	if CultureValuesScript.has_value(profile, "simple_living") or CultureValuesScript.has_value(profile, "town_loving"):
+		return CROWDING_TOLERANT
+	return CROWDING_NORMAL
+
+static func get_crowding_birth_penalty(profile: Dictionary) -> int:
+	return int(CROWDING_BIRTH_PENALTY[get_crowding_tolerance(profile)])
+
+static func get_crowding_hardship_points(profile: Dictionary) -> int:
+	return int(CROWDING_HARDSHIP_POINTS[get_crowding_tolerance(profile)])
+
+static func get_community_attraction(profiles: Array) -> int:
+	if profiles.is_empty():
+		return 0
+	var welcoming: int = 0
+	var clannish: int = 0
+	for profile in profiles:
+		if CultureValuesScript.has_value(profile, "welcoming"):
+			welcoming += 1
+		if CultureValuesScript.has_value(profile, "clannish"):
+			clannish += 1
+	return int(round(float(COMMUNITY_ATTRACTION_PERCENT * (welcoming - clannish)) / float(profiles.size())))

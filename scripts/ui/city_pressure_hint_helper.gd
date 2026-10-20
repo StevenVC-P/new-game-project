@@ -7,6 +7,7 @@ const MAX_HINTS: int = 3
 static func get_hints(pressure_summary: Dictionary, resources: Dictionary, need_pressure_summary: Dictionary = {}) -> Array[String]:
 	var action_hint_lines: Array[String] = []
 
+	_add_departure_hint(action_hint_lines, resources)
 	_add_food_need_hint(action_hint_lines, need_pressure_summary)
 	_add_household_goods_need_hint(action_hint_lines, need_pressure_summary)
 	_add_pressure_hint(action_hint_lines, pressure_summary, "food", "assign farms or import food.")
@@ -19,6 +20,14 @@ static func get_hints(pressure_summary: Dictionary, resources: Dictionary, need_
 		action_hint_lines.append(FALLBACK_HINT)
 
 	return action_hint_lines
+
+# Families near their hardship limit come first: losing a family is the costliest outcome.
+static func _add_departure_hint(action_hint_lines: Array[String], resources: Dictionary) -> void:
+	var count: int = int(resources.get("households_considering_departure", 0))
+	if count <= 0:
+		return
+	var noun: String = "family is" if count == 1 else "families are"
+	action_hint_lines.append(str(count) + " " + noun + " thinking of leaving: ease food and housing.")
 
 static func _add_food_need_hint(action_hint_lines: Array[String], need_pressure_summary: Dictionary) -> void:
 	if action_hint_lines.size() >= MAX_HINTS:

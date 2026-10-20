@@ -56,7 +56,7 @@ func _make_city(household_count: int):
 	city.resources["food"] = household_count * 10000
 	city.resources["wood"] = household_count * 10000
 	city.resources["tools"] = household_count * 10000
-	city.resources["external_population_pool"] = 0
+	city.resources["regional_migrant_families"] = 0
 
 	# Bypass add_building(): it re-runs housing and assignment scans per call, which would
 	# make setup itself quadratic-squared and hide the per-day numbers being measured.

@@ -36,11 +36,11 @@ Founding starts with 4 households in temporary shelter, seeded across lifecycle 
 
 These gaps appear when growth is traced through the current code. They are the main reason growth needs a model before more mechanics.
 
-1. **Migration adds people, not households.** `add_population_from_external_pool()` adds one person to an under-capacity household, or creates a 1-person neutral household in temporary shelter. Migrant households fill up one person at a time and carry no children, lineage, or lifecycle shape, so they never produce new families. This conflicts with the household-first direction.
-2. **Migration has a hard ceiling.** The pool of 20 never refills. Once it is spent, growth comes only from births and family formation.
+1. **Migration adds people, not households.** `add_population_from_external_pool()` adds one person to an under-capacity household, or creates a 1-person neutral household in temporary shelter. Migrant households fill up one person at a time and carry no children, lineage, or lifecycle shape, so they never produce new families. This conflicts with the household-first direction. *Fixed in M2: newcomers arrive as whole families.*
+2. **Migration has a hard ceiling.** The pool of 20 never refills. Once it is spent, growth comes only from births and family formation. *Fixed in M2: the regional pool refills.*
 3. **Natural household growth is slow.** The earliest locally formed family requires a parent with 2 adult children. From the starter seeds that is roughly year 3 (about 18 minutes at 1x). Estimated from code reading; not yet verified by a timed run.
 4. **The likely growth curve stalls near the village threshold.** 4 founders + about 5 migrant households (20 pool / 4 per household) = about 9 households in the first year, then slow natural growth. The point where systems run out is the point where "village" should begin.
-5. **Housing counts people and households differently.** A house holds one household but contributes 4 people of capacity. Families can grow to about 6 (2 adults + up to 4 children), so a fully housed settlement can still read as "housing full" and block births.
+5. **Housing counts people and households differently.** A house holds one household but contributes 4 people of capacity. Families can grow to about 6 (2 adults + up to 4 children), so a fully housed settlement can still read as "housing full" and block births. *Addressed in M2: births are no longer blocked by city-wide capacity; crowding is pressure.*
 6. **The starter newlywed seed has population 4 but no children.** Its population and child fields disagree. Small, but it matters if stages read family structure. *Fixed in M0 (2026-10-19): seeded population is now adults plus children.*
 7. **Nothing tells the player they have grown.** There is no stage, milestone, or progress concept. Growth is visible only as numbers rising.
 
