@@ -1045,7 +1045,9 @@ func draw_city_sidebar(font: Font, font_size: int):
 	y = draw_sidebar_label_value(font, font_size, "Temporary", str(resources["temporary_sheltered_population"]) + " / " + str(resources["temporary_shelter_capacity"]), text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
 	if int(resources["unsheltered_population"]) > 0:
 		y = draw_sidebar_label_value(font, font_size, "Unsheltered", str(resources["unsheltered_population"]), text_x, y, VisualStyle.COLOR_WARNING)
-	y = draw_sidebar_label_value(font, font_size, "External", str(resources["external_population_pool"]), text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
+	y = draw_sidebar_label_value(font, font_size, "Newcomers", HouseholdMigration.get_arrival_blocker_text(HouseholdMigration.get_arrival_blocker(city)), text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
+	if int(resources["households_considering_departure"]) > 0:
+		y = draw_sidebar_label_value(font, font_size, "Leaving?", str(resources["households_considering_departure"]) + " families", text_x, y, VisualStyle.COLOR_WARNING)
 	y = draw_sidebar_label_value(font, font_size, "Labor", str(resources["assigned_workers"]) + " / " + str(resources["total_labor_capacity"]) + " used", text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
 	y = draw_sidebar_label_value(font, font_size, "Idle", str(resources["idle_workers"]), text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
 	y += 4.0
@@ -1244,6 +1246,8 @@ func draw_selected_object_summary(font: Font, font_size: int, city: City, x: flo
 			if household.has_values():
 				y = draw_sidebar_label_value(font, font_size, "Calling", get_household_calling_text(household), x, y, VisualStyle.get_preference_color(household.preference))
 				y = draw_sidebar_label_value(font, font_size, "Defining", get_household_defining_text(city, household), x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
+				if HouseholdMigration.is_considering_departure(household):
+					y = draw_sidebar_label_value(font, font_size, "Hardship", "thinking of leaving", x, y, VisualStyle.COLOR_WARNING)
 			else:
 				y = draw_sidebar_label_value(font, font_size, "Preference", household.preference, x, y, VisualStyle.get_preference_color(household.preference))
 	else:

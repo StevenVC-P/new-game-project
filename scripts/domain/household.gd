@@ -51,6 +51,9 @@ var assigned_building_ids: Array[int] = []
 var values: Dictionary = {}
 # Months this household has had children ready to form a family; Close-Knit families wait longer.
 var family_formation_wait_months: int = 0
+# Accumulated hardship (shortage, no shelter, crowding); the family leaves at its threshold (M2).
+var hardship_points: int = 0
+var suffered_hardship_this_month: bool = false
 
 func _init(household_id: int = -1, building_id: int = -1, work_preference: String = WORK_PREF_NEUTRAL, population: int = 4, residence_status: String = RESIDENCE_TEMPORARY):
 	id = household_id
@@ -94,15 +97,10 @@ func get_compatibility_working_adults_for_population(population: int) -> int:
 
 	return 2
 
-func add_external_population(amount: int = 1):
-	total_population += max(0, amount)
-	working_adults = max(working_adults, get_compatibility_working_adults_for_population(total_population))
-	update_labor_capacity()
-
 func can_receive_birth() -> bool:
 	if lifecycle_stage == LIFECYCLE_OLD_COUPLE:
 		return false
-	if housing_status != RESIDENCE_HOUSED:
+	if housing_status == RESIDENCE_UNSHELTERED:
 		return false
 	if young_children >= 2:
 		return false

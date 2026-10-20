@@ -75,6 +75,21 @@ Known gaps that block the vision:
 - **Births (R3):** remove the city-wide "population at or above housing capacity" block; only unsheltered families are blocked. Crowded homes lower satisfaction and birth chance and raise departure risk, tuned by Home and Place values. New families still need an empty house.
 
 **Authorized formula changes:** `update_population_from_external_pool`, `add_population_from_external_pool`, growth target selection, `get_birth_blocker_reason` / `get_birth_roll_chance` housing rules; new departure and crowding logic.
+
+**Status: done (2026-10-19).** Implemented in `scripts/domain/household_migration.gd`, run monthly from `City.advance_household_lifecycle_month()`; tested by `tests/household_migration_validation.gd`.
+
+- Arrivals: at most one family per month; requires an empty house and enough worked-farm output to feed the newcomers (the overshoot fix), then rolls against attractiveness (food stored, recent shortage, soft needs, Welcoming vs Clannish share). Newcomers are newlyweds or young families with values drawn from a seeded regional culture. Pool starts at 5 families, refills 1 every 4 months to 8, and departing families return to it.
+- Departures: monthly hardship points (shortage of 10+ days: 2; no shelter: 2; overcrowded home: 0-2 by Home and Place values), recovering 1 per good month. Threshold 6, adjusted by values (Rooted +4, Hopeful +2, Fatalistic +2, Close-Knit +1, Wanderlust -2, Leave the Nest -1). At most one family leaves per month, only in a month it is suffering hardship, and hardship is capped just past the threshold so towns recover once a crisis ends.
+- Births: only unsheltered families are blocked. Crowding (temporary shelter, or more than 5 people in a house) lowers the chance by 2/5/10 for tolerant/normal/Hearth-Proud families.
+- Display: sidebar shows the newcomer status and how many families are thinking of leaving; Action Hints put leaving families first; the selected house shows a hardship warning.
+- Fixed a latent bug: new household ids reused `households.size()`, which collided once any household was removed.
+
+**Judgment calls made during implementation (owner may revisit):**
+
+- Temporary shelter counts as crowding for births but not as hardship, so founding families are not driven out while the first houses go up.
+- A departing family's workplace stays open to auto-assignment. Workplaces vacated when an old couple passes on still wait for the player's succession choice (existing design), so towns rely on the player answering succession hints.
+
+**Measured result** (`tests/sim/settlement_growth_run.gd`; the run fills succession vacancies monthly as a stand-in player): the founded town grows to 13 families / 58 people by year 4, outgrows its 10 farms, loses 5 families, and settles at 12-15 families / about 40 people with a second generation. A half-year famine in year 6 drops it to 10 families / 29 people; when the farms restart it recovers to 54 people by year 8 with newcomers arriving again, and reaches a third generation by year 10.
 **Done when:** a timed headless run shows growth continuing past about 9 households, and a sustained-shortage run shows families leaving and the settlement recovering when the shortage ends.
 
 ### M3 - Marriage Between Lineages

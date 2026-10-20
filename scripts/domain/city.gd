@@ -4,6 +4,7 @@ extends RefCounted
 const GoodsNeedBucketHelperScript = preload("res://scripts/domain/goods_need_bucket_helper.gd")
 const CultureValuesScript = preload("res://scripts/domain/culture_values.gd")
 const CultureEffectsScript = preload("res://scripts/domain/culture_effects.gd")
+const HouseholdMigrationScript = preload("res://scripts/domain/household_migration.gd")
 const BUILDING_HOUSE: String = "house"
 const BUILDING_FARM: String = "farm"
 const BUILDING_WOODCUTTER: String = "woodcutter"
@@ -30,14 +31,12 @@ const TOOLMAKER_BASE_OUTPUT: int = 1
 const TOOLMAKER_WOOD_INPUT: int = 2
 const EXPANDED_GOODS_BASE_OUTPUT: int = 1
 const STARTER_NEUTRAL_WORKERS: int = 0
-const STARTING_EXTERNAL_POPULATION_POOL: int = 20
 const STARTING_HOUSEHOLD_COUNT: int = 3
 const STARTING_HOUSEHOLD_POPULATION: int = 4
 const STARTING_POPULATION: int = STARTING_HOUSEHOLD_COUNT * STARTING_HOUSEHOLD_POPULATION
 const HOUSE_CAPACITY: int = 4
 const FOOD_PER_POPULATION_DIVISOR: int = 2
 const OLDER_CHILD_SUPPORT_TICK_INTERVAL: int = 4
-const FOOD_SURPLUS_TICKS_FOR_GROWTH: int = 8
 const STARTING_MAINTENANCE_GRACE_TICKS: int = 20
 const RESOURCE_HISTORY_LIMIT: int = 16
 const BIRTH_FOOD_SURPLUS_DAYS: float = 10.0
@@ -57,6 +56,8 @@ var households: Array[Household] = []
 var resources: Dictionary = {}
 var resource_history: Array = []
 var soft_need_results: Dictionary = {}
+# Value counts of the region newcomers come from; generated on first arrival.
+var regional_value_counts: Dictionary = {}
 # Producing buildings by type, refreshed each tick; read by Communal Labor.
 var operating_building_counts: Dictionary = {}
 var site_profile: SettlementSiteProfile = SettlementSiteProfile.new()
@@ -98,7 +99,7 @@ func should_tick_simulation() -> bool:
 
 func make_starting_resources(starter_household_count: int = STARTING_HOUSEHOLD_COUNT) -> Dictionary:
 	var starting_population: int = starter_household_count * STARTING_HOUSEHOLD_POPULATION
-	return {
+	var starting: Dictionary = {
 		"food": 60,
 		"wood": 45,
 		"tools": 14,
@@ -128,10 +129,10 @@ func make_starting_resources(starter_household_count: int = STARTING_HOUSEHOLD_C
 		"food_consumption_rate": 2,
 		"food_shortage": false,
 		"production_tick_count": 0,
-		"food_surplus_ticks": 0,
-		"external_population_pool": STARTING_EXTERNAL_POPULATION_POOL,
 		"maintenance_grace_ticks": STARTING_MAINTENANCE_GRACE_TICKS
 	}
+	starting.merge(HouseholdMigrationScript.make_starting_resources())
+	return starting
 
 func create_starter_households(starter_household_count: int = STARTING_HOUSEHOLD_COUNT):
 	var preferences: Array[String] = [WORK_PREF_AGRARIAN, WORK_PREF_INDUSTRIAL, WORK_PREF_NEUTRAL]
@@ -240,6 +241,7 @@ func advance_household_lifecycle_month(city_index: int = 0):
 	recalculate_household_succession_pressures(city_index)
 	advance_old_couple_lifecycle_completion_month(city_index)
 	recalculate_household_succession_pressures(city_index)
+	HouseholdMigrationScript.advance_month(self, city_index)
 	update_shelter_counts()
 	update_worker_counts()
 
@@ -296,7 +298,7 @@ func form_new_family_from_parent(parent: Household, house_id: int, city_index: i
 	parent.family_formation_wait_months = 0
 	log_household_lifecycle_event(city_index, parent.id, "NewFamilyParentUpdated", "adult_children=" + str(parent_adult_children_before) + "->" + str(parent.adult_children) + " total_population=" + str(parent_population_before) + "->" + str(parent.total_population))
 
-	var household_id: int = households.size()
+	var household_id: int = get_next_household_id()
 	var new_household: Household = Household.new(household_id, house_id, parent.preference, 2, Household.RESIDENCE_HOUSED)
 	new_household.lifecycle_stage = Household.LIFECYCLE_NEWLYWED
 	new_household.young_children = 0
@@ -598,6 +600,8 @@ func get_birth_roll_chance(household: Household) -> int:
 
 	var chance: int = household.get_birth_base_chance()
 	chance += CultureEffectsScript.get_birth_chance_bonus(household.values)
+	if HouseholdMigrationScript.is_household_crowded(household):
+		chance += CultureEffectsScript.get_crowding_birth_penalty(household.values)
 	if get_food_days_stored() >= BIRTH_FOOD_SURPLUS_DAYS:
 		chance += BIRTH_FOOD_SURPLUS_BONUS
 	if get_housing_headroom() >= BIRTH_REQUIRED_HOUSING_HEADROOM:
@@ -615,12 +619,8 @@ func get_birth_blocker_reason(household: Household) -> String:
 		return "food_shortage"
 	if household.lifecycle_stage == Household.LIFECYCLE_OLD_COUPLE:
 		return "old_couple"
-	if household.housing_status != Household.RESIDENCE_HOUSED:
-		if household.housing_status == Household.RESIDENCE_TEMPORARY:
-			return "temporary_housing"
+	if household.housing_status == Household.RESIDENCE_UNSHELTERED:
 		return "not_housed"
-	if get_total_population() >= int(resources["housing_capacity"]):
-		return "housing_full"
 	if household.young_children >= 2:
 		return "too_many_young_children"
 	if household.get_total_child_count() >= 4:
@@ -720,7 +720,8 @@ func tick():
 			apply_building_production(building)
 
 	resolve_soft_needs()
-	update_population_from_external_pool()
+	if resources["food_shortage"] == true:
+		resources["shortage_days_this_month"] = int(resources["shortage_days_this_month"]) + 1
 
 func update_worker_counts():
 	update_shelter_counts()
@@ -1028,7 +1029,7 @@ func get_satisfaction_ratio(consumed: int, demand: int) -> float:
 func consume_food():
 	update_shelter_counts()
 	var population: int = get_total_population()
-	var consumption_rate: int = int(ceil(float(population) / float(FOOD_PER_POPULATION_DIVISOR)))
+	var consumption_rate: int = get_food_consumption_for_population(population)
 	resources["food_consumption_rate"] = consumption_rate
 
 	var consumed_food: int = consume_need_bucket(GoodsNeedBucketHelperScript.BUCKET_FOOD, consumption_rate)
@@ -1249,32 +1250,6 @@ func get_preferred_worker_for_building(building_type: String) -> String:
 
 	return WORK_PREF_NEUTRAL
 
-func update_population_from_external_pool():
-	update_shelter_counts()
-	if resources["food_shortage"] == true:
-		resources["food_surplus_ticks"] = 0
-		return
-	if get_total_population() >= int(resources["housing_capacity"]):
-		resources["food_surplus_ticks"] = 0
-		return
-	if int(resources["external_population_pool"]) <= 0:
-		resources["food_surplus_ticks"] = 0
-		return
-	if int(resources["food"]) <= int(resources["food_consumption_rate"]):
-		resources["food_surplus_ticks"] = 0
-		return
-
-	resources["food_surplus_ticks"] = int(resources["food_surplus_ticks"]) + 1
-	if int(resources["food_surplus_ticks"]) < FOOD_SURPLUS_TICKS_FOR_GROWTH:
-		return
-
-	resources["food_surplus_ticks"] = 0
-	add_population_from_external_pool()
-	resources["external_population_pool"] = int(resources["external_population_pool"]) - 1
-	update_shelter_counts()
-	update_worker_counts()
-	auto_assign_workers()
-
 func count_housing_capacity() -> int:
 	var capacity: int = 0
 
@@ -1375,16 +1350,15 @@ func get_population_by_residence(residence_status: String) -> int:
 
 	return population
 
-func add_population_from_external_pool():
-	var target: Household = get_growth_target_household()
-	if target == null:
-		var household_id: int = households.size()
-		var household: Household = Household.new(household_id, -1, WORK_PREF_NEUTRAL, 1, Household.RESIDENCE_TEMPORARY)
-		household.set_values(CultureValuesScript.inherit_profile([], make_values_rng(household, "migrant"), get_settlement_value_counts()))
-		households.append(household)
-		return
+# Ids must stay unique after families leave or pass on, so they never reuse households.size().
+func get_next_household_id() -> int:
+	var next_id: int = 0
+	for household: Household in households:
+		next_id = max(next_id, household.id + 1)
+	return next_id
 
-	target.add_external_population()
+func get_food_consumption_for_population(population: int) -> int:
+	return int(ceil(float(population) / float(FOOD_PER_POPULATION_DIVISOR)))
 
 func auto_assign_workers():
 	update_worker_counts()
@@ -1440,17 +1414,6 @@ func get_auto_assignment_score(household: Household, building: Building) -> int:
 	score += household.get_available_workers() * 2
 	score -= household.id
 	return score
-
-func get_growth_target_household() -> Household:
-	for household: Household in households:
-		if household.housing_status == Household.RESIDENCE_HOUSED and household.total_population < household.population_capacity:
-			return household
-
-	for household: Household in households:
-		if household.housing_status == Household.RESIDENCE_TEMPORARY and household.total_population < household.population_capacity:
-			return household
-
-	return null
 
 func update_building_maintenance(building: Building):
 	var interval: int = building.get_maintenance_interval()
