@@ -159,6 +159,24 @@ func create_starter_households(starter_household_count: int = STARTING_HOUSEHOLD
 		var household: Household = Household.new(household_index, -1, WORK_PREF_NEUTRAL, STARTING_HOUSEHOLD_POPULATION, Household.RESIDENCE_TEMPORARY)
 		seed_starter_household_lifecycle(household, rng.randi_range(0, FOUNDING_LIFE_STAGE_SHAPES - 1))
 		households.append(household)
+	ensure_founding_farmer(rng)
+
+# Farms are the only food source, so every founding includes at least one family called to the
+# soil (owner decision 2026-10-20). Everything else about the founders stays random.
+func ensure_founding_farmer(rng: RandomNumberGenerator):
+	if households.is_empty():
+		return
+	for household: Household in households:
+		if CultureValuesScript.has_value(household.values, "soil"):
+			return
+
+	var farmer: Household = households[rng.randi_range(0, households.size() - 1)]
+	var callings: Array = (farmer.values[CultureValuesScript.CATEGORY_CALLING] as Array).duplicate()
+	callings[rng.randi_range(0, callings.size() - 1)] = "soil"
+	var profile: Dictionary = farmer.values.duplicate(true)
+	profile[CultureValuesScript.CATEGORY_CALLING] = callings
+	farmer.set_values(profile)
+	farmer.family_trade = HouseholdMigrationScript.get_family_trade_for_calling(farmer.values)
 
 # `shape_index` picks the family's life stage and children (0-3; 4 is an old couple).
 func seed_starter_household_lifecycle(household: Household, shape_index: int):

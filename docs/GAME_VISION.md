@@ -139,7 +139,7 @@ These follow from the vision and should guide upcoming sprints:
 3. **Family ambitions are a core system, not polish.** They are a main source of motivation in an open sandbox.
 4. **Neighbors and rivals are in scope.** The inert neutral town should eventually become a living neighbor. Conflict and military are in scope for the long arc; population already counts as military potential.
 5. **A world-scale map is required eventually.** The current regional map reads as one valley (see `docs/map_and_settlement_scale_audit.md`).
-6. **A fixed clock has costs at scale.** At 6 minutes per game year at 1x, centuries of history need higher speed options later, and household-by-household simulation must give way to grouped simulation as the audit describes, or late-game ticks will be too slow.
+6. **A fixed clock has costs at scale.** At 12 minutes per game year at 1x (since 2026-10-20), centuries of history need higher speed options later, and household-by-household simulation must give way to grouped simulation as the audit describes, or late-game ticks will be too slow.
 
 7. **Influence is a core system** with two layers: a soft, overlapping influence gradient and hard claimed borders. It gates founding new towns and capturing cities. Founding a second town is currently blocked in code; it should unlock through influence and resources rather than stay blocked.
 8. **Defense matters early.** Bandits and looters can threaten a hamlet, so some defensive response (militia is already a listed household responsibility in `docs/PROJECT_OWNER_QUESTIONS.md`) belongs earlier than full military systems.

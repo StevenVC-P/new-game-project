@@ -383,6 +383,8 @@ func found_player_city_at_pending_site() -> bool:
 	current_view = VIEW_CITY
 	hovered_tile = Vector2i(-1, -1)
 	hovered_city_index = -1
+	# A new town starts paused so the player can plan the first buildings before time runs.
+	simulation_clock.pause()
 	queue_redraw()
 	return true
 
