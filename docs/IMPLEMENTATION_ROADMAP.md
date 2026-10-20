@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-Ordered milestones from the current code (a founded hamlet) to the **first playable village**, drawn from the build orders in the design models (2026-10-19). Draft for owner review.
+Ordered milestones from the current code (a founded hamlet) to the **first playable village**, drawn from the build orders in the design models (2026-10-19). Blocking owner decisions R1-R6 are resolved (see end).
 
 Design sources: `docs/GAME_VISION.md`, `docs/SETTLEMENT_GROWTH_SCALE_MODEL.md`, `docs/ECONOMY_MODEL.md`, `docs/SIMULATION_SCALE_MODEL.md`, `docs/HOUSES_AND_LINEAGE_MODEL.md`, `docs/CULTURE_AND_VALUES_MODEL.md`, `docs/WARFARE_AND_CONFLICT_MODEL.md`.
 
@@ -36,7 +36,10 @@ Known gaps that block the vision:
 
 **Objective:** a clean starting point.
 
-- Decide the untracked June 29 files (root `main.gd`, three `household_settlement_debug_inspector.gd` copies in `addons/`, `features/`, `ui/`): compare with committed versions, then keep, move, or delete per owner.
+- Untracked June 29 files (decision R6: note, then delete):
+  - root `main.gd` is an exact copy of the initial-commit `main.gd` (`64a2528`) and remains recoverable from history
+  - three `household_settlement_debug_inspector.gd` attempts in `addons/`, `features/`, `ui/` are broken local-agent output (Godot 3 `rect_position`; one does not parse), are unreferenced, and duplicate the existing F3 inspector
+  - record them in a short failed-experiment note, then delete all four and their `.uid` files
 - Add workspace `CLAUDE.md` and `project.md` pointing at `AGENTS.md`, `ARCHITECTURE.md`, and the design docs.
 - Fix the starter newlywed seed whose population (4) disagrees with its family structure (2 adults, no children).
 
@@ -61,13 +64,13 @@ Known gaps that block the vision:
 
 **Objective:** growth and decline come from whole families, and hardship has real but recoverable consequences.
 
-- Migrants arrive as **whole households** with lifecycle, calling, values, and lineage, driven by settlement attractiveness (food days, housing headroom, soft-need satisfaction, no shortages).
-- A slowly refilling **regional migrant pool** replaces the fixed pool of 20.
+- Migrants arrive as **whole households** with lifecycle, calling, values, and lineage, driven by settlement attractiveness (food days, housing headroom, soft-need satisfaction, no shortages) and Community values (R2).
+- A slowly refilling **regional migrant pool** replaces the fixed pool of 20. Migrants bring values from their place of origin (R2).
 - **Departures:** households leave after sustained hardship (food shortage, no shelter), with values shifting the threshold (Rooted, Wanderlust, Charitable, Hopeful).
 - Player-facing warnings before a family leaves.
-- Housing pressure measured in households first (pending owner decision R3 below).
+- **Births (R3):** remove the city-wide "population at or above housing capacity" block; only unsheltered families are blocked. Crowded homes lower satisfaction and birth chance and raise departure risk, tuned by Home and Place values. New families still need an empty house.
 
-**Authorized formula changes:** `update_population_from_external_pool`, `add_population_from_external_pool`, growth target selection; new departure logic.
+**Authorized formula changes:** `update_population_from_external_pool`, `add_population_from_external_pool`, growth target selection, `get_birth_blocker_reason` / `get_birth_roll_chance` housing rules; new departure and crowding logic.
 **Done when:** a timed headless run shows growth continuing past about 9 households, and a sustained-shortage run shows families leaving and the settlement recovering when the shortage ends.
 
 ### M3 - Marriage Between Lineages
@@ -128,12 +131,12 @@ Known gaps that block the vision:
 
 **Objective:** Hamlet -> Village is a complete, satisfying arc.
 
-- `settlement-stage-status-v0`: stage, progress, and milestone chronicle (`SETTLEMENT_GROWTH_SCALE_MODEL.md`).
+- `settlement-stage-status-v0`: stage, progress, and milestone chronicle (`SETTLEMENT_GROWTH_SCALE_MODEL.md`). Stage names and conditions as drafted (R1); events such as surviving a raid are chronicle entries, not requirements. Titles never regress; decline shows as a status (R4).
 - `clothing-textile-production-v0`: production answer for the clothing need (Of the Loom).
-- Pacing pass against the targets in the growth model (Village around years 3-10).
+- Pacing pass against the targets in the growth model (Village around year 3).
 - Owner playtest of the first playable village.
 
-**Done when:** owner playtest confirms the first playable target (decision R5).
+**Done when (R5):** in an owner playtest, a settlement reaches Village and holds it stable for about 5-10 game years, including at least one generational turnover (a founding couple passes and their trade is carried on by descendants), and the owner judges it fun.
 
 ## Gate Before Town Scale
 
@@ -148,13 +151,13 @@ Village-scale milestones do not need this gate: the measured daily tick is 2.2 m
 
 In rough order, each needing its own planning pass: Houses and the commons (Grouped level); merchant families and routes; foreign coin; patrols and bandit clearing on the map; government and further policies; armies and capture; minting; living neighbors and established powers; world-scale map.
 
-## Owner Decisions Needed
+## Owner Decisions
 
-Carried over from `SETTLEMENT_GROWTH_SCALE_MODEL.md`, now blocking specific milestones:
+All resolved 2026-10-19 (details in `SETTLEMENT_GROWTH_SCALE_MODEL.md`):
 
-- **R1** (M8): are the stage names and exit conditions acceptable (Founding Camp, Hamlet, Village, Early Town)?
-- **R2** (M2): confirm migration as whole households with a refilling regional pool. The vision strongly implies yes.
-- **R3** (M2): should births be blocked by each family's own housing instead of city-wide population capacity?
-- **R4** (M8): do earned stage titles never regress?
-- **R5** (M8): is the first playable target to reach Village, or to hold it for a number of years?
-- **R6** (M0): what to do with the untracked June 29 files.
+- **R1** (M8): stage names and conditions kept as drafted; raids are chronicle milestones only.
+- **R2** (M2): whole-household migration from a slowly refilling regional pool; migrants bring their origin's values.
+- **R3** (M2): crowding is pressure, not a birth block; only unsheltered families are blocked.
+- **R4** (M8): stage titles never regress; decline shows as a status.
+- **R5** (M8): first playable = reach Village and hold it 5-10 game years with a generational turnover.
+- **R6** (M0): note, then delete the untracked June 29 files.
