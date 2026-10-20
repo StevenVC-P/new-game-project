@@ -107,6 +107,7 @@ const MAP_LINE_WIDTH_TRADE_SHADOW: float = 5.0
 const MAP_LINE_WIDTH_TRADE: float = 2.2
 
 static func get_building_color(building_type: String) -> Color:
+	building_type = BuildingTiers.get_base_type(building_type)
 	if building_type == "farm":
 		return COLOR_BUILDING_FARM
 	if building_type == "woodcutter":

@@ -31,7 +31,7 @@ static func get_requirement_lines(city, building) -> Array[String]:
 
 	# Input requirements
 	var required_inputs: Array[String] = []
-	match building.type:
+	match BuildingTiers.get_base_type(building.type):
 		"toolmaker":
 			required_inputs = ["wood"]
 		"stonecutter":

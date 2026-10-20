@@ -107,6 +107,8 @@ func apply_action(option_data: Dictionary, city: City):
 		city.unassign_building_worker(inspected_building_index)
 	elif action == "toggle_maintenance":
 		city.toggle_building_maintenance(inspected_building_index)
+	elif action == "upgrade":
+		city.upgrade_building(inspected_building_index)
 
 func draw(canvas: CanvasItem, font: Font, font_size: int, city: City):
 	action_options.clear()
@@ -160,6 +162,7 @@ func draw(canvas: CanvasItem, font: Font, font_size: int, city: City):
 		y = draw_overlay_section_title(canvas, font, font_size, "Household Status", text_x, y, overlay_size.x)
 		for prosperity_text: String in get_house_prosperity_lines(city, inspected_building_index):
 			y = draw_overlay_line(canvas, font, font_size, prosperity_text, text_x, y, overlay_size.x)
+		draw_upgrade_option(canvas, font, font_size, text_x, y, overlay_size.x, city, building)
 		return
 
 	y = draw_overlay_line(canvas, font, font_size, "Maintenance: " + str(building.maintenance_level) + "%", text_x, y, overlay_size.x)
@@ -179,7 +182,26 @@ func draw(canvas: CanvasItem, font: Font, font_size: int, city: City):
 	else:
 		y = draw_overlay_available_worker_options(canvas, font, font_size, text_x, y, overlay_size.x, city, building)
 
-	draw_overlay_action_option(canvas, font, font_size, "Toggle maintenance", text_x, y, overlay_size.x, {"action": "toggle_maintenance"}, VisualStyle.COLOR_UI_BUTTON_DISABLED)
+	if building.is_tier0():
+		y = draw_upgrade_option(canvas, font, font_size, text_x, y, overlay_size.x, city, building)
+	else:
+		draw_overlay_action_option(canvas, font, font_size, "Toggle maintenance", text_x, y, overlay_size.x, {"action": "toggle_maintenance"}, VisualStyle.COLOR_UI_BUTTON_DISABLED)
+
+func draw_upgrade_option(canvas: CanvasItem, font: Font, font_size: int, x: float, y: float, overlay_width: float, city: City, building: Building) -> float:
+	var upgrade_type: String = BuildingTiers.get_upgrade_type(building.type)
+	if upgrade_type == "":
+		return y
+	var label: String = "Upgrade to " + capitalize_building_name(upgrade_type) + " (" + get_cost_summary(city.get_upgrade_cost(building.id)) + ")"
+	var color: Color = VisualStyle.COLOR_UI_BUTTON_CONFIRM if city.can_upgrade_building(building.id) else VisualStyle.COLOR_UI_BUTTON_DISABLED
+	return draw_overlay_action_option(canvas, font, font_size, label, x, y, overlay_width, {"action": "upgrade"}, color)
+
+func get_cost_summary(cost: Dictionary) -> String:
+	var parts: Array[String] = []
+	for resource_name in cost.keys():
+		parts.append(str(cost[resource_name]) + " " + str(resource_name))
+	if parts.is_empty():
+		return "free"
+	return ", ".join(parts)
 
 func get_building_screen_rect(building: Building) -> Rect2:
 	var tile_pos: Vector2i = building.tile
@@ -204,6 +226,8 @@ func get_building_overlay_size(city: City, building: Building) -> Vector2:
 			option_count = count_available_overlay_worker_options(city)
 			if option_count <= 0:
 				line_count += 1
+		option_count += 1
+	if building.is_tier0() and building.is_house():
 		option_count += 1
 
 	var height: float = 18.0 + float(line_count) * 18.0 + float(option_count) * 22.0
@@ -283,6 +307,8 @@ func count_buildings_of_type_through_index(buildings: Array, building_type: Stri
 	return count
 
 func capitalize_building_name(building_type: String) -> String:
+	if BuildingTiers.is_tier0(building_type):
+		return BuildingTiers.get_display_name(building_type)
 	if building_type == BUILDING_HOUSE:
 		return "House"
 	if building_type == BUILDING_FARM:

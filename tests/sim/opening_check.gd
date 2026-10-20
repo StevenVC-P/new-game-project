@@ -17,6 +17,7 @@ const EconomyBalanceScript = preload("res://scripts/domain/economy_balance.gd")
 const HouseholdMigrationScript = preload("res://scripts/domain/household_migration.gd")
 const CultureValuesScript = preload("res://scripts/domain/culture_values.gd")
 const SimulationClockScript = preload("res://scripts/simulation/simulation_clock.gd")
+const BuildingTiersScript = preload("res://scripts/domain/building_tiers.gd")
 
 const SITES: int = 20
 const DAYS: int = 720
@@ -128,10 +129,11 @@ func _play(scenario: Dictionary, site: Vector2) -> Dictionary:
 			if tools_out_day < 0:
 				tools_out_day = day
 		if day % POLICY_INTERVAL_DAYS == 0 and day >= int(scenario.get("idle_until", 0)):
+			_upgrade_one(city, scenario, day)
 			var wanted: String = _choose_build(city, scenario, day)
 			if wanted == "":
 				low_wood_streak = 0
-			elif _try_build(city, wanted, scenario, day):
+			elif _try_build(city, wanted, scenario, day) or _try_build(city, _tier0_fallback(wanted), scenario, day):
 				low_wood_streak = 0
 			elif int(city.resources["wood"]) < int(EconomyBalanceScript.get_build_cost(wanted).get("wood", 0)):
 				low_wood_streak += POLICY_INTERVAL_DAYS
@@ -190,7 +192,10 @@ func _choose_build(city, scenario: Dictionary, day: int) -> String:
 			return want
 	return ""
 
+# Scenario rules apply to the kind of building, so delaying the woodcutter also delays the
+# gatherer's camp (forgetting wood means forgetting both).
 func _allowed(building_type: String, scenario: Dictionary, day: int, counts: Dictionary) -> bool:
+	building_type = BuildingTiersScript.get_base_type(building_type)
 	if (scenario.get("never", []) as Array).has(building_type):
 		return false
 	if day < int((scenario.get("not_before", {}) as Dictionary).get(building_type, 0)):
@@ -201,6 +206,8 @@ func _allowed(building_type: String, scenario: Dictionary, day: int, counts: Dic
 	return true
 
 func _try_build(city, building_type: String, scenario: Dictionary, day: int) -> bool:
+	if building_type == "":
+		return false
 	if not _allowed(building_type, scenario, day, _count_types(city)):
 		return false
 	var cost: Dictionary = EconomyBalanceScript.get_build_cost(building_type)
@@ -210,11 +217,30 @@ func _try_build(city, building_type: String, scenario: Dictionary, day: int) -> 
 	city.add_building(Building.new(-1, building_type))
 	return true
 
+# Counts by kind: a gatherer's camp counts as a woodcutter, a hut as a house.
 func _count_types(city) -> Dictionary:
 	var counts: Dictionary = {}
 	for building: Building in city.buildings:
-		counts[building.type] = int(counts.get(building.type, 0)) + 1
+		var kind: String = BuildingTiersScript.get_base_type(building.type)
+		counts[kind] = int(counts.get(kind, 0)) + 1
 	return counts
+
+# When the proper building is unaffordable, a player falls back to tier 0 hand work.
+func _tier0_fallback(building_type: String) -> String:
+	for tier0_type in BuildingTiersScript.TIER0_TO_TIER1.keys():
+		if BuildingTiersScript.TIER0_TO_TIER1[tier0_type] == building_type:
+			return str(tier0_type)
+	return ""
+
+# Upgrade one tier 0 building per policy step when affordable: wood and tools first.
+func _upgrade_one(city, scenario: Dictionary, day: int) -> void:
+	for tier0_type: String in ["gatherer_camp", "tool_mender", "forager_garden", "hut"]:
+		var upgrade_type: String = BuildingTiersScript.get_upgrade_type(tier0_type)
+		if day < int((scenario.get("not_before", {}) as Dictionary).get(upgrade_type, 0)):
+			continue
+		for building: Building in city.buildings:
+			if building.type == tier0_type and city.upgrade_building(building.id):
+				return
 
 func _describe_founders(city) -> String:
 	var callings: Array[String] = []

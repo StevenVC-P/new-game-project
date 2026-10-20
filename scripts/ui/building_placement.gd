@@ -2,6 +2,7 @@ class_name BuildingPlacement
 extends RefCounted
 
 const EconomyBalanceScript = preload("res://scripts/domain/economy_balance.gd")
+const BuildingTiersScript = preload("res://scripts/domain/building_tiers.gd")
 
 const BUILDING_HOUSE: String = "house"
 const BUILDING_FARM: String = "farm"
@@ -30,6 +31,7 @@ func _init(local_width: int = 64, local_height: int = 44, tree_radius: int = 5):
 	woodcutter_tree_radius = tree_radius
 
 func validate(city: City, local_map: Array, building_type: String, origin: Vector2i) -> Dictionary:
+	var rule_type: String = BuildingTiersScript.get_base_type(building_type)
 	var size: Vector2i = get_building_size(building_type)
 	var footprint: Array[Vector2i] = get_footprint_tiles(origin, size)
 	var has_fertile_tile: bool = false
@@ -54,9 +56,9 @@ func validate(city: City, local_map: Array, building_type: String, origin: Vecto
 		if tile["is_fertile"] == true:
 			has_fertile_tile = true
 
-	if building_type == BUILDING_FARM and not has_fertile_tile:
+	if rule_type == BUILDING_FARM and not has_fertile_tile:
 		return make_result(false, "Requires fertile land", footprint)
-	if building_type == BUILDING_WOODCUTTER and not has_trees_near_building(local_map, origin, size, woodcutter_tree_radius):
+	if rule_type == BUILDING_WOODCUTTER and not has_trees_near_building(local_map, origin, size, woodcutter_tree_radius):
 		return make_result(false, "Requires nearby trees", footprint)
 
 	return make_result(true, "Valid placement", footprint)
@@ -92,6 +94,7 @@ func has_trees_near_building(local_map: Array, origin: Vector2i, size: Vector2i,
 	return false
 
 func get_building_size(building_type: String) -> Vector2i:
+	building_type = BuildingTiersScript.get_base_type(building_type)
 	if building_type == BUILDING_FARM:
 		return Vector2i(3, 3)
 	if building_type == BUILDING_TOOLMAKER:

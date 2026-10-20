@@ -742,6 +742,7 @@ func apply_trade_routes():
 		route.transfer_tick(source_city, destination_city)
 
 func get_preferred_worker_for_building(building_type: String) -> String:
+	building_type = BuildingTiers.get_base_type(building_type)
 	if building_type == BUILDING_FARM:
 		return WORK_PREF_AGRARIAN
 	if building_type == BUILDING_WOODCUTTER or building_type == BUILDING_TOOLMAKER:
@@ -1133,6 +1134,8 @@ func draw_sidebar_label_value(font: Font, font_size: int, label: String, value: 
 	return y + 15.0
 
 func get_building_display_name(building_type: String) -> String:
+	if BuildingTiers.is_tier0(building_type):
+		return BuildingTiers.get_display_name(building_type)
 	if building_type == BUILDING_HOUSE:
 		return "House"
 	if building_type == BUILDING_FARM:

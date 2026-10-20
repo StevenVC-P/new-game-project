@@ -238,6 +238,42 @@ Ten-year run with 6 founders: grows to 31 families / 124 people with three gener
 
 **Open tuning point:** converting outputs to per-family doubled the toolmaker (1 tool/day per family) while upkeep stayed per building, and one holding per family halves the buildings. Tools now overproduce (about 2,600 stockpiled by year 10 with one toolmaker), against the owner's aim that running short be more common. Likely fix: `TOOLMAKER_TOOLS_PER_DAY` around 0.6, or more frequent upkeep; either moves the measured toolmaker deadline, so re-run the opening check after changing it.
 
+## Building Tiers (2026-10-20, owner decisions)
+
+Tier 0 is hand work a family can always do, so no shortage of wood or tools is a permanent dead end; tier 1 is today's proper holdings; tier 2 (later) gives the stone and craft chain a purpose. Implemented in `scripts/domain/building_tiers.gd`; tested by `tests/building_tiers_validation.gd`.
+
+| Tier 0 | Upgrades into | Produces |
+| --- | --- | --- |
+| Hut | House | a home (rough housing) |
+| Forager's Garden | Farm | food |
+| Gatherer's Camp | Woodcutter | wood |
+| Tool Mender | Toolmaker | tools from wood (same 2 wood per tool) |
+
+- **Free to build, no tool upkeep, about a third of tier 1 output** (`EconomyBalance.TIER0_OUTPUT_FRACTION`).
+- **Upgrade in place**: pay the tier 1 cost and the same family keeps the holding. The Upgrade action appears on a selected tier 0 building.
+- **Huts are homes.** New families and newcomers can move into them; proper houses are offered first.
+- **Rough housing** (a hut or temporary shelter) lowers birth odds, and after 6 months (`ROUGH_HOUSING_GRACE_MONTHS`) adds monthly hardship scaled by Home and Place values.
+
+**Judgment calls (owner may revisit):**
+
+- Tier 0 buildings share the footprint and terrain rules of their tier 1 counterpart (a garden needs fertile land, a camp needs nearby trees), so an upgrade always fits in place.
+- Callings apply to tier 0 as to tier 1 (a farming family is well suited to a garden).
+- Rough-housing hardship uses the same tolerance as crowding: Simple Living and Town-Loving families do not mind huts, so a town of such families can live in huts indefinitely.
+- Tier 0 buildings draw like their tier 1 counterpart, washed toward bare earth.
+
+**Opening check with tiers** (6 founders; the stand-in player falls back to tier 0 when it cannot afford tier 1 and upgrades when it can; delaying the woodcutter also delays the camp):
+
+| Build order | Before tiers | With tiers |
+| --- | --- | --- |
+| Sensible, owner's opening, four farms first | 20/20 | 20/20 |
+| All wood on houses first | 0/20 | 20/20 |
+| Woodcutter delayed to day 60 / 120 | 0/20 / 0/20 | 10/20 / 8/20 |
+| Toolmaker delayed to day 120 / 150 | 14/20 / 1/20 | 18/20 / 6/20 |
+| Never build houses or huts | fails only the "all housed" rule | families leave (rough housing hardship) |
+| Only one farm, never a toolmaker, never any wood source | 0/20 | 0/20 |
+
+Mild mistakes now cost time instead of the town; obviously bad play still fails.
+
 ## Future Feature Notes
 
 Ideas recorded for later design, not scheduled:

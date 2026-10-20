@@ -52,8 +52,14 @@ static func get_profile(building_type: String) -> Dictionary:
 		"icon_hint": "roof"
 	}
 
+# Tier 0 hand work draws like its tier 1 counterpart, washed toward bare earth so it reads as rough.
+const TIER0_EARTH_COLOR: Color = Color(0.55, 0.5, 0.4)
+const TIER0_WASH: float = 0.55
+
 static func draw_building(canvas: CanvasItem, rect: Rect2, building_type: String):
-	var profile: Dictionary = get_profile(building_type)
+	var profile: Dictionary = get_profile(BuildingTiers.get_base_type(building_type))
+	if BuildingTiers.is_tier0(building_type):
+		profile["base_color"] = (profile["base_color"] as Color).lerp(TIER0_EARTH_COLOR, TIER0_WASH)
 	canvas.draw_rect(rect, profile["base_color"] as Color)
 
 	var glyph: String = profile["glyph"] as String

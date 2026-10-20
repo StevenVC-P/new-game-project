@@ -33,6 +33,13 @@ const EXPANDED_GOODS_PER_DAY: float = 2.0
 # Working adults in the family the output values above assume.
 const FULL_FAMILY_WORKING_ADULTS: float = 2.0
 
+# --- Building tiers (scripts/domain/building_tiers.gd) ---
+# Tier 0 hand work produces this fraction of its tier 1 counterpart and needs no tool upkeep.
+const TIER0_OUTPUT_FRACTION: float = 1.0 / 3.0
+# Families living in tier 0 housing (huts, temporary shelter) for longer than this start to
+# accumulate hardship, scaled by their Home and Place values.
+const ROUGH_HOUSING_GRACE_MONTHS: int = 6
+
 # --- Food ---
 # One unit of food feeds this many people per day.
 const PEOPLE_FED_PER_FOOD: int = 2
@@ -51,6 +58,10 @@ const MAINTENANCE_INTERVAL_DEFAULT_DAYS: int = 20
 
 # --- Construction costs ---
 const BUILD_COSTS: Dictionary = {
+	"hut": {},
+	"forager_garden": {},
+	"gatherer_camp": {},
+	"tool_mender": {},
 	"house": {"wood": 6, "tools": 0},
 	"farm": {"wood": 4, "tools": 1},
 	"woodcutter": {"wood": 6, "tools": 1},

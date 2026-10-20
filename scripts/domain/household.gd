@@ -58,6 +58,8 @@ var family_formation_wait_months: int = 0
 # Accumulated hardship (shortage, no shelter, crowding); the family leaves at its threshold (M2).
 var hardship_points: int = 0
 var suffered_hardship_this_month: bool = false
+# Consecutive months in a hut or temporary shelter.
+var rough_housing_months: int = 0
 
 func _init(household_id: int = -1, building_id: int = -1, work_preference: String = WORK_PREF_NEUTRAL, population: int = 4, residence_status: String = RESIDENCE_TEMPORARY):
 	id = household_id
@@ -272,6 +274,7 @@ func get_match_quality(building_type: String) -> String:
 	return "poor match"
 
 func get_preferred_worker_for_building(building_type: String) -> String:
+	building_type = BuildingTiers.get_base_type(building_type)
 	if building_type == Building.BUILDING_FARM:
 		return WORK_PREF_AGRARIAN
 	if building_type == Building.BUILDING_WOODCUTTER or building_type == Building.BUILDING_TOOLMAKER:
