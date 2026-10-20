@@ -118,49 +118,50 @@ func test_kin_values_change_birth_chance() -> void:
 	_check(city.get_birth_roll_chance(few) > 0, "test families should be eligible for births")
 	_check(city.get_birth_roll_chance(many) > city.get_birth_roll_chance(few), "many-children family should have a higher birth chance")
 
+# Since M3 a new family needs grown children from two households, so these tests pair two.
 func test_close_knit_delays_family_formation() -> void:
 	var close_city = _empty_city_with_food()
-	var close_parent: Household = _housed_household(close_city, 1, _profile(["soil"], ["solitary"], ["close_knit"]))
-	close_parent.adult_children = 2
-	close_parent.total_population += 2
+	for household_id in [1, 2]:
+		_add_marriageable_child(_housed_household(close_city, household_id, _profile(["soil"], ["solitary"], ["close_knit"])))
 	_add_house(close_city)
 	for month in range(CultureEffectsScript.CLOSE_KNIT_FORMATION_DELAY_MONTHS):
 		close_city.advance_new_family_formation_month()
-	_check(close_city.households.size() == 1, "close-knit family should keep its children home during the delay")
+	_check(close_city.households.size() == 2, "close-knit families should keep their children home during the delay")
 	close_city.advance_new_family_formation_month()
-	_check(close_city.households.size() == 2, "close-knit family should form a new family after the delay")
+	_check(close_city.households.size() == 3, "close-knit families should marry their children off after the delay")
 
 	var plain_city = _empty_city_with_food()
-	var plain_parent: Household = _housed_household(plain_city, 1, _profile(["soil"], ["solitary"], ["fathers_line"]))
-	plain_parent.adult_children = 2
-	plain_parent.total_population += 2
+	for household_id in [1, 2]:
+		_add_marriageable_child(_housed_household(plain_city, household_id, _profile(["soil"], ["solitary"], ["fathers_line"])))
 	_add_house(plain_city)
 	plain_city.advance_new_family_formation_month()
-	_check(plain_city.households.size() == 2, "families without close-knit should form a family in the first month")
+	_check(plain_city.households.size() == 3, "families without close-knit should form a family in the first month")
 
 func test_leave_the_nest_claims_empty_house_first() -> void:
 	var city = _empty_city_with_food()
 	var first: Household = _housed_household(city, 1, _profile(["soil"], ["solitary"], ["fathers_line"]))
-	var nest: Household = _housed_household(city, 2, _profile(["soil"], ["solitary"], ["leave_the_nest"]))
-	for parent: Household in [first, nest]:
-		parent.adult_children = 2
-		parent.total_population += 2
+	var second: Household = _housed_household(city, 2, _profile(["soil"], ["solitary"], ["fathers_line"]))
+	var nest: Household = _housed_household(city, 3, _profile(["soil"], ["solitary"], ["leave_the_nest"]))
+	for parent: Household in [first, second, nest]:
+		_add_marriageable_child(parent)
 	_add_house(city)
 	city.advance_new_family_formation_month()
-	_check(city.households.size() == 3, "one family should form into the single empty house")
-	_check(city.households[2].parent_household_id == nest.id, "leave-the-nest family should claim the empty house first")
+	_check(city.households.size() == 4, "one family should form into the single empty house")
+	_check(city.households[3].is_child_of(nest.id), "leave-the-nest family should marry into the empty house first")
 
 func test_new_family_inherits_values() -> void:
 	var city = _empty_city_with_food()
-	var parent_values: Dictionary = _profile(["soil"], ["industrious"], ["many_children"])
-	var parent: Household = _housed_household(city, 1, parent_values)
-	parent.adult_children = 2
-	parent.total_population += 2
+	for household_id in [1, 2]:
+		_add_marriageable_child(_housed_household(city, household_id, _profile(["soil"], ["industrious"], ["many_children"])))
 	_add_house(city)
 	city.advance_new_family_formation_month()
-	_check(city.households.size() == 2, "new family should form")
-	var child: Household = city.households[1]
+	_check(city.households.size() == 3, "new family should form")
+	var child: Household = city.households[2]
 	_check(child.has_values() and CultureValuesScript.is_valid_profile(child.values), "new family should have a valid value profile")
+
+func _add_marriageable_child(household: Household) -> void:
+	household.adult_children = 1
+	household.total_population += 1
 
 func test_defining_values_favor_rare_values() -> void:
 	var city = _empty_city_with_food()

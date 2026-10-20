@@ -306,7 +306,11 @@ Implemented:
 - Kin: Many Children +5 birth chance, Few Children -5; Close-Knit families wait 12 months before a ready child forms a family; Leave the Nest families claim empty houses first.
 - Display: selecting a house shows its family's Calling and 3 defining values; the F3 inspector shows the full profile of the selected house's family.
 
-Deferred to later milestones (hooks not yet wired): goods quality (Perfectionist / Expedient), building wear (Expedient), Solitary's resentment of owed labor (needs tithes, M7), Few Children's child skill bonus, Elder Reverence / Youth Ascendant (succession), lineage rules (M3), and every category beyond Calling, Work Ethic, and Kin.
+Deferred to later milestones (hooks not yet wired): goods quality (Perfectionist / Expedient), building wear (Expedient), Solitary's resentment of owed labor (needs tithes, M7), Few Children's child skill bonus, Elder Reverence / Youth Ascendant (succession), and every category beyond Calling, Work Ethic, Kin, and the M2/M3 hooks below.
+
+**M2 (2026-10-19):** departure thresholds (Rooted, Wanderlust, Hopeful, Fatalistic, Close-Knit, Leave the Nest), crowding tolerance (Hearth-Proud, Simple Living, Town-Loving), and newcomer attraction (Welcoming vs Clannish share). Newcomers bring values from a seeded regional culture.
+
+**M3 (2026-10-19):** lineage rules (Father's / Mother's / Strongest Line) decide which lineage a married couple joins; Clannish families prefer partners from their own lineage; children inherit values from both parent households.
 
 ## Open Questions
 

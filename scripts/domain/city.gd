@@ -45,6 +45,12 @@ const BIRTH_FOOD_SURPLUS_BONUS: int = 5
 const BIRTH_HOUSING_HEADROOM_BONUS: int = 5
 const BIRTH_REQUIRED_HOUSING_HEADROOM: int = 2
 const OLD_COUPLE_MIN_MORTALITY_MONTHS: int = 12
+# Marriage (M3). A grown child with no partner in town marries an outsider after this long.
+const MARRIAGE_OUTSIDER_WAIT_MONTHS: int = 6
+const MARRIAGE_LINEAGE_PREFERENCE: int = 10
+const LINEAGE_RULES: Array[String] = ["fathers_line", "mothers_line", "strongest_line"]
+# Used when no family in the town holds a lineage rule.
+const DEFAULT_LINEAGE_RULE: String = "fathers_line"
 const ENABLE_HOUSEHOLD_LIFECYCLE_LOGS: bool = true
 
 var name: String = "City"
@@ -254,23 +260,112 @@ func recalculate_household_succession_pressures(city_index: int = 0):
 		elif household.has_succession_pressure():
 			log_household_lifecycle_event(city_index, household.id, "SuccessionReady", "potential_new_families=" + str(household.get_potential_new_family_count()))
 
+# M3: a grown child marries a grown child of another household (never a sibling). With no
+# partner in town for MARRIAGE_OUTSIDER_WAIT_MONTHS, they marry someone from outside.
+# Each household marries off at most one child per month.
 func advance_new_family_formation_month(city_index: int = 0):
-	var parent_households: Array[Household] = get_family_formation_order()
-	for parent: Household in parent_households:
-		if not parent.can_form_new_family():
-			parent.family_formation_wait_months = 0
+	var ready: Array[Household] = []
+	for household: Household in get_family_formation_order():
+		if not household.can_form_new_family():
+			household.family_formation_wait_months = 0
 			continue
-		parent.family_formation_wait_months += 1
-		if parent.family_formation_wait_months <= CultureEffectsScript.get_family_formation_delay_months(parent.values):
+		household.family_formation_wait_months += 1
+		if household.family_formation_wait_months > CultureEffectsScript.get_family_formation_delay_months(household.values):
+			ready.append(household)
+
+	var married_this_month: Array[int] = []
+	for household: Household in ready:
+		if married_this_month.has(household.id) or household.adult_children <= 0:
 			continue
 
-		log_household_lifecycle_event(city_index, parent.id, "NewFamilyFormationAttempted", "adult_children=" + str(parent.adult_children) + " potential_new_families=" + str(parent.get_potential_new_family_count()))
+		var partner: Household = find_marriage_partner(household, ready, married_this_month)
+		var outsider_wait: int = CultureEffectsScript.get_family_formation_delay_months(household.values) + MARRIAGE_OUTSIDER_WAIT_MONTHS
+		if partner == null and household.family_formation_wait_months <= outsider_wait:
+			continue
+
+		var partner_text: String = "outsider"
+		if partner != null:
+			partner_text = str(partner.id)
+		log_household_lifecycle_event(city_index, household.id, "NewFamilyFormationAttempted", "adult_children=" + str(household.adult_children) + " partner=" + partner_text)
 		var house_id: int = find_empty_house_building_id()
 		if house_id < 0:
-			log_household_lifecycle_event(city_index, parent.id, "NewFamilyFormationBlocked", "reason=no_empty_house adult_children=" + str(parent.adult_children))
+			log_household_lifecycle_event(city_index, household.id, "NewFamilyFormationBlocked", "reason=no_empty_house adult_children=" + str(household.adult_children))
 			return
 
-		form_new_family_from_parent(parent, house_id, city_index)
+		form_family_by_marriage(household, partner, house_id, city_index)
+		married_this_month.append(household.id)
+		if partner != null:
+			married_this_month.append(partner.id)
+
+# Clannish families prefer partners from their own lineage; others prefer a different lineage.
+func find_marriage_partner(household: Household, ready: Array[Household], married_this_month: Array[int]) -> Household:
+	var best: Household = null
+	var best_score: int = -9999
+	for candidate: Household in ready:
+		if candidate.id == household.id or married_this_month.has(candidate.id) or candidate.adult_children <= 0:
+			continue
+		var same_lineage: bool = get_lineage_origin_id(candidate) == get_lineage_origin_id(household)
+		var score: int = 0
+		for side: Household in [household, candidate]:
+			var clannish: bool = CultureValuesScript.has_value(side.values, "clannish")
+			if same_lineage and clannish:
+				score += MARRIAGE_LINEAGE_PREFERENCE
+			elif same_lineage or clannish:
+				score -= MARRIAGE_LINEAGE_PREFERENCE
+		if best == null or score > best_score:
+			best = candidate
+			best_score = score
+	return best
+
+func get_lineage_origin_id(household: Household) -> int:
+	if household.origin_household_id >= 0:
+		return household.origin_household_id
+	return household.id
+
+func get_lineage_household_count(origin_id: int) -> int:
+	var count: int = 0
+	for household: Household in households:
+		if get_lineage_origin_id(household) == origin_id:
+			count += 1
+	return count
+
+func get_household_lineage_rule(household: Household) -> String:
+	for rule: String in LINEAGE_RULES:
+		if CultureValuesScript.has_value(household.values, rule):
+			return rule
+	return ""
+
+# When the two families agree, their rule applies; otherwise the town's most common rule does.
+func resolve_marriage_lineage_rule(first: Household, second: Household) -> String:
+	var first_rule: String = get_household_lineage_rule(first)
+	if second == null:
+		if first_rule != "":
+			return first_rule
+		return get_settlement_lineage_rule()
+	if first_rule != "" and first_rule == get_household_lineage_rule(second):
+		return first_rule
+	return get_settlement_lineage_rule()
+
+func get_settlement_lineage_rule() -> String:
+	var best_rule: String = DEFAULT_LINEAGE_RULE
+	var best_count: int = 0
+	for rule: String in LINEAGE_RULES:
+		var count: int = 0
+		for household: Household in households:
+			if CultureValuesScript.has_value(household.values, rule):
+				count += 1
+		if count > best_count:
+			best_rule = rule
+			best_count = count
+	return best_rule
+
+func choose_lineage_parent(groom_side: Household, bride_side: Household, rule: String) -> Household:
+	if rule == "mothers_line":
+		return bride_side
+	if rule == "strongest_line":
+		if get_lineage_household_count(get_lineage_origin_id(bride_side)) > get_lineage_household_count(get_lineage_origin_id(groom_side)):
+			return bride_side
+	return groom_side
 
 # Leave the Nest families get first claim on empty houses; otherwise the existing order is kept.
 func get_family_formation_order() -> Array[Household]:
@@ -291,15 +386,38 @@ func find_empty_house_building_id() -> int:
 
 	return int(open_house_ids[0])
 
-func form_new_family_from_parent(parent: Household, house_id: int, city_index: int = 0):
-	var parent_adult_children_before: int = parent.adult_children
-	var parent_population_before: int = parent.total_population
-	parent.spend_adult_children_for_new_family()
-	parent.family_formation_wait_months = 0
-	log_household_lifecycle_event(city_index, parent.id, "NewFamilyParentUpdated", "adult_children=" + str(parent_adult_children_before) + "->" + str(parent.adult_children) + " total_population=" + str(parent_population_before) + "->" + str(parent.total_population))
+# `partner` is null when the spouse comes from outside the town; the family then joins the
+# town household's lineage.
+func form_family_by_marriage(household: Household, partner: Household, house_id: int, city_index: int = 0):
+	var partner_id: int = -1
+	if partner != null:
+		partner_id = partner.id
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = hash([household.id, partner_id, household.generation, int(tile.x), int(tile.y), "marriage"])
 
-	var household_id: int = get_next_household_id()
-	var new_household: Household = Household.new(household_id, house_id, parent.preference, 2, Household.RESIDENCE_HOUSED)
+	var lineage_parent: Household = household
+	var other_parent: Household = partner
+	if partner != null:
+		var groom_side: Household = household
+		var bride_side: Household = partner
+		if rng.randi_range(0, 1) == 1:
+			groom_side = partner
+			bride_side = household
+		lineage_parent = choose_lineage_parent(groom_side, bride_side, resolve_marriage_lineage_rule(household, partner))
+		if lineage_parent == household:
+			other_parent = partner
+		else:
+			other_parent = household
+
+	for side in [household, partner]:
+		if side == null:
+			continue
+		var adult_children_before: int = side.adult_children
+		side.spend_adult_child_for_marriage()
+		side.family_formation_wait_months = 0
+		log_household_lifecycle_event(city_index, side.id, "NewFamilyParentUpdated", "adult_children=" + str(adult_children_before) + "->" + str(side.adult_children) + " total_population=" + str(side.total_population))
+
+	var new_household: Household = Household.new(get_next_household_id(), house_id, lineage_parent.preference, 2, Household.RESIDENCE_HOUSED)
 	new_household.lifecycle_stage = Household.LIFECYCLE_NEWLYWED
 	new_household.young_children = 0
 	new_household.older_children = 0
@@ -307,22 +425,29 @@ func form_new_family_from_parent(parent: Household, house_id: int, city_index: i
 	new_household.age_in_stage = 0
 	new_household.child_age_months = 0
 	new_household.working_adults = 2
-	new_household.parent_household_id = parent.id
-	if parent.origin_household_id >= 0:
-		new_household.origin_household_id = parent.origin_household_id
+	new_household.parent_household_id = lineage_parent.id
+	new_household.second_parent_household_id = -1
+	if other_parent != null:
+		new_household.second_parent_household_id = other_parent.id
+	new_household.spouse_from_outside = partner == null
+	new_household.origin_household_id = get_lineage_origin_id(lineage_parent)
+	new_household.generation = lineage_parent.generation + 1
+	new_household.family_trade = get_inherited_family_trade(lineage_parent, new_household, city_index)
+
+	var parent_profiles: Array = [lineage_parent.values]
+	if other_parent != null:
+		parent_profiles.append(other_parent.values)
 	else:
-		new_household.origin_household_id = parent.id
-	new_household.generation = parent.generation + 1
-	new_household.family_trade = get_inherited_family_trade(parent, new_household, city_index)
-	if parent.has_values():
-		new_household.set_values(CultureValuesScript.inherit_profile([parent.values], make_values_rng(new_household, "inherit"), get_settlement_value_counts()))
+		# The outside spouse brings the region's culture.
+		parent_profiles.append(CultureValuesScript.inherit_profile([], rng, HouseholdMigrationScript.get_regional_value_counts(self)))
+	new_household.set_values(CultureValuesScript.inherit_profile(parent_profiles, make_values_rng(new_household, "inherit"), get_settlement_value_counts()))
+
 	new_household.succession_pressure = 0
 	new_household.move_to_house(house_id)
 	new_household.update_labor_capacity()
 	households.append(new_household)
-	log_household_lifecycle_event(city_index, parent.id, "NewFamilyFormed", "child_household=" + str(new_household.id) + " house=" + str(house_id) + " parent_adult_children=" + str(parent.adult_children))
-	log_household_lifecycle_event(city_index, new_household.id, "NewHouseholdCreated", "parent=" + str(parent.id) + " house=" + str(house_id) + " stage=" + new_household.lifecycle_stage + " total_population=" + str(new_household.total_population) + " working_adults=" + str(new_household.working_adults) + " family_trade=" + new_household.family_trade)
-	log_household_lifecycle_event(city_index, new_household.id, "LineageAssigned", "parent=" + str(new_household.parent_household_id) + " origin=" + str(new_household.origin_household_id) + " generation=" + str(new_household.generation) + " family_trade=" + new_household.family_trade)
+	log_household_lifecycle_event(city_index, new_household.id, "NewFamilyFormed", "lineage_parent=" + str(lineage_parent.id) + " other_parent=" + str(new_household.second_parent_household_id) + " outside_spouse=" + str(new_household.spouse_from_outside) + " house=" + str(house_id))
+	log_household_lifecycle_event(city_index, new_household.id, "LineageAssigned", "origin=" + str(new_household.origin_household_id) + " generation=" + str(new_household.generation) + " family_trade=" + new_household.family_trade)
 
 func get_inherited_family_trade(parent: Household, child: Household, city_index: int = 0) -> String:
 	var parent_trade: String = parent.family_trade
@@ -448,7 +573,7 @@ func record_work_succession_vacancy(removed_household: Household, building: Buil
 func get_household_descendants(household_id: int) -> Array[Household]:
 	var result: Array[Household] = []
 	for household: Household in households:
-		if household.parent_household_id == household_id:
+		if household.is_child_of(household_id):
 			result.append(household)
 
 	return result
@@ -494,7 +619,7 @@ func is_household_available_for_work_succession(household: Household) -> bool:
 
 func get_work_succession_priority(removed_household: Household, candidate: Household) -> String:
 	var same_trade: bool = candidate.family_trade == removed_household.family_trade
-	if candidate.parent_household_id == removed_household.id:
+	if candidate.is_child_of(removed_household.id):
 		if same_trade:
 			return "direct_child_same_trade"
 		return "direct_child"
