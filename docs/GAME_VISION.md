@@ -67,6 +67,36 @@ The world is not empty and not level:
 - **Rival towns** - settlements of similar scale competing for land, trade, and people.
 - **Established civilizations** - some rivals may already be expanded powers when the player founds their first town. The player starts small in a world that already has big players.
 
+## A Living World
+
+The world does not wait for the player. Rivals, established powers, and bandits act on their own, and events happen both outside the player's influence and because of it. The sandbox is driven by the player's objectives inside that moving world.
+
+## Economy
+
+"Controlling the global economy" can take any form the player pursues, for example:
+
+- **Trade network dominance** - your routes, markets, and merchants carry most of the world's goods.
+- **Resource and industry control** - you hold key deposits, the best workshops, or goods others cannot make.
+- **Economic dependency** - rivals cannot feed or supply themselves without you, so leverage replaces conquest.
+
+### Money (proposed, pending owner confirmation)
+
+No universal gold. **Money belongs to someone.**
+
+- **Inside the player's settlement**, money emerges over time, following `docs/MONEY_OBLIGATION_AND_CITY_CREDIT_MODEL.md`: shared storehouse, then tracked obligations, then city credit, then accepted currency.
+- **Established civilizations already have their own coin** at game start, each backed by its issuer's wealth and trustworthiness. To a frontier town, foreign coin is a valuable good earned and spent through trade.
+- **Adopting a neighbor's coin** is convenient but creates economic dependency and gives the issuer influence. **Building your own credit** is slower but keeps independence. If the player's currency becomes widely used, that is a path to economic dominance.
+- Why not generic gold: one universal store of value would erase dependency, influence, and cultural difference, which are the levers this game is about. Tying money to an issuer makes money a form of influence.
+- Guardrails: one currency per civilization, value shown as plain-language trust ("Traders discount your credit"), and no money in the first playable; early neighbor trade is barter.
+
+## Knowledge And Technology
+
+**Practice plus contact.** No tech tree. Families get better at what they do, and techniques spread through lineage, apprenticeship, and migration. Trade and contact with established civilizations can bring in knowledge the player's society did not develop itself.
+
+## Government, Laws, And Policy
+
+**The player decides; culture pushes back.** The player can choose government type, laws, and policies. Culture sets the defaults, and the player can change any of them, but changes that go against what the people value carry consequences (unrest, departures, lost trust) scaled to how strongly the culture feels about them.
+
 ## Pace
 
 - **Slow and contemplative.** Long stretches of watching families live, occasional decisions, frequent pausing to inspect.
@@ -79,7 +109,7 @@ The world is not empty and not level:
 
 ## Culture
 
-**Mostly emergent, with player nudges.** Values and culture grow from the conditions families live under: work, prosperity, shortages, layout, neighbors. The player can nudge them through priorities, institutions, festivals, laws, and which families or trades they favor.
+**Mostly emergent, with player nudges.** Values and culture grow from the conditions families live under: work, prosperity, shortages, layout, neighbors. The player can nudge them through priorities, institutions, festivals, laws, and which families or trades they favor. Culture also sets the default government, laws, and policies, and judges the player's changes to them (see Government, Laws, And Policy).
 
 ## Implications For Current Work
 
@@ -96,7 +126,13 @@ These follow from the vision and should guide upcoming sprints:
 8. **Defense matters early.** Bandits and looters can threaten a hamlet, so some defensive response (militia is already a listed household responsibility in `docs/PROJECT_OWNER_QUESTIONS.md`) belongs earlier than full military systems.
 9. **World generation must place established powers and bandit regions.** Some rivals exist at full scale from day one, and regions need a lawlessness level, so the world needs pre-built civilizations and contested frontier, not only empty land and one neutral town.
 
+10. **Rivals need their own agency.** A living world means AI settlements and powers that grow, trade, and act independently, at a simulation depth the scale audit's aggregation bands can support.
+11. **Skill and technique are household data.** Practice-based progress means families carry trade skill that can be inherited, taught, and carried by migrants, extending today's `family_trade` inheritance.
+12. **Culture needs opinions about policy.** Values must be able to approve or resist specific laws and policies, so values need to be structured data, not labels.
+
 ## Open Questions
+
+- Confirm the proposed money model (money belongs to someone; no universal gold).
 
 - What is the first value or cultural trait that should have a real economic effect?
 - How long, in game years, should the climb from founding to the first nation-level structure take?
