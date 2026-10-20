@@ -32,6 +32,7 @@ Coin spreads inward from trade as the settlement grows, because it makes life si
 - **Households** hold wealth as a level (stored goods and status first, coin once it circulates), not a transaction ledger. Household wealth drives prosperity, ambitions, resilience in bad years, and migration.
 - **The state** holds a treasury used for buildings, defense, trade, and policy.
 - **Taxes** connect the two pockets.
+- At town scale and above, **Houses** (`docs/HOUSES_AND_LINEAGE_MODEL.md`) pool their member families' wealth and hold concrete assets such as workshops, land, caravans, and coin. Wealth then has three holders: ordinary families, Houses, and the state.
 
 ### 3. Local scarcity prices
 

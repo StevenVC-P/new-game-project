@@ -15,14 +15,14 @@ Mount & Blade II: Bannerlord is the reference. Its towns are a handful of number
 | Level | Used for | Unit simulated | Cadence |
 | --- | --- | --- | --- |
 | **Full** | The player's settlements up to roughly village scale | Named households (current model) | Daily needs/production; monthly lifecycle; seasonal births |
-| **Grouped** | The player's large towns and cities | Population groups (households bucketed by trade, class, culture, and life stage, with counts) plus named notable families | Monthly |
+| **Grouped** | The player's large towns and cities | **Houses** (lineages collapsed into one entity, each with a named head household) plus **the commons** (unattached families grouped by trade and culture). See `docs/HOUSES_AND_LINEAGE_MODEL.md` | Monthly |
 | **Summary** | AI towns and rival powers | Settlement numbers: population, prosperity, production by sector, stocks, culture profile | Monthly or seasonal |
 | **Agents** | The living world map | Caravans, armies, bandit gangs, migrant groups, envoys | Daily, on the map |
 
 Rules:
 
 - **One rule set at scale.** When a player settlement grows past the Full threshold, it switches to the same Grouped model that AI cities use. There is no separate "player big city" simulation to maintain.
-- **Continuity across the switch.** Founding and notable lineages stay named households inside the Grouped model. Ordinary households fold into groups that keep their trade, culture, and life-stage mix.
+- **Continuity across the switch.** Large lineages collapse into Houses that keep their name, values, trades, and a named head household. Other households fold into the commons, keeping their trade and culture mix.
 - **Culture must aggregate.** Whatever culture is, it must be representable per household (Full), as a distribution per group (Grouped), and as a profile per settlement (Summary). This constrains the culture model.
 - The Full -> Grouped threshold is a tuning value set from benchmark results, not a design constant. The audit's guardrail is about 250-1,000 people (roughly 60-250 households).
 

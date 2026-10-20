@@ -22,6 +22,10 @@ Main risk: scope. The hamlet-to-village experience must be great on its own, bec
 
 A slow, open-ended civilization sandbox in which culture and economics build on each other. Founding families become hamlets, villages, towns, cities, and eventually nation and global structures. What the player builds is theirs, and the society that grows inside it is partly theirs and partly its own.
 
+## Families At Scale
+
+Families stay families. Lineages that grow large collapse into **Houses**, which belong to their town and carry the lineage's name, blended values, trades, and wealth. Families outside a large lineage form the commons. Full model: `docs/HOUSES_AND_LINEAGE_MODEL.md`.
+
 ## Experience Pillars
 
 A good session should leave the player with:
@@ -71,7 +75,7 @@ Ambitions are acknowledged through what the player can do on the map, not throug
 
 Influence is both soft and hard:
 
-- **Soft and relational:** trade reach (where your goods and routes go), reputation and culture (prosperity and stability that attract and sway), and kinship and lineage (families from your town who settle or marry elsewhere carry your influence with them).
+- **Soft and relational:** trade reach (where your goods and routes go), reputation and culture (prosperity and stability that attract and sway), and kinship and lineage (families from your town who settle or marry elsewhere carry your influence with them; at scale, related Houses in different towns, per `docs/HOUSES_AND_LINEAGE_MODEL.md`).
 - **Hard:** military presence (patrols, garrisons, safe roads).
 - **Hard borders exist.** Influence is a gradient that can overlap and be contested, but territory is ultimately claimed with clear borders.
 
