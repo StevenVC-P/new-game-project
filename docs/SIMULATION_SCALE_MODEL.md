@@ -2,7 +2,7 @@
 
 Firm owner decisions on what the game simulates at each scale, and what it deliberately does not (2026-10-19). Sits under `docs/GAME_VISION.md`; builds on the bands in `docs/map_and_settlement_scale_audit.md`.
 
-Numbers marked *estimate* come from code reading and rough GDScript performance expectations. `docs/HOUSEHOLD_SIM_BENCHMARK.md` replaces them with measured values once the benchmark spike runs.
+Performance numbers are measured in `docs/HOUSEHOLD_SIM_BENCHMARK.md`.
 
 ## Principle
 
@@ -51,11 +51,12 @@ Starting targets, to be tuned from benchmarks:
 
 These are similar in scale to Bannerlord's world.
 
-## Performance Budget (estimate)
+## Performance Budget
 
 - At 10x speed the game advances 10 days per second. With about 4 ms of each frame for simulation, the whole world gets about 20-25 ms per game day.
-- Full household simulation in GDScript is expected to top out at a few thousand households world-wide on daily cadence, lower at faster late-game speeds. Monthly cadence allows roughly 30x more.
-- Current code has costs that are fine at 4 households but not at thousands: per-household monthly lifecycle log strings (`ENABLE_HOUSEHOLD_LIFECYCLE_LOGS = true`), an O(n^2) household sort (`City.sort_households_by_population_desc`), and repeated full scans of households and buildings per tick.
+- **Measured** (`docs/HOUSEHOLD_SIM_BENCHMARK.md`): a household's own monthly work costs about 0.8 microseconds and scales linearly. The city-level daily tick is quadratic because of repeated full scans, which caps one city at about 250 households today (9 ms per day; 500 households take 31 ms).
+- The ceiling is algorithmic, not GDScript: lookup tables instead of repeated scans are the first fix, before any language change.
+- Other costs that grow with scale: per-household lifecycle log strings (`ENABLE_HOUSEHOLD_LIFECYCLE_LOGS = true`) and an O(n^2) household sort (`City.sort_households_by_population_desc`).
 
 ## Architecture Guardrails
 
