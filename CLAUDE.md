@@ -32,6 +32,9 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # Run one test (tests extend SceneTree and quit with a non-zero code on failure)
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/founding_city_validation.gd
 
+# Multi-year settlement run, yearly report (filter output for [SIM])
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/settlement_growth_run.gd
+
 # Household simulation benchmark (filter output for [BENCH]; takes several minutes)
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/benchmarks/household_sim_benchmark.gd
 ```

@@ -9,6 +9,8 @@ var food_label: Label
 var responsibility_label: Label
 var resource_label: Label
 
+var values_label: Label
+
 var current_city = null
 var panel: PanelContainer
 
@@ -59,6 +61,22 @@ func _ready():
 	resource_label = Label.new()
 	resource_label.text = "Resources: unavailable"
 	root_box.add_child(resource_label)
+
+	values_label = Label.new()
+	values_label.text = "Select a house to inspect a family's values."
+	root_box.add_child(values_label)
+
+# Full value profile of the selected family; values are inspect-only (docs/CULTURE_AND_VALUES_MODEL.md).
+func set_selected_household(household):
+	if values_label == null:
+		return
+	if household == null or not household.has_method("has_values") or not household.has_values():
+		values_label.text = "Select a house to inspect a family's values."
+		return
+	var lines: Array[String] = ["Family values (" + current_city.get_household_label(household.id) + "):"] if current_city != null else ["Family values:"]
+	lines.append_array(CultureValues.format_profile_lines(household.values))
+	values_label.text = "
+".join(lines)
 
 func set_city(city):
 	current_city = city

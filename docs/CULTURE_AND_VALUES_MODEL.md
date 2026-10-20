@@ -291,6 +291,23 @@ Culture should arrive alongside the systems it affects, not all at once:
 3. **With economy and policy:** Trade and Coin, Authority and Law, Craft and Learning.
 4. **With Houses, military, and larger layouts:** House aggregation and tensions, Conflict and Honor, Home and Place, settlement identity lines.
 
+## Implementation Status
+
+**M1 values foundation (2026-10-19)** - `scripts/domain/culture_values.gd` (catalog, holding rules, inheritance, defining values) and `scripts/domain/culture_effects.gd` (effects).
+
+Implemented:
+
+- Every seeded, newly formed, and newcomer household carries a full profile (1-2 values per category, no exclusive pair). Seeded callings follow the seeded family trade (farming -> Of the Soil, woodcraft -> Of the Forest + Of the Forge and Bench, stonework -> Of Stone, general -> Of the Hearth); other categories are drawn deterministically per household and town.
+- Inheritance at family formation keeps each parent value with 80% chance and fills empty categories from the settlement's value counts. It accepts several parent profiles, ready for cross-lineage marriage (M3).
+- **Calling is the source of truth for work fit.** `Household.preference` remains only as a derived display category (agrarian / industrial / neutral) for existing UI colors and labels.
+- Calling fit: good match +25% output (the same strength as the old preference bonus), poor match -25%. A poor match applies only when all of a family's callings are material trades and none fit the workplace; families with non-material callings are neutral anywhere.
+- Work Ethic output: Industrious +10%, Leisurely -10%, Steady +5%, Perfectionist -10%, Expedient +10%, Surging +15% during food shortage and -5% otherwise, Communal Labor +10% alongside another worked building of the same type and -5% alone. Total output modifier is capped at ±30%.
+- Output modifiers are percentages with a per-building fractional carry (`Building.output_carry`), so 1-2 unit daily outputs average to the intended rate.
+- Kin: Many Children +5 birth chance, Few Children -5; Close-Knit families wait 12 months before a ready child forms a family; Leave the Nest families claim empty houses first.
+- Display: selecting a house shows its family's Calling and 3 defining values; the F3 inspector shows the full profile of the selected house's family.
+
+Deferred to later milestones (hooks not yet wired): goods quality (Perfectionist / Expedient), building wear (Expedient), Solitary's resentment of owed labor (needs tithes, M7), Few Children's child skill bonus, Elder Reverence / Youth Ascendant (succession), lineage rules (M3), and every category beyond Calling, Work Ethic, and Kin.
+
 ## Open Questions
 
 None currently. Resolved 2026-10-19: twelve categories are the starting pool; family values are held or not (strength later, certain for Houses); values are inspect-only except when relevant to a decision; named peoples only in extreme divergence, as a pressure against unity.

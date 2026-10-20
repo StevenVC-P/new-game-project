@@ -56,6 +56,8 @@ Known gaps that block the vision:
 - **Kin** modifies birth chance and family-formation timing.
 - Household inspector shows all values and highlights defining values. Nothing on cards.
 
+**Status: done (2026-10-19).** See Implementation Status in `CULTURE_AND_VALUES_MODEL.md` for what shipped and which hooks are deferred.
+
 **Authorized formula changes:** output modifiers, birth chance, formation timing, assignment fit.
 **Done when:** tests show values inherited, calling fit affecting output, kin values affecting births; effects capped per the model.
 **Why first:** migration, marriage, ambitions, defense, and policy reactions all read values. Building them first avoids retrofitting migrants and soldiers later.
@@ -63,6 +65,8 @@ Known gaps that block the vision:
 ### M2 - Families Arrive And Leave
 
 **Objective:** growth and decline come from whole families, and hardship has real but recoverable consequences.
+
+**Measured starting point** (`tests/sim/settlement_growth_run.gd`, identical before and after M1): with 40 houses, 6 farms, and 2 woodcutters, the founded town grows from 14 to about 27 people in year 1, falls into permanent food shortage, and shrinks to 3 households by year 9. Causes: migration adds people whenever food is *stored* without checking whether production can sustain them; shortage skips production every other day, locking in the spiral; shortage blocks births while old couples keep passing. M2 must break this spiral.
 
 - Migrants arrive as **whole households** with lifecycle, calling, values, and lineage, driven by settlement attractiveness (food days, housing headroom, soft-need satisfaction, no shortages) and Community values (R2).
 - A slowly refilling **regional migrant pool** replaces the fixed pool of 20. Migrants bring values from their place of origin (R2).
