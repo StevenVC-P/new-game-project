@@ -190,7 +190,7 @@ static func estimate_daily_food_production(city) -> float:
 		var household: Household = city.get_household_by_id(building.assigned_household_id)
 		if household != null and household.has_values():
 			percent = CultureEffectsScript.get_work_output_percent(household.values, building.type)
-		total += float(city.get_base_building_output_amount(Building.BUILDING_FARM)) * float(100 + percent) / 100.0 * get_maintenance_output_factor(building.maintenance_level)
+		total += float(city.get_base_building_output_amount(Building.BUILDING_FARM)) * city.get_family_labor_factor(household) * float(100 + percent) / 100.0 * get_maintenance_output_factor(building.maintenance_level)
 	return total
 
 static func get_maintenance_output_factor(maintenance_level: int) -> float:

@@ -146,6 +146,9 @@ func draw(canvas: CanvasItem, font: Font, font_size: int, city: City):
 
 	if building.is_house():
 		y = draw_overlay_line(canvas, font, font_size, "Resident: " + get_house_resident_text(city, inspected_building_index), text_x, y, overlay_size.x)
+		var resident_calling: String = get_house_calling_text(city, inspected_building_index)
+		if resident_calling != "":
+			y = draw_overlay_line(canvas, font, font_size, "Calling: " + resident_calling, text_x, y, overlay_size.x)
 		y = draw_overlay_line(canvas, font, font_size, "Available labor: " + get_house_available_worker_text(city, inspected_building_index), text_x, y, overlay_size.x)
 		y = draw_overlay_line(canvas, font, font_size, "Assigned: " + get_house_assignment_text(city, inspected_building_index), text_x, y, overlay_size.x)
 		y = draw_overlay_section_title(canvas, font, font_size, "Household Lifecycle", text_x, y, overlay_size.x)
@@ -327,7 +330,16 @@ func get_house_resident_text(city: City, house_index: int) -> String:
 	if household == null:
 		return "empty"
 
-	return city.get_household_label(household.id) + " (" + household.preference + ", pop " + str(household.total_population) + ")"
+	return city.get_household_label(household.id) + ", pop " + str(household.total_population)
+
+func get_house_calling_text(city: City, house_index: int) -> String:
+	var household: Household = city.get_household_for_building_id(house_index)
+	if household == null or not household.has_values():
+		return ""
+	var names: Array[String] = []
+	for calling in household.values.get(CultureValues.CATEGORY_CALLING, []):
+		names.append(CultureValues.get_display_name(calling))
+	return ", ".join(names)
 
 func get_house_available_worker_text(city: City, house_index: int) -> String:
 	var available_workers: int = city.get_available_workers_from_house(house_index)

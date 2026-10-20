@@ -89,8 +89,10 @@ func unassign_from_building(building_id: int, workers: int = 1):
 	assigned_building_ids.erase(building_id)
 	assigned_workers = max(0, assigned_workers - workers)
 
+# A family runs one holding (farmstead or workshop): one primary responsibility, worked by the
+# whole family (owner decision 2026-10-20). Family size changes output, not the number of jobs.
 func update_labor_capacity():
-	labor_capacity = clampi(working_adults, 0, 2)
+	labor_capacity = 1 if working_adults >= 1 else 0
 	worker_capacity = labor_capacity
 
 func get_compatibility_working_adults_for_population(population: int) -> int:

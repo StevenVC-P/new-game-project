@@ -118,14 +118,15 @@ func test_calling_changes_output() -> void:
 	var good: int = _farm_output_over(100, _profile(["soil"], ["solitary"], ["fathers_line"]))
 	var neutral: int = _farm_output_over(100, _profile(["hearth"], ["solitary"], ["fathers_line"]))
 	var poor: int = _farm_output_over(100, _profile(["stone"], ["solitary"], ["fathers_line"]))
-	# Farm base output is 2 per day: +25% -> 250, neutral -> 200, -25% -> 150.
-	_check(abs(good - 250) <= 1, "matched calling should raise farm output by 25%, got " + str(good))
-	_check(abs(neutral - 200) <= 1, "neutral calling should leave farm output unchanged, got " + str(neutral))
-	_check(abs(poor - 150) <= 1, "poor match should lower farm output by 25%, got " + str(poor))
+	# A two-adult family's farm output over 100 days: +25% matched, unchanged neutral, -25% poor.
+	var hundred_days: float = EconomyBalance.FARM_FOOD_PER_DAY * 100.0
+	_check(abs(good - hundred_days * 1.25) <= 1, "matched calling should raise farm output by 25%, got " + str(good))
+	_check(abs(neutral - hundred_days) <= 1, "neutral calling should leave farm output unchanged, got " + str(neutral))
+	_check(abs(poor - hundred_days * 0.75) <= 1, "poor match should lower farm output by 25%, got " + str(poor))
 
 func test_work_ethic_changes_output_and_is_capped() -> void:
 	var leisurely: int = _farm_output_over(100, _profile(["hearth"], ["leisurely"], ["fathers_line"]))
-	_check(abs(leisurely - 180) <= 1, "leisurely family should produce 10% less, got " + str(leisurely))
+	_check(abs(leisurely - EconomyBalance.FARM_FOOD_PER_DAY * 100.0 * 0.9) <= 1, "leisurely family should produce 10% less, got " + str(leisurely))
 	var capped_percent: int = CultureEffectsScript.get_work_output_percent(_profile(["soil"], ["industrious", "expedient"], ["fathers_line"]), Building.BUILDING_FARM)
 	_check(capped_percent == CultureEffectsScript.OUTPUT_PERCENT_CAP, "stacked bonuses should cap at the output limit, got " + str(capped_percent))
 	var communal_alone: int = CultureEffectsScript.get_work_output_percent(_profile(["hearth"], ["communal_labor"], ["fathers_line"]), Building.BUILDING_FARM, {"same_type_operating_others": 0})

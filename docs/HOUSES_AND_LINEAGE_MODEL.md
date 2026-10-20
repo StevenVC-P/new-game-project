@@ -35,6 +35,7 @@ In hamlets and villages every family stays visible and named. Collapse begins on
 - **Members in aggregate:** counts of member households by life stage, total population, labor, and needs. Births and family formation run as rates over these counts at the Grouped cadence (monthly).
 - **Culture as a blend:** a House's culture is the distribution of its member families' values, not a single value. A House can be internally divided, for example mostly traditional with a restless younger branch. This is why House culture is richer than a single family's.
 - **Wealth and holdings:** the House pools the wealth of its collapsed families and holds concrete assets (workshops, land, caravans, coin).
+- **Houses employ families (owner decision 2026-10-20).** A family runs one holding, so larger operations (an estate of several farmsteads, a set of workshops) exist only when a House holds them and dependent families from the commons work them. This is how wealth, labor, and influence connect at town scale.
 - **Loyal by default.** Houses generally follow the player's direction. Friction comes from culture: policies a House's values oppose still carry the consequences described in `docs/GAME_VISION.md`.
 - **Kin ties:** related Houses in other towns (see Branches) remember their shared lineage. Kinship is how soft influence travels between towns.
 
