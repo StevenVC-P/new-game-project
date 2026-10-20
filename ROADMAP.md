@@ -2,7 +2,7 @@
 
 This roadmap is intentionally lightweight. Replace placeholders with scoped tasks as the project direction becomes clearer.
 
-Objectives, pace, and player experience are set in `docs/GAME_VISION.md`. Growth stages and the next sprint order are in `docs/SETTLEMENT_GROWTH_SCALE_MODEL.md`.
+Objectives, pace, and player experience are set in `docs/GAME_VISION.md`. The ordered milestones to the first playable village are in `docs/IMPLEMENTATION_ROADMAP.md`; growth stages are in `docs/SETTLEMENT_GROWTH_SCALE_MODEL.md`.
 
 ## Core Loop
 
