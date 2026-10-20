@@ -5,6 +5,7 @@ const GoodsNeedBucketHelperScript = preload("res://scripts/domain/goods_need_buc
 const CultureValuesScript = preload("res://scripts/domain/culture_values.gd")
 const CultureEffectsScript = preload("res://scripts/domain/culture_effects.gd")
 const HouseholdMigrationScript = preload("res://scripts/domain/household_migration.gd")
+const EconomyBalanceScript = preload("res://scripts/domain/economy_balance.gd")
 const BUILDING_HOUSE: String = "house"
 const BUILDING_FARM: String = "farm"
 const BUILDING_WOODCUTTER: String = "woodcutter"
@@ -25,19 +26,16 @@ const ROLE_DEBUG: String = "debug"
 const WORK_PREF_NEUTRAL: String = "neutral"
 const WORK_PREF_AGRARIAN: String = "agrarian"
 const WORK_PREF_INDUSTRIAL: String = "industrial"
-const FARM_BASE_OUTPUT: int = 2
-const WOODCUTTER_BASE_OUTPUT: int = 2
-const TOOLMAKER_BASE_OUTPUT: int = 1
-const TOOLMAKER_WOOD_INPUT: int = 2
-const EXPANDED_GOODS_BASE_OUTPUT: int = 1
+# Economy numbers live in scripts/domain/economy_balance.gd.
+const TOOLMAKER_WOOD_INPUT: int = EconomyBalanceScript.TOOLMAKER_WOOD_PER_TOOL
 const STARTER_NEUTRAL_WORKERS: int = 0
 const STARTING_HOUSEHOLD_COUNT: int = 3
 const STARTING_HOUSEHOLD_POPULATION: int = 4
 const STARTING_POPULATION: int = STARTING_HOUSEHOLD_COUNT * STARTING_HOUSEHOLD_POPULATION
 const HOUSE_CAPACITY: int = 4
-const FOOD_PER_POPULATION_DIVISOR: int = 2
+const FOOD_PER_POPULATION_DIVISOR: int = EconomyBalanceScript.PEOPLE_FED_PER_FOOD
 const OLDER_CHILD_SUPPORT_TICK_INTERVAL: int = 4
-const STARTING_MAINTENANCE_GRACE_TICKS: int = 20
+const STARTING_MAINTENANCE_GRACE_TICKS: int = EconomyBalanceScript.MAINTENANCE_GRACE_DAYS
 const RESOURCE_HISTORY_LIMIT: int = 16
 const BIRTH_FOOD_SURPLUS_DAYS: float = 10.0
 const BIRTH_MIN_FOOD_DAYS: float = 5.0
@@ -109,9 +107,9 @@ func should_tick_simulation() -> bool:
 func make_starting_resources(starter_household_count: int = STARTING_HOUSEHOLD_COUNT) -> Dictionary:
 	var starting_population: int = starter_household_count * STARTING_HOUSEHOLD_POPULATION
 	var starting: Dictionary = {
-		"food": 60,
-		"wood": 45,
-		"tools": 14,
+		"food": EconomyBalanceScript.STARTING_FOOD,
+		"wood": EconomyBalanceScript.STARTING_WOOD,
+		"tools": EconomyBalanceScript.STARTING_TOOLS,
 		"stone_blocks": 0,
 		"cut_stone": 0,
 		"bricks": 0,
@@ -1282,7 +1280,7 @@ func apply_input_output_production(output_key: String, output_amount: int, input
 func get_current_building_output_amount(building: Building) -> int:
 	var maintenance_level: int = building.maintenance_level
 	var tick_count: int = int(resources["production_tick_count"])
-	var base_output: int = get_base_building_output_amount(building.type)
+	var base_output: float = get_base_building_output_amount(building.type)
 
 	if maintenance_level <= 0:
 		return 0
@@ -1303,57 +1301,47 @@ func get_current_building_output_amount(building: Building) -> int:
 
 	return 0
 
-func get_base_building_output_amount(building_type: String) -> int:
+func get_base_building_output_amount(building_type: String) -> float:
 	if building_type == BUILDING_FARM:
-		return FARM_BASE_OUTPUT
+		return EconomyBalanceScript.FARM_FOOD_PER_DAY
 	if building_type == BUILDING_WOODCUTTER:
-		return WOODCUTTER_BASE_OUTPUT
+		return EconomyBalanceScript.WOODCUTTER_WOOD_PER_DAY
 	if building_type == BUILDING_TOOLMAKER:
-		return TOOLMAKER_BASE_OUTPUT
-	if building_type == BUILDING_QUARRY:
-		return EXPANDED_GOODS_BASE_OUTPUT
-	if building_type == BUILDING_STONECUTTER:
-		return EXPANDED_GOODS_BASE_OUTPUT
-	if building_type == BUILDING_BRICKWORKS:
-		return EXPANDED_GOODS_BASE_OUTPUT
-	if building_type == BUILDING_LIME_KILN:
-		return EXPANDED_GOODS_BASE_OUTPUT
-	if building_type == BUILDING_MORTAR_YARD:
-		return EXPANDED_GOODS_BASE_OUTPUT
-	if building_type == BUILDING_MASON_YARD:
-		return EXPANDED_GOODS_BASE_OUTPUT
-	if building_type == BUILDING_SCULPTOR:
-		return EXPANDED_GOODS_BASE_OUTPUT
-	if building_type == BUILDING_CARVER:
-		return EXPANDED_GOODS_BASE_OUTPUT
-	if building_type == BUILDING_TILEWORKS:
-		return EXPANDED_GOODS_BASE_OUTPUT
-	if building_type == BUILDING_PAVER_YARD:
-		return EXPANDED_GOODS_BASE_OUTPUT
+		return EconomyBalanceScript.TOOLMAKER_TOOLS_PER_DAY
+	if building_type in [BUILDING_QUARRY, BUILDING_STONECUTTER, BUILDING_BRICKWORKS, BUILDING_LIME_KILN, BUILDING_MORTAR_YARD, BUILDING_MASON_YARD, BUILDING_SCULPTOR, BUILDING_CARVER, BUILDING_TILEWORKS, BUILDING_PAVER_YARD]:
+		return EconomyBalanceScript.EXPANDED_GOODS_PER_DAY
 
-	return 0
+	return 0.0
 
-func apply_building_output_modifiers(base_output: int, tick_count: int, building: Building) -> int:
-	var output_amount: int = base_output
-	var household: Household = get_household_by_id(building.assigned_household_id) if building.assigned_household_id >= 0 else null
-	if household != null and household.has_values():
-		output_amount = apply_culture_output_modifier(base_output, building, household)
-	else:
-		output_amount = apply_worker_preference_output_modifier(base_output, tick_count, building)
+func apply_building_output_modifiers(base_output: float, tick_count: int, building: Building) -> int:
+	var output_amount: int = apply_output_percent(base_output, building, get_worker_output_percent(building))
 	return apply_older_child_support_output_modifier(output_amount, tick_count, building)
 
-# Values change output by a percentage; the fraction carries over on the building so small
-# integer outputs (1-2 per day) still average out to the intended rate.
-func apply_culture_output_modifier(base_output: int, building: Building, household: Household) -> int:
-	if base_output <= 0:
-		return base_output
+# Values decide the percent; families without values (legacy) use the old preference match.
+func get_worker_output_percent(building: Building) -> int:
+	var household: Household = null
+	if building.assigned_household_id >= 0:
+		household = get_household_by_id(building.assigned_household_id)
+	if household != null and household.has_values():
+		var context: Dictionary = {
+			"food_shortage": bool(resources.get("food_shortage", false)),
+			"same_type_operating_others": max(0, int(operating_building_counts.get(building.type, 0)) - 1)
+		}
+		return CultureEffectsScript.get_work_output_percent(household.values, building.type, context)
 
-	var context: Dictionary = {
-		"food_shortage": bool(resources.get("food_shortage", false)),
-		"same_type_operating_others": max(0, int(operating_building_counts.get(building.type, 0)) - 1)
-	}
-	var percent: int = CultureEffectsScript.get_work_output_percent(household.values, building.type, context)
-	var exact_output: float = float(base_output) * float(100 + percent) / 100.0 + building.output_carry
+	var assigned_preference: String = get_household_preference_for_worker_modifier(building)
+	if assigned_preference == WORK_PREF_NEUTRAL:
+		return 0
+	if assigned_preference == get_preferred_worker_for_building(building.type):
+		return CultureEffectsScript.CALLING_MATCH_PERCENT
+	return CultureEffectsScript.CALLING_POOR_MATCH_PERCENT
+
+# Output is fractional (balance numbers and percent modifiers); the remainder carries over on
+# the building so small daily outputs still average out to the intended rate.
+func apply_output_percent(base_output: float, building: Building, percent: int) -> int:
+	if base_output <= 0.0:
+		return 0
+	var exact_output: float = base_output * float(100 + percent) / 100.0 + building.output_carry
 	var whole_output: int = int(floor(exact_output))
 	building.output_carry = exact_output - float(whole_output)
 	return max(0, whole_output)
@@ -1363,21 +1351,6 @@ func refresh_operating_building_counts():
 	for building: Building in buildings:
 		if building.can_produce():
 			operating_building_counts[building.type] = int(operating_building_counts.get(building.type, 0)) + 1
-
-func apply_worker_preference_output_modifier(base_output: int, tick_count: int, building: Building) -> int:
-	var assigned_preference: String = get_household_preference_for_worker_modifier(building)
-	var preferred_worker: String = get_preferred_worker_for_building(building.type)
-
-	if assigned_preference == WORK_PREF_NEUTRAL:
-		return base_output
-	if assigned_preference == preferred_worker:
-		if should_apply_preference_adjustment(base_output, tick_count):
-			return base_output + 1
-		return base_output
-	if should_apply_preference_adjustment(base_output, tick_count):
-		return max(0, base_output - 1)
-
-	return base_output
 
 func apply_older_child_support_output_modifier(output_amount: int, tick_count: int, building: Building) -> int:
 	if output_amount <= 0:
@@ -1392,12 +1365,6 @@ func apply_older_child_support_output_modifier(output_amount: int, tick_count: i
 		return output_amount
 
 	return output_amount + household.get_older_child_support_bonus()
-
-func should_apply_preference_adjustment(base_output: int, tick_count: int) -> bool:
-	if base_output >= 2:
-		return tick_count % 2 == 0
-
-	return tick_count % 4 == 0
 
 func get_preferred_worker_for_building(building_type: String) -> String:
 	if building_type == BUILDING_FARM:

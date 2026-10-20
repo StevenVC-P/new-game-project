@@ -32,6 +32,9 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # Run one test (tests extend SceneTree and quit with a non-zero code on failure)
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/founding_city_validation.gd
 
+# Opening check: can 20 different towns get off the ground in two years? (filter for [OPEN])
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/opening_check.gd
+
 # Multi-year settlement run, yearly report (filter output for [SIM])
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/settlement_growth_run.gd
 
@@ -50,3 +53,4 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 - `scripts/ui/`, `scripts/visuals/` - panels, helpers, drawing.
 - Daily `City.tick()`, monthly `advance_household_lifecycle_month()`, and seasonal birth rolls are driven by calendar signals in `main.gd`.
 - Performance limits and their causes are measured in `docs/HOUSEHOLD_SIM_BENCHMARK.md`.
+- Every economy number (starting stock, outputs, upkeep, construction costs) lives in `scripts/domain/economy_balance.gd`.

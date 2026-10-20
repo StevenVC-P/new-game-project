@@ -1,6 +1,8 @@
 class_name BuildingPlacement
 extends RefCounted
 
+const EconomyBalanceScript = preload("res://scripts/domain/economy_balance.gd")
+
 const BUILDING_HOUSE: String = "house"
 const BUILDING_FARM: String = "farm"
 const BUILDING_WOODCUTTER: String = "woodcutter"
@@ -104,36 +106,7 @@ func get_building_size(building_type: String) -> Vector2i:
 	return Vector2i(2, 2)
 
 func get_building_cost(building_type: String) -> Dictionary:
-	if building_type == BUILDING_HOUSE:
-		return {RESOURCE_WOOD: 8, RESOURCE_TOOLS: 1}
-	if building_type == BUILDING_FARM:
-		return {RESOURCE_WOOD: 4, RESOURCE_TOOLS: 1}
-	if building_type == BUILDING_WOODCUTTER:
-		return {RESOURCE_WOOD: 6, RESOURCE_TOOLS: 1}
-	if building_type == BUILDING_TOOLMAKER:
-		return {RESOURCE_WOOD: 10, RESOURCE_TOOLS: 3}
-	if building_type == BUILDING_QUARRY:
-		return {RESOURCE_WOOD: 6, RESOURCE_TOOLS: 2}
-	if building_type == BUILDING_STONECUTTER:
-		return {RESOURCE_WOOD: 8, RESOURCE_TOOLS: 2}
-	if building_type == BUILDING_BRICKWORKS:
-		return {RESOURCE_WOOD: 8, RESOURCE_TOOLS: 2}
-	if building_type == BUILDING_LIME_KILN:
-		return {RESOURCE_WOOD: 10, RESOURCE_TOOLS: 2}
-	if building_type == BUILDING_MORTAR_YARD:
-		return {RESOURCE_WOOD: 8, RESOURCE_TOOLS: 2}
-	if building_type == BUILDING_MASON_YARD:
-		return {RESOURCE_WOOD: 10, RESOURCE_TOOLS: 3}
-	if building_type == BUILDING_SCULPTOR:
-		return {RESOURCE_WOOD: 8, RESOURCE_TOOLS: 3}
-	if building_type == BUILDING_CARVER:
-		return {RESOURCE_WOOD: 8, RESOURCE_TOOLS: 2}
-	if building_type == BUILDING_TILEWORKS:
-		return {RESOURCE_WOOD: 8, RESOURCE_TOOLS: 2}
-	if building_type == BUILDING_PAVER_YARD:
-		return {RESOURCE_WOOD: 8, RESOURCE_TOOLS: 2}
-
-	return {}
+	return EconomyBalanceScript.get_build_cost(building_type)
 
 func get_cost_text(cost: Dictionary) -> String:
 	var parts: Array[String] = []
