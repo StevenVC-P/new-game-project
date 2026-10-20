@@ -5,6 +5,7 @@ extends SceneTree
 const CityScript = preload("res://scripts/domain/city.gd")
 const CultureValuesScript = preload("res://scripts/domain/culture_values.gd")
 const LifecycleDisplayScript = preload("res://scripts/ui/household_lifecycle_display_helper.gd")
+const CultureEffectsScript = preload("res://scripts/domain/culture_effects.gd")
 
 var failure_count: int = 0
 # Typed empty array: find_marriage_partner takes Array[int], and an untyped [] aborts the call.
@@ -56,7 +57,7 @@ func test_siblings_do_not_marry_each_other() -> void:
 	parent.adult_children = 2
 	parent.total_population += 2
 	_add_house(city)
-	for month in range(CityScript.MARRIAGE_OUTSIDER_WAIT_MONTHS):
+	for month in range(CultureEffectsScript.get_outsider_marriage_wait_months(parent.values)):
 		city.advance_new_family_formation_month()
 	_check(city.households.size() == 1, "two grown children of one household should not marry each other")
 
@@ -65,7 +66,7 @@ func test_lone_child_marries_outsider_after_waiting() -> void:
 	var parent: Household = _household(city, 1, ["fathers_line"])
 	_add_child(parent)
 	_add_house(city)
-	for month in range(CityScript.MARRIAGE_OUTSIDER_WAIT_MONTHS + 1):
+	for month in range(CultureEffectsScript.get_outsider_marriage_wait_months(parent.values) + 1):
 		city.advance_new_family_formation_month()
 	_check(city.households.size() == 2, "a grown child with no partner in town should marry an outsider after waiting")
 	if city.households.size() < 2:

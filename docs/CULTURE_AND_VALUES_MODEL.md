@@ -312,6 +312,8 @@ Deferred to later milestones (hooks not yet wired): goods quality (Perfectionist
 
 **M3 (2026-10-19):** lineage rules (Father's / Mother's / Strongest Line) decide which lineage a married couple joins; Clannish families prefer partners from their own lineage; children inherit values from both parent households.
 
+**Owner tuning (2026-10-20):** how long a grown child waits before marrying someone from outside the town is cultural: 6 months base, Clannish +12, Insular +6, Welcoming -3, Cosmopolitan -3, minimum 2.
+
 ## Open Questions
 
 None currently. Resolved 2026-10-19: twelve categories are the starting pool; family values are held or not (strength later, certain for Houses); values are inspect-only except when relevant to a decision; named peoples only in extreme divergence, as a pressure against unity.

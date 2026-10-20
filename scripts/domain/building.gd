@@ -32,6 +32,9 @@ var assignment_source: String = ASSIGNMENT_NONE
 var auto_assignment_blocked: bool = false
 var preferred_successor_household_id: int = -1
 var succession_source_household_id: int = -1
+# Months a workplace has waited for a successor after its family passed on or left; -1 when
+# it is not a succession vacancy (for example a player hold, which is never auto-filled).
+var succession_vacancy_months: int = -1
 var maintenance_timer: int = 0
 var maintenance_level: int = 100
 var receives_maintenance: bool = true
@@ -83,10 +86,12 @@ func unassign_worker(block_auto_assignment: bool = true):
 	assigned_household_id = -1
 	assignment_source = ASSIGNMENT_NONE
 	auto_assignment_blocked = block_auto_assignment
+	succession_vacancy_months = -1
 
 func clear_work_succession_preference():
 	preferred_successor_household_id = -1
 	succession_source_household_id = -1
+	succession_vacancy_months = -1
 
 func toggle_maintenance():
 	if is_house():

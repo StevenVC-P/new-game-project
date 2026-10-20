@@ -189,3 +189,22 @@ static func get_community_attraction(profiles: Array) -> int:
 		if CultureValuesScript.has_value(profile, "clannish"):
 			clannish += 1
 	return int(round(float(COMMUNITY_ATTRACTION_PERCENT * (welcoming - clannish)) / float(profiles.size())))
+
+# --- Marriage outside the town ---
+
+# Months a grown child with no partner in town waits before marrying an outsider.
+const OUTSIDER_MARRIAGE_BASE_WAIT_MONTHS: int = 6
+const OUTSIDER_MARRIAGE_MIN_WAIT_MONTHS: int = 2
+const OUTSIDER_MARRIAGE_WAIT_MODIFIERS: Dictionary = {
+	"clannish": 12,
+	"insular": 6,
+	"welcoming": -3,
+	"cosmopolitan": -3
+}
+
+static func get_outsider_marriage_wait_months(profile: Dictionary) -> int:
+	var wait: int = OUTSIDER_MARRIAGE_BASE_WAIT_MONTHS
+	for category in profile.keys():
+		for value_id in profile[category]:
+			wait += int(OUTSIDER_MARRIAGE_WAIT_MODIFIERS.get(value_id, 0))
+	return max(OUTSIDER_MARRIAGE_MIN_WAIT_MONTHS, wait)
