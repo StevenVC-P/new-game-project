@@ -1,5 +1,7 @@
 # Money, Obligation, and City Credit Model
 
+> **Partly superseded (2026-10-19).** `docs/ECONOMY_MODEL.md` is now the authoritative economy direction. The owner decided there is no credit or debt: obligation ledgers, city credit, credit trust, default risk, transferable credit, and implementation phases 3-7 below no longer apply. A settlement's own money comes from minting metal coin instead. The Subsistence and Storehouse modes, the "money must not replace the survival economy" principle, and the player-facing language guidance still apply.
+
 This document is a future-facing design model. It does not describe current implementation unless explicitly stated. The current first-playable loop remains focused on food, shelter, labor, tools, maintenance, production buildings, pressure management, and action guidance.
 
 The economic north star is household-rooted civilization simulation. Households are social and economic units, not generic worker slots or anonymous account rows. Any later money, credit, or obligation system must preserve that foundation.
