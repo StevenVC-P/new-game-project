@@ -107,23 +107,30 @@ Births, aging, and family formation already exist and are the right long-term en
 
 ### Migration
 
-Recommended direction: **migration brings families, not heads.**
+**Decided (owner, 2026-10-19): migration brings families, not heads.**
 
-- Migrants should arrive as whole households (newlywed or young family, 2-5 people) with lifecycle, preference, and family trade set, the same shape as founding households.
-- Arrival should be driven by settlement attractiveness built from pressures that already exist: food days stored, housing headroom, soft-need satisfaction, absence of shortages.
-- The source should be regional rather than an invisible fixed counter. Simplest version: a slowly refilling regional migrant pool. Later: the neutral town or regional sites supply migrants.
+- Migrants arrive as whole households (newlywed or young family, 2-5 people) with lifecycle, calling, values, family trade, and lineage, the same shape as founding households.
+- Arrival is driven by settlement attractiveness built from pressures that already exist: food days stored, housing headroom, soft-need satisfaction, absence of shortages. Community values adjust it (Welcoming attracts more, Clannish fewer).
+- The source is a **slowly refilling regional migrant pool** for now. Later, real places (the neutral town, established powers) supply migrants.
+- Migrants **bring values from their place of origin**, so immigration changes the settlement's culture over time.
+- Households **leave** after sustained hardship (food shortage, no shelter), with values shifting the threshold.
+- Turning migrants away is not part of the first implementation; it arrives later as the "open the town to migrants" policy.
 - Migration should be strongest in the Hamlet and taper in the Village, so the village grows mainly from its own families.
-
-**Owner decision:** should migration be reworked to whole households, and should the pool refill?
 
 ## Housing And Stage Pressure
 
 The house is a family home, so housing pressure should be measured in households first:
 
 - primary signal: households without a house, and families waiting to form (adult children ready but no empty house)
-- secondary signal: crowding when a family exceeds its house's comfortable size, as a later stability or satisfaction effect rather than a hard birth block
+- secondary signal: crowding when a family exceeds its house's comfortable size, as a stability or satisfaction effect rather than a hard birth block
 
-**Owner decision:** should births stay blocked by city-wide population vs. capacity, or move to household-level housing (has a house, house not overcrowded)?
+**Decided (owner, 2026-10-19): crowding is pressure, not a birth block.**
+
+- The city-wide "population at or above housing capacity" birth block is removed.
+- Housing blocks births only for families with no shelter at all.
+- A crowded home lowers that family's satisfaction and birth chance and raises its departure risk. Home and Place values tune the tolerance (Simple Living and Town-Loving mind crowding less; Hearth-Proud minds it more).
+- The real housing gate stays: grown children cannot form a new family without an empty house.
+- Food remains the hard limit on population, through shortages and departures.
 
 ## Pacing Targets
 
@@ -151,7 +158,9 @@ Toward Village:
   [ ] One stable season (food ok, all sheltered)
 ```
 
-Stage titles should not drop back once earned; they are history. Current stability can still drop and be shown as pressure. **Owner decision:** confirm that stages never regress.
+**Decided (owner, 2026-10-19):** stage titles never drop back once earned; they are history. A shrinking settlement keeps its title with a status such as "A declining village". Mechanics always key off actual size and conditions, never the title.
+
+**Decided (owner, 2026-10-19):** stage names and exit conditions stand as drafted. Events such as surviving a bandit raid are chronicle milestones, not stage requirements.
 
 ## Recommended Implementation Order
 
@@ -174,13 +183,15 @@ Revised after `docs/GAME_VISION.md` (2026-10-19). The owner chose family ambitio
 
 Housing-in-households (finding 5) and the newlywed seed mismatch (finding 6) can be small fixes inside sprint 1 or their own `fix/` branch once decided.
 
-## Owner Decisions Needed
+## Owner Decisions
 
-1. Are the stage names and exit conditions acceptable (Founding Camp, Hamlet, Village, Early Town)?
-2. Should migration bring whole households, and should its pool refill?
-3. Should birth blocking move from city-wide population capacity to household-level housing?
-4. Do stage titles never regress?
-5. What is the first playable's target: reach Village, or hold Village for some number of years?
+All resolved 2026-10-19:
+
+1. Stage names and exit conditions: kept as drafted; raids and similar events are chronicle milestones only.
+2. Migration: whole households from a slowly refilling regional pool, bringing their origin's values; departures after sustained hardship.
+3. Births: crowding is pressure, not a block; only unsheltered families are blocked.
+4. Stage titles never regress; decline is shown as a status.
+5. First playable target: reach Village and hold it stable for about 5-10 game years, including at least one generational turnover (a founding couple passes and their trade is carried on).
 
 ## Explicit Non-Goals
 
