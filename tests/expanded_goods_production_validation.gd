@@ -30,9 +30,11 @@ func test_existing_producers_still_work() -> void:
 	city.apply_building_production(woodcutter)
 	city.apply_building_production(toolmaker)
 
-	_check(int(city.resources["food"]) == start_food + City.FARM_BASE_OUTPUT, "farm should still produce food")
-	_check(int(city.resources["wood"]) == start_wood + City.WOODCUTTER_BASE_OUTPUT - City.TOOLMAKER_WOOD_INPUT, "woodcutter/toolmaker wood behavior should remain stable")
-	_check(int(city.resources["tools"]) == start_tools + City.TOOLMAKER_BASE_OUTPUT, "toolmaker should still produce tools")
+	# First-day output rounds the balance number (buildings start with half a unit carried).
+	var tools_made: int = _first_day_output(EconomyBalance.TOOLMAKER_TOOLS_PER_DAY)
+	_check(int(city.resources["food"]) == start_food + _first_day_output(EconomyBalance.FARM_FOOD_PER_DAY), "farm should still produce food")
+	_check(int(city.resources["wood"]) == start_wood + _first_day_output(EconomyBalance.WOODCUTTER_WOOD_PER_DAY) - tools_made * City.TOOLMAKER_WOOD_INPUT, "woodcutter/toolmaker wood behavior should remain stable")
+	_check(int(city.resources["tools"]) == start_tools + tools_made, "toolmaker should still produce tools")
 
 func test_quarry_outputs_stone_blocks() -> void:
 	var city: City = _make_city()
@@ -96,6 +98,9 @@ func _assert_chain(building_type: String, input_values: Dictionary, output_key: 
 	for input_key: String in input_values.keys():
 		_check(int(city.resources[input_key]) == int(before_inputs[input_key]) - 1, building_type + " should consume " + input_key)
 		_check(int(city.resources[input_key]) >= 0, building_type + " should not make " + input_key + " negative")
+
+func _first_day_output(per_day: float) -> int:
+	return int(floor(per_day + 0.5))
 
 func _make_city() -> City:
 	var city: City = City.new("Test City")

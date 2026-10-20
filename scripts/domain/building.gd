@@ -1,6 +1,8 @@
 class_name Building
 extends RefCounted
 
+const EconomyBalanceScript = preload("res://scripts/domain/economy_balance.gd")
+
 const BUILDING_HOUSE: String = "house"
 const BUILDING_FARM: String = "farm"
 const BUILDING_WOODCUTTER: String = "woodcutter"
@@ -100,14 +102,7 @@ func toggle_maintenance():
 	receives_maintenance = not receives_maintenance
 
 func get_maintenance_interval() -> int:
-	if type == BUILDING_FARM:
-		return 12
-	if type == BUILDING_WOODCUTTER:
-		return 10
-	if type == BUILDING_TOOLMAKER:
-		return 8
-
-	return 10
+	return EconomyBalanceScript.get_maintenance_interval(type)
 
 func get_maintenance_tool_cost() -> int:
-	return 1
+	return EconomyBalanceScript.MAINTENANCE_TOOL_COST
