@@ -10,14 +10,16 @@ extends SceneTree
 #   famine   - farms stop for half of year 6 (when stores are low), then restart
 
 const CityScript = preload("res://scripts/domain/city.gd")
+const EconomyBalanceScript = preload("res://scripts/domain/economy_balance.gd")
 
 const YEARS: int = 10
 const HOUSES: int = 40
 const FARMS: int = 10
 const WOODCUTTERS: int = 2
 # Maintenance consumes tools, so a town without a toolmaker loses its farms within months.
-# One toolmaker (~1 tool/day) only just covers ~13 buildings; a poorly suited heir tips it into decline.
-const TOOLMAKERS: int = 2
+# Since one holding per family (2026-10-20) a toolmaker family makes ~1 tool/day against upkeep of
+# ~1 tool per 20 days per workplace, so one toolmaker covers this town (two overproduced heavily).
+const TOOLMAKERS: int = 1
 const FAMINE_START_DAY: int = 360 * 5
 const FAMINE_END_DAY: int = 360 * 5 + 180
 
@@ -30,16 +32,19 @@ func run_all() -> void:
 	quit()
 
 func _run_scenario(label: String, with_famine: bool) -> void:
-	var city = CityScript.new("Player Town", Vector2(20, 20), CityScript.ROLE_PLAYER, 4)
+	var city = CityScript.new("Player Town", Vector2(20, 20), CityScript.ROLE_PLAYER, EconomyBalanceScript.FOUNDING_FAMILIES)
 	for index in range(HOUSES):
 		city.add_building(Building.new(-1, Building.BUILDING_HOUSE))
-	# Tools and wood first, so auto-assignment staffs them before the farms take all labor.
-	for index in range(TOOLMAKERS):
-		city.add_building(Building.new(-1, Building.BUILDING_TOOLMAKER))
-	for index in range(WOODCUTTERS):
-		city.add_building(Building.new(-1, Building.BUILDING_WOODCUTTER))
-	for index in range(FARMS):
+	# A family runs one holding, and auto-assignment staffs buildings in the order they were
+	# built, so build in the order a player would staff them: food, wood, tools, then the rest.
+	for building_type: String in ["farm", "farm", "woodcutter", "toolmaker"]:
+		city.add_building(Building.new(-1, building_type))
+	for index in range(FARMS - 2):
 		city.add_building(Building.new(-1, Building.BUILDING_FARM))
+	for index in range(WOODCUTTERS - 1):
+		city.add_building(Building.new(-1, Building.BUILDING_WOODCUTTER))
+	for index in range(TOOLMAKERS - 1):
+		city.add_building(Building.new(-1, Building.BUILDING_TOOLMAKER))
 
 	var calendar: Calendar = Calendar.new()
 	_report(label, "year,households,population,food,tools,food_shortage,max_generation,departed,arrived,idle_workplaces")

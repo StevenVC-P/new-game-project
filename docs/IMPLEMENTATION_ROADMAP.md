@@ -219,9 +219,30 @@ The owner settled on 2-3 minutes, with a newly founded town starting paused so t
 
 **Room for error (opening check, first-pass numbers, random founders, before the two changes above):** food and shelter mistakes are mostly forgiving (four farms first 17/20, two idle months 13/20). Wood and tools are each a one-way door: a woodcutter after about day 60, or a toolmaker after about day 50-60, is fatal in every town. A free woodcutter plus 20 starting tools was tested (before founder randomization) and closes the wood door; the tool deadline remains. Owner decision pending.
 
+## One Holding Per Family (2026-10-20, owner decisions)
+
+- **A family runs one holding**: a farmstead or workshop worked by the whole family (labor capacity 1). Family size changes output, not the number of jobs. Balance outputs are per two-adult family (farm 4, woodcutter 6, toolmaker 1, crafts 2 per day); a one-adult family works at half; older children add the periodic family-support bonus.
+- **A farm is a family farmstead**: one family's fields, animals, and tools.
+- **At scale, Houses employ families**: estates and workshop groups exist when a House holds several holdings worked by dependent families from the commons (`docs/HOUSES_AND_LINEAGE_MODEL.md`).
+- **More founders**: with one holding each, four founding families meant exactly four jobs (two farms, wood, tools) and no slack; the opening check fell from 19/20 to 15/20 (sensible) and 0/20 (four farms first). Founding families became a balance number (`EconomyBalance.FOUNDING_FAMILIES`) and is now **6** (historically, founding groups were often 5-10 families).
+
+| Opening check (20 towns, 2 years) | 4 founders | 5 founders | 6 founders |
+| --- | --- | --- | --- |
+| Sensible | 15/20 | 18/20 | 20/20 |
+| Owner's playtest opening | 17/20 | 20/20 | 20/20 |
+| Four farms first | 0/20 | 17/20 | 20/20 |
+| Toolmaker by day 90 | 14/20 | 18/20 | 19/20 |
+| Idle first 60 days | 7/20 | 9/20 | 15/20 |
+
+Ten-year run with 6 founders: grows to 31 families / 124 people with three generations, outgrows its 10 farms in year 9, and recovers.
+
+**Open tuning point:** converting outputs to per-family doubled the toolmaker (1 tool/day per family) while upkeep stayed per building, and one holding per family halves the buildings. Tools now overproduce (about 2,600 stockpiled by year 10 with one toolmaker), against the owner's aim that running short be more common. Likely fix: `TOOLMAKER_TOOLS_PER_DAY` around 0.6, or more frequent upkeep; either moves the measured toolmaker deadline, so re-run the opening check after changing it.
+
 ## Future Feature Notes
 
 Ideas recorded for later design, not scheduled:
+
+- **Side work (by-employment).** Pre-modern farming families also cut their own firewood, mended their own tools, spun, or brewed. A family keeps one primary holding but produces a little of a secondary good on the side, which gives small hamlets slack without turning families back into worker slots. Owner-endorsed as the planned follow-up to one holding per family.
 
 - **Contested succession.** When more than one party has a claim to control a workplace (rival Houses, competing heirs, or another power), the wait before the game fills it could lengthen, turning succession into a contest the player can influence. Today the wait is a flat 2 months (`City.SUCCESSION_AUTO_FILL_MONTHS`).
 

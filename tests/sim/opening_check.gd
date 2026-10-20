@@ -7,7 +7,7 @@ extends SceneTree
 # Only some build orders: add  -- toolmaker  (runs scenarios whose name contains "toolmaker").
 #
 # A town is "off the ground" at the end of year 2 when every family is housed, it had no food
-# shortage in the last 90 days, and it still has at least its 4 founding families.
+# shortage in the last 90 days, and it has at least as many families as founded it.
 #
 # Limits: the headless run ignores terrain (fertile land, trees, water), so map luck is not tested;
 # towns differ only in their founding families.
@@ -51,7 +51,8 @@ func _init() -> void:
 	call_deferred("run_all")
 
 func run_all() -> void:
-	_report("balance: food %.1f, wood %.1f, tools %.1f per day; start %d food, %d wood, %d tools" % [
+	_report("balance: %d founding families; food %.1f, wood %.1f, tools %.1f per family-day; start %d food, %d wood, %d tools" % [
+		EconomyBalanceScript.FOUNDING_FAMILIES,
 		EconomyBalanceScript.FARM_FOOD_PER_DAY, EconomyBalanceScript.WOODCUTTER_WOOD_PER_DAY, EconomyBalanceScript.TOOLMAKER_TOOLS_PER_DAY,
 		EconomyBalanceScript.STARTING_FOOD, EconomyBalanceScript.STARTING_WOOD, EconomyBalanceScript.STARTING_TOOLS])
 	var only: Array = OS.get_cmdline_user_args()
@@ -96,7 +97,7 @@ func _run_scenario(scenario: Dictionary) -> void:
 			tools_out_days.size(), tools_out_days[0], float(tools_out_days[0]) * SimulationClockScript.DEFAULT_DAY_SECONDS_AT_1X / 60.0])
 
 func _play(scenario: Dictionary, site: Vector2) -> Dictionary:
-	var city = CityScript.new("Player Town", site, CityScript.ROLE_PLAYER, 4)
+	var city = CityScript.new("Player Town", site, CityScript.ROLE_PLAYER, EconomyBalanceScript.FOUNDING_FAMILIES)
 	var founders: String = _describe_founders(city)
 	for entry: String in scenario.get("prebuild", []):
 		if entry.ends_with("*"):
@@ -154,7 +155,7 @@ func _play(scenario: Dictionary, site: Vector2) -> Dictionary:
 	if stuck_on_wood:
 		reasons.append("stuck on wood")
 	return {
-		"off_the_ground": all_housed and fed and city.households.size() >= 4,
+		"off_the_ground": all_housed and fed and city.households.size() >= EconomyBalanceScript.FOUNDING_FAMILIES,
 		"reasons": reasons,
 		"population": city.get_total_population(),
 		"tools_out_day": tools_out_day,

@@ -12,7 +12,10 @@ extends RefCounted
 # Previous values: woodcutter 2.0, toolmaker 1.0/day, upkeep every 8-12 days, house 8 wood + 1 tool,
 # toolmaker 10 wood + 3 tools, stone and craft buildings 2-3 tools. Results: docs/IMPLEMENTATION_ROADMAP.md.
 
-# --- Founding stock ---
+# --- Founding ---
+# Families that found a new town. With one holding per family, this is also the number of
+# jobs a new town can fill (two farms, wood, and tools use four).
+const FOUNDING_FAMILIES: int = 6
 const STARTING_FOOD: int = 60
 const STARTING_WOOD: int = 45
 const STARTING_TOOLS: int = 14

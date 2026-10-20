@@ -44,13 +44,14 @@ func test_pending_site_creates_player_city() -> void:
 	_check(founded_city.name == "Player Town", "founded city should use default player-town name")
 	_check(founded_city.is_player_city(), "founded city should have player role")
 	_check(founded_city.tile == Vector2(founding_tile.x, founding_tile.y), "founded city should use pending tile")
-	_check(founded_city.households.size() == 4, "founded city should start with four households")
+	var founders: int = EconomyBalance.FOUNDING_FAMILIES
+	_check(founded_city.households.size() == founders, "founded city should start with the founding families")
 	# Founders have random life stages: a newlywed couple is 2 people, the other stages 4.
-	_check(founded_city.get_total_population() >= 8 and founded_city.get_total_population() <= 16, "founded city should start with 8-16 people, got " + str(founded_city.get_total_population()))
+	_check(founded_city.get_total_population() >= founders * 2 and founded_city.get_total_population() <= founders * 4, "founded city should start with 2-4 people per family, got " + str(founded_city.get_total_population()))
 	for household: Household in founded_city.households:
 		_check(household.total_population == household.working_adults + household.get_total_child_count(), "seeded household population should match its adults and children")
-	_check(int(founded_city.resources["temporary_shelter_capacity"]) == 16, "founded city should have temporary shelter for four founding households")
-	_check(int(founded_city.resources["housing_capacity"]) == 16, "founded city should have startup housing capacity state for founding population")
+	_check(int(founded_city.resources["temporary_shelter_capacity"]) == founders * 4, "founded city should have temporary shelter for the founding households")
+	_check(int(founded_city.resources["housing_capacity"]) == founders * 4, "founded city should have startup housing capacity state for founding population")
 	_check(int(founded_city.resources["food"]) == 60, "founded city should keep expected starting food")
 	_check(int(founded_city.resources["wood"]) == 45, "founded city should keep expected starting wood")
 	_check(int(founded_city.resources["tools"]) == 14, "founded city should keep expected starting tools")
