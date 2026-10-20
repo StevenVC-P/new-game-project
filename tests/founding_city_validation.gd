@@ -45,8 +45,8 @@ func test_pending_site_creates_player_city() -> void:
 	_check(founded_city.is_player_city(), "founded city should have player role")
 	_check(founded_city.tile == Vector2(founding_tile.x, founding_tile.y), "founded city should use pending tile")
 	_check(founded_city.households.size() == 4, "founded city should start with four households")
-	# Three seeded families of four plus a childless newlywed couple.
-	_check(founded_city.get_total_population() == 14, "founded city should start with fourteen population")
+	# Founders have random life stages: a newlywed couple is 2 people, the other stages 4.
+	_check(founded_city.get_total_population() >= 8 and founded_city.get_total_population() <= 16, "founded city should start with 8-16 people, got " + str(founded_city.get_total_population()))
 	for household: Household in founded_city.households:
 		_check(household.total_population == household.working_adults + household.get_total_child_count(), "seeded household population should match its adults and children")
 	_check(int(founded_city.resources["temporary_shelter_capacity"]) == 16, "founded city should have temporary shelter for four founding households")

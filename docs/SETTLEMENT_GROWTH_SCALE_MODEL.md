@@ -30,7 +30,7 @@ What the code does today (`scripts/domain/city.gd`, `scripts/domain/household.gd
 | Old couple completion | each month | old couples with no adult children roll for removal after 12 months in stage; house is freed; work succession prefers descendants |
 | Housing | continuous | one household per house; `HOUSE_CAPACITY = 4` people per house counts toward `housing_capacity` |
 
-Founding starts with 4 households in temporary shelter, seeded across lifecycle stages: three families of 4 and a newlywed couple of 2 (14 people, after the M0 seed fix for finding 6).
+Founding starts with 4 households in temporary shelter. Since 2026-10-20 founders are random per game: each has a random life stage (newlywed couple of 2, or a family of 4 as young, established, or mature; never an old couple) and a fully random value profile, so founding population is 8-16 and the founders' trades follow their callings.
 
 ## Findings That Shape The Model
 

@@ -387,7 +387,7 @@ func found_player_city_at_pending_site() -> bool:
 	return true
 
 func create_player_city_at_tile(tile_pos: Vector2i) -> City:
-	return City.new("Player Town", Vector2(tile_pos.x, tile_pos.y), City.ROLE_PLAYER, FOUNDING_HOUSEHOLD_COUNT)
+	return City.new("Player Town", Vector2(tile_pos.x, tile_pos.y), City.ROLE_PLAYER, FOUNDING_HOUSEHOLD_COUNT, rng.randi())
 
 func configure_new_city_map(city: City, city_index: int) -> void:
 	city.site_profile = SettlementSiteProfile.analyze(city.tile, tiles, CITY_RESOURCE_RANGE)

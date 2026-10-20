@@ -14,6 +14,7 @@ func _init() -> void:
 func run_all() -> void:
 	test_random_profiles_follow_holding_rules()
 	test_starter_households_have_values_matching_their_trade()
+	test_founders_are_random_per_game()
 	test_inheritance_keeps_most_parent_values()
 	test_calling_match_quality()
 	test_preference_is_derived_from_calling()
@@ -57,6 +58,20 @@ func test_starter_households_have_values_matching_their_trade() -> void:
 
 	var again = CityScript.new("Seed Town", Vector2(10, 10), CityScript.ROLE_PLAYER, 4)
 	_check(str(again.households[0].values) == str(city.households[0].values), "seeded values should be deterministic for the same town")
+
+func test_founders_are_random_per_game() -> void:
+	var seen_callings: Dictionary = {}
+	for game_seed in range(1, 21):
+		var city = CityScript.new("Seed Town", Vector2(10, 10), CityScript.ROLE_PLAYER, 4, game_seed)
+		for household: Household in city.households:
+			_check(household.lifecycle_stage != Household.LIFECYCLE_OLD_COUPLE, "founders should never start as old couples")
+			_check(household.total_population == household.working_adults + household.get_total_child_count(), "founder population should match its family")
+			for calling in household.values[CultureValuesScript.CATEGORY_CALLING]:
+				seen_callings[calling] = true
+	_check(seen_callings.size() >= 8, "founding callings should vary across games, saw " + str(seen_callings.keys()))
+	var first = CityScript.new("Seed Town", Vector2(10, 10), CityScript.ROLE_PLAYER, 4, 77)
+	var again = CityScript.new("Seed Town", Vector2(10, 10), CityScript.ROLE_PLAYER, 4, 77)
+	_check(str(first.households[0].values) == str(again.households[0].values), "the same game seed should found the same families")
 
 func test_inheritance_keeps_most_parent_values() -> void:
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()

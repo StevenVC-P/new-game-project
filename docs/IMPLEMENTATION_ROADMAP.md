@@ -203,6 +203,10 @@ Over ten years with one toolmaker, small towns build a tool buffer (about 166 by
 
 These are a starting point for owner tuning, not final values.
 
+**Random founding families (2026-10-20, owner decision).** Each founded town gets a random seed from the game, so founders differ every game: random life stage (never an old couple) and a fully random value profile, with the family trade following the calling. Tests and tools pass no seed and stay reproducible. The opening check shows founders now matter: with a sensible opening 17/20 towns get off the ground (was 20/20 when every town had the same founders); the strugglers had no family called to the soil, so their farms ran at -25%, and towns without a toolmaking family ran short of tools. The owner's playtest opening still succeeds 20/20.
+
+**Room for error (opening check, first-pass numbers, random founders):** food and shelter mistakes are mostly forgiving (four farms first 17/20, two idle months 13/20). Wood and tools are each a one-way door: a woodcutter after about day 60, or a toolmaker after about day 50-60, is fatal in every town. A free woodcutter plus 20 starting tools was tested (before founder randomization) and closes the wood door; the tool deadline remains. Owner decision pending.
+
 ## Future Feature Notes
 
 Ideas recorded for later design, not scheduled:
