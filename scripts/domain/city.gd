@@ -177,6 +177,10 @@ func seed_starter_household_lifecycle(household: Household, household_index: int
 		household.adult_children = 0
 		household.age_in_stage = 4
 
+	# Seeds are constructed at a flat starting population; derive it from the seeded family so
+	# couples without children (newlywed, old couple) are not counted as four people.
+	household.total_population = household.working_adults + household.get_total_child_count()
+	household.update_labor_capacity()
 	household.recalculate_succession_pressure()
 
 func get_seeded_family_trade(preference: String, household_index: int) -> String:

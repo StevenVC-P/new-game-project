@@ -30,7 +30,7 @@ What the code does today (`scripts/domain/city.gd`, `scripts/domain/household.gd
 | Old couple completion | each month | old couples with no adult children roll for removal after 12 months in stage; house is freed; work succession prefers descendants |
 | Housing | continuous | one household per house; `HOUSE_CAPACITY = 4` people per house counts toward `housing_capacity` |
 
-Founding starts with 4 households of population 4 (16 people) in temporary shelter, seeded across lifecycle stages.
+Founding starts with 4 households in temporary shelter, seeded across lifecycle stages: three families of 4 and a newlywed couple of 2 (14 people, after the M0 seed fix for finding 6).
 
 ## Findings That Shape The Model
 
@@ -41,7 +41,7 @@ These gaps appear when growth is traced through the current code. They are the m
 3. **Natural household growth is slow.** The earliest locally formed family requires a parent with 2 adult children. From the starter seeds that is roughly year 3 (about 18 minutes at 1x). Estimated from code reading; not yet verified by a timed run.
 4. **The likely growth curve stalls near the village threshold.** 4 founders + about 5 migrant households (20 pool / 4 per household) = about 9 households in the first year, then slow natural growth. The point where systems run out is the point where "village" should begin.
 5. **Housing counts people and households differently.** A house holds one household but contributes 4 people of capacity. Families can grow to about 6 (2 adults + up to 4 children), so a fully housed settlement can still read as "housing full" and block births.
-6. **The starter newlywed seed has population 4 but no children.** Its population and child fields disagree. Small, but it matters if stages read family structure.
+6. **The starter newlywed seed has population 4 but no children.** Its population and child fields disagree. Small, but it matters if stages read family structure. *Fixed in M0 (2026-10-19): seeded population is now adults plus children.*
 7. **Nothing tells the player they have grown.** There is no stage, milestone, or progress concept. Growth is visible only as numbers rising.
 
 Findings 1, 2, and 5 change formulas in high-risk files and are product-design changes per `docs/household_simulation_philosophy.md`. They are listed here for decision, not fixed.
