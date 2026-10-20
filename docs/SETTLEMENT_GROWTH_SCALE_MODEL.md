@@ -22,7 +22,7 @@ What the code does today (`scripts/domain/city.gd`, `scripts/domain/household.gd
 
 | Mechanic | Cadence | Rule |
 | --- | --- | --- |
-| Simulation day | 1 real second at 1x | `SimulationClock.DEFAULT_DAY_SECONDS_AT_1X = 1.0`; 1 year = 360 days = 6 min at 1x, 36 s at 10x |
+| Simulation day | 2 real seconds at 1x | `SimulationClock.DEFAULT_DAY_SECONDS_AT_1X = 2.0` (was 1.0 until 2026-10-20); 1 month = 1 min, 1 year = 360 days = 12 min at 1x, 72 s at 10x |
 | Migration | daily check | after `FOOD_SURPLUS_TICKS_FOR_GROWTH = 8` surplus days with housing headroom, +1 person from `external_population_pool` (starts at 20, never refills) |
 | Births | each season | per-household roll; base chance by lifecycle stage (15/20/8/2), +5 for 10+ food days, +5 for housing headroom, capped at 30; blocked by food, housing, child limits, old age |
 | Aging | each month | lifecycle stages newlywed (6 mo) -> young family (12) -> established (24) -> mature (36) -> old couple; child cohorts age every 36 months |
@@ -30,7 +30,7 @@ What the code does today (`scripts/domain/city.gd`, `scripts/domain/household.gd
 | Old couple completion | each month | old couples with no adult children roll for removal after 12 months in stage; house is freed; work succession prefers descendants |
 | Housing | continuous | one household per house; `HOUSE_CAPACITY = 4` people per house counts toward `housing_capacity` |
 
-Founding starts with 4 households in temporary shelter. Since 2026-10-20 founders are random per game: each has a random life stage (newlywed couple of 2, or a family of 4 as young, established, or mature; never an old couple) and a fully random value profile, so founding population is 8-16 and the founders' trades follow their callings.
+Founding starts with 4 households in temporary shelter, at least one of them called to the soil. Since 2026-10-20 founders are random per game: each has a random life stage (newlywed couple of 2, or a family of 4 as young, established, or mature; never an old couple) and a fully random value profile, so founding population is 8-16 and the founders' trades follow their callings.
 
 ## Findings That Shape The Model
 
@@ -134,16 +134,16 @@ The house is a family home, so housing pressure should be measured in households
 
 ## Pacing Targets
 
-The owner chose a fixed clock with player speed control and a slow, contemplative pace (`docs/GAME_VISION.md`), so these targets assume the current calendar. At 1x (6 minutes per game year), provisional:
+The owner chose a fixed clock with player speed control and a slow, contemplative pace (`docs/GAME_VISION.md`), so these targets assume the current calendar. At 1x (12 minutes per game year since 2026-10-20), provisional:
 
-| Stage | Target game time | Real time at 1x |
-| --- | --- | --- |
-| Founding Camp | first season | about 1-2 min |
-| Hamlet | years 1-3 | about 6-18 min |
-| Village | years 3-10 | about 18-60 min |
-| Early Town | year 10+ | beyond first playable |
+| Stage | Target game time | Real time at 1x | At 10x |
+| --- | --- | --- | --- |
+| Founding Camp | first season | about 3 min | under 30 s |
+| Hamlet | years 1-3 | about 12-36 min | about 1-4 min |
+| Village | years 3-10 | about 36 min - 2 h | about 4-12 min |
+| Early Town | year 10+ | beyond first playable | |
 
-The first playable milestone should be able to reach Village in one session. Under current rules that is roughly possible near year 3, but growth likely stalls soon after because migration ends. A timed headless run would confirm this before any tuning.
+The first playable target (reach Village and hold it 5-10 game years) is therefore about 1-2 hours at 1x, or 10-20 minutes at 10x. Growth no longer stalls after the first migrants (fixed in M2), and since M3 the first home-grown family can form in year 1.
 
 ## Player-Facing Stage Display
 

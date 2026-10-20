@@ -4,6 +4,7 @@ extends SceneTree
 # founding families and values) under several build orders, good and bad, plays two years, and
 # reports which towns got off the ground and why the others did not.
 # Run: <godot> --headless --path . --script res://tests/sim/opening_check.gd   (filter for [OPEN])
+# Only some build orders: add  -- toolmaker  (runs scenarios whose name contains "toolmaker").
 #
 # A town is "off the ground" at the end of year 2 when every family is housed, it had no food
 # shortage in the last 90 days, and it still has at least its 4 founding families.
@@ -15,6 +16,7 @@ const CityScript = preload("res://scripts/domain/city.gd")
 const EconomyBalanceScript = preload("res://scripts/domain/economy_balance.gd")
 const HouseholdMigrationScript = preload("res://scripts/domain/household_migration.gd")
 const CultureValuesScript = preload("res://scripts/domain/culture_values.gd")
+const SimulationClockScript = preload("res://scripts/simulation/simulation_clock.gd")
 
 const SITES: int = 20
 const DAYS: int = 720
@@ -33,6 +35,10 @@ const SCENARIOS: Array = [
 	{"name": "spend_all_before_woodcutter", "prebuild": ["house", "farm", "house", "farm", "house*", "farm*"], "not_before": {"woodcutter": 9999}},
 	{"name": "woodcutter_day_60", "not_before": {"woodcutter": 60}},
 	{"name": "woodcutter_day_120", "not_before": {"woodcutter": 120}},
+	{"name": "toolmaker_day_60", "not_before": {"toolmaker": 60}},
+	{"name": "toolmaker_day_90", "not_before": {"toolmaker": 90}},
+	{"name": "toolmaker_day_120", "not_before": {"toolmaker": 120}},
+	{"name": "toolmaker_day_150", "not_before": {"toolmaker": 150}},
 	{"name": "toolmaker_day_180", "not_before": {"toolmaker": 180}},
 	{"name": "toolmaker_day_365", "not_before": {"toolmaker": 365}},
 	{"name": "never_toolmaker", "never": ["toolmaker"]},
@@ -48,7 +54,10 @@ func run_all() -> void:
 	_report("balance: food %.1f, wood %.1f, tools %.1f per day; start %d food, %d wood, %d tools" % [
 		EconomyBalanceScript.FARM_FOOD_PER_DAY, EconomyBalanceScript.WOODCUTTER_WOOD_PER_DAY, EconomyBalanceScript.TOOLMAKER_TOOLS_PER_DAY,
 		EconomyBalanceScript.STARTING_FOOD, EconomyBalanceScript.STARTING_WOOD, EconomyBalanceScript.STARTING_TOOLS])
+	var only: Array = OS.get_cmdline_user_args()
 	for scenario: Dictionary in SCENARIOS:
+		if not only.is_empty() and not str(scenario["name"]).contains(str(only[0])):
+			continue
 		_run_scenario(scenario)
 	quit()
 
@@ -58,9 +67,12 @@ func _run_scenario(scenario: Dictionary) -> void:
 	var smallest: Dictionary = {}
 	var largest: Dictionary = {}
 	var total_people: int = 0
+	var tools_out_days: Array[int] = []
 	for site in range(SITES):
 		var result: Dictionary = _play(scenario, Vector2(5 + site * 3, 7 + site * 2))
 		total_people += int(result["population"])
+		if int(result["tools_out_day"]) >= 0:
+			tools_out_days.append(int(result["tools_out_day"]))
 		if result["off_the_ground"]:
 			made_it += 1
 		for reason: String in result["reasons"]:
@@ -78,6 +90,10 @@ func _run_scenario(scenario: Dictionary) -> void:
 	_report("%-28s %2d/%d off the ground | avg people %.0f (smallest %d, largest %d) | problems: %s" % [
 		scenario["name"], made_it, SITES, float(total_people) / SITES, int(smallest["population"]), int(largest["population"]), reason_text])
 	_report("    smallest town founders: %s | largest: %s" % [smallest["founders"], largest["founders"]])
+	if not tools_out_days.is_empty():
+		tools_out_days.sort()
+		_report("    tools ran out in %d towns, earliest day %d (%.1f min at 1x)" % [
+			tools_out_days.size(), tools_out_days[0], float(tools_out_days[0]) * SimulationClockScript.DEFAULT_DAY_SECONDS_AT_1X / 60.0])
 
 func _play(scenario: Dictionary, site: Vector2) -> Dictionary:
 	var city = CityScript.new("Player Town", site, CityScript.ROLE_PLAYER, 4)
@@ -94,6 +110,7 @@ func _play(scenario: Dictionary, site: Vector2) -> Dictionary:
 	var low_wood_streak: int = 0
 	var stuck_on_wood: bool = false
 	var ran_out_of_tools: bool = false
+	var tools_out_day: int = -1
 	for day in range(DAYS):
 		var month_before: int = calendar.current_month
 		var season_before: String = calendar.get_current_season()
@@ -107,6 +124,8 @@ func _play(scenario: Dictionary, site: Vector2) -> Dictionary:
 			last_shortage_day = day
 		if day > 30 and int(city.resources["tools"]) == 0:
 			ran_out_of_tools = true
+			if tools_out_day < 0:
+				tools_out_day = day
 		if day % POLICY_INTERVAL_DAYS == 0 and day >= int(scenario.get("idle_until", 0)):
 			var wanted: String = _choose_build(city, scenario, day)
 			if wanted == "":
@@ -138,6 +157,7 @@ func _play(scenario: Dictionary, site: Vector2) -> Dictionary:
 		"off_the_ground": all_housed and fed and city.households.size() >= 4,
 		"reasons": reasons,
 		"population": city.get_total_population(),
+		"tools_out_day": tools_out_day,
 		"founders": founders
 	}
 

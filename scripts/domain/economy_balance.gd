@@ -30,7 +30,9 @@ const EXPANDED_GOODS_PER_DAY: float = 1.0
 const PEOPLE_FED_PER_FOOD: int = 2
 
 # --- Upkeep: every interval a workplace consumes tools, or loses condition without them ---
-const MAINTENANCE_GRACE_DAYS: int = 20
+# New buildings need no tools for this long. 60 days gives about 3 minutes at 1x to get a
+# toolmaker running (owner decision 2026-10-20; measured in docs/IMPLEMENTATION_ROADMAP.md).
+const MAINTENANCE_GRACE_DAYS: int = 60
 const MAINTENANCE_TOOL_COST: int = 1
 const MAINTENANCE_INTERVAL_DAYS: Dictionary = {
 	"farm": 24,

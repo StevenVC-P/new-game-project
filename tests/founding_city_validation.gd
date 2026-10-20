@@ -58,6 +58,7 @@ func test_pending_site_creates_player_city() -> void:
 	_check(main.pending_founding_tile == Vector2i(-1, -1), "pending founding tile should clear after founding")
 	_check(main.selected_city_index == 1, "founded city should become selected city")
 	_check(main.current_view == MainScript.VIEW_CITY, "founding should enter city view")
+	_check(main.simulation_clock.is_paused, "a newly founded town should start paused")
 	main.free()
 
 func test_second_player_city_is_prevented() -> void:

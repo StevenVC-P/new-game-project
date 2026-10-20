@@ -69,6 +69,15 @@ func test_founders_are_random_per_game() -> void:
 			for calling in household.values[CultureValuesScript.CATEGORY_CALLING]:
 				seen_callings[calling] = true
 	_check(seen_callings.size() >= 8, "founding callings should vary across games, saw " + str(seen_callings.keys()))
+	for game_seed in range(1, 41):
+		var town = CityScript.new("Seed Town", Vector2(3, 4), CityScript.ROLE_PLAYER, 4, game_seed)
+		var has_farmer: bool = false
+		for household: Household in town.households:
+			has_farmer = has_farmer or CultureValuesScript.has_value(household.values, "soil")
+			_check(CultureValuesScript.is_valid_profile(household.values), "founder profiles should stay valid after the farmer guarantee")
+			if CultureValuesScript.has_value(household.values, "soil"):
+				_check(household.family_trade == "farming", "a founder called to the soil should farm")
+		_check(has_farmer, "every founding should include a family called to the soil (seed " + str(game_seed) + ")")
 	var first = CityScript.new("Seed Town", Vector2(10, 10), CityScript.ROLE_PLAYER, 4, 77)
 	var again = CityScript.new("Seed Town", Vector2(10, 10), CityScript.ROLE_PLAYER, 4, 77)
 	_check(str(first.households[0].values) == str(again.households[0].values), "the same game seed should found the same families")

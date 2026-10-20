@@ -2,7 +2,8 @@ class_name SimulationClock
 extends RefCounted
 
 const SPEED_PAUSED: String = "Paused"
-const DEFAULT_DAY_SECONDS_AT_1X: float = 1.0
+# 2 seconds per day at 1x: a month is a minute, a year 12 minutes (owner decision 2026-10-20).
+const DEFAULT_DAY_SECONDS_AT_1X: float = 2.0
 
 var speed_options: Array[Dictionary] = [
 	{"label": "1x", "multiplier": 1.0},
