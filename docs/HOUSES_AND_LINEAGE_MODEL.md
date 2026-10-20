@@ -49,7 +49,7 @@ Families that are not part of a collapsed lineage (migrants, small families, lin
 
 **Set by culture.** When two lineages join through marriage, culture decides which lineage the new household belongs to: the father's line, the mother's line, or the stronger House. Inheritance rules are therefore a cultural trait with real consequences for which Houses grow.
 
-**Current code gap:** new families form today when two adult children of the *same* household pair off (`Household.spend_adult_children_for_new_family`). There is no marriage between lineages yet. Implementing this model requires a pairing step between households from different lineages.
+**Implemented in M3 (2026-10-19):** grown children of two different households marry, the lineage rule picks the lineage, and a grown child with no partner in town marries an outsider after 6 months. Details in `docs/IMPLEMENTATION_ROADMAP.md`, M3.
 
 ## How Houses Change
 

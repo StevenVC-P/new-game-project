@@ -102,6 +102,16 @@ Known gaps that block the vision:
 - Inspector shows both parent lineages.
 
 **Authorized formula changes:** `advance_new_family_formation_month`, `form_new_family_from_parent`, `spend_adult_children_for_new_family`.
+
+**Status: done (2026-10-19).** Tested by `tests/marriage_lineage_validation.gd`.
+
+- Each month, households with a grown child ready (after any Close-Knit delay) pair with a ready household; siblings never marry each other. Each household marries off at most one child per month; each side gives one grown child.
+- Partner choice: most families prefer another lineage; Clannish families prefer their own lineage (but never their own household).
+- Lineage: each pairing has a groom's and a bride's side. If both families hold the same lineage rule it applies; otherwise the town's most common rule does (Father's Line if no family holds one). Father's Line follows the groom's side, Mother's Line the bride's, Strongest Line the side whose lineage has more households in town.
+- New families record both parent households (`second_parent_household_id`); work succession and descendants count children through either parent; the lineage display names both parents.
+- Values are inherited from both parent households.
+
+**Judgment call (owner may revisit):** a grown child with no partner in town marries someone from outside after 6 months. The spouse brings the region's culture, and the family joins the town parent's lineage. Without this, small hamlets could stall with unmarried children. In the sim run this produced 10 outside and 21 in-town marriages over 10 years, and it moves the first home-grown family from about year 3 to year 1, which the M8 pacing pass should consider.
 **Done when:** tests show cross-lineage formation, the lineage rule applied, and two-parent value inheritance.
 
 ### M4 - Satisfaction And Family Ambitions

@@ -37,7 +37,11 @@ var young_children: int = 0
 var older_children: int = 0
 var adult_children: int = 0
 var family_trade: String = "general"
+# The parent household whose lineage this family joined (set by the culture's lineage rule).
 var parent_household_id: int = -1
+# The other parent household in a marriage; -1 for founders and for a spouse from outside the town.
+var second_parent_household_id: int = -1
+var spouse_from_outside: bool = false
 var origin_household_id: int = -1
 var generation: int = 0
 var succession_pressure: int = 0
@@ -130,8 +134,10 @@ func add_young_child_from_birth():
 func get_total_child_count() -> int:
 	return young_children + older_children + adult_children
 
+# Each grown child can marry into a new family, with a partner from another household or from
+# outside the town (M3), so every adult child is a potential new family.
 func get_potential_new_family_count() -> int:
-	return int(floor(float(adult_children) / 2.0))
+	return adult_children
 
 func has_succession_pressure() -> bool:
 	return get_potential_new_family_count() > 0
@@ -146,13 +152,16 @@ func recalculate_succession_pressure():
 	succession_pressure = get_potential_new_family_count()
 
 func can_form_new_family() -> bool:
-	return adult_children >= 2
+	return adult_children >= 1
 
-func spend_adult_children_for_new_family():
-	adult_children = max(0, adult_children - 2)
-	total_population = max(0, total_population - 2)
+func spend_adult_child_for_marriage():
+	adult_children = max(0, adult_children - 1)
+	total_population = max(0, total_population - 1)
 	recalculate_succession_pressure()
 	update_labor_capacity()
+
+func is_child_of(household_id: int) -> bool:
+	return household_id >= 0 and (parent_household_id == household_id or second_parent_household_id == household_id)
 
 func advance_lifecycle_month():
 	age_in_stage += 1
