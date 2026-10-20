@@ -5,7 +5,8 @@ Draft model of what culture is, how it is held, how it changes, and what it does
 **Status:**
 
 - **Owner decisions:** values are grouped into categories; a family holds **1-2 values per category**; a House holds **3-4 per category**; values should reach as many systems as possible (preferred industries, how hard people work, and everything else).
-- **Proposed, pending owner review:** the specific categories, values, effects, and change rules below. They were written to be expansive; cutting is expected.
+- **Owner-accepted (2026-10-19):** the twelve categories and their values are the **starting pool**. Family values are held or not held (no strength yet); values are inspect-only unless relevant to a player decision; named peoples appear only in extreme divergence.
+- **Still proposed:** specific effect sizes and change-rule probabilities. These are tuning values.
 
 ## Design Rules
 
@@ -20,12 +21,16 @@ Draft model of what culture is, how it is held, how it changes, and what it does
 
 | Holder | Values per category | Form |
 | --- | --- | --- |
-| **Family** | 1-2 | Discrete values; no opposing pair |
-| **House** | 3-4 | The most common values among its member families, each with a share (for example "Thrifty 60%, Lavish 25%") |
+| **Family** | 1-2 | Held or not held; no strength. No opposing pair |
+| **House** | 3-4 | The most common values among its member families, each with a strength (its share of members, for example "Thrifty 60%, Lavish 25%") |
 | **Commons group** | Distribution | Shares of each value across the group |
 | **Settlement** | Distribution | Blend of families (small places), or Houses weighted by size plus the commons (towns and up), per the owner decision in `docs/HOUSES_AND_LINEAGE_MODEL.md` |
 
-With 12 categories, a family holds 12-24 values. That is a lot to read, so the UI shows a family's **defining values**: the 3 that differ most from their town's norm. A thrifty family in a thrifty town is unremarkable; a lavish family there is the story. The full profile is in the household inspector.
+Strength per value is certain for Houses (above) and may be considered for families later.
+
+**Visibility.** With 12 categories, a family holds 12-24 values. Values are **inspect-only**: the full profile lives in the household (or House) inspector, not on cards or overviews. The exception is **decisions**: when the player faces a choice that values react to (a policy, a coin decision, a call to arms), the UI shows which values approve or resist and how widely they are held. Players meet culture through its consequences and through the choices it affects.
+
+A useful inspector aid: highlight a family's **defining values**, the ones that differ most from their town's norm. A thrifty family in a thrifty town is unremarkable; a lavish family there is the story.
 
 House-only characteristics, derived from structure rather than held by members:
 
@@ -237,7 +242,7 @@ Each policy carries tags that values react to. Reaction is the weighted response
 
 ## Settlement Identity
 
-Each settlement gets a generated identity line from its strongest values, shown in the City Overview. For example:
+Each settlement gets a generated identity line from its strongest values, shown in its inspect view (consistent with values being inspect-only). For example:
 
 > *A thrifty, devout farming folk who distrust coin and keep to their own.*
 
@@ -246,6 +251,10 @@ Identity lines let the player watch culture drift. The same town might read diff
 > *A prosperous, coin-minded people of the road, proud of their stone halls.*
 
 Towns in the same nation can diverge, and conquered towns bring their own identity.
+
+### Named Peoples
+
+Only in **extreme** cases does a region's culture diverge far enough to become a named people of its own. A named people is a **pressure against unity**: it strains a unified kingdom or region through unrest, resistance to central policy, and in the worst cases a push to break away. It is a late-game force the player must manage, not a reward. Divergence thresholds should be high, so most of a nation's towns remain recognizably one people with local flavor.
 
 ## Examples
 
@@ -277,14 +286,11 @@ Values are small integer IDs: at most 24 per family, and 3-4 shares per category
 
 Culture should arrive alongside the systems it affects, not all at once:
 
-1. **First slice (fits current code):** values data on households with inheritance at family formation; Calling replaces `preference`; Work Ethic modifies output; Kin modifies births and family formation; defining values shown in the household inspector.
+1. **First slice (fits current code):** values data on households with inheritance at family formation; Calling replaces `preference`; Work Ethic modifies output; Kin modifies births and family formation; full values and defining values shown in the household inspector only.
 2. **With migration and needs:** Community and Change and Risk (arrivals, departures), Faith and Ritual (festival and faith needs), Wealth (savings and luxury demand).
 3. **With economy and policy:** Trade and Coin, Authority and Law, Craft and Learning.
 4. **With Houses, military, and larger layouts:** House aggregation and tensions, Conflict and Honor, Home and Place, settlement identity lines.
 
 ## Open Questions
 
-- Are twelve categories the right number, or should some merge (for example Change and Risk with Craft and Learning)?
-- Should values be strictly held or not held, or should families also have a strength per value?
-- Can the player see every family's values, or only defining values unless they inspect?
-- Should settlement identities get names (a people's name) once they diverge enough?
+None currently. Resolved 2026-10-19: twelve categories are the starting pool; family values are held or not (strength later, certain for Houses); values are inspect-only except when relevant to a decision; named peoples only in extreme divergence, as a pressure against unity.
