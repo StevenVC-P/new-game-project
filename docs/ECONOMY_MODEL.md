@@ -21,6 +21,10 @@ Coin spreads inward from trade as the settlement grows, because it makes life si
 - A **coin** is metal stamped by an issuer. Its value is its metal content plus trust in the issuer.
 - Each established civilization has its own coin at game start. There is no universal gold.
 - **Debasement** (less metal per coin) is a policy: short-term treasury gain, long-term loss of trust in that coin.
+- **Trust in a coin** comes from:
+  - the **strength of the issuer's economy and military** - can this power keep producing, trading, and protecting what backs its coin?
+  - the **value of the underlying metal** - how much real metal is in the coin, and how much that metal is worth.
+  Both apply to the player's own coin and to every established power's coin.
 - **Default:** silver is the only coin metal at first. Copper small change and gold high-value coin can be added later if they earn their place.
 
 ### 2. Two pockets: households and the state
@@ -48,6 +52,7 @@ Coin spreads inward from trade as the settlement grows, because it makes life si
 - The player builds routes and sets import and export policy, tariffs, and priorities.
 - Caravans travel through real regions and can be raided by bandits, which ties trade to defense and to clearing bandits off the map.
 - The current manual trade menu is an acceptable prototype until merchant families exist.
+- **Any trading entity can always refuse** a trade: established powers, rival towns, and merchant families alike. Refusal can come from price, relations, culture, or policy.
 
 ### 6. Taxes: in kind, then coin
 
@@ -66,9 +71,9 @@ Coin spreads inward from trade as the settlement grows, because it makes life si
 
 Money is not a scheduled feature. It arrives when the player chooses it, because it makes life simpler and more stable. The design therefore needs:
 
-- **Barter with real friction:**
+- **Barter with real friction, felt through outcomes rather than shown as a penalty:**
   - a trade only happens if the partner wants what you have
-  - each barter exchange loses some value
+  - what you get is set by supply and demand on both sides; there is no fixed "barter loss" number, but goods the partner does not need fetch little
   - in-kind wealth is bulky to store, and food wealth spoils
   - in-kind taxes need storage and handling
 - **Coin that removes that friction:**
@@ -124,6 +129,4 @@ It is superseded on:
 
 ## Open Questions
 
-- Which building or institution creates the "trust" needed to mint: a mint plus stability, a government type, or influence above some level?
-- How visible should barter friction be: a shown "barter loss" per trade, or only felt through outcomes?
-- Should established powers ever refuse to trade with the player, or only charge worse terms?
+None currently. Resolved 2026-10-19: trust in a coin comes from economic and military strength plus metal value; barter friction is felt through supply and demand outcomes, not shown; any trading entity can refuse.
