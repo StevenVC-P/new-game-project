@@ -2,6 +2,22 @@
 
 Owner-confirmed direction for objectives, pace, and player experience (2026-10-19). This sits above the system models in `docs/`: when a model or sprint conflicts with this document, this document wins unless the owner changes it. It complements `docs/household_simulation_philosophy.md` (how the simulation works) and `docs/PROJECT_OWNER_QUESTIONS.md` (prototype-level answers).
 
+## The Game In One Page
+
+Owner-confirmed description (2026-10-19).
+
+**You guide a handful of families onto unclaimed frontier land, at the edge of a world that already has kingdoms in it.** You never play a person. You are the unseen hand shaping the conditions they live under. Over generations, those families become a village, a town, a nation, and possibly the power that dominates the map. They do it by growing, trading, fighting, and believing things you only partly control. Underneath everything, how people live shapes their economy, and their economy shapes how they live.
+
+- **Founding:** four named families in temporary shelter. Every assignment matters; a bad winter is personal; bandits are a real danger, depending on the region.
+- **Hamlet and village:** slow time. Children grow up, old couples pass on, grown children found families and inherit trades. Newcomers arrive when the town is a good place to live; families leave when it is not. Families want things, and the player helps or doesn't.
+- **First trades:** barter is clumsy. The player feels why coin exists, then chooses between earning a kingdom's coin (dependency) and minting their own (needs metal, economic and military strength, and trust).
+- **Town:** the player stops managing families and starts managing a society through taxes, wages, policies, and a government form the culture has opinions about. Influence spreads soft first (trade, reputation, kin), then hard (patrols, garrisons, safe roads).
+- **Nation and beyond:** with influence and resources, the player founds towns or takes cities, and borders appear. The world keeps moving on its own. The player picks their own ambition: conquest, economic dominance, or following their people's values. There is no victory screen; the map is the record, and lineages trace back to the first families.
+
+What makes it different: families instead of workers; money that belongs to someone; things are adopted, not unlocked; military, trade, coin, influence, and expansion are one connected system; the player starts small in a full world.
+
+Main risk: scope. The hamlet-to-village experience must be great on its own, because every layer above it inherits from it.
+
 ## Vision
 
 A slow, open-ended civilization sandbox in which culture and economics build on each other. Founding families become hamlets, villages, towns, cities, and eventually nation and global structures. What the player builds is theirs, and the society that grows inside it is partly theirs and partly its own.
