@@ -1,0 +1,95 @@
+class_name HouseholdLifecycleDisplayHelper
+
+static func get_lifecycle_lines(household, city = null) -> Array[String]:
+	if household == null:
+		return ["No household lifecycle details."]
+
+	var lines: Array[String] = []
+
+	var lifecycle_stage = _read_household_property(household, "lifecycle_stage", "")
+	var family_trade = _read_household_property(household, "family_trade", "")
+	var age_in_stage: int = int(_read_household_property(household, "age_in_stage", 0))
+	var young_children: int = int(_read_household_property(household, "young_children", 0))
+	var older_children: int = int(_read_household_property(household, "older_children", 0))
+	var adult_children: int = int(_read_household_property(household, "adult_children", 0))
+	var parent_household_id: int = int(_read_household_property(household, "parent_household_id", -1))
+	var generation: int = int(_read_household_property(household, "generation", 0))
+
+	if lifecycle_stage == "" and family_trade == "":
+		return ["No household lifecycle details."]
+
+	lines.append("Stage: " + _format_lifecycle_label(str(lifecycle_stage), "Unknown"))
+	lines.append("Children: " + str(young_children) + " young, " + str(older_children) + " older, " + str(adult_children) + " adult")
+	var second_parent_household_id: int = int(_read_household_property(household, "second_parent_household_id", -1))
+	var spouse_from_outside: bool = bool(_read_household_property(household, "spouse_from_outside", false))
+	lines.append(_get_lineage_text(parent_household_id, generation, second_parent_household_id, spouse_from_outside))
+	if older_children > 0:
+		lines.append("Family support: " + _get_family_support_text(household))
+	lines.append("Family trade: " + _format_lifecycle_label(str(family_trade), "General"))
+	lines.append(_get_family_growth_text(household, city))
+	lines.append(_get_succession_text(household, city))
+
+	lines.append("Age in stage: " + str(age_in_stage))
+
+	return lines
+
+static func _get_lineage_text(parent_household_id: int, generation: int, second_parent_household_id: int = -1, spouse_from_outside: bool = false) -> String:
+	if parent_household_id < 0:
+		return "Lineage: Founder household"
+
+	var parents_text: String = "Household " + str(parent_household_id + 1)
+	if second_parent_household_id >= 0:
+		parents_text += " and Household " + str(second_parent_household_id + 1)
+	elif spouse_from_outside:
+		parents_text += " and a spouse from outside"
+	return "Lineage: Child of " + parents_text + ", generation " + str(generation)
+
+static func _get_family_growth_text(household, city) -> String:
+	if city is Object and city.has_method("get_family_growth_status_text"):
+		return str(city.get_family_growth_status_text(household))
+
+	return "Family growth: not eligible"
+
+static func _get_succession_text(household, city) -> String:
+	if city is Object and city.has_method("get_household_succession_status_text"):
+		return str(city.get_household_succession_status_text(household))
+	if household is Object and household.has_method("has_succession_pressure") and household.has_succession_pressure():
+		var family_count: int = int(household.get_potential_new_family_count())
+		if family_count == 1:
+			return "Succession: 1 future family ready"
+		return "Succession: " + str(family_count) + " future families ready"
+
+	return "Succession: No pressure"
+
+static func _get_family_support_text(household) -> String:
+	if household is Object and household.has_method("get_older_child_support_bonus"):
+		var support_bonus: int = int(household.get_older_child_support_bonus())
+		if support_bonus > 0:
+			return "+" + str(support_bonus) + " periodic output"
+
+	return "older children helping production"
+
+static func _read_household_property(household, property_name: String, fallback):
+	if household == null:
+		return fallback
+	if household is Dictionary:
+		if household.has(property_name):
+			return household[property_name]
+		return fallback
+	if household is Object:
+		var value = household.get(property_name)
+		if value != null:
+			return value
+
+	return fallback
+
+static func _format_lifecycle_label(value: String, fallback: String) -> String:
+	if value.strip_edges() == "":
+		return fallback
+
+	var words: PackedStringArray = value.replace("_", " ").split(" ")
+	for index in range(words.size()):
+		if words[index].length() > 0:
+			words[index] = words[index].substr(0, 1).to_upper() + words[index].substr(1).to_lower()
+
+	return " ".join(words)
