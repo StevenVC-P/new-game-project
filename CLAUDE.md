@@ -35,6 +35,9 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # Opening check: can 20 different towns get off the ground in two years? (filter for [OPEN])
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/opening_check.gd
 
+# Map luck: 48 towns on real generated maps and sites (filter for [MAP])
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/map_luck_check.gd
+
 # Multi-year settlement run, yearly report (filter output for [SIM])
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/settlement_growth_run.gd
 

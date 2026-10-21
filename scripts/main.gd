@@ -54,6 +54,11 @@ var hovered_tile: Vector2i = Vector2i(-1, -1)
 var hovered_city_index: int = -1
 var city_hovered_tile: Vector2i = Vector2i(-1, -1)
 var pending_founding_tile: Vector2i = Vector2i(-1, -1)
+# The town map for the pending site, generated when the site is picked so the survey shown to the
+# player describes exactly the map the town will get; reused at founding.
+var pending_site_profile: SettlementSiteProfile = null
+var pending_local_map: Array = []
+var pending_site_survey: Array[String] = []
 var current_view: String = VIEW_REGION
 var selected_city_index: int = -1
 var household_debug_inspector: Control = null
@@ -342,11 +347,25 @@ func get_founding_tile_invalid_reason(tile_pos: Vector2i) -> String:
 func set_pending_founding_tile(tile_pos: Vector2i) -> bool:
 	if not is_valid_founding_tile(tile_pos):
 		return false
+	if tile_pos != pending_founding_tile:
+		survey_pending_site(tile_pos)
 	pending_founding_tile = tile_pos
 	return true
 
+func survey_pending_site(tile_pos: Vector2i) -> void:
+	var preview_city: City = City.new("Player Town", Vector2(tile_pos.x, tile_pos.y), City.ROLE_PLAYER, 0)
+	pending_site_profile = SettlementSiteProfile.analyze(preview_city.tile, tiles, CITY_RESOURCE_RANGE)
+	preview_city.site_profile = pending_site_profile
+	var generator: LocalCityMapGenerator = LocalCityMapGenerator.new(rng, CITY_MAP_WIDTH, CITY_MAP_HEIGHT, MAP_WIDTH, MAP_HEIGHT, RIVER_NEAR_RANGE, CITY_RESOURCE_RANGE)
+	# The founded town will take the next city index, which the map generator uses.
+	pending_local_map = generator.generate(preview_city, tiles, cities.size())
+	pending_site_survey = SiteSurvey.get_lines(pending_local_map, pending_site_profile)
+
 func clear_pending_founding_tile() -> void:
 	pending_founding_tile = Vector2i(-1, -1)
+	pending_site_profile = null
+	pending_local_map = []
+	pending_site_survey.clear()
 
 func has_pending_founding_tile() -> bool:
 	return is_inside_map(pending_founding_tile.x, pending_founding_tile.y)
@@ -375,7 +394,11 @@ func found_player_city_at_pending_site() -> bool:
 	var founded_city: City = create_player_city_at_tile(pending_founding_tile)
 	cities.append(founded_city)
 	var founded_city_index: int = cities.size() - 1
-	configure_new_city_map(founded_city, founded_city_index)
+	if not pending_local_map.is_empty():
+		founded_city.site_profile = pending_site_profile
+		founded_city.local_map = pending_local_map
+	else:
+		configure_new_city_map(founded_city, founded_city_index)
 	clear_pending_founding_tile()
 	generate_roads()
 
@@ -1579,6 +1602,8 @@ func draw_inspector_panel():
 	y = draw_sidebar_like_line(font, font_size, get_founding_prompt_text(), text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, get_founding_prompt_color())
 	if has_pending_founding_tile():
 		y = draw_region_label_value(font, font_size, "Pending", str(pending_founding_tile.x) + ", " + str(pending_founding_tile.y), text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_UI_TITLE)
+		for survey_line: String in pending_site_survey:
+			y = draw_sidebar_like_line(font, font_size, survey_line, text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_UI_TEXT_NORMAL)
 		y = draw_sidebar_like_line(font, font_size, "Right-click to clear.", text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_MUTED)
 		if can_found_player_city():
 			y = draw_region_action_option(font, font_size, "Found Town", text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, {"action": "found_player_city"}, VisualStyle.COLOR_UI_BUTTON_ACTIVE)
