@@ -274,6 +274,32 @@ Tier 0 is hand work a family can always do, so no shortage of wood or tools is a
 
 Mild mistakes now cost time instead of the town; obviously bad play still fails.
 
+## Map And Presentation Track (2026-10-20)
+
+Owner direction: the map is part of the plan now; art and presentation wait for mechanics to settle.
+
+**Done:**
+
+- `tests/sim/map_luck_check.gd`: real generated worlds, real valid founding sites, real town maps, the stand-in player placing every building on the map. Result: 47/48 towns get off the ground; even the worst site has room for 12+ farms and 12+ gatherer's camps. Map luck is not a hidden killer.
+- **Founding site survey.** Picking a site generates its town map right away and shows a plain-language survey (farmland, forest, water, rough ground, stone/ore in the region); founding reuses that exact map, so what the player sees is what the town gets (`scripts/world/site_survey.gd`).
+
+**Findings:**
+
+- Regional fertility misleads: 84% of valid sites would read as "poor farmland" by the regional measure, yet every town map holds room for many farms, because the town map generator guarantees fertile pockets. The survey therefore reads the town map, not the region.
+- Stone and ore deposits never appear on town maps: the "stone cluster" step paints rough ground, and quarries can be placed anywhere. A site's stone and ore currently have no effect on the town.
+- The `isolated` site tag applies to 44/48 sites (it mostly measures nearby roads, which barely exist before founding), so it carries little information.
+
+**Decisions needed (owner):**
+
+1. What should a site mean economically, beyond how much room its map has? For example: farmland richness changing farm yields, forest density changing gatherer and woodcutter yields, a river adding trade or fishing, nearby stone enabling quarries.
+2. Should stone and ore appear on town maps, with quarries (tier 2's raw material) placed on them?
+
+**Later in this track (after the first playable village):**
+
+1. World-scale map, built together with living neighbors and rivals.
+2. Readability pass: tell tier 0 from tier 1, who works where, who is struggling, at a glance.
+3. Art direction decision (style, perspective, scope), then art, the UI overhaul, and audio replacing code-drawn shapes. `BuildingVisuals` profiles are the intended hook for sprites.
+
 ## Future Feature Notes
 
 Ideas recorded for later design, not scheduled:
