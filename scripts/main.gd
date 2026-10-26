@@ -11,6 +11,7 @@ const PANEL_WIDTH: int = 260
 const PANEL_PADDING: int = VisualStyle.SIDEBAR_PADDING
 const VIEW_REGION: String = "region"
 const VIEW_CITY: String = "city"
+const VIEW_WORLD: String = "world"
 const CITY_TILE_SIZE: int = 12
 const CITY_MAP_WIDTH: int = 64
 const CITY_MAP_HEIGHT: int = 44
@@ -73,6 +74,12 @@ var building_placement: BuildingPlacement = BuildingPlacement.new(CITY_MAP_WIDTH
 var city_building_overlay: CityBuildingOverlay = CityBuildingOverlay.new(CITY_TILE_SIZE, CITY_VIEW_TOP, CITY_MAP_WIDTH, CITY_MAP_HEIGHT)
 
 var city_pressure_debug_panel: Control = null
+# The world atlas draws on its own canvas layer above this node's screen-space drawing.
+var world_map_layer: CanvasLayer = null
+var world_map_view: WorldMapView = null
+var world_map_data: WorldMapData = null
+# World region the current regional map was generated for; -1 before any region is entered.
+var entered_world_region_id: int = -1
 
 func get_city_pressure_debug_city() -> City:
 	if selected_city_index >= 0 and selected_city_index < cities.size():
@@ -88,16 +95,81 @@ func _ready():
 	rng.randomize()
 	world_calendar.month_changed.connect(on_calendar_month_changed)
 	world_calendar.season_changed.connect(on_calendar_season_changed)
+	_ensure_household_debug_inspector()
+	# The game opens on the world atlas; the regional map is generated when a region is entered.
+	open_world_map()
+
+func generate_region_content():
 	generate_map()
 	place_cities()
 	analyze_city_site_profiles()
 	generate_city_local_maps()
 	generate_roads()
 	analyze_city_site_profiles()
-	_ensure_household_debug_inspector()
+
+func _ensure_world_map_view() -> void:
+	if world_map_view != null:
+		return
+	world_map_data = FixedWorldDefinition.build()
+	world_map_layer = CanvasLayer.new()
+	world_map_layer.layer = 1
+	add_child(world_map_layer)
+	world_map_view = WorldMapView.new()
+	world_map_layer.add_child(world_map_view)
+	world_map_view.setup(world_map_data)
+	world_map_view.region_entry_requested.connect(on_world_region_entry_requested)
+	world_map_view.return_requested.connect(close_world_map)
+
+func open_world_map() -> void:
+	_ensure_world_map_view()
+	current_view = VIEW_WORLD
+	hovered_tile = Vector2i(-1, -1)
+	hovered_city_index = -1
+	trade_menu.close()
+	if household_debug_inspector != null:
+		household_debug_inspector.visible = false
+	if city_pressure_debug_panel != null:
+		city_pressure_debug_panel.visible = false
+	# Only one player settlement exists for now, so founding locks the player to its region.
+	world_map_view.set_home_region(entered_world_region_id, has_player_city())
+	world_map_layer.visible = true
+	world_map_view.set_active(true)
+	if entered_world_region_id >= 0:
+		world_map_view.select_region(entered_world_region_id)
 	queue_redraw()
 
+func close_world_map() -> void:
+	if entered_world_region_id < 0:
+		return
+	world_map_layer.visible = false
+	world_map_view.set_active(false)
+	current_view = VIEW_REGION
+	queue_redraw()
+
+func on_world_region_entry_requested(region_id: int) -> void:
+	if region_id != entered_world_region_id:
+		if has_player_city():
+			return
+		generate_region_for_world(world_map_data.get_region(region_id))
+	close_world_map()
+
+# Seeding from the world region makes each region's map the same every time it is
+# entered. The seed is dropped afterwards so founding families stay unpredictable.
+func generate_region_for_world(region: WorldMapData.Region) -> void:
+	rng.seed = region.regional_map_seed
+	clear_pending_founding_tile()
+	trade_routes.clear()
+	selected_city_index = -1
+	generate_region_content()
+	rng.randomize()
+	entered_world_region_id = region.id
+	print("Entered world region: ", region.name, " (", region.climate, "; ", region.landscape, ")")
+
 func _process(_delta: float):
+	if current_view == VIEW_WORLD and entered_world_region_id < 0:
+		# Nothing lives in the world simulation yet, so the calendar waits for the first region.
+		return
+
 	if not simulation_clock.is_paused:
 		city_walker_time += _delta * max(1.0, simulation_clock.get_speed_multiplier())
 		if city_walker_time >= CITY_WALKER_CYCLE_SECONDS:
@@ -113,7 +185,7 @@ func _process(_delta: float):
 		update_hovered_city(mouse_pos)
 		if hovered_city_index != -1:
 			queue_redraw()
-	else:
+	elif current_view == VIEW_CITY:
 		update_city_hovered_tile(get_local_mouse_position())
 		if hovered_tile != Vector2i(-1, -1):
 			hovered_tile = Vector2i(-1, -1)
@@ -124,6 +196,9 @@ func _process(_delta: float):
 		queue_redraw()
 
 func _input(event: InputEvent):
+	# The world map handles its own input.
+	if current_view == VIEW_WORLD:
+		return
 	if event is InputEventKey:
 		if event.pressed and not event.echo and event.keycode == KEY_F4:
 			if current_view != VIEW_CITY:
@@ -227,6 +302,8 @@ func _input(event: InputEvent):
 			get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent):
+	if current_view == VIEW_WORLD:
+		return
 	if event is InputEventKey:
 		var key_event: InputEventKey = event as InputEventKey
 		if handle_simulation_speed_key_event(key_event):
@@ -454,6 +531,8 @@ func try_handle_top_bar_click(mouse_pos: Vector2) -> bool:
 		var action: String = option_data["action"] as String
 		if action == "back_to_region":
 			try_return_to_region(mouse_pos)
+		elif action == "open_world_map":
+			open_world_map()
 		else:
 			apply_time_control_action(action)
 		return true
@@ -825,6 +904,8 @@ func get_household_debug_city():
 	return null
 
 func _draw():
+	if current_view == VIEW_WORLD:
+		return
 	if current_view == VIEW_CITY:
 		draw_city_view()
 		return
@@ -938,6 +1019,9 @@ func draw_top_bar():
 	if current_view == VIEW_CITY:
 		x = draw_top_bar_button(font, font_size, "Back", x, y, 78.0, {"action": "back_to_region"}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
 		x += 14.0
+	elif world_map_view != null:
+		x = draw_top_bar_button(font, font_size, "World", x, y, 78.0, {"action": "open_world_map"}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
+		x += 14.0
 
 	draw_string(font, Vector2(x, y), get_top_bar_title(), HORIZONTAL_ALIGNMENT_LEFT, 230.0, title_size, VisualStyle.COLOR_UI_TITLE)
 	x += 250.0
@@ -954,6 +1038,8 @@ func draw_top_bar():
 func get_top_bar_title() -> String:
 	if current_view == VIEW_CITY:
 		return get_selected_city_name() + " Local Map"
+	if world_map_data != null and entered_world_region_id >= 0:
+		return world_map_data.get_region(entered_world_region_id).name
 
 	return "Regional Map"
 

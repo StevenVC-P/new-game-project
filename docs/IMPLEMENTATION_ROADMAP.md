@@ -297,9 +297,11 @@ Owner direction: the map is part of the plan now; art and presentation wait for 
 
 Next implementation step: draw regional deposits onto town maps as resource tiles, give each resource an access rule (on-site or nearby), require quarries to sit on stone, and show available resources in the founding site survey.
 
+**World atlas v1 (2026-10-25, owner-requested ahead of the village):** a fixed, hand-authored planet drawn as a painterly atlas, with kingdoms, regions, settlements, and roads as data a later simulation can change. The game opens on it, and entering an unclaimed region opens the existing regional map. It sets the global art direction. Details and remaining integration work are in `docs/WORLD_MAP.md`.
+
 **Later in this track (after the first playable village):**
 
-1. World-scale map, built together with living neighbors and rivals.
+1. Living neighbors and rivals on the world map; the regional map generated from its world region's geography.
 2. Readability pass: tell tier 0 from tier 1, who works where, who is struggling, at a glance.
 3. Art direction decision (style, perspective, scope), then art, the UI overhaul, and audio replacing code-drawn shapes. `BuildingVisuals` profiles are the intended hook for sprites.
 

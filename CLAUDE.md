@@ -43,6 +43,13 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 
 # Household simulation benchmark (filter output for [BENCH]; takes several minutes)
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/benchmarks/household_sim_benchmark.gd
+
+# World map: data checks, and the hand-off into the regional/founding flow
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/world_map_validation.gd
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/world_map_flow_validation.gd
+
+# World map screenshots for visual review (needs a window, so no --headless)
+& (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/world_map_capture.gd -- <output_dir>
 ```
 
 `tests/expanded_goods_production_validation.gd` extends `RefCounted`, so it cannot be run with `--script` directly; load it from a small `SceneTree` wrapper and call `run_all()`.
@@ -52,7 +59,8 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 - `scripts/main.gd` - large central scene script: map input, drawing, UI, day ticking, trade. High-risk; avoid adding new simulation logic here.
 - `scripts/domain/` - simulation model: `city.gd` (resources, households, buildings, growth, lifecycle orchestration), `household.gd` (family structure, lifecycle, labor), `building.gd`.
 - `scripts/simulation/` - `calendar.gd` and `simulation_clock.gd` (1 day = 1 real second at 1x).
-- `scripts/world/` - regional and local map generation, founding-site helpers.
+- `scripts/world/` - regional and local map generation, founding-site helpers, and the world map's data (`world_map_data.gd`), authored planet (`fixed_world_definition.gd`), and builder (`world_field_builder.gd`).
+- `scripts/visuals/world_map/` and `shaders/world_terrain.gdshader` - the world atlas renderer; the game opens on it (`VIEW_WORLD` in `main.gd`). Design, decisions, and remaining integration work: `docs/WORLD_MAP.md`.
 - `scripts/ui/`, `scripts/visuals/` - panels, helpers, drawing.
 - Daily `City.tick()`, monthly `advance_household_lifecycle_month()`, and seasonal birth rolls are driven by calendar signals in `main.gd`.
 - Performance limits and their causes are measured in `docs/HOUSEHOLD_SIM_BENCHMARK.md`.
