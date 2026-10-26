@@ -94,6 +94,12 @@ var chunk_last_used: Dictionary = {}
 var pending_tasks: Dictionary = {}
 var use_counter: int = 0
 var settlement_tiles: Dictionary = {}
+# Chunk key -> ids of world settlements whose world position lies in that chunk.
+var settlements_by_chunk: Dictionary = {}
+# Called with each new chunk on the thread that made it (the renderer prepares its data).
+var chunk_finisher: Callable = Callable()
+# Road line index -> its meandering course in tiles (see road_course).
+var road_courses: Dictionary = {}
 
 func _init(world_data: WorldMapData) -> void:
 	world = world_data
@@ -105,6 +111,11 @@ func _init(world_data: WorldMapData) -> void:
 	noise_cdfs = RegionalChunkGenerator.build_noise_cdfs()
 	build_water_lines()
 	build_road_lines()
+	for settlement: WorldMapData.Settlement in world.settlements:
+		var key: int = chunk_key(chunk_of_tile(world_to_tile_index(settlement.position)))
+		if not settlements_by_chunk.has(key):
+			settlements_by_chunk[key] = []
+		(settlements_by_chunk[key] as Array).append(settlement.id)
 
 # --- Coordinates ---------------------------------------------------------------------
 
@@ -297,6 +308,30 @@ func build_road_lines() -> void:
 		road_lines.append(line)
 	chunk_road_lines = index_lines(road_lines, RegionalChunkGenerator.ROAD_MEANDER_TILES + 2.0)
 
+# The course a road is stamped along (RegionalChunkGenerator.walk_line), as tile points
+# (unwrapped) about every 1.2 tiles, for drawing the road where its tiles are.
+func road_course(line_index: int) -> PackedVector2Array:
+	if road_courses.has(line_index):
+		return road_courses[line_index]
+	var line: Polyline = road_lines[line_index]
+	var course: PackedVector2Array = PackedVector2Array()
+	for segment in range(line.points.size() - 1):
+		var a: Vector2 = line.points[segment]
+		var b: Vector2 = line.points[segment + 1]
+		var length: float = a.distance_to(b)
+		if length < 1e-4:
+			continue
+		var normal: Vector2 = (b - a).normalized().orthogonal()
+		var steps: int = maxi(1, ceili(length / 1.2))
+		for step in range(steps):
+			var t: float = float(step) / steps
+			var along: float = lerpf(line.along[segment], line.along[segment + 1], t)
+			course.append(a.lerp(b, t) + normal * RegionalChunkGenerator.road_offset(along, line.phase))
+	var last: int = line.points.size() - 1
+	course.append(line.points[last] + (line.points[last] - line.points[last - 1]).normalized().orthogonal() * RegionalChunkGenerator.road_offset(line.along[last], line.phase))
+	road_courses[line_index] = course
+	return course
+
 # World points to unwrapped tile points, with distances along the line.
 func set_line_points(line: Polyline, world_points: PackedVector2Array) -> void:
 	var previous_x: float = 0.0
@@ -429,11 +464,17 @@ func request_chunk(chunk: Vector2i) -> void:
 	pending_tasks[key] = WorkerThreadPool.add_task(generate_task.bind(key, canonical), false, "Regional chunk")
 
 func generate_task(key: int, chunk: Vector2i) -> void:
-	var generated: RegionalChunk = RegionalChunkGenerator.new(self).generate(chunk)
+	var generated: RegionalChunk = make_chunk(chunk)
 	mutex.lock()
 	if not chunks.has(key):
 		chunks[key] = generated
 	mutex.unlock()
+
+func make_chunk(chunk: Vector2i) -> RegionalChunk:
+	var generated: RegionalChunk = RegionalChunkGenerator.new(self).generate(chunk)
+	if chunk_finisher.is_valid():
+		chunk_finisher.call(generated)
+	return generated
 
 # Finishes completed worker tasks and trims the cache. Call once per frame from the main thread.
 func poll() -> void:
@@ -443,6 +484,13 @@ func poll() -> void:
 			WorkerThreadPool.wait_for_task_completion(task_id)
 			pending_tasks.erase(key)
 	trim_cache()
+
+# Waits for every chunk still generating. Call before the terrain's owner goes away: a worker
+# thread still running a task while the engine shuts down keeps the process from exiting.
+func wait_for_tasks() -> void:
+	for key: int in pending_tasks.keys():
+		WorkerThreadPool.wait_for_task_completion(pending_tasks[key])
+	pending_tasks.clear()
 
 func get_chunk_if_ready(chunk: Vector2i) -> RegionalChunk:
 	if not is_chunk_on_planet(chunk):
@@ -468,7 +516,7 @@ func get_chunk_now(chunk: Vector2i) -> RegionalChunk:
 		WorkerThreadPool.wait_for_task_completion(pending_tasks[key])
 		pending_tasks.erase(key)
 		return get_chunk_if_ready(chunk)
-	var generated: RegionalChunk = RegionalChunkGenerator.new(self).generate(Vector2i(posmod(chunk.x, chunk_counts.x), chunk.y))
+	var generated: RegionalChunk = make_chunk(Vector2i(posmod(chunk.x, chunk_counts.x), chunk.y))
 	mutex.lock()
 	chunks[key] = generated
 	mutex.unlock()
@@ -477,17 +525,19 @@ func get_chunk_now(chunk: Vector2i) -> RegionalChunk:
 	return generated
 
 func trim_cache() -> void:
+	# Worker threads add to chunks, so it is only read under the lock.
 	mutex.lock()
 	var cached: int = chunks.size()
+	var keys: Array = chunks.keys() if cached > MAX_CACHED_CHUNKS else []
 	mutex.unlock()
-	if cached <= MAX_CACHED_CHUNKS:
+	if keys.is_empty():
 		return
 	var by_age: Array = []
-	for key: int in chunks.keys():
+	for key: int in keys:
 		by_age.append(Vector2i(chunk_last_used.get(key, 0), key))
 	by_age.sort()
 	mutex.lock()
-	for i in range(cached - MAX_CACHED_CHUNKS):
+	for i in range(by_age.size() - MAX_CACHED_CHUNKS):
 		var key: int = (by_age[i] as Vector2i).y
 		chunks.erase(key)
 		chunk_last_used.erase(key)
@@ -554,6 +604,17 @@ func settlement_tile(settlement: WorldMapData.Settlement) -> Vector2i:
 	settlement_tiles[settlement.id] = best
 	mutex.unlock()
 	return best
+
+# The settlement's tile if the chunk it depends on is ready (no generation on this thread).
+func settlement_tile_if_ready(settlement: WorldMapData.Settlement) -> Variant:
+	mutex.lock()
+	var known: Variant = settlement_tiles.get(settlement.id, null)
+	mutex.unlock()
+	if known != null:
+		return known
+	if get_chunk_if_ready(chunk_of_tile(world_to_tile_index(settlement.position))) == null:
+		return null
+	return settlement_tile(settlement)
 
 # World settlements whose tile lies inside a window (global origin, size), as
 # [settlement, tile] pairs with tiles in the window's unwrapped coordinates.

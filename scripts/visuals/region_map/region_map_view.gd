@@ -10,8 +10,20 @@ extends Node2D
 # founding-site pegs, interaction overlay, labels. Permanent geography (terrain, features)
 # is kept apart from development (fields, roads, settlements), so whatever changes the
 # region later calls notify_changed() with the layer that changed and only that is redrawn.
+#
+# Two modes. A bounded region (set_region) is one board of tiles, as the original maps are.
+# The continuous map (set_terrain, then set_neighbourhood) shows the whole planet at
+# regional scale, streamed in chunks (RegionChunkStreamer) over a backdrop of the world
+# atlas, and wraps east-west. The game's rules work on a bounded neighbourhood of it: the
+# tiles, towns, and roads main.gd owns. The development layers draw that neighbourhood at
+# its place on the planet, and the public coordinates (screen_to_map, screen_to_tile,
+# map_to_screen) are the neighbourhood's, so the owner's rules see the same tile space in
+# both modes.
 
 signal map_clicked(screen_position: Vector2)
+# The player zoomed out past the continuous map's widest view (where the world atlas's
+# closest view takes over).
+signal zoom_out_past_min(screen_position: Vector2)
 
 const LAYER_GROUND: String = "ground"
 const LAYER_DEVELOPMENT: String = "development"
@@ -19,6 +31,14 @@ const LAYER_DEVELOPMENT: String = "development"
 const HUD_BUTTON_HEIGHT: float = 22.0
 const HUD_MARGIN: float = 10.0
 const LEGEND_SIZE: Vector2 = Vector2(214.0, 232.0)
+
+# Map units per world unit (12 per tile, 1.2 world units per tile).
+const MAP_UNITS_PER_WORLD: float = RegionMapStyle.TILE / RegionalTerrain.TILE_WORLD_UNITS
+# The continuous map's widest view: the world atlas's closest view, at the same scale.
+const HANDOFF_ZOOM: float = WorldMapStyle.MAX_ZOOM / MAP_UNITS_PER_WORLD
+# Individual trees, peaks, and boulders are drawn from this zoom in; farther out the
+# terrain shows woods as canopy.
+const FEATURE_ZOOM: float = 1.0
 
 var tiles: Array = []
 var cities: Array[City] = []
@@ -39,6 +59,25 @@ var label_layer: RegionLabelLayer = null
 var layers: Array[RegionMapLayer] = []
 var board_clip: HudCanvas = null
 var hud: HudCanvas = null
+
+# Continuous map.
+var terrain: RegionalTerrain = null
+var streamer: RegionChunkStreamer = null
+var backdrop_root: Node2D = null
+var backdrop: WorldTerrainLayer = null
+var chunk_terrain_root: Node2D = null
+var chunk_field_root: Node2D = null
+var chunk_feature_root: Node2D = null
+var chunk_structure_root: Node2D = null
+var world_label_layer: RegionWorldLabelLayer = null
+# Global tile of the neighbourhood's first tile, and where its layers are drawn now (map
+# units, the copy of the planet nearest the camera).
+var neighbourhood_origin: Vector2i = Vector2i.ZERO
+var neighbourhood_offset: Vector2 = Vector2.ZERO
+# World roads through the neighbourhood, in its map units; its towns line their streets along them.
+var neighbourhood_context_roads: Array[RegionMapGeometry.RoadShape] = []
+var show_borders: bool = true
+var hud_region_text: String = ""
 
 # Camera. Zoom is screen pixels per map unit; screen_rect is where the map shows through.
 var screen_rect: Rect2 = Rect2(0.0, 0.0, 960.0, 600.0)
@@ -78,10 +117,18 @@ func _init() -> void:
 	map_root = Node2D.new()
 	map_root.name = "MapRoot"
 	add_child(map_root)
+	backdrop_root = add_root("Backdrop")
+	backdrop_root.scale = Vector2(MAP_UNITS_PER_WORLD, MAP_UNITS_PER_WORLD)
 	board_layer = add_layer(RegionBoardLayer.new(), "Board")
 	terrain_layer = add_layer(RegionTerrainLayer.new(), "Terrain")
+	chunk_terrain_root = add_root("ChunkTerrain")
+	chunk_field_root = add_root("ChunkFields")
 	field_layer = add_layer(RegionFieldLayer.new(), "Fields")
 	feature_layer = add_layer(RegionFeatureLayer.new(), "Features")
+	chunk_feature_root = add_root("ChunkFeatures")
+	# Chunk rows draw north to south, so trees near a chunk edge overlap correctly.
+	chunk_feature_root.y_sort_enabled = true
+	chunk_structure_root = add_root("ChunkStructures")
 	structure_layer = add_layer(RegionStructureLayer.new(), "Structures")
 	# Founding marks stay on the board: the clip node draws the board's shape as their mask.
 	board_clip = HudCanvas.new()
@@ -91,6 +138,7 @@ func _init() -> void:
 	map_root.add_child(board_clip)
 	site_layer = add_layer(RegionSiteLayer.new(), "Sites", board_clip)
 	overlay_layer = add_layer(RegionOverlayLayer.new(), "Overlay", board_clip)
+	world_label_layer = add_layer(RegionWorldLabelLayer.new(), "WorldLabels")
 	label_layer = add_layer(RegionLabelLayer.new(), "Labels")
 	hud = HudCanvas.new()
 	hud.name = "Hud"
@@ -103,6 +151,46 @@ func add_layer(layer: RegionMapLayer, layer_name: String, parent: Node2D = null)
 	layer.setup(self)
 	layers.append(layer)
 	return layer
+
+func _exit_tree() -> void:
+	if terrain != null:
+		terrain.wait_for_tasks()
+
+func add_root(root_name: String) -> Node2D:
+	var root: Node2D = Node2D.new()
+	root.name = root_name
+	map_root.add_child(root)
+	return root
+
+func is_continuous() -> bool:
+	return terrain != null
+
+# Switches to the continuous map of the whole planet. The owner then places the gameplay
+# neighbourhood with set_neighbourhood() and the camera with focus_on_global_tile().
+func set_terrain(regional_terrain: RegionalTerrain) -> void:
+	if terrain == regional_terrain:
+		return
+	if streamer != null:
+		streamer.clear()
+	terrain = regional_terrain
+	if backdrop == null:
+		backdrop = WorldTerrainLayer.new()
+		backdrop.name = "AtlasBackdrop"
+		backdrop_root.add_child(backdrop)
+	backdrop.setup(terrain.world)
+	var shared: Dictionary = {
+		"political_tex": backdrop.shader_material.get_shader_parameter("political_tex"),
+		"kingdom_palette": backdrop.shader_material.get_shader_parameter("kingdom_palette"),
+		"political_size": Vector2(terrain.world.political_size),
+	}
+	var roots: Array[Node2D] = [chunk_terrain_root, chunk_field_root, chunk_feature_root, chunk_structure_root]
+	streamer = RegionChunkStreamer.new(self, terrain, roots, shared)
+	# The board and the bounded region's ground give way to the streamed chunks.
+	board_layer.visible = false
+	terrain_layer.visible = false
+	feature_layer.visible = false
+	geography = null
+	apply_camera()
 
 # --- Data ---------------------------------------------------------------------------
 
@@ -122,6 +210,70 @@ func set_region(region_tiles: Array, region_cities: Array[City], region_roads: A
 	board_clip.queue_redraw()
 	reset_camera()
 
+# Continuous map: the gameplay neighbourhood, a window of the planet starting at the global
+# tile origin. tiles, cities, and roads are in the window's tile coordinates. The camera
+# stays where it is.
+func set_neighbourhood(window_tiles: Array, window_cities: Array[City], window_roads: Array[Array], origin: Vector2i) -> void:
+	var old_rect: Rect2 = neighbourhood_map_rect()
+	tiles = window_tiles
+	cities = window_cities
+	roads = window_roads
+	neighbourhood_origin = Vector2i(terrain.wrap_tile_x(origin.x), origin.y)
+	map_size = Vector2i((tiles[0] as Array).size(), tiles.size()) if not tiles.is_empty() else Vector2i.ZERO
+	hovered_tile = Vector2i(-1, -1)
+	hovered_city = -1
+	selected_city = -1
+	pending_tile = Vector2i(-1, -1)
+	neighbourhood_context_roads.clear()
+	var window_map: Vector2 = Vector2(neighbourhood_origin) * RegionMapStyle.TILE
+	for piece: RegionMapGeometry.RoadShape in streamer.world_road_pieces(Rect2i(neighbourhood_origin, map_size)):
+		piece.is_context = true
+		var local_points: PackedVector2Array = PackedVector2Array()
+		for point: Vector2 in piece.points:
+			local_points.append(point - window_map)
+		piece.points = local_points
+		neighbourhood_context_roads.append(piece)
+	geometry.world_tiers.clear()
+	for settlement: WorldMapData.Settlement in terrain.world.settlements:
+		geometry.world_tiers[settlement.name] = settlement.tier
+	geometry.build(tiles, cities, roads, geography, neighbourhood_context_roads)
+	for layer: RegionMapLayer in [field_layer, structure_layer, site_layer, overlay_layer, label_layer]:
+		layer.rebuild()
+	board_clip.queue_redraw()
+	streamer.on_neighbourhood_changed(old_rect, neighbourhood_map_rect())
+	apply_camera()
+
+# The neighbourhood in global map units (canonical x), or an empty rect without one.
+func neighbourhood_map_rect() -> Rect2:
+	if not is_continuous() or map_size == Vector2i.ZERO:
+		return Rect2()
+	return Rect2(Vector2(neighbourhood_origin) * RegionMapStyle.TILE, Vector2(map_size) * RegionMapStyle.TILE)
+
+func is_global_tile_in_neighbourhood(tile: Vector2i) -> bool:
+	if not is_continuous() or map_size == Vector2i.ZERO:
+		return false
+	var local: Vector2i = global_tile_to_local(tile)
+	return is_tile_inside(local)
+
+# A global tile in the neighbourhood's tile coordinates (taking the short way around the planet).
+func global_tile_to_local(tile: Vector2i) -> Vector2i:
+	var dx: int = posmod(tile.x - neighbourhood_origin.x, terrain.size_tiles.x)
+	if dx > terrain.size_tiles.x / 2:
+		dx -= terrain.size_tiles.x
+	return Vector2i(dx, tile.y - neighbourhood_origin.y)
+
+func local_tile_to_global(tile: Vector2i) -> Vector2i:
+	return Vector2i(terrain.wrap_tile_x(tile.x + neighbourhood_origin.x), tile.y + neighbourhood_origin.y)
+
+# Whether the neighbourhood's development keeps this spot (global map units) clear of trees.
+func is_cleared_by_neighbourhood(map_point: Vector2) -> bool:
+	if map_size == Vector2i.ZERO:
+		return false
+	var planet: float = terrain.size_tiles.x * RegionMapStyle.TILE
+	var local: Vector2 = map_point - Vector2(neighbourhood_origin) * RegionMapStyle.TILE
+	local.x -= roundf(local.x / planet) * planet
+	return geometry.is_cleared(local)
+
 # The owner calls this after changing tiles (LAYER_GROUND) or towns and roads
 # (LAYER_DEVELOPMENT). The arrays are shared, so it may also pass replaced ones.
 func notify_changed(layer: String, region_cities: Array[City] = cities, region_roads: Array[Array] = roads) -> void:
@@ -130,13 +282,18 @@ func notify_changed(layer: String, region_cities: Array[City] = cities, region_r
 	cities = region_cities
 	roads = region_roads
 	var previous_clearings: PackedByteArray = geometry.clear_grid
-	geometry.build(tiles, cities, roads, geography)
-	if layer == LAYER_GROUND:
-		terrain_layer.rebuild()
-	# Trees keep clear of roads and houses, so features are rebuilt when the cleared ground
-	# changes; a town that only grew in population leaves them alone.
-	if layer == LAYER_GROUND or geometry.clear_grid != previous_clearings:
-		feature_layer.rebuild()
+	geometry.build(tiles, cities, roads, geography, neighbourhood_context_roads)
+	if is_continuous():
+		# The chunks draw the ground; trees there make way for new development.
+		if geometry.clear_grid != previous_clearings:
+			streamer.mark_features_dirty_near(neighbourhood_map_rect())
+	else:
+		if layer == LAYER_GROUND:
+			terrain_layer.rebuild()
+		# Trees keep clear of roads and houses, so features are rebuilt when the cleared ground
+		# changes; a town that only grew in population leaves them alone.
+		if layer == LAYER_GROUND or geometry.clear_grid != previous_clearings:
+			feature_layer.rebuild()
 	for redrawn: RegionMapLayer in [field_layer, structure_layer, site_layer, overlay_layer, label_layer]:
 		redrawn.rebuild()
 
@@ -190,8 +347,11 @@ func set_screen_rect(rect: Rect2) -> void:
 func map_extent() -> Vector2:
 	return Vector2(map_size) * RegionMapStyle.TILE
 
-# Fully zoomed out, the whole region fits the map area.
+# Fully zoomed out, the whole region fits the map area; the continuous map goes out as far
+# as the world atlas's closest view.
 func min_zoom() -> float:
+	if is_continuous():
+		return HANDOFF_ZOOM
 	var extent: Vector2 = map_extent() + Vector2(0.0, RegionMapStyle.BOARD_THICKNESS)
 	if extent.x <= 0.0 or screen_rect.size.x <= 0.0:
 		return 1.0
@@ -204,42 +364,104 @@ func reset_camera() -> void:
 	camera_center = map_extent() * 0.5
 	apply_camera()
 
+# map_position is in the neighbourhood's map units (the whole map in bounded mode).
 func focus_on(map_position: Vector2, new_zoom: float) -> void:
-	camera_center = map_position
+	camera_center = map_position + neighbourhood_offset
 	zoom = new_zoom
 	target_zoom = new_zoom
 	apply_camera()
 
+# Continuous map: centers the camera on a global tile (fractional tiles allowed).
+func focus_on_global_tile(tile: Vector2, new_zoom: float) -> void:
+	camera_center = tile * RegionMapStyle.TILE
+	zoom = new_zoom
+	target_zoom = new_zoom
+	apply_camera()
+
+# Continuous map: the global tile (fractional) at the middle of the view.
+func camera_global_tile() -> Vector2:
+	return Vector2(fposmod(camera_center.x / RegionMapStyle.TILE, terrain.size_tiles.x), camera_center.y / RegionMapStyle.TILE)
+
+# Continuous map: the world position under a screen position.
+func screen_to_world(screen_position: Vector2) -> Vector2:
+	var map_point: Vector2 = screen_to_global_map(screen_position)
+	return Vector2(fposmod(map_point.x / MAP_UNITS_PER_WORLD, terrain.world.world_size.x), map_point.y / MAP_UNITS_PER_WORLD)
+
 func apply_camera() -> void:
 	zoom = clampf(zoom, min_zoom(), RegionMapStyle.MAX_ZOOM)
 	target_zoom = clampf(target_zoom, min_zoom(), RegionMapStyle.MAX_ZOOM)
-	# The map may not leave the screen: its center stays within the visible half-extent.
-	var extent: Vector2 = map_extent()
 	var half_view: Vector2 = screen_rect.size * 0.5 / zoom
-	for axis in range(2):
-		if half_view[axis] * 2.0 >= extent[axis]:
-			camera_center[axis] = extent[axis] * 0.5
-		else:
-			camera_center[axis] = clampf(camera_center[axis], half_view[axis], extent[axis] - half_view[axis])
+	if is_continuous():
+		# East-west the planet wraps; north-south the view stops at the poles.
+		var planet: Vector2 = Vector2(terrain.size_tiles) * RegionMapStyle.TILE
+		camera_center.x = fposmod(camera_center.x, planet.x)
+		camera_center.y = clampf(camera_center.y, minf(half_view.y, planet.y * 0.5), maxf(planet.y - half_view.y, planet.y * 0.5))
+		neighbourhood_offset = Vector2(neighbourhood_origin) * RegionMapStyle.TILE
+		neighbourhood_offset.x += roundf((camera_center.x - neighbourhood_offset.x) / planet.x) * planet.x
+		for layer: Node2D in [field_layer, structure_layer, board_clip, label_layer]:
+			layer.position = neighbourhood_offset
+		backdrop.set_view_zoom(zoom * MAP_UNITS_PER_WORLD)
+		update_region_text()
+	else:
+		# The map may not leave the screen: its center stays within the visible half-extent.
+		var extent: Vector2 = map_extent()
+		for axis in range(2):
+			if half_view[axis] * 2.0 >= extent[axis]:
+				camera_center[axis] = extent[axis] * 0.5
+			else:
+				camera_center[axis] = clampf(camera_center[axis], half_view[axis], extent[axis] - half_view[axis])
 	map_root.scale = Vector2(zoom, zoom)
 	map_root.position = (screen_rect.get_center() - camera_center * zoom).round()
 	for layer: RegionMapLayer in layers:
 		layer.set_view_zoom(zoom)
+	world_label_layer.queue_redraw()
 	queue_redraw()
 	hud.queue_redraw()
 
-func screen_to_map(screen_position: Vector2) -> Vector2:
+# The part of the map on screen, in global map units near the camera.
+func visible_map_rect() -> Rect2:
+	return Rect2(screen_to_global_map(screen_rect.position), screen_rect.size / zoom)
+
+func screen_to_global_map(screen_position: Vector2) -> Vector2:
 	return (screen_position - map_root.position) / zoom
 
-func map_to_screen(map_position: Vector2) -> Vector2:
-	return map_root.position + map_position * zoom
+# Screen position to the neighbourhood's map units (the whole map's in bounded mode).
+func screen_to_map(screen_position: Vector2) -> Vector2:
+	return screen_to_global_map(screen_position) - neighbourhood_offset
 
-# The tile under a screen position, or (-1, -1) outside the map area or the board.
+func map_to_screen(map_position: Vector2) -> Vector2:
+	return map_root.position + (map_position + neighbourhood_offset) * zoom
+
+# The neighbourhood tile under a screen position, or (-1, -1) outside the map area or the
+# board (or, on the continuous map, outside the neighbourhood).
 func screen_to_tile(screen_position: Vector2) -> Vector2i:
 	if not screen_rect.has_point(screen_position):
 		return Vector2i(-1, -1)
 	var tile: Vector2i = Vector2i((screen_to_map(screen_position) / RegionMapStyle.TILE).floor())
 	return tile if is_tile_inside(tile) else Vector2i(-1, -1)
+
+# Continuous map: the global tile under a screen position (x wrapped), or (-1, -1) off the map area.
+func screen_to_global_tile(screen_position: Vector2) -> Vector2i:
+	if not screen_rect.has_point(screen_position):
+		return Vector2i(-1, -1)
+	var tile: Vector2i = Vector2i((screen_to_global_map(screen_position) / RegionMapStyle.TILE).floor())
+	if not terrain.is_tile_on_planet(tile):
+		return Vector2i(-1, -1)
+	return terrain.wrap_tile(tile)
+
+func update_region_text() -> void:
+	var region_id: int = terrain.region_vote_at(camera_global_tile() * RegionalTerrain.TILE_WORLD_UNITS)
+	var region: WorldMapData.Region = terrain.world.get_region(region_id)
+	if region == null:
+		hud_region_text = ""
+		return
+	var status: String = "unclaimed frontier"
+	var kingdom: WorldMapData.Kingdom = terrain.world.get_kingdom(region.owner_kingdom_id)
+	if kingdom != null:
+		status = "held by " + kingdom.name
+	elif region.is_contested():
+		status = "contested frontier"
+	hud_region_text = "%s, %s" % [region.name, status]
 
 func zoom_toward(factor: float, screen_position: Vector2) -> void:
 	target_zoom = clampf(target_zoom * factor, min_zoom(), RegionMapStyle.MAX_ZOOM)
@@ -272,6 +494,8 @@ func _process(delta: float) -> void:
 		moved = true
 	if moved:
 		apply_camera()
+	if is_continuous():
+		streamer.update(visible_map_rect(), zoom, zoom >= FEATURE_ZOOM, show_borders)
 
 # --- Input -----------------------------------------------------------------------------
 
@@ -285,6 +509,10 @@ func handle_mouse_event(event: InputEvent) -> bool:
 		if button.pressed and (button.button_index == MOUSE_BUTTON_WHEEL_UP or button.button_index == MOUSE_BUTTON_WHEEL_DOWN):
 			if not screen_rect.has_point(position):
 				return false
+			if button.button_index == MOUSE_BUTTON_WHEEL_DOWN and is_continuous() and target_zoom <= min_zoom() * 1.001:
+				# Already as far out as the regional map goes: the world atlas takes over.
+				zoom_out_past_min.emit(position)
+				return true
 			zoom_toward(RegionMapStyle.ZOOM_STEP if button.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / RegionMapStyle.ZOOM_STEP, position)
 			return true
 		if button.button_index != MOUSE_BUTTON_LEFT and button.button_index != MOUSE_BUTTON_MIDDLE:
@@ -327,6 +555,9 @@ func handle_key(event: InputEventKey) -> bool:
 	if event.keycode == KEY_L or event.physical_keycode == KEY_L:
 		toggle_labels()
 		return true
+	if is_continuous() and (event.keycode == KEY_B or event.physical_keycode == KEY_B):
+		toggle_borders()
+		return true
 	return false
 
 func toggle_sites() -> void:
@@ -337,6 +568,11 @@ func toggle_sites() -> void:
 func toggle_labels() -> void:
 	show_labels = not show_labels
 	label_layer.queue_redraw()
+	world_label_layer.queue_redraw()
+	hud.queue_redraw()
+
+func toggle_borders() -> void:
+	show_borders = not show_borders
 	hud.queue_redraw()
 
 func is_over_hud(screen_position: Vector2) -> bool:
@@ -354,6 +590,8 @@ func handle_hud_click(screen_position: Vector2) -> bool:
 				toggle_sites()
 			"labels":
 				toggle_labels()
+			"borders":
+				toggle_borders()
 			"legend":
 				show_legend = not show_legend
 				hud.queue_redraw()
@@ -372,7 +610,7 @@ func legend_rect() -> Rect2:
 
 func draw_hud(canvas: CanvasItem) -> void:
 	hud_buttons.clear()
-	if map_size == Vector2i.ZERO:
+	if map_size == Vector2i.ZERO and not is_continuous():
 		return
 	var font: Font = RegionMapStyle.ui_font()
 	var x: float = screen_rect.position.x + HUD_MARGIN
@@ -380,10 +618,27 @@ func draw_hud(canvas: CanvasItem) -> void:
 	if founding_active:
 		x = draw_hud_button(canvas, font, "Founding sites (F)", x, y, show_sites, "sites")
 	x = draw_hud_button(canvas, font, "Labels (L)", x, y, show_labels, "labels")
+	if is_continuous():
+		x = draw_hud_button(canvas, font, "Borders (B)", x, y, show_borders, "borders")
 	x = draw_hud_button(canvas, font, "Legend", x, y, show_legend, "legend")
-	canvas.draw_string(font, Vector2(x + 6.0, y + 15.0), "Drag or WASD to pan, wheel to zoom", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, RegionMapStyle.COLOR_HUD_MUTED)
+	var hint: String = "Drag or WASD to pan, wheel to zoom" + (" (out to the world map)" if is_continuous() else "")
+	canvas.draw_string(font, Vector2(x + 6.0, y + 15.0), hint, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, RegionMapStyle.COLOR_HUD_MUTED)
 	if show_legend:
 		draw_legend(canvas, font)
+	if is_continuous() and hud_region_text != "":
+		var text_size: Vector2 = font.get_string_size(hud_region_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14)
+		var box: Rect2 = Rect2(screen_rect.position + Vector2(HUD_MARGIN, HUD_MARGIN), text_size + Vector2(16.0, 10.0))
+		canvas.draw_rect(box, RegionMapStyle.COLOR_HUD)
+		canvas.draw_rect(box, RegionMapStyle.COLOR_HUD_BORDER, false, 1.0)
+		canvas.draw_string(font, box.position + Vector2(8.0, 5.0 + font.get_ascent(14)), hud_region_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, RegionMapStyle.COLOR_HUD_TEXT)
+
+# Temperature that colors the legend's woodland: the region's, or the chunk in view.
+func legend_temperature() -> float:
+	if is_continuous():
+		var chunk: RegionalChunk = terrain.get_chunk_if_ready(terrain.chunk_of_tile(Vector2i(camera_global_tile().floor())))
+		if chunk != null:
+			return chunk.mean_temperature
+	return RegionMapStyle.region_temperature(geography)
 
 func draw_hud_button(canvas: CanvasItem, font: Font, text: String, x: float, y: float, active: bool, action: String) -> float:
 	var width: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + 16.0
@@ -398,8 +653,7 @@ func draw_legend(canvas: CanvasItem, font: Font) -> void:
 	var rect: Rect2 = legend_rect()
 	canvas.draw_rect(rect, RegionMapStyle.COLOR_HUD)
 	canvas.draw_rect(rect, RegionMapStyle.COLOR_HUD_BORDER, false, 1.0)
-	var t: float = RegionMapStyle.region_temperature(geography)
-	var forest: Color = RegionMapStyle.forest_color(t)
+	var forest: Color = RegionMapStyle.forest_color(legend_temperature())
 	var rows: Array = [
 		["Fertile land (farms)", Color(0.42, 0.58, 0.27)],
 		["Open meadow", Color(0.62, 0.66, 0.43)],

@@ -80,8 +80,7 @@ func rebuild() -> void:
 	set_mask("masks_c", masks_c, size)
 	set_mask("masks_d", masks_d, size)
 	shader_material.set_shader_parameter("map_tiles", Vector2(size))
-	var tree_dark: Color = RegionMapStyle.tree_style(geography)["dark"]
-	var floor_color: Color = tree_dark.lerp(Color(0.5, 0.48, 0.32), 0.25) if RegionMapStyle.climate_family(geography) == RegionGeography.CLIMATE_ARID else tree_dark.darkened(0.08)
+	var floor_color: Color = RegionMapStyle.forest_floor_color(RegionMapStyle.region_temperature(geography), RegionMapStyle.climate_family(geography))
 	shader_material.set_shader_parameter("forest_floor", Vector3(floor_color.r, floor_color.g, floor_color.b))
 	queue_redraw()
 

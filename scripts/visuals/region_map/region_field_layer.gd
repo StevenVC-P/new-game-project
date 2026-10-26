@@ -11,9 +11,10 @@ func on_lod_changed() -> void:
 func _draw() -> void:
 	if view == null:
 		return
-	for field: RegionMapGeometry.FieldShape in view.geometry.fields:
+	var shapes: RegionMapGeometry = geometry()
+	for field: RegionMapGeometry.FieldShape in shapes.fields:
 		draw_field(field)
-	for quarry: RegionMapGeometry.QuarryShape in view.geometry.quarries:
+	for quarry: RegionMapGeometry.QuarryShape in shapes.quarries:
 		draw_quarry(quarry)
 
 func draw_field(field: RegionMapGeometry.FieldShape) -> void:

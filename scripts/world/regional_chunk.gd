@@ -48,6 +48,9 @@ var climate_family: String = RegionGeography.CLIMATE_TEMPERATE
 var mean_temperature: float = 0.5
 var mean_moisture: float = 0.5
 
+# Filled by whoever draws the chunk (RegionalTerrain.chunk_finisher), on the worker thread.
+var shader_masks: Array = []
+
 const DEPTH_TILES: float = 8.0
 
 static func make_tile_dictionary(tile_type: int, tile_flags: int, resource: int) -> Dictionary:

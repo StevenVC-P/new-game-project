@@ -42,6 +42,8 @@ func run_all() -> void:
 	test_region_lookup_matches_the_world()
 	test_window_extraction()
 	measure_generation()
+	await test_view_coordinates()
+	terrain.wait_for_tasks()
 
 	if failure_count > 0:
 		push_error("Regional terrain validation failed: " + str(failure_count) + " failure(s)")
@@ -298,6 +300,42 @@ func measure_generation() -> void:
 		times.append((Time.get_ticks_usec() - start) / 1000.0)
 	times.sort()
 	print("[PERF] chunk generation on the main thread: median %.1f ms, worst %.1f ms" % [times[times.size() / 2], times[times.size() - 1]])
+
+# The continuous view keeps the owner's coordinates: neighbourhood tiles map to the screen
+# and back, global tiles wrap at the date line, and chunks stream in around the camera.
+func test_view_coordinates() -> void:
+	var view: RegionMapView = RegionMapView.new()
+	root.add_child(view)
+	view.set_screen_rect(Rect2(Vector2(0.0, 42.0), Vector2(1300.0, 858.0)))
+	view.set_terrain(terrain)
+	# A neighbourhood straddling the date line.
+	var origin: Vector2i = Vector2i(terrain.size_tiles.x - 30, 1400)
+	var size: Vector2i = Vector2i(60, 40)
+	var cities: Array[City] = []
+	var roads: Array[Array] = []
+	view.set_neighbourhood(terrain.extract_window(origin, size), cities, roads, origin)
+	view.focus_on_global_tile(Vector2(2.0, 1420.0), 1.5)
+	var local: Vector2i = Vector2i(31, 20)
+	var screen: Vector2 = view.map_to_screen(RegionMapGeometry.tile_center(Vector2(local)))
+	_check(view.screen_to_tile(screen) == local, "a neighbourhood tile should map to the screen and back (%s)" % str(view.screen_to_tile(screen)))
+	_check(view.screen_to_global_tile(screen) == Vector2i(1, 1420), "the neighbourhood tile east of the date line should be global tile (1, 1420), got %s" % str(view.screen_to_global_tile(screen)))
+	var west: Vector2 = view.map_to_screen(RegionMapGeometry.tile_center(Vector2(29, 20)))
+	_check(view.screen_to_global_tile(west) == Vector2i(terrain.size_tiles.x - 1, 1420), "the tile west of the date line should wrap to the planet's last column")
+	_check(view.global_tile_to_local(Vector2i(1, 1420)) == local, "global tiles should convert to neighbourhood tiles across the date line")
+	view.camera_center.x -= RegionMapStyle.TILE * 10.0
+	view.apply_camera()
+	_check(view.camera_center.x >= 0.0 and view.camera_center.x < terrain.size_tiles.x * RegionMapStyle.TILE, "the camera should wrap around the planet")
+	var moved_screen: Vector2 = view.map_to_screen(RegionMapGeometry.tile_center(Vector2(local)))
+	_check(view.screen_to_tile(moved_screen) == local, "neighbourhood tiles should still map to the screen and back after the camera wraps (%s)" % str(view.screen_to_tile(moved_screen)))
+	var started: int = Time.get_ticks_msec()
+	while not view.streamer.is_ready() and Time.get_ticks_msec() - started < 30000:
+		await process_frame
+	print("[PERF] streaming a view in headless: %d ms" % (Time.get_ticks_msec() - started))
+	_check(view.streamer.is_ready(), "chunks around the camera should stream in")
+	_check(view.streamer.visuals.size() >= 4, "several chunks should be drawn around the camera (%d)" % view.streamer.visuals.size())
+	_check(view.hud_region_text != "", "the view should name the region under the camera")
+	view.queue_free()
+	await process_frame
 
 func _check(condition: bool, message: String) -> void:
 	if condition:

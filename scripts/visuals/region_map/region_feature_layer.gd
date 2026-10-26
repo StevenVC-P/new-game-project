@@ -31,7 +31,7 @@ var rock_light: Color = RegionMapStyle.COLOR_ROCK_LIGHT
 var rock_dark: Color = RegionMapStyle.COLOR_ROCK_DARK
 
 func rebuild() -> void:
-	var size: Vector2i = view.map_size
+	var size: Vector2i = source_size()
 	var strip_count: int = ceili(float(size.y) / RegionMapStyle.STRIP_ROWS)
 	while strips.size() < strip_count:
 		var strip: Strip = Strip.new()
@@ -45,11 +45,7 @@ func rebuild() -> void:
 		strip_items.append([])
 		strip_details.append([])
 
-	tree_style = RegionMapStyle.tree_style(view.geography)
-	var arid: bool = RegionMapStyle.climate_family(view.geography) == RegionGeography.CLIMATE_ARID
-	rock_light = Color(0.74, 0.58, 0.42) if arid else Color(0.68, 0.64, 0.58)
-	rock_dark = Color(0.46, 0.33, 0.25) if arid else Color(0.40, 0.37, 0.35)
-
+	setup_style()
 	for y in range(size.y):
 		for x in range(size.x):
 			collect_tile_features(x, y)
@@ -57,6 +53,49 @@ func rebuild() -> void:
 		items.sort_custom(func(a: PackedFloat32Array, b: PackedFloat32Array) -> bool: return a[2] < b[2])
 	for strip: Strip in strips:
 		strip.queue_redraw()
+
+func setup_style() -> void:
+	apply_climate_style(RegionMapStyle.region_temperature(view.geography), RegionMapStyle.climate_family(view.geography))
+
+func apply_climate_style(temperature: float, family: String) -> void:
+	tree_style = RegionMapStyle.tree_style_for(temperature, family)
+	var arid: bool = family == RegionGeography.CLIMATE_ARID
+	rock_light = Color(0.74, 0.58, 0.42) if arid else Color(0.68, 0.64, 0.58)
+	rock_dark = Color(0.46, 0.33, 0.25) if arid else Color(0.40, 0.37, 0.35)
+
+# --- Tile source -------------------------------------------------------------------
+# The bounded region's tile dictionaries. RegionChunkFeatureLayer reads a chunk instead.
+
+func source_size() -> Vector2i:
+	return view.map_size
+
+# Tiles outside the source count as matching when counting neighbours, as at a board edge.
+func is_in_source(x: int, y: int) -> bool:
+	return x >= 0 and y >= 0 and x < view.map_size.x and y < view.map_size.y
+
+func tile_type_at(x: int, y: int) -> String:
+	return view.tiles[y][x]["type"]
+
+func forest_at(x: int, y: int) -> bool:
+	return view.tiles[y][x]["has_forest"] == true
+
+func fertile_at(x: int, y: int) -> bool:
+	return view.tiles[y][x]["is_fertile"] == true
+
+func resource_at(x: int, y: int) -> String:
+	return view.tiles[y][x]["resource"]
+
+# Coordinates the per-tile variation is hashed from.
+func hash_tile(x: int, y: int) -> Vector2i:
+	return Vector2i(x, y)
+
+func is_cleared_at(position: Vector2) -> bool:
+	return view.geometry.is_cleared(position)
+
+func tile_temperature(x: int, y: int) -> float:
+	if view.geography == null:
+		return 0.6
+	return view.geography.temperature[view.geography.tile_index(x, y)]
 
 func on_lod_changed() -> void:
 	for strip: Strip in strips:
@@ -70,46 +109,48 @@ func add_item(list_owner: Array, kind: int, position: Vector2, size: float, vari
 	(list_owner[strip] as Array).append(PackedFloat32Array([kind, position.x, position.y, size, variant]))
 
 func collect_tile_features(x: int, y: int) -> void:
-	var tile: Dictionary = view.tiles[y][x]
-	var tile_type: String = tile["type"]
+	var tile_type: String = tile_type_at(x, y)
+	var resource: String = resource_at(x, y)
+	var has_forest: bool = forest_at(x, y)
 	var origin: Vector2 = Vector2(x, y) * RegionMapStyle.TILE
 	var unit: float = RegionMapStyle.TILE
+	var h: Vector2i = hash_tile(x, y)
 
-	if tile["has_forest"] == true:
-		var neighbors: int = count_neighbors(x, y, func(t: Dictionary) -> bool: return t["has_forest"] == true)
-		var count: int = 2 + (1 if neighbors >= 6 else 0) + (1 if hash01(x, y, 1) > 0.45 else 0)
+	if has_forest:
+		var neighbors: int = count_forest_neighbors(x, y)
+		var count: int = 2 + (1 if neighbors >= 6 else 0) + (1 if hash01(h.x, h.y, 1) > 0.45 else 0)
 		var radius: Vector2 = tree_style["radius"]
 		for k in range(count):
-			var position: Vector2 = origin + Vector2(1.5 + hash01(x, y, 10 + k) * (unit - 3.0), 1.5 + hash01(x, y, 20 + k) * (unit - 3.0))
-			if view.geometry.is_cleared(position):
+			var position: Vector2 = origin + Vector2(1.5 + hash01(h.x, h.y, 10 + k) * (unit - 3.0), 1.5 + hash01(h.x, h.y, 20 + k) * (unit - 3.0))
+			if is_cleared_at(position):
 				continue
 			var kind: int = ITEM_TREE
 			if tree_style["kind"] == "scrub":
 				kind = ITEM_SCRUB
-			elif hash01(x, y, 30 + k) < float(tree_style["conifer_share"]):
+			elif hash01(h.x, h.y, 30 + k) < float(tree_style["conifer_share"]):
 				kind = ITEM_CONIFER
-			add_item(strip_items, kind, position, lerpf(radius.x, radius.y, hash01(x, y, 40 + k)), hash01(x, y, 50 + k))
+			add_item(strip_items, kind, position, lerpf(radius.x, radius.y, hash01(h.x, h.y, 40 + k)), hash01(h.x, h.y, 50 + k))
 
-	if tile_type == "mountain" and hash01(x, y, 1) < PEAK_DENSITY:
+	if tile_type == "mountain" and hash01(h.x, h.y, 1) < PEAK_DENSITY:
 		collect_peak(x, y)
 
-	if tile["resource"] == "stone" or tile["resource"] == "iron":
-		var kind: int = ITEM_STONE if tile["resource"] == "stone" else ITEM_IRON
+	if resource == "stone" or resource == "iron":
+		var kind: int = ITEM_STONE if resource == "stone" else ITEM_IRON
 		for k in range(2):
-			var position: Vector2 = origin + Vector2(2.5 + hash01(x, y, 60 + k) * (unit - 5.0), 2.5 + hash01(x, y, 70 + k) * (unit - 5.0))
-			add_item(strip_items, kind, position, 1.5 + hash01(x, y, 80 + k) * 1.1, hash01(x, y, 90 + k))
+			var position: Vector2 = origin + Vector2(2.5 + hash01(h.x, h.y, 60 + k) * (unit - 5.0), 2.5 + hash01(h.x, h.y, 70 + k) * (unit - 5.0))
+			add_item(strip_items, kind, position, 1.5 + hash01(h.x, h.y, 80 + k) * 1.1, hash01(h.x, h.y, 90 + k))
 
 	var open_ground: bool = tile_type == "grass" or tile_type == "hill"
-	if open_ground and tile["has_forest"] == false and tile["resource"] == "none":
-		if hash01(x, y, 100) < (0.25 if tile_type == "hill" else 0.12):
-			var position: Vector2 = origin + Vector2(hash01(x, y, 101), hash01(x, y, 102)) * unit
-			if not view.geometry.is_cleared(position):
-				add_item(strip_details, DETAIL_SHRUB, position, 0.9 + hash01(x, y, 103) * 0.5, hash01(x, y, 104))
-		if tile["is_fertile"] == true:
+	if open_ground and not has_forest and resource == "none":
+		if hash01(h.x, h.y, 100) < (0.25 if tile_type == "hill" else 0.12):
+			var position: Vector2 = origin + Vector2(hash01(h.x, h.y, 101), hash01(h.x, h.y, 102)) * unit
+			if not is_cleared_at(position):
+				add_item(strip_details, DETAIL_SHRUB, position, 0.9 + hash01(h.x, h.y, 103) * 0.5, hash01(h.x, h.y, 104))
+		if fertile_at(x, y):
 			for k in range(3):
-				var position: Vector2 = origin + Vector2(hash01(x, y, 110 + k), hash01(x, y, 120 + k)) * unit
-				if not view.geometry.is_cleared(position):
-					add_item(strip_details, DETAIL_FLOWER, position, 0.32, hash01(x, y, 130 + k))
+				var position: Vector2 = origin + Vector2(hash01(h.x, h.y, 110 + k), hash01(h.x, h.y, 120 + k)) * unit
+				if not is_cleared_at(position):
+					add_item(strip_details, DETAIL_FLOWER, position, 0.32, hash01(h.x, h.y, 130 + k))
 
 # Peaks stand on a random share of mountain tiles, sized by how deep in the range the tile
 # lies: big summits inside, small peaks along the edge, and lit rock showing between them.
@@ -117,34 +158,25 @@ func collect_peak(x: int, y: int) -> void:
 	var depth: int = 0
 	for ny in range(y - 2, y + 3):
 		for nx in range(x - 2, x + 3):
-			if nx < 0 or ny < 0 or nx >= view.map_size.x or ny >= view.map_size.y or view.tiles[ny][nx]["type"] == "mountain":
+			if not is_in_source(nx, ny) or tile_type_at(nx, ny) == "mountain":
 				depth += 1
+	var h: Vector2i = hash_tile(x, y)
 	var interior: float = depth / 25.0
-	var size: float = 0.7 + interior * interior * 1.5 + hash01(x, y, 2) * 0.45
-	var position: Vector2 = (Vector2(x, y) + Vector2(hash01(x, y, 3), 0.3 + hash01(x, y, 4) * 0.7)) * RegionMapStyle.TILE
+	var size: float = 0.7 + interior * interior * 1.5 + hash01(h.x, h.y, 2) * 0.45
+	var position: Vector2 = (Vector2(x, y) + Vector2(hash01(h.x, h.y, 3), 0.3 + hash01(h.x, h.y, 4) * 0.7)) * RegionMapStyle.TILE
 	var cold: float = tile_temperature(x, y) - size * 0.06
 	var snowy: float = 1.0 if cold < SNOW_TEMPERATURE else 0.0
-	add_item(strip_items, ITEM_PEAK, position, size, snowy + hash01(x, y, 5) * 0.5)
+	add_item(strip_items, ITEM_PEAK, position, size, snowy + hash01(h.x, h.y, 5) * 0.5)
 
-func count_neighbors(x: int, y: int, matches: Callable) -> int:
+func count_forest_neighbors(x: int, y: int) -> int:
 	var count: int = 0
 	for oy in range(-1, 2):
 		for ox in range(-1, 2):
 			if ox == 0 and oy == 0:
 				continue
-			var nx: int = x + ox
-			var ny: int = y + oy
-			if nx < 0 or ny < 0 or nx >= view.map_size.x or ny >= view.map_size.y:
-				count += 1
-				continue
-			if matches.call(view.tiles[ny][nx]):
+			if not is_in_source(x + ox, y + oy) or forest_at(x + ox, y + oy):
 				count += 1
 	return count
-
-func tile_temperature(x: int, y: int) -> float:
-	if view.geography == null:
-		return 0.6
-	return view.geography.temperature[view.geography.tile_index(x, y)]
 
 # --- Drawing ----------------------------------------------------------------------
 
