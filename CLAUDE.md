@@ -61,6 +61,16 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # atlas zoom-in / found / cross a border / zoom-out flow (both need a window)
 & (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/region_map_capture.gd -- <output_dir>
 & (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/region_flow_capture.gd -- <output_dir>
+
+# Town map: generator (determinism, follows the region, floors) and the view in the real flow (fit, coordinates, click/drag/wheel)
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_map_validation.gd
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_map_view_validation.gd
+
+# What town maps hold over 160 real sites, and generation time (filter for [TOWN]); the survey's thresholds come from it
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/town_map_probe.gd
+
+# Town map screenshots: showcase sites, a grown town, every building type, the real game ([PERF] lines; needs a window)
+& (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/town_map_capture.gd -- <output_dir>
 ```
 
 `scenes/region_map_demo.tscn` opens the continuous regional map on the showcase regions (keys 1-6, G for a grown town).
@@ -75,6 +85,7 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 - `scripts/world/` - regional and local map generation, founding-site helpers, and the world map's data (`world_map_data.gd`), authored planet (`fixed_world_definition.gd`), and builder (`world_field_builder.gd`).
 - `scripts/visuals/world_map/` and `shaders/world_terrain.gdshader` - the world atlas renderer; the game opens on it (`VIEW_WORLD` in `main.gd`). Design, decisions, and remaining integration work: `docs/WORLD_MAP.md`.
 - `scripts/world/regional_terrain.gd` (+ `regional_chunk_generator.gd`), `scripts/visuals/region_map/`, and `shaders/region_terrain.gdshader` - the regional map: the whole planet at true scale (1 tile = 1.2 world units), generated in 60x60 chunks on worker threads; every tile must stay a pure function of its global position, or chunks stop joining. `main.gd` runs its rules on a 160x100 neighbourhood (`extract_window`), and `RegionMapView` streams the landscape under `main.gd`'s panels. The original `region_map_generator.gd` path must stay byte-identical (`tests/region_map_validation.gd` checks fingerprints). Decoration must never show what the tile data does not hold. Call `RegionalTerrain.wait_for_tasks()` before quitting a script that streamed chunks, or Godot hangs on exit. Details: `docs/REGIONAL_MAP.md`.
+- `scripts/world/local_city_map_generator.gd`, `scripts/visuals/town_map/`, and `shaders/town_terrain.gdshader` - the town map: the regional land around the site magnified 4x (64x44 town tiles = 16x11 regional tiles), drawn in the regional map's style under a pan and zoom camera on its own canvas layer under `main.gd`'s panels. `main.gd` keeps the rules and routes town-map clicks through `TownMapView` (`map_clicked`); never draw the town in `main.gd`'s `_draw`. Town maps must stay deterministic per site (no game RNG). Painters shared with the regional map: `scripts/visuals/landscape_painter.gd`, `building_painter.gd`. Details: `docs/TOWN_MAP.md`.
 - `scripts/ui/`, `scripts/visuals/` - panels, helpers, drawing.
 - Daily `City.tick()`, monthly `advance_household_lifecycle_month()`, and seasonal birth rolls are driven by calendar signals in `main.gd`.
 - Performance limits and their causes are measured in `docs/HOUSEHOLD_SIM_BENCHMARK.md`.

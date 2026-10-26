@@ -76,9 +76,8 @@ The map-luck probe (`tests/sim/map_luck_check.gd`) founds 3 towns in each of 14 
 ## Remaining Work And Limitations
 
 - **The old world-driven path is unused.** `RegionGeography` and the world path of `RegionMapGenerator` (and `RegionShowcase.build`) remain only for `tests/region_map_validation.gd`; removing them is pending the owner's go-ahead.
-- **Settlements are depicted, not simulated.** World settlements are drawn from their world tier; the player's town from its buildings. Houses are placed by rule around roads, not from the town map's layout.
+- **Settlements are depicted, not simulated.** World settlements are drawn from their world tier; the player's town from its buildings. Houses are placed by rule around roads, not from the town map's layout. Since the town map became the regional land magnified 4x (`docs/TOWN_MAP.md`), a town tile has a real place on this map, so its buildings could be drawn where they stand.
 - **Neutral towns are rebuilt when the neighbourhood moves before founding**, which costs a short pause (a few hundred milliseconds when new chunks are needed). Only towns in the neighbourhood can trade.
 - **Founding on ice is allowed.** Polar frontier offers thousands of valid sites; whether frozen land should refuse founding is a design question.
-- **Town maps ignore coasts and lakes beyond the water edge** (the survey names them correctly).
 - **Streams end in hollows.** A stream traced downhill can stop in a local low with no outlet; no pond is drawn there.
 - **Integrated GPUs are untested.**
