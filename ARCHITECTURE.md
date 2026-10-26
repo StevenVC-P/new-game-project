@@ -44,6 +44,13 @@ This is a starting inventory for safe agent-assisted development. It describes w
 - `scripts/visuals/visual_style.gd`: Shared visual style values/helpers.
 - `scripts/ui/trade_menu.gd`: Trade menu UI/model helper.
 - `scripts/domain/trade_route.gd`: Trade route data/model.
+- `scripts/world/world_map_data.gd`, `fixed_world_definition.gd`, `world_field_builder.gd`: World map data model, the hand-authored planet, and the builder that turns one into the other.
+- `scripts/visuals/world_map/`: World atlas view (camera, input, selection) and its drawing layers; `shaders/world_terrain.gdshader` draws terrain and borders.
+- `scripts/ui/world_map_panel.gd`: World atlas HUD.
+
+## World Map
+
+The game opens on the world atlas (`VIEW_WORLD` in `scripts/main.gd`), which runs on its own `CanvasLayer`. Entering an unclaimed region generates the existing regional map, seeded per region. Details: `docs/WORLD_MAP.md`.
 
 ## Known Systems
 
