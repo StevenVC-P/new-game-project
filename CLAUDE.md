@@ -50,7 +50,16 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 
 # World map screenshots for visual review (needs a window, so no --headless)
 & (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/world_map_capture.gd -- <output_dir>
+
+# Regional map: data checks (world-driven generation, unchanged original maps, decoration follows data, founding)
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/region_map_validation.gd
+
+# Regional map screenshots: showcases with [PERF] render times, and the real enter/found/return flow (needs a window)
+& (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/region_map_capture.gd -- <output_dir>
+& (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/region_flow_capture.gd -- <output_dir>
 ```
+
+`scenes/region_map_demo.tscn` shows the regional map showcases on their own (keys 1-6, G for a grown town).
 
 `tests/expanded_goods_production_validation.gd` extends `RefCounted`, so it cannot be run with `--script` directly; load it from a small `SceneTree` wrapper and call `run_all()`.
 
@@ -61,6 +70,7 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 - `scripts/simulation/` - `calendar.gd` and `simulation_clock.gd` (1 day = 1 real second at 1x).
 - `scripts/world/` - regional and local map generation, founding-site helpers, and the world map's data (`world_map_data.gd`), authored planet (`fixed_world_definition.gd`), and builder (`world_field_builder.gd`).
 - `scripts/visuals/world_map/` and `shaders/world_terrain.gdshader` - the world atlas renderer; the game opens on it (`VIEW_WORLD` in `main.gd`). Design, decisions, and remaining integration work: `docs/WORLD_MAP.md`.
+- `scripts/world/region_geography.gd`, `scripts/visuals/region_map/`, and `shaders/region_terrain.gdshader` - the regional map: world geography steers `region_map_generator.gd` (whose original path must stay byte-identical; `tests/region_map_validation.gd` checks fingerprints), and `RegionMapView` draws the miniature landscape under `main.gd`'s panels. Decoration must never show what the tile data does not hold. Details: `docs/REGIONAL_MAP.md`.
 - `scripts/ui/`, `scripts/visuals/` - panels, helpers, drawing.
 - Daily `City.tick()`, monthly `advance_household_lifecycle_month()`, and seasonal birth rolls are driven by calendar signals in `main.gd`.
 - Performance limits and their causes are measured in `docs/HOUSEHOLD_SIM_BENCHMARK.md`.

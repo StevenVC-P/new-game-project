@@ -299,9 +299,11 @@ Next implementation step: draw regional deposits onto town maps as resource tile
 
 **World atlas v1 (2026-10-25, owner-requested ahead of the village):** a fixed, hand-authored planet drawn as a painterly atlas, with kingdoms, regions, settlements, and roads as data a later simulation can change. The game opens on it, and entering an unclaimed region opens the existing regional map. It sets the global art direction. Details and remaining integration work are in `docs/WORLD_MAP.md`.
 
+**Regional map art direction v1 (2026-10-26, owner-requested):** the regional map is drawn as a miniature landscape with a pan and zoom camera and follows its world region (rivers, coast, lakes, high ground, climate, woods, roads, settlement). Founding is presented on the landscape with the unchanged survey. Maps made without the world are byte-identical to before. No economy formula changed; world-driven land does change what towns start with (a probe across 14 regions of every climate got 40/42 towns off the ground, against 47/48 on the original maps). Details: `docs/REGIONAL_MAP.md`.
+
 **Later in this track (after the first playable village):**
 
-1. Living neighbors and rivals on the world map; the regional map generated from its world region's geography.
+1. Living neighbors and rivals on the world map. (The regional map generated from its world region's geography is done: see below.)
 2. Readability pass: tell tier 0 from tier 1, who works where, who is struggling, at a glance.
 3. Art direction decision (style, perspective, scope), then art, the UI overhaul, and audio replacing code-drawn shapes. `BuildingVisuals` profiles are the intended hook for sprites.
 

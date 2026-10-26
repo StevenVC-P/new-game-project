@@ -54,14 +54,13 @@ The rules live in `WorldMapStyle`, shared by drawing and label collision.
 `scripts/main.gd` has a third view, `VIEW_WORLD`, and opens on it. Its input and drawing return early in that view; the atlas handles its own input.
 
 - Only regions no kingdom holds can be entered: the player starts as free settlers on frontier land (`docs/GAME_VISION.md`).
-- Entering a region seeds the existing `RegionMapGenerator` with the region's `regional_map_seed` (from its name), so a region gives the same regional map every time. The seed is dropped afterwards so founding families stay random.
+- Entering a region seeds the existing `RegionMapGenerator` with the region's `regional_map_seed` (from its name) and passes it the region's world geography (`RegionGeography`), so a region gives the same regional map every time and it matches the atlas. The seed is dropped afterwards so founding families stay random.
 - Before founding, the player may enter another region instead; that regenerates the regional map. After founding, only the home region can be entered, because only one player settlement is supported.
 - The calendar does not advance on the atlas before any region is entered.
 
 ## Remaining Work And Limitations
 
-- **The regional map ignores the world.** It is still the generic river valley. Next step: pass the region's climate, moisture, relief, rivers, and coast to `RegionMapGenerator`, and place the world's settlements in the region as the regional map's neutral towns.
-- **No world-to-region coordinates.** The regional map is not yet placed at a specific spot inside its world region.
+- **Regional maps follow the world** (done since): `RegionGeography` samples a window of the region for the generator; see `docs/REGIONAL_MAP.md`.
 - **Startup cost.** Building the world takes about 2.4 s on the main thread when the game starts. Caching the built fields or building on a thread are the options if it becomes a problem.
 - **Kingdom land cannot be entered or viewed regionally,** and only one player settlement is supported.
 - **Capacity.** The political texture carries at most 254 regions and 64 kingdoms.
