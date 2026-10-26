@@ -11,7 +11,7 @@ The map leg is done: the game opens on a world atlas, entering an unclaimed regi
 ## Status
 
 - **Working:** world atlas (`docs/WORLD_MAP.md`); regional map art, camera, world-driven generation, and founding presentation (`docs/REGIONAL_MAP.md`); the World button round trip (fixed 2026-10-26). All 18 test scripts pass; import validation is clean.
-- **Branches:** everything is merged into `develop` and pushed. `main` is 6 merges behind (last updated 2026-10-20) and has not had this leg reviewed. Merging to `main` is the owner's call.
+- **Branches:** the owner approved this leg and `develop` was merged into `main` on 2026-10-26; both are pushed.
 - **Unchanged:** the town map, economy numbers, and the original region generator (maps made without world data are byte-identical, checked by fingerprints in `tests/region_map_validation.gd`).
 
 ## Decisions Made (Don't Re-litigate Without The Owner)
