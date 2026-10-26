@@ -7,10 +7,11 @@ const MIN_CITY_DISTANCE: int = 24
 const RIVER_NEAR_RANGE: int = 5
 const CITY_RESOURCE_RANGE: int = 7
 const PANEL_MARGIN: int = VisualStyle.PANEL_MARGIN
-const PANEL_WIDTH: int = 260
+const PANEL_WIDTH: int = 290
 const PANEL_PADDING: int = VisualStyle.SIDEBAR_PADDING
 const VIEW_REGION: String = "region"
 const VIEW_CITY: String = "city"
+const VIEW_WORLD: String = "world"
 const CITY_TILE_SIZE: int = 12
 const CITY_MAP_WIDTH: int = 64
 const CITY_MAP_HEIGHT: int = 44
@@ -54,6 +55,11 @@ var hovered_tile: Vector2i = Vector2i(-1, -1)
 var hovered_city_index: int = -1
 var city_hovered_tile: Vector2i = Vector2i(-1, -1)
 var pending_founding_tile: Vector2i = Vector2i(-1, -1)
+# The town map for the pending site, generated when the site is picked so the survey shown to the
+# player describes exactly the map the town will get; reused at founding.
+var pending_site_profile: SettlementSiteProfile = null
+var pending_local_map: Array = []
+var pending_site_survey: Array[String] = []
 var current_view: String = VIEW_REGION
 var selected_city_index: int = -1
 var household_debug_inspector: Control = null
@@ -68,6 +74,21 @@ var building_placement: BuildingPlacement = BuildingPlacement.new(CITY_MAP_WIDTH
 var city_building_overlay: CityBuildingOverlay = CityBuildingOverlay.new(CITY_TILE_SIZE, CITY_VIEW_TOP, CITY_MAP_WIDTH, CITY_MAP_HEIGHT)
 
 var city_pressure_debug_panel: Control = null
+# The world atlas draws on its own canvas layer above this node's screen-space drawing.
+var world_map_layer: CanvasLayer = null
+var world_map_view: WorldMapView = null
+var world_map_data: WorldMapData = null
+# World region the current regional map was generated for; -1 before any region is entered.
+var entered_world_region_id: int = -1
+# What the world says about the entered region; steers the generator and the landscape's
+# palette. Null for regional maps made without the world (tests, the original valley).
+var region_geography: RegionGeography = null
+# The regional landscape draws on its own canvas layer under this node's panels. Without it
+# (scripts that never enter the scene tree) the original tile drawing is used.
+var region_map_layer: CanvasLayer = null
+var region_map_view: RegionMapView = null
+# Tiles where a town may be founded, refreshed when towns change rather than every frame.
+var region_founding_sites: Array[Vector2i] = []
 
 func get_city_pressure_debug_city() -> City:
 	if selected_city_index >= 0 and selected_city_index < cities.size():
@@ -83,16 +104,164 @@ func _ready():
 	rng.randomize()
 	world_calendar.month_changed.connect(on_calendar_month_changed)
 	world_calendar.season_changed.connect(on_calendar_season_changed)
+	_ensure_household_debug_inspector()
+	_ensure_region_map_view()
+	# The game opens on the world atlas; the regional map is generated when a region is entered.
+	open_world_map()
+
+func generate_region_content():
 	generate_map()
 	place_cities()
 	analyze_city_site_profiles()
 	generate_city_local_maps()
 	generate_roads()
 	analyze_city_site_profiles()
-	_ensure_household_debug_inspector()
+	refresh_founding_sites()
+	if region_map_view != null:
+		region_map_view.set_region(tiles, cities, roads, region_geography)
+
+func _ensure_region_map_view() -> void:
+	if region_map_view != null:
+		return
+	region_map_layer = CanvasLayer.new()
+	region_map_layer.layer = -1
+	add_child(region_map_layer)
+	region_map_view = RegionMapView.new()
+	region_map_view.visible = false
+	region_map_layer.add_child(region_map_view)
+	region_map_view.map_clicked.connect(on_region_map_clicked)
+
+# Called after towns or roads change (founding, growth, building in the town view).
+func notify_region_map_changed() -> void:
+	refresh_founding_sites()
+	if region_map_view != null:
+		region_map_view.notify_changed(RegionMapView.LAYER_DEVELOPMENT, cities, roads)
+
+func refresh_founding_sites() -> void:
+	region_founding_sites.clear()
+	if has_player_city() or tiles.is_empty():
+		return
+	for y in range(MAP_HEIGHT):
+		for x in range(MAP_WIDTH):
+			if is_valid_founding_tile(Vector2i(x, y)):
+				region_founding_sites.append(Vector2i(x, y))
+
+# Panels drawn over the regional map: the top bar, the inspector, and the trade menu.
+func get_region_inspector_rect() -> Rect2:
+	var viewport_size: Vector2 = get_viewport_rect().size
+	var x: float = maxf(viewport_size.x - PANEL_WIDTH - PANEL_MARGIN, PANEL_MARGIN)
+	return Rect2(Vector2(x, TOP_BAR_HEIGHT), Vector2(PANEL_WIDTH, maxf(viewport_size.y - TOP_BAR_HEIGHT - PANEL_MARGIN, 200.0)))
+
+func get_region_map_screen_rect() -> Rect2:
+	var viewport_size: Vector2 = get_viewport_rect().size
+	var right: float = get_region_inspector_rect().position.x - PANEL_MARGIN * 0.5
+	return Rect2(Vector2(0.0, TOP_BAR_HEIGHT), Vector2(maxf(right, 100.0), maxf(viewport_size.y - TOP_BAR_HEIGHT, 100.0)))
+
+func is_over_region_panels(mouse_pos: Vector2) -> bool:
+	if mouse_pos.y < TOP_BAR_HEIGHT or get_region_inspector_rect().has_point(mouse_pos):
+		return true
+	return trade_menu.is_open() and trade_menu.menu_rect.has_point(mouse_pos)
+
+# Screen position to regional-map position (map units, TILE_SIZE per tile).
+func region_screen_to_map(mouse_pos: Vector2) -> Vector2:
+	if region_map_view == null:
+		return mouse_pos
+	return region_map_view.screen_to_map(mouse_pos)
+
+func region_map_to_screen(map_pos: Vector2) -> Vector2:
+	if region_map_view == null:
+		return map_pos
+	return region_map_view.map_to_screen(map_pos)
+
+# Mouse events belong to the landscape when they are over it, or when it is mid-drag.
+func is_region_map_input(mouse_pos: Vector2) -> bool:
+	if region_map_view == null:
+		return false
+	return region_map_view.press_button != MOUSE_BUTTON_NONE or not is_over_region_panels(mouse_pos)
+
+func on_region_map_clicked(mouse_pos: Vector2) -> void:
+	if trade_menu.is_open():
+		try_handle_trade_city_click(mouse_pos)
+	elif not try_open_city_at_position(mouse_pos):
+		try_select_founding_tile_at_position(mouse_pos)
 	queue_redraw()
 
+# Keeps the landscape's overlays in step with the founding state.
+func sync_region_map_view() -> void:
+	if region_map_view == null:
+		return
+	var choosing_site: bool = not has_player_city()
+	region_map_view.set_founding_state(choosing_site, region_founding_sites, pending_founding_tile, MIN_CITY_DISTANCE, CITY_RESOURCE_RANGE)
+	region_map_view.set_selected_city(selected_city_index)
+	region_map_view.set_hover(hovered_tile, choosing_site and is_valid_founding_tile(hovered_tile), hovered_city_index)
+
+func _ensure_world_map_view() -> void:
+	if world_map_view != null:
+		return
+	world_map_data = FixedWorldDefinition.build()
+	world_map_layer = CanvasLayer.new()
+	world_map_layer.layer = 1
+	add_child(world_map_layer)
+	world_map_view = WorldMapView.new()
+	world_map_layer.add_child(world_map_view)
+	world_map_view.setup(world_map_data)
+	world_map_view.region_entry_requested.connect(on_world_region_entry_requested)
+	world_map_view.return_requested.connect(close_world_map)
+
+func open_world_map() -> void:
+	_ensure_world_map_view()
+	current_view = VIEW_WORLD
+	hovered_tile = Vector2i(-1, -1)
+	hovered_city_index = -1
+	trade_menu.close()
+	if household_debug_inspector != null:
+		household_debug_inspector.visible = false
+	if city_pressure_debug_panel != null:
+		city_pressure_debug_panel.visible = false
+	# Only one player settlement exists for now, so founding locks the player to its region.
+	world_map_view.set_home_region(entered_world_region_id, has_player_city())
+	world_map_layer.visible = true
+	world_map_view.set_active(true)
+	if entered_world_region_id >= 0:
+		world_map_view.select_region(entered_world_region_id)
+	queue_redraw()
+
+func close_world_map() -> void:
+	if entered_world_region_id < 0:
+		return
+	world_map_layer.visible = false
+	world_map_view.set_active(false)
+	current_view = VIEW_REGION
+	queue_redraw()
+
+func on_world_region_entry_requested(region_id: int) -> void:
+	if region_id != entered_world_region_id:
+		if has_player_city():
+			return
+		generate_region_for_world(world_map_data.get_region(region_id))
+	close_world_map()
+
+# Seeding from the world region makes each region's map the same every time it is
+# entered. The seed is dropped afterwards so founding families stay unpredictable.
+func generate_region_for_world(region: WorldMapData.Region) -> void:
+	rng.seed = region.regional_map_seed
+	region_geography = RegionGeography.from_world(world_map_data, region.id, Vector2i(MAP_WIDTH, MAP_HEIGHT))
+	clear_pending_founding_tile()
+	trade_routes.clear()
+	selected_city_index = -1
+	generate_region_content()
+	rng.randomize()
+	entered_world_region_id = region.id
+	print("Entered world region: ", region.name, " (", region.climate, "; ", region.landscape, ")")
+
 func _process(_delta: float):
+	if region_map_view != null:
+		region_map_view.visible = current_view == VIEW_REGION
+		region_map_view.set_screen_rect(get_region_map_screen_rect())
+	if current_view == VIEW_WORLD and entered_world_region_id < 0:
+		# Nothing lives in the world simulation yet, so the calendar waits for the first region.
+		return
+
 	if not simulation_clock.is_paused:
 		city_walker_time += _delta * max(1.0, simulation_clock.get_speed_multiplier())
 		if city_walker_time >= CITY_WALKER_CYCLE_SECONDS:
@@ -108,7 +277,7 @@ func _process(_delta: float):
 		update_hovered_city(mouse_pos)
 		if hovered_city_index != -1:
 			queue_redraw()
-	else:
+	elif current_view == VIEW_CITY:
 		update_city_hovered_tile(get_local_mouse_position())
 		if hovered_tile != Vector2i(-1, -1):
 			hovered_tile = Vector2i(-1, -1)
@@ -119,6 +288,9 @@ func _process(_delta: float):
 		queue_redraw()
 
 func _input(event: InputEvent):
+	# The world map handles its own input.
+	if current_view == VIEW_WORLD:
+		return
 	if event is InputEventKey:
 		if event.pressed and not event.echo and event.keycode == KEY_F4:
 			if current_view != VIEW_CITY:
@@ -147,8 +319,14 @@ func _input(event: InputEvent):
 
 	if event is InputEventMouseButton:
 		var mouse_event: InputEventMouseButton = event as InputEventMouseButton
-		var local_mouse_pos: Vector2 = get_local_mouse_position()
+		# Where this click happened (this node sits at the screen origin, so it is local too).
+		var local_mouse_pos: Vector2 = mouse_event.position
 		if current_view == VIEW_REGION and trade_menu.handle_mouse_button(mouse_event, local_mouse_pos):
+			queue_redraw()
+			return
+		# The landscape takes wheel zoom, drag panning, and clicks on the map itself; a click
+		# comes back through on_region_map_clicked when the button is released without a drag.
+		if current_view == VIEW_REGION and is_region_map_input(local_mouse_pos) and region_map_view.handle_mouse_event(mouse_event):
 			queue_redraw()
 			return
 
@@ -171,17 +349,17 @@ func _input(event: InputEvent):
 			return
 
 		if try_handle_top_bar_click(local_mouse_pos):
+			# The World button opens the atlas during this press; unhandled, the same press
+			# would reach the atlas and hit its "Back to" button in the same spot.
+			get_viewport().set_input_as_handled()
 			queue_redraw()
 			return
 
 		if current_view == VIEW_REGION:
 			if try_handle_region_action_click(local_mouse_pos):
 				queue_redraw()
-			elif trade_menu.is_open():
-				try_handle_trade_city_click(local_mouse_pos)
-			else:
-				if not try_open_city_at_position(local_mouse_pos):
-					try_select_founding_tile_at_position(local_mouse_pos)
+			elif region_map_view == null:
+				on_region_map_clicked(local_mouse_pos)
 		elif current_view == VIEW_CITY:
 			if try_handle_build_menu_click(local_mouse_pos):
 				queue_redraw()
@@ -204,8 +382,13 @@ func _input(event: InputEvent):
 	elif event is InputEventMouseMotion:
 		if current_view == VIEW_REGION and trade_menu.handle_mouse_motion(get_local_mouse_position(), get_viewport_rect().size):
 			queue_redraw()
+		elif current_view == VIEW_REGION and region_map_view != null and region_map_view.handle_mouse_event(event):
+			queue_redraw()
 	elif event is InputEventKey:
 		var key_event: InputEventKey = event as InputEventKey
+		if current_view == VIEW_REGION and region_map_view != null and region_map_view.handle_key(key_event):
+			get_viewport().set_input_as_handled()
+			return
 		if handle_simulation_speed_key_event(key_event):
 			get_viewport().set_input_as_handled()
 			return
@@ -222,6 +405,8 @@ func _input(event: InputEvent):
 			get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent):
+	if current_view == VIEW_WORLD:
+		return
 	if event is InputEventKey:
 		var key_event: InputEventKey = event as InputEventKey
 		if handle_simulation_speed_key_event(key_event):
@@ -240,12 +425,11 @@ func _unhandled_input(event: InputEvent):
 			get_viewport().set_input_as_handled()
 
 func update_hovered_tile(mouse_pos: Vector2):
-	var tile_x: int = int(floor(mouse_pos.x / TILE_SIZE))
-	var tile_y: int = int(floor(mouse_pos.y / TILE_SIZE))
+	var tile_pos: Vector2i = get_region_tile_at_position(mouse_pos)
 	var new_hovered_tile: Vector2i = Vector2i(-1, -1)
 
-	if is_inside_map(tile_x, tile_y):
-		new_hovered_tile = Vector2i(tile_x, tile_y)
+	if is_inside_map(tile_pos.x, tile_pos.y):
+		new_hovered_tile = tile_pos
 
 	if new_hovered_tile != hovered_tile:
 		hovered_tile = new_hovered_tile
@@ -287,7 +471,9 @@ func generate_roads():
 	roads = generator.generate_roads_for_cities(cities)
 
 func make_region_map_generator() -> RegionMapGenerator:
-	return RegionMapGenerator.new(rng, MAP_WIDTH, MAP_HEIGHT, MIN_CITY_DISTANCE, RIVER_NEAR_RANGE, CITY_RESOURCE_RANGE)
+	var generator: RegionMapGenerator = RegionMapGenerator.new(rng, MAP_WIDTH, MAP_HEIGHT, MIN_CITY_DISTANCE, RIVER_NEAR_RANGE, CITY_RESOURCE_RANGE)
+	generator.geography = region_geography
+	return generator
 
 func analyze_city_site_profiles():
 	for city: City in cities:
@@ -331,6 +517,10 @@ func try_select_founding_tile_at_position(mouse_pos: Vector2) -> bool:
 	return true
 
 func get_region_tile_at_position(mouse_pos: Vector2) -> Vector2i:
+	if region_map_view != null:
+		if is_over_region_panels(mouse_pos):
+			return Vector2i(-1, -1)
+		return region_map_view.screen_to_tile(mouse_pos)
 	return Vector2i(int(floor(mouse_pos.x / TILE_SIZE)), int(floor(mouse_pos.y / TILE_SIZE)))
 
 func is_valid_founding_tile(tile_pos: Vector2i) -> bool:
@@ -342,11 +532,25 @@ func get_founding_tile_invalid_reason(tile_pos: Vector2i) -> String:
 func set_pending_founding_tile(tile_pos: Vector2i) -> bool:
 	if not is_valid_founding_tile(tile_pos):
 		return false
+	if tile_pos != pending_founding_tile:
+		survey_pending_site(tile_pos)
 	pending_founding_tile = tile_pos
 	return true
 
+func survey_pending_site(tile_pos: Vector2i) -> void:
+	var preview_city: City = City.new("Player Town", Vector2(tile_pos.x, tile_pos.y), City.ROLE_PLAYER, 0)
+	pending_site_profile = SettlementSiteProfile.analyze(preview_city.tile, tiles, CITY_RESOURCE_RANGE)
+	preview_city.site_profile = pending_site_profile
+	var generator: LocalCityMapGenerator = LocalCityMapGenerator.new(rng, CITY_MAP_WIDTH, CITY_MAP_HEIGHT, MAP_WIDTH, MAP_HEIGHT, RIVER_NEAR_RANGE, CITY_RESOURCE_RANGE)
+	# The founded town will take the next city index, which the map generator uses.
+	pending_local_map = generator.generate(preview_city, tiles, cities.size())
+	pending_site_survey = SiteSurvey.get_lines(pending_local_map, pending_site_profile)
+
 func clear_pending_founding_tile() -> void:
 	pending_founding_tile = Vector2i(-1, -1)
+	pending_site_profile = null
+	pending_local_map = []
+	pending_site_survey.clear()
 
 func has_pending_founding_tile() -> bool:
 	return is_inside_map(pending_founding_tile.x, pending_founding_tile.y)
@@ -375,9 +579,14 @@ func found_player_city_at_pending_site() -> bool:
 	var founded_city: City = create_player_city_at_tile(pending_founding_tile)
 	cities.append(founded_city)
 	var founded_city_index: int = cities.size() - 1
-	configure_new_city_map(founded_city, founded_city_index)
+	if not pending_local_map.is_empty():
+		founded_city.site_profile = pending_site_profile
+		founded_city.local_map = pending_local_map
+	else:
+		configure_new_city_map(founded_city, founded_city_index)
 	clear_pending_founding_tile()
 	generate_roads()
+	notify_region_map_changed()
 
 	selected_city_index = founded_city_index
 	current_view = VIEW_CITY
@@ -397,12 +606,15 @@ func configure_new_city_map(city: City, city_index: int) -> void:
 	city.local_map = generator.generate(city, tiles, city_index)
 
 func get_city_index_at_position(mouse_pos: Vector2) -> int:
+	if region_map_view != null and is_over_region_panels(mouse_pos):
+		return -1
+	var map_pos: Vector2 = region_screen_to_map(mouse_pos)
 	for city_index in range(cities.size()):
 		var city: City = cities[city_index]
 		var tile_pos: Vector2 = city.tile
 		var center: Vector2 = tile_to_center(tile_pos)
 
-		if center.distance_to(mouse_pos) <= TILE_SIZE * 1.2:
+		if center.distance_to(map_pos) <= TILE_SIZE * 1.2:
 			return city_index
 
 	return -1
@@ -431,6 +643,8 @@ func try_handle_top_bar_click(mouse_pos: Vector2) -> bool:
 		var action: String = option_data["action"] as String
 		if action == "back_to_region":
 			try_return_to_region(mouse_pos)
+		elif action == "open_world_map":
+			open_world_map()
 		else:
 			apply_time_control_action(action)
 		return true
@@ -546,6 +760,8 @@ func create_trade_route_from_menu_if_ready():
 func try_return_to_region(_mouse_pos: Vector2):
 	current_view = VIEW_REGION
 	selected_city_index = -1
+	# Buildings added in the town view show on the regional map.
+	notify_region_map_changed()
 	city_building_overlay.clear()
 	city_hovered_tile = Vector2i(-1, -1)
 	if household_debug_inspector != null:
@@ -716,6 +932,9 @@ func on_calendar_month_changed(_calendar: Calendar):
 		var city: City = cities[city_index]
 		if city.should_tick_simulation():
 			city.advance_household_lifecycle_month(city_index)
+	# Growing towns change size on the regional map; it is redrawn only while shown.
+	if current_view == VIEW_REGION:
+		notify_region_map_changed()
 
 func on_calendar_season_changed(calendar: Calendar):
 	for city_index in range(cities.size()):
@@ -802,20 +1021,27 @@ func get_household_debug_city():
 	return null
 
 func _draw():
+	if current_view == VIEW_WORLD:
+		return
 	if current_view == VIEW_CITY:
 		draw_city_view()
 		return
 
-	for y in range(MAP_HEIGHT):
-		for x in range(MAP_WIDTH):
-			draw_tile(x, y)
+	if region_map_view != null:
+		# The landscape, towns, and founding marks are drawn by region_map_view.
+		sync_region_map_view()
+		draw_trade_routes()
+	else:
+		for y in range(MAP_HEIGHT):
+			for x in range(MAP_WIDTH):
+				draw_tile(x, y)
 
-	draw_roads()
-	draw_trade_routes()
-	draw_fords()
-	draw_cities()
-	draw_pending_founding_site()
-	draw_hover()
+		draw_roads()
+		draw_trade_routes()
+		draw_fords()
+		draw_cities()
+		draw_pending_founding_site()
+		draw_hover()
 	draw_inspector_panel()
 	draw_trade_menu_popup()
 	draw_city_resource_tooltip()
@@ -854,8 +1080,8 @@ func draw_trade_routes():
 		var destination_city: City = cities[destination_index]
 		var source_tile: Vector2 = source_city.tile
 		var destination_tile: Vector2 = destination_city.tile
-		var source_center: Vector2 = tile_to_center(source_tile)
-		var destination_center: Vector2 = tile_to_center(destination_tile)
+		var source_center: Vector2 = region_map_to_screen(tile_to_center(source_tile))
+		var destination_center: Vector2 = region_map_to_screen(tile_to_center(destination_tile))
 
 		MapElementVisuals.draw_trade_route(self, source_center, destination_center)
 
@@ -915,6 +1141,9 @@ func draw_top_bar():
 	if current_view == VIEW_CITY:
 		x = draw_top_bar_button(font, font_size, "Back", x, y, 78.0, {"action": "back_to_region"}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
 		x += 14.0
+	elif world_map_view != null:
+		x = draw_top_bar_button(font, font_size, "World", x, y, 78.0, {"action": "open_world_map"}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
+		x += 14.0
 
 	draw_string(font, Vector2(x, y), get_top_bar_title(), HORIZONTAL_ALIGNMENT_LEFT, 230.0, title_size, VisualStyle.COLOR_UI_TITLE)
 	x += 250.0
@@ -931,6 +1160,8 @@ func draw_top_bar():
 func get_top_bar_title() -> String:
 	if current_view == VIEW_CITY:
 		return get_selected_city_name() + " Local Map"
+	if world_map_data != null and entered_world_region_id >= 0:
+		return world_map_data.get_region(entered_world_region_id).name
 
 	return "Regional Map"
 
@@ -1554,9 +1785,8 @@ func draw_hover():
 func draw_inspector_panel():
 	region_action_options.clear()
 
-	var panel_pos: Vector2 = Vector2(MAP_WIDTH * TILE_SIZE + PANEL_MARGIN, TOP_BAR_HEIGHT)
-	var panel_size: Vector2 = Vector2(PANEL_WIDTH, MAP_HEIGHT * TILE_SIZE - TOP_BAR_HEIGHT)
-	var panel_rect: Rect2 = Rect2(panel_pos, panel_size)
+	var panel_rect: Rect2 = get_region_inspector_rect()
+	var panel_pos: Vector2 = panel_rect.position
 	var font: Font = ThemeDB.fallback_font
 	var font_size: int = 14
 	var title_size: int = 16
@@ -1569,6 +1799,10 @@ func draw_inspector_panel():
 
 	var y: float = text_pos.y + 32.0
 	y = draw_region_section_title(font, "Region Overview", text_pos.x, y)
+	if region_geography != null:
+		y = draw_region_label_value(font, font_size, "Climate", region_geography.climate_label, text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_UI_TEXT_SOFT)
+		y = draw_region_label_value(font, font_size, "Land", region_geography.landscape_label, text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_UI_TEXT_SOFT)
+		y += 4.0
 	if is_inside_map(hovered_tile.x, hovered_tile.y):
 		y = draw_region_hover_summary(font, font_size, text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2)
 	else:
@@ -1579,6 +1813,11 @@ func draw_inspector_panel():
 	y = draw_sidebar_like_line(font, font_size, get_founding_prompt_text(), text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, get_founding_prompt_color())
 	if has_pending_founding_tile():
 		y = draw_region_label_value(font, font_size, "Pending", str(pending_founding_tile.x) + ", " + str(pending_founding_tile.y), text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_UI_TITLE)
+		y = draw_sidebar_like_line(font, font_size, RegionTileDisplayHelper.describe_site_character(pending_site_profile), text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_UI_TEXT_SOFT)
+		for survey_line: String in pending_site_survey:
+			y = draw_sidebar_like_line(font, font_size, survey_line, text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_UI_TEXT_NORMAL)
+		if region_map_view != null:
+			y = draw_sidebar_like_line(font, font_size, "The gold circle is the town's land.", text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_MUTED)
 		y = draw_sidebar_like_line(font, font_size, "Right-click to clear.", text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_MUTED)
 		if can_found_player_city():
 			y = draw_region_action_option(font, font_size, "Found Town", text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, {"action": "found_player_city"}, VisualStyle.COLOR_UI_BUTTON_ACTIVE)
@@ -1617,21 +1856,19 @@ func draw_region_label_value(font: Font, font_size: int, label: String, value: S
 
 func draw_region_hover_summary(font: Font, font_size: int, x: float, y: float, width: float) -> float:
 	var tile: Dictionary = tiles[hovered_tile.y][hovered_tile.x] as Dictionary
-	var resource: String = tile["resource"] as String
 	var city_name: String = get_city_name_at_tile(hovered_tile.x, hovered_tile.y)
 
 	y = draw_region_label_value(font, font_size, "Tile", str(hovered_tile.x) + ", " + str(hovered_tile.y), x, y, width, VisualStyle.COLOR_UI_TEXT_NORMAL)
-	y = draw_region_label_value(font, font_size, "Terrain", str(tile["type"]), x, y, width, VisualStyle.COLOR_UI_TEXT_NORMAL)
+	y = draw_region_label_value(font, font_size, "Terrain", RegionTileDisplayHelper.describe_terrain(tile), x, y, width, VisualStyle.COLOR_UI_TEXT_NORMAL)
+	var offer: String = RegionTileDisplayHelper.describe_offer(tile)
+	if offer != "":
+		y = draw_region_label_value(font, font_size, "Offers", offer, x, y, width, VisualStyle.COLOR_RESOURCE_TOOLS)
 	if city_name != "none":
 		y = draw_region_label_value(font, font_size, "City", city_name, x, y, width, VisualStyle.COLOR_UI_TITLE)
 		var city: City = get_city_at_tile(hovered_tile.x, hovered_tile.y)
 		if city != null:
 			y = draw_region_label_value(font, font_size, "Role", get_city_role_display_name(city), x, y, width, VisualStyle.COLOR_UI_TEXT_NORMAL)
 			y = draw_region_label_value(font, font_size, "Site", city.site_profile.get_tag_text(), x, y, width, VisualStyle.COLOR_UI_TEXT_NORMAL)
-	y = draw_region_label_value(font, font_size, "Forest", yes_no(tile["has_forest"] == true), x, y, width, VisualStyle.COLOR_UI_TEXT_NORMAL)
-	y = draw_region_label_value(font, font_size, "Fertile", yes_no(tile["is_fertile"] == true), x, y, width, VisualStyle.COLOR_UI_TEXT_NORMAL)
-	if resource != "none":
-		y = draw_region_label_value(font, font_size, "Resource", resource, x, y, width, VisualStyle.COLOR_RESOURCE_TOOLS)
 	var founding_status: String = get_founding_hover_status_text(hovered_tile)
 	var founding_color: Color = VisualStyle.COLOR_UI_TEXT_NORMAL
 	if is_valid_founding_tile(hovered_tile) and not has_player_city():
@@ -1757,8 +1994,9 @@ func draw_city_resource_tooltip():
 	var mouse_pos: Vector2 = get_local_mouse_position()
 	var tooltip_size: Vector2 = Vector2(230.0, 112.0)
 	var tooltip_pos: Vector2 = mouse_pos + Vector2(18.0, 16.0)
-	var max_x: float = MAP_WIDTH * TILE_SIZE - tooltip_size.x - 4.0
-	var max_y: float = MAP_HEIGHT * TILE_SIZE - tooltip_size.y - 4.0
+	var map_rect: Rect2 = get_region_map_screen_rect()
+	var max_x: float = map_rect.end.x - tooltip_size.x - 4.0
+	var max_y: float = map_rect.end.y - tooltip_size.y - 4.0
 	if max_x < 4.0:
 		max_x = 4.0
 	if max_y < 4.0:

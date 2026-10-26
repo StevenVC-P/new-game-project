@@ -4,6 +4,7 @@ extends RefCounted
 const VALID_FOUNDING_SITE: String = "Valid founding site"
 const REASON_OUTSIDE_REGION: String = "Outside region"
 const REASON_RIVER: String = "Cannot found on river"
+const REASON_WATER: String = "Cannot found on open water"
 const REASON_MOUNTAIN: String = "Cannot found on mountain"
 const REASON_FOREST: String = "Cannot found in forest"
 const REASON_RESOURCE: String = "Cannot found on resource deposit"
@@ -24,6 +25,8 @@ static func get_founding_tile_invalid_reason(tiles: Array, cities: Array[City], 
 	var tile: Dictionary = tiles[tile_pos.y][tile_pos.x] as Dictionary
 	if tile.get("type", "") == "river":
 		return REASON_RIVER
+	if tile.get("type", "") == "lake" or tile.get("type", "") == "sea":
+		return REASON_WATER
 	if tile.get("type", "") == "mountain":
 		return REASON_MOUNTAIN
 	if tile.get("has_forest", false) == true:

@@ -7,6 +7,8 @@ extends RefCounted
 
 const ANALYSIS_RADIUS: int = 7
 
+# The river_* measures cover any open water: rivers, and in world regions also lakes and
+# sea. nearest_water_kind says which ("river", "lake", "sea"; "" when there is none).
 var river_influence: float = 0.0
 var fertility: float = 0.0
 var forest_density: float = 0.0
@@ -17,6 +19,7 @@ var iron_access: float = 0.0
 var trade_position: float = 0.0
 var openness: float = 0.0
 var nearest_river_distance: int = -1
+var nearest_water_kind: String = ""
 var nearest_forest_distance: int = -1
 var nearest_rough_distance: int = -1
 var nearest_resource_distance: int = -1
@@ -84,9 +87,11 @@ func analyze_site(city_tile: Vector2, regional_tiles: Array, radius: int = ANALY
 			var weighted_offset: Vector2 = get_weighted_offset(offset)
 			total_tiles += 1
 
-			if tile_type == "river":
+			if tile_type == "river" or tile_type == "lake" or tile_type == "sea":
 				river_tiles += 1
 				river_vector_sum += weighted_offset
+				if distance < nearest_river:
+					nearest_water_kind = tile_type
 				nearest_river = min(nearest_river, distance)
 				increment_directional_count("river", offset)
 			if tile["is_fertile"] == true:

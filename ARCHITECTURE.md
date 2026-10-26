@@ -44,6 +44,19 @@ This is a starting inventory for safe agent-assisted development. It describes w
 - `scripts/visuals/visual_style.gd`: Shared visual style values/helpers.
 - `scripts/ui/trade_menu.gd`: Trade menu UI/model helper.
 - `scripts/domain/trade_route.gd`: Trade route data/model.
+- `scripts/world/world_map_data.gd`, `fixed_world_definition.gd`, `world_field_builder.gd`: World map data model, the hand-authored planet, and the builder that turns one into the other.
+- `scripts/visuals/world_map/`: World atlas view (camera, input, selection) and its drawing layers; `shaders/world_terrain.gdshader` draws terrain and borders.
+- `scripts/ui/world_map_panel.gd`: World atlas HUD.
+- `scripts/world/region_geography.gd`: What the world says about one region, in regional tiles; steers `region_map_generator.gd`.
+- `scripts/visuals/region_map/`: Regional map view (camera, layers) drawing the region as a miniature landscape; `shaders/region_terrain.gdshader` draws the ground. `shaders/natural_palette.gdshaderinc` holds the colors both map shaders share.
+
+## World Map
+
+The game opens on the world atlas (`VIEW_WORLD` in `scripts/main.gd`), which runs on its own `CanvasLayer`. Entering an unclaimed region generates the regional map from that region's world geography, seeded per region. Details: `docs/WORLD_MAP.md`.
+
+## Regional Map
+
+The regional map is drawn by `RegionMapView` on a `CanvasLayer` below `main.gd`'s panels; `main.gd` keeps the data and rules and routes input to it. Details: `docs/REGIONAL_MAP.md`.
 
 ## Known Systems
 

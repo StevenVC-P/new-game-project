@@ -274,6 +274,39 @@ Tier 0 is hand work a family can always do, so no shortage of wood or tools is a
 
 Mild mistakes now cost time instead of the town; obviously bad play still fails.
 
+## Map And Presentation Track (2026-10-20)
+
+Owner direction: the map is part of the plan now; art and presentation wait for mechanics to settle.
+
+**Done:**
+
+- `tests/sim/map_luck_check.gd`: real generated worlds, real valid founding sites, real town maps, the stand-in player placing every building on the map. Result: 47/48 towns get off the ground; even the worst site has room for 12+ farms and 12+ gatherer's camps. Map luck is not a hidden killer.
+- **Founding site survey.** Picking a site generates its town map right away and shows a plain-language survey (farmland, forest, water, rough ground, stone/ore in the region); founding reuses that exact map, so what the player sees is what the town gets (`scripts/world/site_survey.gd`).
+
+**Findings:**
+
+- Regional fertility misleads: 84% of valid sites would read as "poor farmland" by the regional measure, yet every town map holds room for many farms, because the town map generator guarantees fertile pockets. The survey therefore reads the town map, not the region.
+- Stone and ore deposits never appear on town maps: the "stone cluster" step paints rough ground, and quarries can be placed anywhere. A site's stone and ore currently have no effect on the town.
+- The `isolated` site tag applies to 44/48 sites (it mostly measures nearby roads, which barely exist before founding), so it carries little information.
+
+**Owner decisions (2026-10-25):**
+
+1. **A site means which resources the town can reach.** Some resources must be built on (a quarry sits on stone); others only need to be near the building (a camp near trees, as today).
+2. **Stone appears on town maps** as a real deposit.
+3. **Not every site has every resource.** More kinds of resources will be added later, so the resource model should be easy to extend.
+
+Next implementation step: draw regional deposits onto town maps as resource tiles, give each resource an access rule (on-site or nearby), require quarries to sit on stone, and show available resources in the founding site survey.
+
+**World atlas v1 (2026-10-25, owner-requested ahead of the village):** a fixed, hand-authored planet drawn as a painterly atlas, with kingdoms, regions, settlements, and roads as data a later simulation can change. The game opens on it, and entering an unclaimed region opens the existing regional map. It sets the global art direction. Details and remaining integration work are in `docs/WORLD_MAP.md`.
+
+**Regional map art direction v1 (2026-10-26, owner-requested):** the regional map is drawn as a miniature landscape with a pan and zoom camera and follows its world region (rivers, coast, lakes, high ground, climate, woods, roads, settlement). Founding is presented on the landscape with the unchanged survey. Maps made without the world are byte-identical to before. No economy formula changed; world-driven land does change what towns start with (a probe across 14 regions of every climate got 40/42 towns off the ground, against 47/48 on the original maps). Details: `docs/REGIONAL_MAP.md`.
+
+**Later in this track (after the first playable village):**
+
+1. Living neighbors and rivals on the world map. (The regional map generated from its world region's geography is done: see below.)
+2. Readability pass: tell tier 0 from tier 1, who works where, who is struggling, at a glance.
+3. Art direction decision (style, perspective, scope), then art, the UI overhaul, and audio replacing code-drawn shapes. `BuildingVisuals` profiles are the intended hook for sprites.
+
 ## Future Feature Notes
 
 Ideas recorded for later design, not scheduled:

@@ -36,6 +36,8 @@ func test_pending_site_creates_player_city() -> void:
 	var founding_tile: Vector2i = Vector2i(35, 35)
 
 	_check(main.set_pending_founding_tile(founding_tile), "valid founding tile should become pending")
+	_check(main.pending_site_survey.size() >= 4, "a picked site should show a survey of its town map")
+	var surveyed_map: Array = main.pending_local_map
 	_check(main.can_found_player_city(), "pending valid founding tile should allow founding")
 	_check(main.found_player_city_at_pending_site(), "founding should succeed at pending tile")
 
@@ -56,6 +58,7 @@ func test_pending_site_creates_player_city() -> void:
 	_check(int(founded_city.resources["wood"]) == 45, "founded city should keep expected starting wood")
 	_check(int(founded_city.resources["tools"]) == 14, "founded city should keep expected starting tools")
 	_check(not founded_city.local_map.is_empty(), "founded city should receive a local map")
+	_check(founded_city.local_map == surveyed_map, "the founded town should get exactly the surveyed map")
 	_check(main.pending_founding_tile == Vector2i(-1, -1), "pending founding tile should clear after founding")
 	_check(main.selected_city_index == 1, "founded city should become selected city")
 	_check(main.current_view == MainScript.VIEW_CITY, "founding should enter city view")
