@@ -47,16 +47,17 @@ This is a starting inventory for safe agent-assisted development. It describes w
 - `scripts/world/world_map_data.gd`, `fixed_world_definition.gd`, `world_field_builder.gd`: World map data model, the hand-authored planet, and the builder that turns one into the other.
 - `scripts/visuals/world_map/`: World atlas view (camera, input, selection) and its drawing layers; `shaders/world_terrain.gdshader` draws terrain and borders.
 - `scripts/ui/world_map_panel.gd`: World atlas HUD.
-- `scripts/world/region_geography.gd`: What the world says about one region, in regional tiles; steers `region_map_generator.gd`.
-- `scripts/visuals/region_map/`: Regional map view (camera, layers) drawing the region as a miniature landscape; `shaders/region_terrain.gdshader` draws the ground. `shaders/natural_palette.gdshaderinc` holds the colors both map shaders share.
+- `scripts/world/regional_terrain.gd`, `regional_chunk_generator.gd`, `regional_chunk.gd`: The whole planet at regional scale, generated in chunks from the world on worker threads.
+- `scripts/world/region_geography.gd`: The earlier per-region window of the world; unused by the game since the continuous map, kept for `tests/region_map_validation.gd`.
+- `scripts/visuals/region_map/`: Regional map view (camera, chunk streaming, layers) drawing the planet as a miniature landscape; `shaders/region_terrain.gdshader` draws the ground. `shaders/natural_palette.gdshaderinc` holds the colors both map shaders share.
 
 ## World Map
 
-The game opens on the world atlas (`VIEW_WORLD` in `scripts/main.gd`), which runs on its own `CanvasLayer`. Entering an unclaimed region generates the regional map from that region's world geography, seeded per region. Details: `docs/WORLD_MAP.md`.
+The game opens on the world atlas (`VIEW_WORLD` in `scripts/main.gd`), which runs on its own `CanvasLayer`. Zooming in past its closest view, or entering a region, opens the regional map at the same place and scale. Details: `docs/WORLD_MAP.md`.
 
 ## Regional Map
 
-The regional map is drawn by `RegionMapView` on a `CanvasLayer` below `main.gd`'s panels; `main.gd` keeps the data and rules and routes input to it. Details: `docs/REGIONAL_MAP.md`.
+One continuous, true-scale map of the planet, streamed in chunks by `RegionMapView` on a `CanvasLayer` below `main.gd`'s panels. `main.gd` keeps the rules and runs them on a 160x100-tile neighbourhood of it. Details: `docs/REGIONAL_MAP.md`.
 
 ## Known Systems
 
