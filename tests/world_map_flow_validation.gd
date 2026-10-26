@@ -19,6 +19,7 @@ func run_all() -> void:
 	var frontier: WorldMapData.Region = test_entering_frontier_builds_regional_map(main)
 	test_same_region_gives_same_map(main, frontier)
 	test_founding_locks_player_to_home_region(main, frontier)
+	await test_world_button_opens_the_world_map(main)
 
 	main.queue_free()
 	if failure_count > 0:
@@ -84,6 +85,37 @@ func test_founding_locks_player_to_home_region(main: Node2D, frontier: WorldMapD
 	_check(bool(main.world_map_view.get_region_entry_status(frontier)["allowed"]), "the home region should stay enterable")
 	main.world_map_view.request_region_entry(frontier.id)
 	_check(main.current_view == MainScript.VIEW_REGION and main.has_player_city(), "returning home should keep the founded town")
+
+# Clicks pushed through the whole input chain. The atlas's "Back to (region)" button sits
+# where the regional map's World button is, so a click that opened the atlas must not also
+# reach the atlas and close it again.
+func test_world_button_opens_the_world_map(main: Node2D) -> void:
+	# Headless runs report a 64x64 window; give the panels their normal layout.
+	root.size = Vector2i(1600, 900)
+	var world_button: Vector2 = Vector2(50.0, 21.0)
+	for trip in range(3):
+		await _settle()
+		_check(main.current_view == MainScript.VIEW_REGION, "trip %d should start on the regional map" % trip)
+		_click(world_button)
+		await _settle()
+		_check(main.current_view == MainScript.VIEW_WORLD, "the World button should open the world map (trip %d)" % trip)
+		# The atlas's own "Back to" button returns to the region.
+		_click(Vector2(30.0, 21.0))
+		await _settle()
+		_check(main.current_view == MainScript.VIEW_REGION, "the atlas's Back button should return to the region (trip %d)" % trip)
+
+func _click(position: Vector2) -> void:
+	for pressed: bool in [true, false]:
+		var event: InputEventMouseButton = InputEventMouseButton.new()
+		event.button_index = MOUSE_BUTTON_LEFT
+		event.pressed = pressed
+		event.position = position
+		event.global_position = position
+		root.push_input(event)
+
+func _settle() -> void:
+	for _frame in range(3):
+		await process_frame
 
 func _find_valid_founding_tile(main: Node2D) -> Vector2i:
 	for y in range(MainScript.MAP_HEIGHT):
