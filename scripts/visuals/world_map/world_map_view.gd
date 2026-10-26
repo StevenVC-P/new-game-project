@@ -104,17 +104,24 @@ func set_home_region(region_id: int, lock_other_regions: bool) -> void:
 	panel.queue_redraw()
 
 func _draw() -> void:
-	# Space beyond the poles when the whole planet fits on screen.
+	# Backdrop for the strip under the top bar and any frame before the map draws.
 	draw_rect(Rect2(Vector2.ZERO, get_viewport_rect().size), WorldMapStyle.COLOR_BACKGROUND)
 
 # --- Camera ----------------------------------------------------------------
 
-func min_zoom() -> float:
+# The part of the screen the map shows through: everything below the top bar.
+func map_screen_rect() -> Rect2:
 	var viewport_size: Vector2 = get_viewport_rect().size
-	if data == null or viewport_size.x <= 0.0:
+	var top: float = minf(WorldMapPanel.TOP_BAR_HEIGHT, viewport_size.y * 0.5)
+	return Rect2(Vector2(0.0, top), Vector2(viewport_size.x, viewport_size.y - top))
+
+func min_zoom() -> float:
+	var map_size: Vector2 = map_screen_rect().size
+	if data == null or map_size.x <= 0.0 or map_size.y <= 0.0:
 		return WorldMapStyle.MIN_ZOOM_FALLBACK
-	# Zoomed fully out, the whole planet fits on screen.
-	return minf(viewport_size.x / data.world_size.x, viewport_size.y / data.world_size.y)
+	# Zoomed fully out, pole to pole fills the screen height. The sides need no fit
+	# because the map wraps east-west.
+	return map_size.y / data.world_size.y
 
 func reset_camera() -> void:
 	zoom = min_zoom()
@@ -131,18 +138,18 @@ func focus_on(world_position: Vector2, new_zoom: float) -> void:
 func apply_camera() -> void:
 	if data == null:
 		return
-	var viewport_size: Vector2 = get_viewport_rect().size
+	var map_rect: Rect2 = map_screen_rect()
 	zoom = clampf(zoom, min_zoom(), WorldMapStyle.MAX_ZOOM)
 	target_zoom = clampf(target_zoom, min_zoom(), WorldMapStyle.MAX_ZOOM)
 	camera_center.x = data.wrap_x(camera_center.x)
-	var half_height: float = viewport_size.y * 0.5 / zoom
+	var half_height: float = map_rect.size.y * 0.5 / zoom
 	if half_height * 2.0 >= data.world_size.y:
 		camera_center.y = data.world_size.y * 0.5
 	else:
 		camera_center.y = clampf(camera_center.y, half_height, data.world_size.y - half_height)
 	world_root.scale = Vector2(zoom, zoom)
-	world_root.position = viewport_size * 0.5 - camera_center * zoom
-	var copies: Array[int] = visible_wrap_copies(viewport_size)
+	world_root.position = map_rect.get_center() - camera_center * zoom
+	var copies: Array[int] = visible_wrap_copies(get_viewport_rect().size)
 	for layer: WorldMapLayer in layers:
 		layer.set_view_zoom(zoom)
 		layer.set_visible_copies(copies)
@@ -192,7 +199,7 @@ func _process(delta: float) -> void:
 		zoom = lerpf(zoom, target_zoom, 1.0 - exp(-ZOOM_SMOOTHING * delta))
 		if absf(zoom - target_zoom) / target_zoom < 0.002:
 			zoom = target_zoom
-		camera_center = anchor_world - (zoom_anchor_screen - get_viewport_rect().size * 0.5) / zoom
+		camera_center = anchor_world - (zoom_anchor_screen - map_screen_rect().get_center()) / zoom
 		moved = true
 
 	if moved:
@@ -260,9 +267,9 @@ func handle_mouse_button(event: InputEventMouseButton) -> void:
 func handle_key(keycode: int) -> bool:
 	match keycode:
 		KEY_EQUAL, KEY_PLUS, KEY_KP_ADD:
-			zoom_toward(ZOOM_STEP, get_viewport_rect().size * 0.5)
+			zoom_toward(ZOOM_STEP, map_screen_rect().get_center())
 		KEY_MINUS, KEY_KP_SUBTRACT:
-			zoom_toward(1.0 / ZOOM_STEP, get_viewport_rect().size * 0.5)
+			zoom_toward(1.0 / ZOOM_STEP, map_screen_rect().get_center())
 		KEY_HOME:
 			reset_camera()
 		KEY_ENTER, KEY_KP_ENTER:

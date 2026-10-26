@@ -35,13 +35,14 @@ A future system changes the world by editing `WorldMapData` and calling `notify_
 - **Capital status is separate from size.** Capitals carry a pennant in the kingdom's color. Carvel's capital is a town, and Aldermark's largest city (Varenne) is not its capital.
 - **Roads are physical classes.** Major, regional, and local roads differ by drawing, not traffic. Routes are pathfound over land (mountains costly), major routes first, and later roads prefer existing roadbed so networks merge.
 - **Camera is a transform, not a Camera2D,** so the atlas lives on its own `CanvasLayer` without disturbing `main.gd`'s screen-space drawing.
+- **Fully zoomed out, the map fills the screen height.** Pole to pole spans the area below the top bar; the sides need no fit because the map wraps. The game window opens maximized (1600x900 when restored, set in `project.godot`) so the atlas uses the whole screen.
 - **Horizontal wrap draws only visible copies.** Each layer can draw the planet at three offsets; it records only the copies on screen and re-records when the view crosses the seam. This cut per-frame canvas CPU time at close zoom from 9-12 ms to 2-3 ms.
 
 ## Level Of Detail
 
 | Zoom (screen px per world unit) | Shows |
 | --- | --- |
-| ~0.17 (whole planet) to 0.3 | Continents, biomes, kingdom names and borders, capitals and great cities, faint major routes, ocean and continent names |
+| Fully out (about 0.17 to 0.4, set by window height) to 0.3 | Continents, biomes, kingdom names and borders, capitals and great cities, faint major routes, ocean and continent names |
 | 0.3 to 0.75 | Cities, then towns; regional roads; minor rivers; landform and sea names; region names and boundaries from ~0.55 |
 | 0.75 to 1.4 | Villages; local roads; urban footprints fade in; kingdom names fade out |
 | 1.4 to 4.0 | Rooftop texture in footprints, field patchwork around towns, forest clumps |
