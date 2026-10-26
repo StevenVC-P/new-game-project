@@ -16,10 +16,12 @@ created: 2026-05-21
 
 ## What it does
 
-A slow, open-ended civilization sandbox. The player is an unseen guiding hand over a few founding families on unclaimed frontier land in a world that already has established powers. Families grow into lineages and Houses, settlements grow from hamlet to village to town and beyond, and culture, economy, influence, and conflict shape one another. The current build covers founding and the early hamlet; the next goal is the first playable village (`docs/IMPLEMENTATION_ROADMAP.md`).
+A slow, open-ended civilization sandbox. The player is an unseen guiding hand over a few founding families on unclaimed frontier land in a world that already has established powers. Families grow into lineages and Houses, settlements grow from hamlet to village to town and beyond, and culture, economy, influence, and conflict shape one another. The current build opens on a world atlas, shows each unclaimed region as a miniature landscape built from the world's geography, and covers founding and the early hamlet; the next goal is the first playable village (`docs/IMPLEMENTATION_ROADMAP.md`).
 
 ## Links
 
 - Repository: https://github.com/StevenVC-P/new-game-project
 - Vision: `docs/GAME_VISION.md`
 - Roadmap: `docs/IMPLEMENTATION_ROADMAP.md`
+- Current status and handoff: `docs/HANDOFF.md`
+- Maps: `docs/WORLD_MAP.md`, `docs/REGIONAL_MAP.md`
