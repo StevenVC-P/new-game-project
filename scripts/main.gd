@@ -15,7 +15,6 @@ const VIEW_WORLD: String = "world"
 const CITY_TILE_SIZE: int = 12
 const CITY_MAP_WIDTH: int = 64
 const CITY_MAP_HEIGHT: int = 44
-const CITY_VIEW_TOP: int = 48
 const TOP_BAR_HEIGHT: int = 42
 const CITY_SIDEBAR_MARGIN: int = VisualStyle.PANEL_MARGIN
 const CITY_SIDEBAR_WIDTH: int = 300
@@ -81,9 +80,12 @@ var city_walker_time: float = 0.0
 var world_calendar: Calendar = Calendar.new()
 var simulation_clock: SimulationClock = SimulationClock.new()
 var building_placement: BuildingPlacement = BuildingPlacement.new(CITY_MAP_WIDTH, CITY_MAP_HEIGHT, WOODCUTTER_TREE_RADIUS)
-var city_building_overlay: CityBuildingOverlay = CityBuildingOverlay.new(CITY_TILE_SIZE, CITY_VIEW_TOP, CITY_MAP_WIDTH, CITY_MAP_HEIGHT)
+var city_building_overlay: CityBuildingOverlay = CityBuildingOverlay.new(CITY_TILE_SIZE, TOP_BAR_HEIGHT, CITY_MAP_WIDTH, CITY_MAP_HEIGHT)
 
 var city_pressure_debug_panel: Control = null
+# The town map draws on its own canvas layer under this node's panels, like the regional map.
+var town_map_layer: CanvasLayer = null
+var town_map_view: TownMapView = null
 # The world atlas draws on its own canvas layer above this node's screen-space drawing.
 var world_map_layer: CanvasLayer = null
 var world_map_view: WorldMapView = null
@@ -137,6 +139,7 @@ func _ready():
 	world_calendar.season_changed.connect(on_calendar_season_changed)
 	_ensure_household_debug_inspector()
 	_ensure_region_map_view()
+	_ensure_town_map_view()
 	# The game opens on the world atlas; the regional map is generated when a region is entered.
 	open_world_map()
 
@@ -151,6 +154,73 @@ func _ensure_region_map_view() -> void:
 	region_map_layer.add_child(region_map_view)
 	region_map_view.map_clicked.connect(on_region_map_clicked)
 	region_map_view.zoom_out_past_min.connect(on_region_zoom_out_past_min)
+
+func _ensure_town_map_view() -> void:
+	if town_map_view != null:
+		return
+	town_map_layer = CanvasLayer.new()
+	town_map_layer.layer = -1
+	add_child(town_map_layer)
+	town_map_view = TownMapView.new()
+	town_map_view.set_shown(false)
+	town_map_layer.add_child(town_map_view)
+	town_map_view.map_clicked.connect(on_town_map_clicked)
+	city_building_overlay.screen_rect_of_building = func(building: Building) -> Rect2: return town_map_view.tile_rect_to_screen(building.tile, building.size)
+
+# The town view: the sidebar docked right under the top bar, the town map filling the rest.
+func get_city_sidebar_rect() -> Rect2:
+	var viewport_size: Vector2 = get_viewport_rect().size
+	var x: float = maxf(viewport_size.x - CITY_SIDEBAR_WIDTH - CITY_SIDEBAR_MARGIN, CITY_SIDEBAR_MARGIN)
+	return Rect2(Vector2(x, TOP_BAR_HEIGHT), Vector2(CITY_SIDEBAR_WIDTH, maxf(viewport_size.y - TOP_BAR_HEIGHT - CITY_SIDEBAR_MARGIN, 200.0)))
+
+func get_town_map_screen_rect() -> Rect2:
+	var viewport_size: Vector2 = get_viewport_rect().size
+	var right: float = get_city_sidebar_rect().position.x - CITY_SIDEBAR_MARGIN * 0.5
+	return Rect2(Vector2(0.0, TOP_BAR_HEIGHT), Vector2(maxf(right, 100.0), maxf(viewport_size.y - TOP_BAR_HEIGHT, 100.0)))
+
+# Panels drawn over the town map: the top bar, the sidebar, the build menu, and the selected
+# building's card.
+func is_over_city_panels(mouse_pos: Vector2) -> bool:
+	if mouse_pos.y < TOP_BAR_HEIGHT or is_inside_city_sidebar(mouse_pos):
+		return true
+	if is_build_menu_open and get_build_menu_rect().has_point(mouse_pos):
+		return true
+	return city_building_overlay.overlay_rect.has_point(mouse_pos)
+
+# Mouse events belong to the town map when they are over it, or when it is mid-drag.
+func is_town_map_input(mouse_pos: Vector2) -> bool:
+	if town_map_view == null:
+		return false
+	return town_map_view.press_button != MOUSE_BUTTON_NONE or not is_over_city_panels(mouse_pos)
+
+# A click on the town map (released without dragging): select a building, or place one.
+func on_town_map_clicked(mouse_pos: Vector2, shift_pressed: bool) -> void:
+	update_city_hovered_tile(mouse_pos)
+	if not try_handle_building_click_at_tile(city_hovered_tile, shift_pressed):
+		if city_building_overlay.has_selection():
+			clear_selected_household()
+		elif is_placing_building and not shift_pressed:
+			try_place_selected_building()
+	queue_redraw()
+
+# Keeps the town map's overlays in step with the town view's state.
+func sync_town_map_view() -> void:
+	if town_map_view == null or selected_city_index < 0 or selected_city_index >= cities.size():
+		return
+	var city: City = cities[selected_city_index]
+	town_map_view.set_city(city)
+	town_map_view.hovered_tile = city_hovered_tile
+	town_map_view.preview_type = selected_building_type if is_placing_building else ""
+	town_map_view.preview_size = get_building_size(selected_building_type)
+	town_map_view.preview_valid = is_placing_building and is_inside_city_map(city_hovered_tile.x, city_hovered_tile.y) and is_valid_building_placement(selected_city_index, selected_building_type, city_hovered_tile)
+	town_map_view.inspected_index = city_building_overlay.inspected_building_index
+	town_map_view.selected_house_index = city_building_overlay.selected_house_building_index
+	var links: Array[int] = []
+	if city_building_overlay.inspected_building_index >= 0:
+		links = HouseholdHomeWorkLinkHelper.get_related_building_indices(city, city_building_overlay.inspected_building_index)
+	town_map_view.linked_indices = links
+	town_map_view.walker_time = city_walker_time
+	town_map_view.walker_cycle_seconds = CITY_WALKER_CYCLE_SECONDS
 
 # Called after towns or roads change (founding, growth, building in the town view).
 func notify_region_map_changed() -> void:
@@ -528,6 +598,9 @@ func _process(_delta: float):
 	if region_map_view != null:
 		region_map_view.set_shown(current_view == VIEW_REGION)
 		region_map_view.set_screen_rect(get_region_map_screen_rect())
+	if town_map_view != null:
+		town_map_view.set_shown(current_view == VIEW_CITY)
+		town_map_view.set_screen_rect(get_town_map_screen_rect())
 	if terrain_build_task >= 0 and WorkerThreadPool.is_task_completed(terrain_build_task):
 		# The terrain finished building in the background: ready the regional view now, while the
 		# atlas is shown, rather than on the first zoom into it.
@@ -562,6 +635,7 @@ func _process(_delta: float):
 			queue_redraw()
 	elif current_view == VIEW_CITY:
 		update_city_hovered_tile(get_local_mouse_position())
+		sync_town_map_view()
 		if hovered_tile != Vector2i(-1, -1):
 			hovered_tile = Vector2i(-1, -1)
 			queue_redraw()
@@ -610,6 +684,10 @@ func _input(event: InputEvent):
 		# The landscape takes wheel zoom, drag panning, and clicks on the map itself; a click
 		# comes back through on_region_map_clicked when the button is released without a drag.
 		if current_view == VIEW_REGION and is_region_map_input(local_mouse_pos) and region_map_view.handle_mouse_event(mouse_event):
+			queue_redraw()
+			return
+		# The same for the town map; its clicks come back through on_town_map_clicked.
+		if current_view == VIEW_CITY and is_town_map_input(local_mouse_pos) and town_map_view.handle_mouse_event(mouse_event):
 			queue_redraw()
 			return
 
@@ -666,14 +744,21 @@ func _input(event: InputEvent):
 		if current_view == VIEW_REGION and region_map_view != null and region_map_view.handle_gesture(event):
 			get_viewport().set_input_as_handled()
 			queue_redraw()
+		elif current_view == VIEW_CITY and town_map_view != null and town_map_view.handle_gesture(event):
+			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion:
 		if current_view == VIEW_REGION and trade_menu.handle_mouse_motion(get_local_mouse_position(), get_viewport_rect().size):
 			queue_redraw()
 		elif current_view == VIEW_REGION and region_map_view != null and region_map_view.handle_mouse_event(event):
 			queue_redraw()
+		elif current_view == VIEW_CITY and town_map_view != null and town_map_view.handle_mouse_event(event):
+			queue_redraw()
 	elif event is InputEventKey:
 		var key_event: InputEventKey = event as InputEventKey
 		if current_view == VIEW_REGION and region_map_view != null and region_map_view.handle_key(key_event):
+			get_viewport().set_input_as_handled()
+			return
+		if current_view == VIEW_CITY and town_map_view != null and town_map_view.handle_key(key_event):
 			get_viewport().set_input_as_handled()
 			return
 		if handle_simulation_speed_key_event(key_event):
@@ -730,12 +815,15 @@ func update_hovered_city(mouse_pos: Vector2):
 		queue_redraw()
 
 func update_city_hovered_tile(mouse_pos: Vector2):
-	var tile_x: int = int(floor(mouse_pos.x / CITY_TILE_SIZE))
-	var tile_y: int = int(floor((mouse_pos.y - CITY_VIEW_TOP) / CITY_TILE_SIZE))
 	var new_hovered_tile: Vector2i = Vector2i(-1, -1)
-
-	if is_inside_city_map(tile_x, tile_y):
-		new_hovered_tile = Vector2i(tile_x, tile_y)
+	if town_map_view != null:
+		if not is_over_city_panels(mouse_pos):
+			new_hovered_tile = town_map_view.screen_to_tile(mouse_pos)
+	else:
+		var tile_x: int = int(floor(mouse_pos.x / CITY_TILE_SIZE))
+		var tile_y: int = int(floor((mouse_pos.y - TOP_BAR_HEIGHT) / CITY_TILE_SIZE))
+		if is_inside_city_map(tile_x, tile_y):
+			new_hovered_tile = Vector2i(tile_x, tile_y)
 
 	if new_hovered_tile != city_hovered_tile:
 		city_hovered_tile = new_hovered_tile
@@ -1098,9 +1186,7 @@ func is_inside_city_map(x: int, y: int) -> bool:
 	return x >= 0 and x < CITY_MAP_WIDTH and y >= 0 and y < CITY_MAP_HEIGHT
 
 func is_inside_city_sidebar(mouse_pos: Vector2) -> bool:
-	var sidebar_x: int = CITY_MAP_WIDTH * CITY_TILE_SIZE + CITY_SIDEBAR_MARGIN
-	var sidebar_rect: Rect2 = Rect2(Vector2(sidebar_x, CITY_VIEW_TOP), Vector2(CITY_SIDEBAR_WIDTH, CITY_MAP_HEIGHT * CITY_TILE_SIZE))
-	return sidebar_rect.has_point(mouse_pos)
+	return get_city_sidebar_rect().has_point(mouse_pos)
 
 func try_handle_building_click_at_tile(tile_pos: Vector2i, toggle_maintenance: bool) -> bool:
 	if selected_city_index < 0 or selected_city_index >= cities.size():
@@ -1508,7 +1594,7 @@ func draw_city_view():
 	var font: Font = ThemeDB.fallback_font
 	var font_size: int = 14
 
-	draw_rect(Rect2(Vector2.ZERO, Vector2(1100, 650)), VisualStyle.COLOR_UI_BACKGROUND)
+	# The town itself is drawn by town_map_view, under these panels.
 	draw_city_sidebar(font, font_size)
 
 	if selected_city_index < 0 or selected_city_index >= cities.size():
@@ -1516,14 +1602,6 @@ func draw_city_view():
 		draw_top_bar()
 		return
 
-	var local_map: Array = cities[selected_city_index].local_map
-	for y in range(CITY_MAP_HEIGHT):
-		for x in range(CITY_MAP_WIDTH):
-			draw_city_tile(local_map, x, y)
-
-	draw_city_buildings()
-	draw_city_walkers()
-	draw_building_preview()
 	draw_building_overlay(font, font_size)
 	draw_build_menu(font, font_size)
 	draw_top_bar()
@@ -1542,10 +1620,8 @@ func get_placement_status_message() -> String:
 func draw_city_sidebar(font: Font, font_size: int):
 	city_action_options.clear()
 
-	var sidebar_x: int = CITY_MAP_WIDTH * CITY_TILE_SIZE + CITY_SIDEBAR_MARGIN
-	var sidebar_pos: Vector2 = Vector2(sidebar_x, CITY_VIEW_TOP)
-	var sidebar_size: Vector2 = Vector2(CITY_SIDEBAR_WIDTH, CITY_MAP_HEIGHT * CITY_TILE_SIZE)
-	var sidebar_rect: Rect2 = Rect2(sidebar_pos, sidebar_size)
+	var sidebar_rect: Rect2 = get_city_sidebar_rect()
+	var sidebar_pos: Vector2 = sidebar_rect.position
 	var text_x: float = sidebar_pos.x + CITY_SIDEBAR_PADDING
 	var y: float = sidebar_pos.y + 18.0
 	var title_size: int = 16
@@ -1624,11 +1700,12 @@ func draw_city_sidebar(font: Font, font_size: int):
 		y = draw_sidebar_label_value(font, font_size, "Cost", building_placement.get_cost_text(building_placement.get_building_cost(selected_building_type)), text_x, y, VisualStyle.COLOR_MUTED)
 	else:
 		y = draw_sidebar_label_value(font, font_size, "Building", "none", text_x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
-	y = draw_sidebar_line(font, font_size, "1 house, 2 farm, 3 woodcutter", text_x, y, VisualStyle.COLOR_MUTED)
-	y = draw_sidebar_line(font, font_size, "4 toolmaker, 5 quarry, 6 stonecutter", text_x, y, VisualStyle.COLOR_MUTED)
-	y = draw_sidebar_line(font, font_size, "7 brickworks, 8 lime, 9 mortar", text_x, y, VisualStyle.COLOR_MUTED)
-	y = draw_sidebar_line(font, font_size, "0 mason, Q sculptor, W carver", text_x, y, VisualStyle.COLOR_MUTED)
-	y = draw_sidebar_line(font, font_size, "E tileworks, R paver yard", text_x, y, VisualStyle.COLOR_MUTED)
+	# The key list is long; when a selection fills the panel it shrinks to one line.
+	var key_lines: Array[String] = ["1 house, 2 farm, 3 woodcutter", "4 toolmaker, 5 quarry, 6 stonecutter", "7 brickworks, 8 lime, 9 mortar", "0 mason, Q sculptor, W carver", "E tileworks, R paver yard"]
+	if y + (key_lines.size() + 4) * 15.0 > sidebar_rect.end.y:
+		key_lines = ["Keys 1-0, Q-R choose a building"]
+	for key_line: String in key_lines:
+		y = draw_sidebar_line(font, font_size, key_line, text_x, y, VisualStyle.COLOR_MUTED)
 	y = draw_sidebar_line(font, font_size, "B: build menu, Right click/Esc: clear", text_x, y, VisualStyle.COLOR_MUTED)
 	if int(resources["maintenance_grace_ticks"]) > 0:
 		y = draw_sidebar_line(font, font_size, "Grace: " + str(resources["maintenance_grace_ticks"]) + " ticks", text_x, y, VisualStyle.COLOR_MUTED)
@@ -1636,7 +1713,7 @@ func draw_city_sidebar(font: Font, font_size: int):
 	draw_sidebar_line(font, font_size, placement_status, text_x, y, placement_color)
 
 func get_build_menu_rect() -> Rect2:
-	return Rect2(Vector2(16.0, CITY_VIEW_TOP + 16.0), Vector2(330.0, 460.0))
+	return Rect2(Vector2(16.0, TOP_BAR_HEIGHT + 16.0), Vector2(330.0, 460.0))
 
 func draw_build_menu(font: Font, font_size: int):
 	build_menu_options.clear()
@@ -1878,6 +1955,7 @@ func draw_building_overlay(font: Font, font_size: int):
 	if selected_city_index < 0 or selected_city_index >= cities.size():
 		return
 	var city: City = cities[selected_city_index]
+	city_building_overlay.bounds = get_town_map_screen_rect()
 	city_building_overlay.draw(self, font, font_size, city)
 
 func count_maintenance_needed_buildings(city_index: int) -> int:
@@ -1891,209 +1969,6 @@ func count_maintenance_needed_buildings(city_index: int) -> int:
 			count += 1
 
 	return count
-
-func draw_city_tile(local_map: Array, x: int, y: int):
-	var tile: Dictionary = local_map[y][x] as Dictionary
-	var pos: Vector2 = Vector2(x * CITY_TILE_SIZE, CITY_VIEW_TOP + y * CITY_TILE_SIZE)
-	var rect: Rect2 = Rect2(pos, Vector2(CITY_TILE_SIZE - 1, CITY_TILE_SIZE - 1))
-
-	TerrainVisuals.draw_city_tile(self, rect, tile, Vector2i(x, y))
-
-func draw_city_buildings():
-	if selected_city_index < 0 or selected_city_index >= cities.size():
-		return
-
-	var buildings: Array = cities[selected_city_index].buildings
-	for building_index in range(buildings.size()):
-		var building: Building = buildings[building_index]
-		var tile_pos: Vector2i = building.tile
-		var size: Vector2i = building.size
-		var building_type: String = building.type
-		var pos: Vector2 = Vector2(tile_pos.x * CITY_TILE_SIZE, CITY_VIEW_TOP + tile_pos.y * CITY_TILE_SIZE)
-		var rect: Rect2 = Rect2(pos, Vector2(size.x * CITY_TILE_SIZE - 1, size.y * CITY_TILE_SIZE - 1))
-		var maintenance_level: int = building.maintenance_level
-
-		BuildingVisuals.draw_building(self, rect, building_type)
-		if city_building_overlay.is_inspected(building_index):
-			draw_rect(rect, VisualStyle.COLOR_BUILDING_SELECTED)
-		elif city_building_overlay.is_selected_house(building_index):
-			draw_rect(rect, VisualStyle.COLOR_BUILDING_SELECTED)
-		if building_type == BUILDING_HOUSE:
-			draw_house_preference_indicator(rect, cities[selected_city_index].get_household_preference_for_building(building_index))
-		if building_type != BUILDING_HOUSE and maintenance_level < 100:
-			var decay_alpha: float = 0.55 * (1.0 - float(maintenance_level) / 100.0)
-			draw_rect(rect, Color(0.20, 0.20, 0.20, decay_alpha))
-		elif building_type != BUILDING_HOUSE and building.assigned_workers == 0:
-			draw_rect(rect, VisualStyle.COLOR_UNASSIGNED_BUILDING)
-		draw_worker_indicator(rect, building_type, building.assigned_workers, building.assigned_preference)
-		draw_maintenance_indicator(rect, building_type, maintenance_level, building.receives_maintenance)
-
-	draw_household_work_link_overlay()
-
-func draw_household_work_link_overlay():
-	if selected_city_index < 0 or selected_city_index >= cities.size():
-		return
-
-	var city: City = cities[selected_city_index]
-	var selected_building_index: int = city_building_overlay.inspected_building_index
-	if selected_building_index < 0 or selected_building_index >= city.buildings.size():
-		return
-
-	var related_building_indices: Array[int] = HouseholdHomeWorkLinkHelper.get_related_building_indices(city, selected_building_index)
-	if related_building_indices.is_empty():
-		return
-
-	var selected_building: Building = city.buildings[selected_building_index]
-	var start_pos: Vector2 = get_building_screen_center(selected_building)
-	var link_shadow: Color = Color(0.05, 0.05, 0.05, 0.8)
-	var link_color: Color = Color(0.95, 0.82, 0.28, 0.95)
-
-	for related_building_index: int in related_building_indices:
-		if related_building_index < 0 or related_building_index >= city.buildings.size():
-			continue
-
-		var related_building: Building = city.buildings[related_building_index]
-		var end_pos: Vector2 = get_building_screen_center(related_building)
-		draw_line(start_pos + Vector2(1, 1), end_pos + Vector2(1, 1), link_shadow, 4.0)
-		draw_line(start_pos, end_pos, link_color, 2.0)
-		draw_circle(start_pos, 4.0, link_color)
-		draw_circle(end_pos, 5.0, link_color)
-
-func draw_city_walkers():
-	if selected_city_index < 0 or selected_city_index >= cities.size():
-		return
-
-	var city: City = cities[selected_city_index]
-	var buildings: Array[Building] = city.buildings
-
-	for building_index in range(buildings.size()):
-		var workplace: Building = buildings[building_index]
-		if not workplace.is_production_building():
-			continue
-		if workplace.assigned_workers <= 0:
-			continue
-		if workplace.assigned_household_id < 0:
-			continue
-
-		var house_index: int = city.get_assigned_house_building_id(workplace)
-		var home_pos: Vector2 = get_household_home_position(city, house_index, workplace.assigned_household_id)
-		var work_pos: Vector2 = get_building_screen_center(workplace)
-		var preference: String = city.get_household_preference_for_worker_modifier(workplace)
-		var walker_count: int = workplace.assigned_workers
-
-		for walker_index in range(walker_count):
-			var walker_key: int = workplace.assigned_household_id * 10 + building_index
-			var walker_pos: Vector2 = get_walker_position(home_pos, work_pos, walker_index, walker_key)
-			draw_circle(walker_pos + Vector2(0.8, 0.8), 3.1, VisualStyle.COLOR_WALKER_SHADOW)
-			draw_circle(walker_pos, 2.6, get_walker_color(preference))
-
-func get_building_screen_center(building: Building) -> Vector2:
-	var tile_pos: Vector2i = building.tile
-	var size: Vector2i = building.size
-	var center_x: float = (float(tile_pos.x) + float(size.x) * 0.5) * float(CITY_TILE_SIZE)
-	var center_y: float = float(CITY_VIEW_TOP) + (float(tile_pos.y) + float(size.y) * 0.5) * float(CITY_TILE_SIZE)
-	return Vector2(center_x, center_y)
-
-func get_household_home_position(city: City, house_index: int, household_id: int) -> Vector2:
-	var buildings: Array[Building] = city.buildings
-	if house_index >= 0 and house_index < buildings.size():
-		var house: Building = buildings[house_index]
-		return get_building_screen_center(house)
-
-	var lane: int = max(0, household_id)
-	var camp_x: float = float(CITY_TILE_SIZE * 4) + float((lane % 4) * CITY_TILE_SIZE)
-	var camp_y: float = float(CITY_VIEW_TOP + CITY_TILE_SIZE * 4) + float((lane / 4) * CITY_TILE_SIZE)
-	return Vector2(camp_x, camp_y)
-
-func get_walker_position(home_pos: Vector2, work_pos: Vector2, walker_index: int, household_id: int) -> Vector2:
-	var cycle_progress: float = city_walker_time / CITY_WALKER_CYCLE_SECONDS
-	var travel_progress: float = 0.0
-	if cycle_progress < 0.5:
-		travel_progress = cycle_progress * 2.0
-	else:
-		travel_progress = 1.0 - ((cycle_progress - 0.5) * 2.0)
-
-	var position: Vector2 = home_pos.lerp(work_pos, travel_progress)
-	var direction: Vector2 = work_pos - home_pos
-	if direction.length() > 0.1:
-		var unit_direction: Vector2 = direction.normalized()
-		var side_direction: Vector2 = Vector2(-unit_direction.y, unit_direction.x)
-		var lane_offset: float = (float(walker_index) - 0.5) * 4.0
-		var walking_bob: float = sin(city_walker_time * 5.0 + float(household_id + walker_index)) * 1.1
-		position += side_direction * (lane_offset + walking_bob)
-
-	return position
-
-func get_walker_color(preference: String) -> Color:
-	if preference == WORK_PREF_AGRARIAN:
-		return VisualStyle.COLOR_WALKER_AGRARIAN
-	if preference == WORK_PREF_INDUSTRIAL:
-		return VisualStyle.COLOR_WALKER_INDUSTRIAL
-
-	return VisualStyle.COLOR_WALKER_NEUTRAL
-
-func draw_worker_indicator(rect: Rect2, building_type: String, assigned_workers: int, assigned_preference: String):
-	if building_type == BUILDING_HOUSE:
-		return
-
-	var indicator_color: Color = VisualStyle.COLOR_WARNING
-	if assigned_workers > 0:
-		indicator_color = get_preference_color(assigned_preference)
-
-	draw_circle(rect.position + Vector2(rect.size.x - 5, 5), 3.0, indicator_color)
-
-func draw_house_preference_indicator(rect: Rect2, preference: String):
-	var color: Color = get_preference_color(preference)
-	var stripe_rect: Rect2 = Rect2(rect.position + Vector2(2, 2), Vector2(rect.size.x - 4, 4))
-	draw_rect(stripe_rect, color)
-
-func get_preference_color(preference: String) -> Color:
-	if preference == WORK_PREF_AGRARIAN:
-		return VisualStyle.COLOR_PREF_AGRARIAN
-	if preference == WORK_PREF_INDUSTRIAL:
-		return VisualStyle.COLOR_PREF_INDUSTRIAL
-
-	return VisualStyle.COLOR_PREF_NEUTRAL
-
-func draw_maintenance_indicator(rect: Rect2, building_type: String, maintenance_level: int, receives_maintenance: bool):
-	if building_type == BUILDING_HOUSE:
-		return
-
-	var bar_width: float = rect.size.x - 4.0
-	var filled_width: float = bar_width * float(maintenance_level) / 100.0
-	var bar_pos: Vector2 = rect.position + Vector2(2, rect.size.y - 5)
-	var bar_color: Color = VisualStyle.COLOR_MAINTENANCE_GOOD
-	if maintenance_level < 75:
-		bar_color = VisualStyle.COLOR_MAINTENANCE_WARNING
-	if maintenance_level < 50:
-		bar_color = VisualStyle.COLOR_MAINTENANCE_BAD
-	if not receives_maintenance:
-		bar_color = VisualStyle.COLOR_MAINTENANCE_DISABLED
-
-	draw_rect(Rect2(bar_pos, Vector2(bar_width, 3)), VisualStyle.COLOR_MAINTENANCE_BAR_BACKGROUND)
-	draw_rect(Rect2(bar_pos, Vector2(filled_width, 3)), bar_color)
-
-func draw_building_preview():
-	if not is_placing_building:
-		return
-	if selected_city_index < 0 or selected_city_index >= cities.size():
-		return
-	if not is_inside_city_map(city_hovered_tile.x, city_hovered_tile.y):
-		return
-
-	var size: Vector2i = get_building_size(selected_building_type)
-	var is_valid: bool = is_valid_building_placement(selected_city_index, selected_building_type, city_hovered_tile)
-	var color: Color = VisualStyle.COLOR_VALID_PLACEMENT
-	if not is_valid:
-		color = VisualStyle.COLOR_INVALID_PLACEMENT
-
-	var pos: Vector2 = Vector2(city_hovered_tile.x * CITY_TILE_SIZE, CITY_VIEW_TOP + city_hovered_tile.y * CITY_TILE_SIZE)
-	var rect: Rect2 = Rect2(pos, Vector2(size.x * CITY_TILE_SIZE, size.y * CITY_TILE_SIZE))
-	draw_rect(rect, color)
-	draw_rect(rect, Color(color.r, color.g, color.b, 0.95), false, 2.0)
-
-func get_building_color(building_type: String) -> Color:
-	return VisualStyle.get_building_color(building_type)
 
 func get_selected_city_name() -> String:
 	if selected_city_index < 0 or selected_city_index >= cities.size():
