@@ -56,9 +56,18 @@ The HUD names the region under the camera and its status (unclaimed, contested, 
 
 Measured at 1600x900 on an RTX 3070 Ti (`[PERF]` lines in the tests and captures):
 
-- Terrain setup: about 1 s when the regional map is first needed, on top of the world build's 2.4 s.
+- Terrain setup: about 1 s on a worker thread while the atlas is shown, so the first zoom in does not wait for it.
 - Chunk generation: about 65 ms per chunk on a worker thread; a fresh view streams in within 0.4-1.1 s.
-- Rendering: 1-4 ms CPU and 5-7 ms GPU per frame; panning holds 60 fps (worst frame about 27 ms while trees are built, 18 ms from afar).
+- Rendering: 0.3-1 ms CPU and 5-6 ms GPU per frame; panning holds 60 fps (worst frame 17 ms).
+- Scrolling from the atlas into a region and back holds 60 fps at the median; the worst single frames are 40-70 ms (they were 0.4-0.8 s).
+
+What keeps it smooth, and must stay that way:
+
+- **The founding neighbourhood is prepared on a worker thread** (`main.gd` `prepare_neighbourhood`: tiles, regions, settlements, founding sites); the main thread only applies it.
+- **Trees are collected and painted one strip per frame**, nearest the middle of the view first (`RegionChunkStreamer.paint_pending_strips`); woods keep the shader's canopy until their trees are in. With vsync, a frame that runs past 16.7 ms waits for the next refresh, so even three strips per frame halved the frame rate.
+- **Layers are hidden in the rendering server, not with `visible`.** Making a node visible queues a redraw of it and everything under it: showing the trees when zooming past 1.0 re-painted every chunk at once (0.2-0.3 s), and so did switching back from the atlas. `RegionMapView.set_shown` and the streamer's tree layers use `RenderingServer.canvas_item_set_visible`.
+- **The atlas records its layers for an area three screens wide** and only re-records on leaving it, after the zoom drifts 15%, or when it settles (`WorldMapView.refresh_layer_recordings`); re-recording every layer on every zoom frame cost 110-150 ms per frame.
+- **Zoom momentum crosses the hand-off.** A zoom aimed past either map's limit eases to the limit and the other map carries on with the rest (`zoom_out_past_min` / `zoom_in_past_max` pass the remaining factor), so there is no extra wheel step and no jump in scale.
 
 ## Gameplay Effect
 

@@ -21,9 +21,10 @@ extends Node2D
 # both modes.
 
 signal map_clicked(screen_position: Vector2)
-# The player zoomed out past the continuous map's widest view (where the world atlas's
-# closest view takes over).
-signal zoom_out_past_min(screen_position: Vector2)
+# The zoom eased out to the continuous map's widest view while the player was still zooming
+# out: the world atlas takes over there. remaining_factor is the zoom still to go (below 1),
+# so the atlas can carry on without a jump.
+signal zoom_out_past_min(screen_position: Vector2, remaining_factor: float)
 
 const LAYER_GROUND: String = "ground"
 const LAYER_DEVELOPMENT: String = "development"
@@ -39,6 +40,8 @@ const HANDOFF_ZOOM: float = WorldMapStyle.MAX_ZOOM / MAP_UNITS_PER_WORLD
 # Individual trees, peaks, and boulders are drawn from this zoom in; farther out the
 # terrain shows woods as canopy.
 const FEATURE_ZOOM: float = 1.0
+# How far past the widest view a zoom-out may aim; the part beyond it is handed to the atlas.
+const HANDOFF_OVERSHOOT: float = 8.0
 
 var tiles: Array = []
 var cities: Array[City] = []
@@ -78,6 +81,10 @@ var neighbourhood_offset: Vector2 = Vector2.ZERO
 var neighbourhood_context_roads: Array[RegionMapGeometry.RoadShape] = []
 var show_borders: bool = true
 var hud_region_text: String = ""
+# When the camera last moved or zoomed (Time.get_ticks_msec), so the owner can wait for it to rest.
+var last_camera_change_msec: int = 0
+# See set_shown().
+var shown: bool = true
 
 # Camera. Zoom is screen pixels per map unit; screen_rect is where the map shows through.
 var screen_rect: Rect2 = Rect2(0.0, 0.0, 960.0, 600.0)
@@ -155,6 +162,17 @@ func add_layer(layer: RegionMapLayer, layer_name: String, parent: Node2D = null)
 func _exit_tree() -> void:
 	if terrain != null:
 		terrain.wait_for_tasks()
+
+# Shows or hides the whole map in the rendering server. Toggling `visible` instead would
+# queue a redraw of every layer, chunk, and tree strip each time the view comes back.
+func set_shown(show: bool) -> void:
+	if show == shown:
+		return
+	shown = show
+	RenderingServer.canvas_item_set_visible(get_canvas_item(), show)
+
+func is_shown() -> bool:
+	return shown
 
 func add_root(root_name: String) -> Node2D:
 	var root: Node2D = Node2D.new()
@@ -389,7 +407,8 @@ func screen_to_world(screen_position: Vector2) -> Vector2:
 
 func apply_camera() -> void:
 	zoom = clampf(zoom, min_zoom(), RegionMapStyle.MAX_ZOOM)
-	target_zoom = clampf(target_zoom, min_zoom(), RegionMapStyle.MAX_ZOOM)
+	target_zoom = clampf(target_zoom, lowest_target_zoom(), RegionMapStyle.MAX_ZOOM)
+	last_camera_change_msec = Time.get_ticks_msec()
 	var half_view: Vector2 = screen_rect.size * 0.5 / zoom
 	if is_continuous():
 		# East-west the planet wraps; north-south the view stops at the poles.
@@ -464,11 +483,40 @@ func update_region_text() -> void:
 	hud_region_text = "%s, %s" % [region.name, status]
 
 func zoom_toward(factor: float, screen_position: Vector2) -> void:
-	target_zoom = clampf(target_zoom * factor, min_zoom(), RegionMapStyle.MAX_ZOOM)
+	target_zoom = clampf(target_zoom * factor, lowest_target_zoom(), RegionMapStyle.MAX_ZOOM)
 	zoom_anchor_screen = screen_position
 
+# Carries on a zoom begun on the atlas: eases from the current zoom toward zoom * factor,
+# keeping the point under screen_position in place.
+func continue_zoom(factor: float, screen_position: Vector2) -> void:
+	zoom_toward(factor, screen_position)
+
+# Trackpad pinch zooms and two-finger pans, like the atlas. Returns true when used.
+func handle_gesture(event: InputEvent) -> bool:
+	if event is InputEventMagnifyGesture:
+		var magnify: InputEventMagnifyGesture = event as InputEventMagnifyGesture
+		if not screen_rect.has_point(magnify.position):
+			return false
+		zoom_toward(magnify.factor, magnify.position)
+		return true
+	if event is InputEventPanGesture:
+		var pan: InputEventPanGesture = event as InputEventPanGesture
+		if not screen_rect.has_point(pan.position):
+			return false
+		camera_center += pan.delta * 12.0 / zoom
+		apply_camera()
+		return true
+	return false
+
+# On the continuous map a zoom-out may aim past the widest view; the rest goes to the atlas.
+func lowest_target_zoom() -> float:
+	return min_zoom() / HANDOFF_OVERSHOOT if is_continuous() else min_zoom()
+
+func is_camera_resting(rest_msec: int) -> bool:
+	return press_button == MOUSE_BUTTON_NONE and is_equal_approx(zoom, target_zoom) and Time.get_ticks_msec() - last_camera_change_msec >= rest_msec
+
 func _process(delta: float) -> void:
-	if not visible:
+	if not visible or not shown:
 		return
 	var moved: bool = false
 	var pan: Vector2 = Vector2.ZERO
@@ -484,17 +532,26 @@ func _process(delta: float) -> void:
 	if pan != Vector2.ZERO:
 		camera_center += pan.normalized() * RegionMapStyle.KEY_PAN_SPEED_PX * delta / zoom
 		moved = true
-	if not is_equal_approx(zoom, target_zoom):
+	if not is_equal_approx(zoom, target_zoom) and not (target_zoom < zoom and zoom <= min_zoom()):
 		# Keep the map point under the cursor fixed while the zoom eases in.
-		var anchor_map: Vector2 = screen_to_map(zoom_anchor_screen)
+		# Global map units: the camera is global, the public screen_to_map is the neighbourhood's.
+		var anchor_map: Vector2 = screen_to_global_map(zoom_anchor_screen)
 		zoom = lerpf(zoom, target_zoom, 1.0 - exp(-RegionMapStyle.ZOOM_SMOOTHING * delta))
 		if absf(zoom - target_zoom) / target_zoom < 0.002:
 			zoom = target_zoom
+		# A target past the widest view (the atlas takes the rest) never pulls the zoom past it.
+		zoom = clampf(zoom, min_zoom(), RegionMapStyle.MAX_ZOOM)
 		camera_center = anchor_map - (zoom_anchor_screen - screen_rect.get_center()) / zoom
 		moved = true
 	if moved:
 		apply_camera()
 	if is_continuous():
+		if target_zoom < min_zoom() and zoom <= min_zoom() * 1.001:
+			# Eased out to the widest view with zoom still to go: the atlas carries on from here.
+			var remaining: float = target_zoom / min_zoom()
+			target_zoom = min_zoom()
+			zoom_out_past_min.emit(zoom_anchor_screen, remaining)
+			return
 		streamer.update(visible_map_rect(), zoom, zoom >= FEATURE_ZOOM, show_borders)
 
 # --- Input -----------------------------------------------------------------------------
@@ -509,10 +566,6 @@ func handle_mouse_event(event: InputEvent) -> bool:
 		if button.pressed and (button.button_index == MOUSE_BUTTON_WHEEL_UP or button.button_index == MOUSE_BUTTON_WHEEL_DOWN):
 			if not screen_rect.has_point(position):
 				return false
-			if button.button_index == MOUSE_BUTTON_WHEEL_DOWN and is_continuous() and target_zoom <= min_zoom() * 1.001:
-				# Already as far out as the regional map goes: the world atlas takes over.
-				zoom_out_past_min.emit(position)
-				return true
 			zoom_toward(RegionMapStyle.ZOOM_STEP if button.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / RegionMapStyle.ZOOM_STEP, position)
 			return true
 		if button.button_index != MOUSE_BUTTON_LEFT and button.button_index != MOUSE_BUTTON_MIDDLE:
