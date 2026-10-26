@@ -51,6 +51,8 @@ func validate(city: City, local_map: Array, building_type: String, origin: Vecto
 			return make_result(false, "Blocked terrain", footprint)
 		if tile["has_trees"] == true:
 			return make_result(false, "Blocked terrain", footprint)
+		if tile.get("has_road", false) == true:
+			return make_result(false, "Road", footprint)
 		if tile["occupied"] == true:
 			return make_result(false, "Occupied tiles", footprint)
 		if tile["is_fertile"] == true:

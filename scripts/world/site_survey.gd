@@ -5,19 +5,22 @@ extends RefCounted
 # (the map is generated when the site is picked and reused at founding). Regional measures alone
 # misled: most sites read as poor farmland although every town map holds room for many farms.
 #
-# Thresholds come from the spread of real town maps (2026-10-20 probe of 160 sites): fertile
-# tiles 79-671 (median 160), tree tiles 93-569 (median 228).
+# Thresholds come from the spread of real town maps on the continuous regional map
+# (tests/sim/town_map_probe.gd, 80 sites in 20 frontier regions, 2026-10-26): fertile tiles
+# 119-1218 (quartiles 183 / 367 / 627), tree tiles 96-2117 (quartiles 194 / 277 / 518). About a
+# quarter of sites read as limited and a quarter as rich.
 
-const FARMLAND_RICH_TILES: int = 300
-const FARMLAND_FAIR_TILES: int = 140
-const FOREST_DENSE_TILES: int = 300
-const FOREST_SOME_TILES: int = 170
+const FARMLAND_RICH_TILES: int = 600
+const FARMLAND_FAIR_TILES: int = 200
+const FOREST_DENSE_TILES: int = 500
+const FOREST_SOME_TILES: int = 200
 
 static func get_lines(local_map: Array, profile: SettlementSiteProfile) -> Array[String]:
 	var fertile: int = 0
 	var trees: int = 0
-	var water: int = 0
 	var rough: int = 0
+	var water_kinds: Dictionary = {}
+	var deposits: Dictionary = {}
 	for row in local_map:
 		for tile in row:
 			if tile["is_fertile"] == true:
@@ -25,28 +28,50 @@ static func get_lines(local_map: Array, profile: SettlementSiteProfile) -> Array
 			if tile["has_trees"] == true:
 				trees += 1
 			if tile["type"] == "water":
-				water += 1
+				var kind: String = tile.get("water_kind", "river")
+				water_kinds[kind] = int(water_kinds.get(kind, 0)) + 1
 			elif tile["type"] == "rough":
 				rough += 1
+			var resource: String = tile.get("resource", "none")
+			if resource != "none":
+				deposits[resource] = true
 
 	var lines: Array[String] = []
 	lines.append("Farmland: " + _level(fertile, FARMLAND_RICH_TILES, FARMLAND_FAIR_TILES, "rich", "fair", "limited"))
 	lines.append("Forest: " + _level(trees, FOREST_DENSE_TILES, FOREST_SOME_TILES, "dense", "some", "light"))
-	lines.append("Water: " + (_water_text(profile) if water > 0 else "none"))
+	lines.append("Water: " + _water_text(water_kinds))
 	lines.append("Rough ground: " + ("some" if rough > 0 else "none"))
-	# Stone and ore are not drawn on town maps yet, so this comes from the surrounding region.
-	if profile != null and profile.nearest_resource_distance >= 0:
+	if not deposits.is_empty():
+		lines.append("Stone/ore: " + _deposit_text(deposits) + " on the town map")
+	elif profile != null and profile.nearest_resource_distance >= 0:
 		lines.append("Stone/ore: in the region, " + str(profile.nearest_resource_distance) + " tiles away")
 	else:
 		lines.append("Stone/ore: none nearby")
 	return lines
 
-static func _water_text(profile: SettlementSiteProfile) -> String:
-	if profile != null and profile.nearest_water_kind == "sea":
-		return "sea coast"
-	if profile != null and profile.nearest_water_kind == "lake":
-		return "lakeshore"
+# The kind of water most of the town's water is.
+static func _water_text(water_kinds: Dictionary) -> String:
+	var kind: String = ""
+	var most: int = 0
+	for candidate: String in water_kinds.keys():
+		if int(water_kinds[candidate]) > most:
+			most = int(water_kinds[candidate])
+			kind = candidate
+	match kind:
+		"":
+			return "none"
+		"sea":
+			return "sea coast"
+		"lake":
+			return "lakeshore"
 	return "river runs through"
+
+static func _deposit_text(deposits: Dictionary) -> String:
+	if deposits.has("stone") and deposits.has("iron"):
+		return "stone and ore"
+	if deposits.has("iron"):
+		return "ore"
+	return "stone"
 
 static func _level(value: int, high: int, middle: int, high_word: String, middle_word: String, low_word: String) -> String:
 	if value >= high:

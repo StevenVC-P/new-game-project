@@ -777,19 +777,29 @@ func make_region_map_generator() -> RegionMapGenerator:
 	generator.geography = region_geography
 	return generator
 
-func make_local_map_generator() -> LocalCityMapGenerator:
-	return LocalCityMapGenerator.new(rng, CITY_MAP_WIDTH, CITY_MAP_HEIGHT, region_map_size.x, region_map_size.y, RIVER_NEAR_RANGE, CITY_RESOURCE_RANGE)
+# A site's town map: the regional land around it, magnified (LocalCityMapGenerator).
+func make_town_map(tile_pos: Vector2i, profile: SettlementSiteProfile) -> Array:
+	var generator: LocalCityMapGenerator = LocalCityMapGenerator.new(CITY_MAP_WIDTH, CITY_MAP_HEIGHT)
+	if is_continuous_region_map():
+		return generator.generate_from_terrain(regional_terrain, local_to_global_tile(tile_pos), profile.climate)
+	return generator.generate(tile_pos, tiles, Vector2i.ZERO, profile.climate)
+
+func analyze_site(tile_pos: Vector2i) -> SettlementSiteProfile:
+	var profile: SettlementSiteProfile = SettlementSiteProfile.analyze(Vector2(tile_pos), tiles, CITY_RESOURCE_RANGE)
+	profile.climate = get_site_climate(tile_pos)
+	return profile
+
+func get_site_climate(tile_pos: Vector2i) -> Dictionary:
+	if is_continuous_region_map():
+		return regional_terrain.climate_at(local_to_global_tile(tile_pos))
+	if region_geography != null:
+		return {"temperature": region_geography.mean_temperature, "moisture": region_geography.mean_moisture, "family": region_geography.climate_family, "tree_temperature": region_geography.mean_temperature}
+	return LocalCityMapGenerator.DEFAULT_CLIMATE.duplicate()
 
 func analyze_city_site_profiles():
 	for city: City in cities:
 		city.site_profile = SettlementSiteProfile.analyze(city.tile, tiles, CITY_RESOURCE_RANGE)
 		print(city.name, " site profile: ", city.site_profile.get_debug_summary())
-
-func generate_city_local_maps():
-	var generator: LocalCityMapGenerator = make_local_map_generator()
-	for city_index in range(cities.size()):
-		var city: City = cities[city_index]
-		city.local_map = generator.generate(city, tiles, city_index)
 
 func is_inside_map(x: int, y: int) -> bool:
 	return x >= 0 and x < region_map_size.x and y >= 0 and y < region_map_size.y
@@ -856,12 +866,8 @@ func set_pending_founding_tile(tile_pos: Vector2i) -> bool:
 	return true
 
 func survey_pending_site(tile_pos: Vector2i) -> void:
-	var preview_city: City = City.new("Player Town", Vector2(tile_pos.x, tile_pos.y), City.ROLE_PLAYER, 0)
-	pending_site_profile = SettlementSiteProfile.analyze(preview_city.tile, tiles, CITY_RESOURCE_RANGE)
-	preview_city.site_profile = pending_site_profile
-	var generator: LocalCityMapGenerator = make_local_map_generator()
-	# The founded town will take the next city index, which the map generator uses.
-	pending_local_map = generator.generate(preview_city, tiles, cities.size())
+	pending_site_profile = analyze_site(tile_pos)
+	pending_local_map = make_town_map(tile_pos, pending_site_profile)
 	pending_site_survey = SiteSurvey.get_lines(pending_local_map, pending_site_profile)
 
 func clear_pending_founding_tile() -> void:
@@ -901,7 +907,7 @@ func found_player_city_at_pending_site() -> bool:
 		founded_city.site_profile = pending_site_profile
 		founded_city.local_map = pending_local_map
 	else:
-		configure_new_city_map(founded_city, founded_city_index)
+		configure_new_city_map(founded_city)
 	clear_pending_founding_tile()
 	generate_roads()
 	notify_region_map_changed()
@@ -921,10 +927,9 @@ func found_player_city_at_pending_site() -> bool:
 func create_player_city_at_tile(tile_pos: Vector2i) -> City:
 	return City.new("Player Town", Vector2(tile_pos.x, tile_pos.y), City.ROLE_PLAYER, FOUNDING_HOUSEHOLD_COUNT, rng.randi())
 
-func configure_new_city_map(city: City, city_index: int) -> void:
-	city.site_profile = SettlementSiteProfile.analyze(city.tile, tiles, CITY_RESOURCE_RANGE)
-	var generator: LocalCityMapGenerator = make_local_map_generator()
-	city.local_map = generator.generate(city, tiles, city_index)
+func configure_new_city_map(city: City) -> void:
+	city.site_profile = analyze_site(Vector2i(city.tile))
+	city.local_map = make_town_map(Vector2i(city.tile), city.site_profile)
 
 func get_city_index_at_position(mouse_pos: Vector2) -> int:
 	if region_map_view != null and is_over_region_panels(mouse_pos):
