@@ -4,7 +4,6 @@ extends RegionMapLayer
 # Built things: roads by class, bridges at river crossings, and settlements as clusters of
 # miniature buildings. One early-to-late medieval building style throughout.
 
-const LIGHT_DIRECTION: Vector2 = Vector2(-0.63, -0.77)
 const YARD_COLOR: Color = Color(0.62, 0.56, 0.38, 0.22)
 
 func on_lod_changed() -> void:
@@ -89,19 +88,9 @@ func draw_settlement(settlement: RegionMapGeometry.SettlementShape) -> void:
 func draw_building(building: RegionMapGeometry.BuildingShape) -> void:
 	var half: Vector2 = building.size * 0.5
 	var height_offset: Vector2 = Vector2(1.0, 1.2) * (1.6 if building.kind == "church" else 1.0)
-	draw_colored_polygon(rotated_rect(building.position + height_offset, half, building.angle), RegionMapStyle.COLOR_SHADOW)
-	# Seen from slightly south, the front wall shows below the roof.
 	var wall: Color = RegionMapStyle.COLOR_TOWN_WALL if building.kind == "church" else RegionMapStyle.COLOR_WALL_TIMBER
-	draw_colored_polygon(rotated_rect(building.position + Vector2(0.0, 0.9), half, building.angle), wall.darkened(0.12))
+	BuildingPainter.draw_gabled(self, building.position, building.size, building.angle, building.roof, wall, height_offset, 0.9, 0.35)
 	var axis: Vector2 = Vector2(cos(building.angle), sin(building.angle))
-	var across: Vector2 = Vector2(-axis.y, axis.x)
-	var lit_side: float = 1.0 if across.dot(LIGHT_DIRECTION) > 0.0 else -1.0
-	var ridge_a: Vector2 = building.position - axis * half.x
-	var ridge_b: Vector2 = building.position + axis * half.x
-	var lit_edge: Vector2 = across * half.y * lit_side
-	draw_colored_polygon(PackedVector2Array([ridge_a, ridge_b, ridge_b + lit_edge, ridge_a + lit_edge]), building.roof.lightened(0.14))
-	draw_colored_polygon(PackedVector2Array([ridge_a, ridge_b, ridge_b - lit_edge, ridge_a - lit_edge]), building.roof.darkened(0.22))
-	draw_line(ridge_a, ridge_b, building.roof.darkened(0.4), 0.35, true)
 	if building.kind == "church":
 		var tower: Vector2 = building.position + axis * (half.x + 0.9)
 		draw_colored_polygon(rotated_rect(tower + Vector2(1.6, 2.0), Vector2(1.2, 1.2), building.angle), RegionMapStyle.COLOR_SHADOW)

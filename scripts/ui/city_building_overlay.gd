@@ -30,6 +30,11 @@ var selected_house_building_index: int = -1
 var inspected_building_index: int = -1
 var action_options: Array[Dictionary] = []
 var overlay_rect: Rect2 = Rect2()
+# Where the town map shows a building on screen (Building -> Rect2), and the screen area the
+# card must stay inside. Set by the owner when the town map has a camera; without them the card
+# follows the fixed tile grid.
+var screen_rect_of_building: Callable = Callable()
+var bounds: Rect2 = Rect2()
 
 func _init(tile_size: int = 12, view_top: int = 48, map_width: int = 64, map_height: int = 44):
 	city_tile_size = tile_size
@@ -125,17 +130,16 @@ func draw(canvas: CanvasItem, font: Font, font_size: int, city: City):
 	var building_rect: Rect2 = get_building_screen_rect(building)
 	var overlay_size: Vector2 = get_building_overlay_size(city, building)
 	var overlay_pos: Vector2 = building_rect.position + Vector2(building_rect.size.x + 8.0, -4.0)
-	var max_x: float = city_map_width * city_tile_size - overlay_size.x - 4.0
-	var max_y: float = city_view_top + city_map_height * city_tile_size - overlay_size.y - 4.0
-	if max_x < 4.0:
-		max_x = 4.0
-	if max_y < city_view_top + 4.0:
-		max_y = city_view_top + 4.0
+	var area: Rect2 = bounds if bounds.has_area() else Rect2(Vector2(0.0, city_view_top), Vector2(city_map_width, city_map_height) * city_tile_size)
+	var min_x: float = area.position.x + 4.0
+	var min_y: float = area.position.y + 4.0
+	var max_x: float = maxf(area.end.x - overlay_size.x - 4.0, min_x)
+	var max_y: float = maxf(area.end.y - overlay_size.y - 4.0, min_y)
 
 	if overlay_pos.x > max_x:
 		overlay_pos.x = building_rect.position.x - overlay_size.x - 8.0
-	overlay_pos.x = clamp(overlay_pos.x, 4.0, max_x)
-	overlay_pos.y = clamp(overlay_pos.y, city_view_top + 4.0, max_y)
+	overlay_pos.x = clamp(overlay_pos.x, min_x, max_x)
+	overlay_pos.y = clamp(overlay_pos.y, min_y, max_y)
 
 	overlay_rect = Rect2(overlay_pos, overlay_size)
 	var text_x: float = overlay_pos.x + 10.0
@@ -204,6 +208,8 @@ func get_cost_summary(cost: Dictionary) -> String:
 	return ", ".join(parts)
 
 func get_building_screen_rect(building: Building) -> Rect2:
+	if screen_rect_of_building.is_valid():
+		return screen_rect_of_building.call(building)
 	var tile_pos: Vector2i = building.tile
 	var size: Vector2i = building.size
 	var pos: Vector2 = Vector2(tile_pos.x * city_tile_size, city_view_top + tile_pos.y * city_tile_size)

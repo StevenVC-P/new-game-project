@@ -295,7 +295,7 @@ Owner direction: the map is part of the plan now; art and presentation wait for 
 2. **Stone appears on town maps** as a real deposit.
 3. **Not every site has every resource.** More kinds of resources will be added later, so the resource model should be easy to extend.
 
-Next implementation step: draw regional deposits onto town maps as resource tiles, give each resource an access rule (on-site or nearby), require quarries to sit on stone, and show available resources in the founding site survey.
+Next implementation step: draw regional deposits onto town maps as resource tiles, give each resource an access rule (on-site or nearby), require quarries to sit on stone, and show available resources in the founding site survey. *Since 2026-10-26 deposits are on town maps and the survey names them (town map art and terrain, below); the access rules and quarries on stone remain.*
 
 **World atlas v1 (2026-10-25, owner-requested ahead of the village):** a fixed, hand-authored planet drawn as a painterly atlas, with kingdoms, regions, settlements, and roads as data a later simulation can change. The game opens on it, and entering an unclaimed region opens the existing regional map. It sets the global art direction. Details and remaining integration work are in `docs/WORLD_MAP.md`.
 
@@ -303,11 +303,13 @@ Next implementation step: draw regional deposits onto town maps as resource tile
 
 **Continuous regional map (2026-10-26, owner-requested):** the regional map became one continuous, true-scale map of the planet that scrolls from region to region and hands off to the atlas by zooming, with kingdom land view-only. No economy formula changed; the map-luck probe got 42/42 towns off the ground across 14 frontier regions. Details: `docs/REGIONAL_MAP.md`.
 
+**Town map art and terrain (2026-10-26, owner-requested ahead of the village):** the town map became the regional land around the site magnified four times (64x44 town tiles over 16x11 regional tiles), so the river, lake or coast, woods, rock, deposits, and roads seen around a site are the town's; and the town is drawn in the regional map's miniature style under a pan and zoom camera, with every building type drawn as its own miniature and the layout filling the window. No economy formula changed. Measured effect: map-luck 42/42 on the continuous map (unchanged) and 46/48 on the original maps (was 47/48; both failures had full room); farmland per town rose (median 364 fertile tiles, was 160); most sites have no water on the town map. Details: `docs/TOWN_MAP.md`.
+
 **Later in this track (after the first playable village):**
 
 1. Living neighbors and rivals on the world map. (The regional map generated from its world region's geography is done: see below.)
 2. Readability pass: tell tier 0 from tier 1, who works where, who is struggling, at a glance.
-3. Art direction decision (style, perspective, scope), then art, the UI overhaul, and audio replacing code-drawn shapes. `BuildingVisuals` profiles are the intended hook for sprites.
+3. Art direction decision (style, perspective, scope), then art, the UI overhaul, and audio replacing code-drawn shapes. `BuildingVisuals` profiles are the intended hook for sprites. (All three map scales now share the miniature style, so in practice the direction is set; sprites, UI, and audio remain.)
 
 ## Future Feature Notes
 

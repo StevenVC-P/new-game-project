@@ -584,6 +584,21 @@ func tile_at(tile: Vector2i) -> Dictionary:
 		return RegionalChunk.make_tile_dictionary(RegionalChunk.TYPE_SEA, 0, RegionalChunk.RESOURCE_NONE)
 	return chunk.tile_dictionary(tile)
 
+# Climate at a tile, for the town map: the tile's own temperature and moisture (which set how
+# much open land is arable), and its chunk's tree palette, so the town's woods are the woods
+# the regional map draws around it.
+func climate_at(tile: Vector2i) -> Dictionary:
+	var chunk: RegionalChunk = get_chunk_now(chunk_of_tile(tile))
+	if chunk == null:
+		return LocalCityMapGenerator.DEFAULT_CLIMATE.duplicate()
+	var i: int = chunk.index_of(wrap_tile(tile))
+	return {
+		"temperature": chunk.temperature[i] / 255.0,
+		"moisture": chunk.moisture[i] / 255.0,
+		"family": chunk.climate_family,
+		"tree_temperature": chunk.mean_temperature,
+	}
+
 # Rows of tile dictionaries (RegionMapGenerator's format) for a window of the planet; row y,
 # column x is the global tile origin + (x, y). Rows past the poles are sea.
 func extract_window(origin: Vector2i, size: Vector2i) -> Array:

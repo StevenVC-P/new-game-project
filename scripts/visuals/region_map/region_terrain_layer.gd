@@ -90,12 +90,20 @@ func set_mask(parameter: String, bytes: PackedByteArray, size: Vector2i) -> void
 
 # Tiles from the nearest land, for water; 0 on land.
 func shore_distance(size: Vector2i) -> PackedFloat32Array:
-	var distance: PackedFloat32Array = PackedFloat32Array()
-	distance.resize(size.x * size.y)
+	var is_water: PackedByteArray = PackedByteArray()
+	is_water.resize(size.x * size.y)
 	for y in range(size.y):
 		for x in range(size.x):
 			var tile_type: String = view.tiles[y][x]["type"]
-			distance[y * size.x + x] = 9999.0 if tile_type == "river" or tile_type == "lake" or tile_type == "sea" else 0.0
+			is_water[y * size.x + x] = 1 if tile_type == "river" or tile_type == "lake" or tile_type == "sea" else 0
+	return distance_to_land(is_water, size)
+
+# Per tile, tiles to the nearest tile that is not water (is_water 0); 0 on land.
+static func distance_to_land(is_water: PackedByteArray, size: Vector2i) -> PackedFloat32Array:
+	var distance: PackedFloat32Array = PackedFloat32Array()
+	distance.resize(size.x * size.y)
+	for i in range(size.x * size.y):
+		distance[i] = 9999.0 if is_water[i] != 0 else 0.0
 	for pass_index in range(2):
 		var forward: bool = pass_index == 0
 		for row in range(size.y):

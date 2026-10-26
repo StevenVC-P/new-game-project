@@ -30,6 +30,9 @@ var resource_direction: Vector2 = Vector2.ZERO
 var sampled_bounds: Rect2i = Rect2i()
 var directional_counts: Dictionary = {}
 var tags: Array[String] = []
+# Climate at the site (temperature, moisture, family, tree_temperature), set by whoever knows
+# it (main.gd from the regional terrain); the town map reads it for arable land and its palette.
+var climate: Dictionary = LocalCityMapGenerator.DEFAULT_CLIMATE.duplicate()
 
 static func analyze(city_tile: Vector2, regional_tiles: Array, radius: int = ANALYSIS_RADIUS) -> SettlementSiteProfile:
 	var profile: SettlementSiteProfile = SettlementSiteProfile.new()
