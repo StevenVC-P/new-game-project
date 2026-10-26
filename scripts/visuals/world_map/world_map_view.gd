@@ -10,6 +10,18 @@ extends Node2D
 # on its own CanvasLayer without disturbing the screen-space drawing in main.gd.
 
 signal region_entry_requested(region_id: int)
+# The zoom eased in to the atlas's closest view while the player was still zooming in: the
+# regional map takes over there. remaining_factor is the zoom still to go (above 1), so the
+# regional map can carry on without a jump.
+signal zoom_in_past_max(world_position: Vector2, screen_position: Vector2, remaining_factor: float)
+
+# How far past the closest view a zoom-in may aim; the part beyond it is handed to the regional map.
+const HANDOFF_OVERSHOOT: float = 8.0
+# While zooming, layers are re-recorded once the zoom has changed this much (see refresh_layer_recordings).
+const REDRAW_ZOOM_DRIFT: float = 1.15
+
+var recorded_zoom: float = -1.0
+var recorded_area: Rect2 = Rect2()
 signal return_requested
 
 const ZOOM_STEP: float = 1.25
@@ -140,7 +152,7 @@ func apply_camera() -> void:
 		return
 	var map_rect: Rect2 = map_screen_rect()
 	zoom = clampf(zoom, min_zoom(), WorldMapStyle.MAX_ZOOM)
-	target_zoom = clampf(target_zoom, min_zoom(), WorldMapStyle.MAX_ZOOM)
+	target_zoom = clampf(target_zoom, min_zoom(), WorldMapStyle.MAX_ZOOM * HANDOFF_OVERSHOOT)
 	camera_center.x = data.wrap_x(camera_center.x)
 	var half_height: float = map_rect.size.y * 0.5 / zoom
 	if half_height * 2.0 >= data.world_size.y:
@@ -150,10 +162,31 @@ func apply_camera() -> void:
 	world_root.scale = Vector2(zoom, zoom)
 	world_root.position = map_rect.get_center() - camera_center * zoom
 	var copies: Array[int] = visible_wrap_copies(get_viewport_rect().size)
+	refresh_layer_recordings()
 	for layer: WorldMapLayer in layers:
-		layer.set_view_zoom(zoom)
 		layer.set_visible_copies(copies)
 	queue_redraw()
+
+# Layers record their drawing for an area around the view at one zoom. Re-recording all of
+# them costs tens of milliseconds, so while the zoom animates they are re-recorded only once
+# it has drifted REDRAW_ZOOM_DRIFT (strokes and icons are briefly a little off their exact
+# screen size), and once more when it settles; panning re-records only on leaving the area.
+func refresh_layer_recordings() -> void:
+	terrain_layer.set_view_zoom(zoom)
+	var view_rect: Rect2 = Rect2(camera_center - map_screen_rect().size * 0.5 / zoom, map_screen_rect().size / zoom)
+	var settled: bool = is_equal_approx(zoom, target_zoom)
+	var drifted: bool = recorded_zoom <= 0.0 or maxf(zoom / recorded_zoom, recorded_zoom / zoom) > REDRAW_ZOOM_DRIFT
+	var stale: bool = drifted or (settled and not is_equal_approx(zoom, recorded_zoom)) or not recorded_area.encloses(view_rect)
+	if not stale:
+		return
+	recorded_zoom = zoom
+	# A screen's margin on every side: labels just off screen still keep room for those on it.
+	recorded_area = view_rect.grow_individual(view_rect.size.x, view_rect.size.y, view_rect.size.x, view_rect.size.y)
+	for layer: WorldMapLayer in layers:
+		if layer == terrain_layer:
+			continue
+		layer.set_cull_rect(recorded_area)
+		layer.set_view_zoom(zoom)
 
 # Wrap copies (one world-width apart) that overlap the screen, with a margin so labels
 # and icons hanging over the seam are not clipped.
@@ -171,7 +204,7 @@ func screen_to_world(screen_position: Vector2) -> Vector2:
 	return (screen_position - world_root.position) / zoom
 
 func zoom_toward(factor: float, screen_position: Vector2) -> void:
-	target_zoom = clampf(target_zoom * factor, min_zoom(), WorldMapStyle.MAX_ZOOM)
+	target_zoom = clampf(target_zoom * factor, min_zoom(), WorldMapStyle.MAX_ZOOM * HANDOFF_OVERSHOOT)
 	zoom_anchor_screen = screen_position
 
 func on_viewport_resized() -> void:
@@ -193,12 +226,20 @@ func _process(delta: float) -> void:
 		camera_center += pan.normalized() * KEY_PAN_SPEED_PX * delta / zoom
 		moved = true
 
-	if not is_equal_approx(zoom, target_zoom):
+	if target_zoom > WorldMapStyle.MAX_ZOOM and zoom >= WorldMapStyle.MAX_ZOOM * 0.999:
+		# Eased in to the closest view with zoom still to go: the regional map carries on.
+		var remaining: float = target_zoom / WorldMapStyle.MAX_ZOOM
+		target_zoom = WorldMapStyle.MAX_ZOOM
+		var world_position: Vector2 = screen_to_world(zoom_anchor_screen)
+		zoom_in_past_max.emit(Vector2(data.wrap_x(world_position.x), world_position.y), zoom_anchor_screen, remaining)
+	elif not is_equal_approx(zoom, target_zoom):
 		# Keep the world point under the cursor fixed while the zoom eases in.
 		var anchor_world: Vector2 = screen_to_world(zoom_anchor_screen)
 		zoom = lerpf(zoom, target_zoom, 1.0 - exp(-ZOOM_SMOOTHING * delta))
 		if absf(zoom - target_zoom) / target_zoom < 0.002:
 			zoom = target_zoom
+		# A target past the closest view (the regional map takes the rest) never pulls the zoom past it.
+		zoom = clampf(zoom, min_zoom(), WorldMapStyle.MAX_ZOOM)
 		camera_center = anchor_world - (zoom_anchor_screen - map_screen_rect().get_center()) / zoom
 		moved = true
 
@@ -370,22 +411,23 @@ func refresh_highlights() -> void:
 
 # --- Entering regions ------------------------------------------------------
 
-# The player starts as free settlers, so only land no kingdom holds can be settled.
+# Every region can be looked at on the regional map. The player starts as free settlers, so
+# only land no kingdom holds can be settled, and only one settlement is supported today.
 func get_region_entry_status(region: WorldMapData.Region) -> Dictionary:
 	if region == null:
-		return {"allowed": false, "button": "Enter region", "reason": ""}
-	if region.id == home_region_id:
-		return {"allowed": true, "button": "Return to region", "reason": "Your people live here."}
+		return {"allowed": false, "button": "Enter region", "reason": "", "can_settle": false}
+	if region.id == home_region_id and other_regions_locked:
+		return {"allowed": true, "button": "Return to region", "reason": "Your people live here.", "can_settle": false}
 	var kingdom: WorldMapData.Kingdom = data.get_kingdom(region.owner_kingdom_id)
 	if kingdom != null:
-		return {"allowed": false, "button": "Held by " + kingdom.name, "reason": "Free settlers can only found towns on land no kingdom holds."}
+		return {"allowed": true, "button": "View region", "reason": "Held by " + kingdom.name + ". Free settlers can only found towns on land no kingdom holds.", "can_settle": false}
 	if other_regions_locked and home_region_id >= 0:
 		var home: WorldMapData.Region = data.get_region(home_region_id)
-		return {"allowed": false, "button": "Enter region", "reason": "Your settlement is in " + home.name + ". Settling a second region is not possible yet."}
+		return {"allowed": true, "button": "View region", "reason": "Your settlement is in " + home.name + ". Settling a second region is not possible yet.", "can_settle": false}
 	var reason: String = "Open frontier. Enter to survey founding sites."
 	if region.is_contested():
 		reason = "Contested frontier: claimed by kingdoms but held by none. Enter to survey founding sites."
-	return {"allowed": true, "button": "Enter region", "reason": reason}
+	return {"allowed": true, "button": "Enter region", "reason": reason, "can_settle": true}
 
 func request_region_entry(region_id: int) -> void:
 	var region: WorldMapData.Region = data.get_region(region_id)

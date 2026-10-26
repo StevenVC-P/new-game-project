@@ -195,6 +195,32 @@ func region_id_at(world_pos: Vector2) -> int:
 	var cell: Vector2i = political_cell_at(world_pos)
 	return region_grid[cell.y * political_size.x + cell.x]
 
+# Region grid where water cells take the region of the nearest land, so borders drawn from
+# it (the atlas shader, the regional map) appear only where two regions meet on land.
+func region_grid_spread_into_water() -> PackedInt32Array:
+	var width: int = political_size.x
+	var height: int = political_size.y
+	var spread: PackedInt32Array = region_grid.duplicate()
+	var frontier: PackedInt32Array = PackedInt32Array()
+	for i in range(width * height):
+		if spread[i] >= 0:
+			frontier.append(i)
+	var head: int = 0
+	while head < frontier.size():
+		var current: int = frontier[head]
+		head += 1
+		var x: int = current % width
+		var y: int = current / width
+		for offset: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var ny: int = y + offset.y
+			if ny < 0 or ny >= height:
+				continue
+			var neighbor: int = ny * width + posmod(x + offset.x, width)
+			if spread[neighbor] == -1:
+				spread[neighbor] = spread[current]
+				frontier.append(neighbor)
+	return spread
+
 func get_region(region_id: int) -> Region:
 	if region_id < 0 or region_id >= regions.size():
 		return null

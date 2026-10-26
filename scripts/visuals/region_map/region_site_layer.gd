@@ -10,7 +10,10 @@ func on_lod_changed() -> void:
 func _draw() -> void:
 	if view == null or not view.founding_active or not view.show_sites:
 		return
-	# Pegs stay visible when zoomed out without crowding the land when zoomed in.
+	# Pegs stay visible when zoomed out without crowding the land when zoomed in. Thousands of
+	# them go down as one triangle batch: a draw call per peg stalled the frame.
 	var radius: float = clampf(1.6 / maxf(zoom, 0.01), 0.7, 1.2)
+	var batch: TriangleBatch = TriangleBatch.new()
 	for tile: Vector2i in view.founding_sites:
-		draw_circle(RegionMapGeometry.tile_center(Vector2(tile)), radius, RegionMapStyle.COLOR_SITE_DOT)
+		batch.add_blob(RegionMapGeometry.tile_center(Vector2(tile)), Vector2(radius, radius), RegionMapStyle.COLOR_SITE_DOT, 6)
+	batch.flush(self)

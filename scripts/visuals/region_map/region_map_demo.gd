@@ -1,21 +1,25 @@
 extends Node2D
 
-# Isolated regional map demo (scenes/region_map_demo.tscn): the showcase regions without the
-# rest of the game. Keys 1-6 switch region, G toggles a grown player town, F and L toggle
-# founding sites and labels; drag or WASD pans and the wheel zooms.
+# Isolated regional map demo (scenes/region_map_demo.tscn): the continuous regional map
+# without the rest of the game, opened on the showcase regions. Keys 1-6 jump to a showcase,
+# G toggles a grown player town, F, L, and B toggle founding sites, labels, and borders; drag
+# or WASD pans across the whole planet and the wheel zooms.
 
 var world: WorldMapData = null
+var terrain: RegionalTerrain = null
 var view: RegionMapView = null
 var showcase_index: int = 0
 var grown: bool = false
 
 func _ready() -> void:
 	world = FixedWorldDefinition.build()
+	terrain = RegionalTerrain.new(world)
 	var layer: CanvasLayer = CanvasLayer.new()
 	add_child(layer)
 	view = RegionMapView.new()
 	layer.add_child(view)
-	view.map_clicked.connect(func(position: Vector2) -> void: print("Clicked tile ", view.screen_to_tile(position)))
+	view.set_terrain(terrain)
+	view.map_clicked.connect(func(position: Vector2) -> void: print("Clicked tile ", view.screen_to_global_tile(position)))
 	get_viewport().size_changed.connect(fit_view)
 	fit_view()
 	show_showcase(0)
@@ -26,18 +30,20 @@ func fit_view() -> void:
 func show_showcase(index: int) -> void:
 	showcase_index = index
 	var showcase: Dictionary = RegionShowcase.SHOWCASES[index]
-	var region: Dictionary = RegionShowcase.build(world, showcase["region"], grown)
-	view.set_region(region["tiles"], region["cities"], region["roads"], region["geography"])
-	var sites: Array[Vector2i] = []
+	var region: Dictionary = RegionShowcase.build_continuous(world, terrain, showcase["region"], grown)
+	view.set_neighbourhood(region["tiles"], region["cities"], region["roads"], region["origin"])
 	var cities: Array[City] = region["cities"]
 	var has_player: bool = cities.any(func(city: City) -> bool: return city.is_player_city())
+	var sites: Array[Vector2i] = []
 	if not has_player:
-		for y in range(RegionShowcase.MAP_SIZE.y):
-			for x in range(RegionShowcase.MAP_SIZE.x):
+		var size: Vector2i = RegionShowcase.NEIGHBOURHOOD_SIZE
+		for y in range(size.y):
+			for x in range(size.x):
 				if FoundingSiteHelper.is_valid_founding_tile(region["tiles"], cities, Vector2i(x, y), RegionShowcase.MIN_CITY_DISTANCE):
 					sites.append(Vector2i(x, y))
 	view.set_founding_state(not has_player, sites, Vector2i(-1, -1), RegionShowcase.MIN_CITY_DISTANCE, RegionShowcase.CITY_RESOURCE_RANGE)
-	print("Showcase: ", showcase["label"], " (", showcase["region"], ") ", (region["geography"] as RegionGeography).get_debug_summary())
+	view.focus_on_global_tile(region["focus"], 1.4)
+	print("Showcase: ", showcase["label"], " (", showcase["region"], ")")
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouse:

@@ -4,7 +4,7 @@ The world atlas: one fixed, hand-authored planet shown as a painterly physical a
 
 ## Seeing It
 
-- **In the game:** the game now opens on the world atlas. Click a region to inspect it; **Enter region** (or double-click, or Enter) opens the existing regional map for unclaimed or contested regions. The regional map's top bar has a **World** button back to the atlas.
+- **In the game:** the game now opens on the world atlas. Click a region to inspect it; **Enter region** (or double-click, or Enter) opens the regional map there, and zooming in past the atlas's closest view lands on the regional map at the same place and scale. The regional map's top bar has a **World** button back to the atlas, and zooming out past its widest view returns too.
 - **Isolated:** run `scenes/world_map_demo.tscn` (F6 in the editor).
 - **Screenshots:** `tests/visual/world_map_capture.gd` renders nine views (planet, continents, close zoom, a selected region, the wrap seam) to PNG files. It needs a window, so run it without `--headless` (command in `CLAUDE.md`).
 
@@ -53,16 +53,16 @@ The rules live in `WorldMapStyle`, shared by drawing and label collision.
 
 `scripts/main.gd` has a third view, `VIEW_WORLD`, and opens on it. Its input and drawing return early in that view; the atlas handles its own input.
 
-- Only regions no kingdom holds can be entered: the player starts as free settlers on frontier land (`docs/GAME_VISION.md`).
-- Entering a region seeds the existing `RegionMapGenerator` with the region's `regional_map_seed` (from its name) and passes it the region's world geography (`RegionGeography`), so a region gives the same regional map every time and it matches the atlas. The seed is dropped afterwards so founding families stay random.
-- Before founding, the player may enter another region instead; that regenerates the regional map. After founding, only the home region can be entered, because only one player settlement is supported.
-- The calendar does not advance on the atlas before any region is entered.
+- The regional map is the atlas magnified: one regional tile is 1.2 world units, and regional zoom 0.4 equals the atlas's closest zoom (4.0). `WorldMapView.zoom_in_past_max` and `RegionMapView.zoom_out_past_min` hand the view over at that scale, keeping the point under the cursor in place. Details: `docs/REGIONAL_MAP.md`.
+- Every region can be viewed. Only land no kingdom holds can be settled: the player starts as free settlers on frontier land (`docs/GAME_VISION.md`), so kingdom regions show **View region** and founding there is refused.
+- Entering a region looks at its main settlement. Before founding, the founding neighbourhood moves there; after founding, other regions are view-only because only one player settlement is supported.
+- The calendar does not advance on the atlas before the regional map has been shown.
 
 ## Remaining Work And Limitations
 
-- **Regional maps follow the world** (done since): `RegionGeography` samples a window of the region for the generator; see `docs/REGIONAL_MAP.md`.
-- **Startup cost.** Building the world takes about 2.4 s on the main thread when the game starts. Caching the built fields or building on a thread are the options if it becomes a problem.
-- **Kingdom land cannot be entered or viewed regionally,** and only one player settlement is supported.
+- **Regional maps follow the world** (done since): the regional map is one continuous, true-scale map of the planet; see `docs/REGIONAL_MAP.md`.
+- **Startup cost.** Building the world takes about 2.4 s on the main thread when the game starts, and the regional terrain's setup about 1 s more when the regional map is first needed. Caching the built fields or building on a thread are the options if it becomes a problem.
+- **Only one player settlement is supported,** so after founding other regions are view-only.
 - **Capacity.** The political texture carries at most 254 regions and 64 kingdoms.
 - **Not built (per the brief):** trade, wealth, culture, migration, or resource map modes; sea lanes; culture-specific architecture; world simulation of any kind.
 - **Measured on one machine only** (RTX 3070 Ti: about 2 ms GPU per frame at any zoom). Integrated GPUs are untested.

@@ -13,11 +13,13 @@ func on_lod_changed() -> void:
 func _draw() -> void:
 	if view == null:
 		return
-	for road: RegionMapGeometry.RoadShape in view.geometry.roads:
-		draw_road(road)
-	for bridge: RegionMapGeometry.BridgeShape in view.geometry.bridges:
+	var shapes: RegionMapGeometry = geometry()
+	for road: RegionMapGeometry.RoadShape in shapes.roads:
+		if not road.is_context:
+			draw_road(road)
+	for bridge: RegionMapGeometry.BridgeShape in shapes.bridges:
 		draw_bridge(bridge)
-	for settlement: RegionMapGeometry.SettlementShape in view.geometry.settlements:
+	for settlement: RegionMapGeometry.SettlementShape in shapes.settlements:
 		draw_settlement(settlement)
 
 # --- Roads -------------------------------------------------------------------------

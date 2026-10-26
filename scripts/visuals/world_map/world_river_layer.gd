@@ -21,6 +21,8 @@ func draw_river(river: WorldMapData.River, visibility: float, draw_banks: bool) 
 		var end: int = mini(start + POINTS_PER_STRETCH, last)
 		var stretch: PackedVector2Array = river.points.slice(start, end + 1)
 		var width_px: float = maxf(river.widths[(start + end) / 2] * zoom, min_px)
+		if not is_in_view(points_rect(stretch).grow((width_px + 2.0) / zoom)):
+			continue
 		if draw_banks:
 			if width_px > 2.6:
 				draw_polyline(stretch, faded(WorldMapStyle.COLOR_RIVER_EDGE, visibility * 0.6), (width_px + 1.2) / zoom, true)

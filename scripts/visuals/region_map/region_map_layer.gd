@@ -8,9 +8,14 @@ extends Node2D
 var view: RegionMapView = null
 var zoom: float = 1.0
 var lod: int = -1
+# Shapes this layer draws when not the view's own (a chunk's roads, a world settlement).
+var geometry_override: RegionMapGeometry = null
 
 func setup(map_view: RegionMapView) -> void:
 	view = map_view
+
+func geometry() -> RegionMapGeometry:
+	return geometry_override if geometry_override != null else view.geometry
 
 # Called when the data this layer draws has changed.
 func rebuild() -> void:
@@ -110,6 +115,9 @@ class Strip:
 	extends Node2D
 	var painter: Callable
 	var index: int = 0
+	# Cleared while a scheduler spreads the work over frames: a strip entering the scene draws
+	# at once, before its turn, and must not do its expensive work then.
+	var may_paint: bool = true
 
 	func _draw() -> void:
 		painter.call(self, index)

@@ -12,8 +12,35 @@ const REASON_OCCUPIED: String = "Tile already occupied"
 const REASON_TOO_CLOSE_NEUTRAL: String = "Too close to neutral town"
 const REASON_TOO_CLOSE_TOWN: String = "Too close to existing town"
 
+# Free settlers may not found towns on land a kingdom holds (checked by the owner of the
+# continuous regional map, which knows the political map).
+static func kingdom_land_reason(kingdom_name: String) -> String:
+	return "Held by %s: free settlers cannot found here" % kingdom_name
+
 static func is_valid_founding_tile(tiles: Array, cities: Array[City], tile_pos: Vector2i, min_city_distance: int) -> bool:
-	return get_founding_tile_invalid_reason(tiles, cities, tile_pos, min_city_distance) == VALID_FOUNDING_SITE
+	var town_tiles: PackedVector2Array = PackedVector2Array()
+	for city: City in cities:
+		if city != null:
+			town_tiles.append(city.tile)
+	return is_valid_founding_site(tiles, town_tiles, tile_pos, min_city_distance)
+
+# The same rule from town positions alone, so it can run where City objects are not at hand
+# (preparing a regional neighbourhood on a worker thread). A town on the tile is closer than
+# the minimum distance, so it needs no separate check.
+static func is_valid_founding_site(tiles: Array, town_tiles: PackedVector2Array, tile_pos: Vector2i, min_city_distance: int) -> bool:
+	if not is_inside_tiles(tiles, tile_pos):
+		return false
+	var tile: Dictionary = tiles[tile_pos.y][tile_pos.x] as Dictionary
+	var tile_type: String = tile.get("type", "")
+	if tile_type == "river" or tile_type == "lake" or tile_type == "sea" or tile_type == "mountain":
+		return false
+	if tile.get("has_forest", false) == true or tile.get("resource", "none") != "none":
+		return false
+	var site: Vector2 = Vector2(tile_pos)
+	for town: Vector2 in town_tiles:
+		if site.distance_to(town) < float(min_city_distance):
+			return false
+	return true
 
 static func get_founding_tile_invalid_reason(tiles: Array, cities: Array[City], tile_pos: Vector2i, min_city_distance: int) -> String:
 	if not is_inside_tiles(tiles, tile_pos):

@@ -45,7 +45,7 @@ func rebuild_terrain() -> void:
 func rebuild_political() -> void:
 	var width: int = data.political_size.x
 	var height: int = data.political_size.y
-	var spread: PackedInt32Array = spread_regions_into_water()
+	var spread: PackedInt32Array = data.region_grid_spread_into_water()
 	if data.regions.size() > MAX_REGIONS:
 		push_warning("World map draws at most %d regions; extra regions share ids." % MAX_REGIONS)
 
@@ -67,32 +67,6 @@ func rebuild_political() -> void:
 		if kingdom.id < MAX_KINGDOMS:
 			palette.set_pixel(kingdom.id, 0, kingdom.color)
 	shader_material.set_shader_parameter("kingdom_palette", ImageTexture.create_from_image(palette))
-
-# Water cells take the region of the nearest land, so the shader finds borders only
-# where two regions meet on land, never along coasts.
-func spread_regions_into_water() -> PackedInt32Array:
-	var width: int = data.political_size.x
-	var height: int = data.political_size.y
-	var spread: PackedInt32Array = data.region_grid.duplicate()
-	var frontier: PackedInt32Array = PackedInt32Array()
-	for i in range(width * height):
-		if spread[i] >= 0:
-			frontier.append(i)
-	var head: int = 0
-	while head < frontier.size():
-		var current: int = frontier[head]
-		head += 1
-		var x: int = current % width
-		var y: int = current / width
-		for offset: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-			var ny: int = y + offset.y
-			if ny < 0 or ny >= height:
-				continue
-			var neighbor: int = ny * width + posmod(x + offset.x, width)
-			if spread[neighbor] == -1:
-				spread[neighbor] = spread[current]
-				frontier.append(neighbor)
-	return spread
 
 # Cultivated land around each settlement grows with its population.
 func rebuild_development() -> void:

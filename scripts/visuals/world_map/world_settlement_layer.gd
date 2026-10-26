@@ -62,7 +62,8 @@ func draw_world() -> void:
 		if visibility <= 0.01:
 			return
 		for settlement: WorldMapData.Settlement in data.settlements:
-			draw_footprint(settlement, visibility)
+			if is_in_view(Rect2(settlement.position, Vector2.ZERO).grow(WorldMapStyle.footprint_radius(settlement) * 2.0)):
+				draw_footprint(settlement, visibility)
 		return
 
 	# Smaller settlements first so cities sit on top where icons touch.
@@ -77,6 +78,8 @@ func draw_settlement_icon(settlement: WorldMapData.Settlement) -> void:
 	if visibility <= 0.02:
 		return
 	var icon_scale: float = WorldMapStyle.settlement_icon_radius(settlement, zoom) / zoom
+	if not is_in_view(Rect2(settlement.position, Vector2.ZERO).grow(icon_scale * 2.0)):
+		return
 	draw_set_transform(draw_offset + settlement.position, 0.0, Vector2(icon_scale, icon_scale))
 	var highlight: Color = Color(0, 0, 0, 0)
 	if settlement.id == selected_settlement_id:

@@ -28,6 +28,8 @@ class RoadShape:
 	# Where the road leads beyond the map edge, "" for roads between towns.
 	var toward: String = ""
 	var edge_point: Vector2 = Vector2.ZERO
+	# Drawn elsewhere (a world road the chunks draw); still lines streets and clears trees.
+	var is_context: bool = false
 
 class BridgeShape:
 	var center: Vector2 = Vector2.ZERO
@@ -70,6 +72,11 @@ var tiles: Array = []
 var cities: Array[City] = []
 var geography: RegionGeography = null
 var map_size: Vector2i = Vector2i.ZERO
+# Tile of tiles[0][0]. Shapes are in map units of this tile space: tile t covers
+# t * TILE .. (t + 1) * TILE. Zero for a bounded region; a global tile on the continuous map.
+var tile_origin: Vector2i = Vector2i.ZERO
+# World tier by settlement name, for towns that are world settlements on the continuous map.
+var world_tiers: Dictionary = {}
 
 var roads: Array[RoadShape] = []
 var bridges: Array[BridgeShape] = []
@@ -78,21 +85,16 @@ var fields: Array[FieldShape] = []
 var quarries: Array[QuarryShape] = []
 var clear_grid: PackedByteArray = PackedByteArray()
 
-func build(region_tiles: Array, region_cities: Array[City], road_paths: Array[Array], region_geography: RegionGeography) -> void:
-	tiles = region_tiles
+# context_roads: world roads drawn by the continuous map's chunks; settlements line their
+# streets along them and trees keep clear of them, but this geometry does not draw them.
+func build(region_tiles: Array, region_cities: Array[City], road_paths: Array[Array], region_geography: RegionGeography, context_roads: Array[RoadShape] = []) -> void:
+	begin(region_tiles, Vector2i.ZERO)
 	cities = region_cities
 	geography = region_geography
-	map_size = Vector2i((tiles[0] as Array).size(), tiles.size()) if not tiles.is_empty() else Vector2i.ZERO
-	roads.clear()
-	bridges.clear()
-	settlements.clear()
-	fields.clear()
-	quarries.clear()
-	clear_grid = PackedByteArray()
-	clear_grid.resize(map_size.x * map_size.y * CLEAR_CELLS_PER_TILE * CLEAR_CELLS_PER_TILE)
 	if map_size == Vector2i.ZERO:
 		return
 	build_roads(road_paths)
+	add_context_roads(context_roads)
 	build_bridges()
 	for city_index in range(cities.size()):
 		build_settlement(city_index)
@@ -100,16 +102,40 @@ func build(region_tiles: Array, region_cities: Array[City], road_paths: Array[Ar
 		build_fields(settlement)
 	build_quarries()
 
+# Clears the shapes and takes a new window of tiles starting at the given tile. A window
+# without tiles (size given) only clears ground for trees, as a chunk's roads do.
+func begin(window_tiles: Array, window_origin: Vector2i, window_size: Vector2i = Vector2i.ZERO) -> void:
+	tiles = window_tiles
+	tile_origin = window_origin
+	cities = []
+	map_size = Vector2i((tiles[0] as Array).size(), tiles.size()) if not tiles.is_empty() else window_size
+	roads.clear()
+	bridges.clear()
+	settlements.clear()
+	fields.clear()
+	quarries.clear()
+	clear_grid = PackedByteArray()
+	clear_grid.resize(map_size.x * map_size.y * CLEAR_CELLS_PER_TILE * CLEAR_CELLS_PER_TILE)
+
+# Roads drawn elsewhere that still shape this geometry (see build()).
+func add_context_roads(context_roads: Array[RoadShape]) -> void:
+	for road: RoadShape in context_roads:
+		roads.append(road)
+		mark_road_cleared(road)
+
 # --- Lookups -------------------------------------------------------------------
 
 func tile_at(map_point: Vector2) -> Dictionary:
-	var tile: Vector2i = Vector2i((map_point / RegionMapStyle.TILE).floor())
+	var tile: Vector2i = Vector2i((map_point / RegionMapStyle.TILE).floor()) - tile_origin
 	if tile.x < 0 or tile.y < 0 or tile.x >= map_size.x or tile.y >= map_size.y:
 		return {}
 	return tiles[tile.y][tile.x]
 
 static func tile_center(tile: Vector2) -> Vector2:
 	return (tile + Vector2(0.5, 0.5)) * RegionMapStyle.TILE
+
+func map_origin() -> Vector2:
+	return Vector2(tile_origin) * RegionMapStyle.TILE
 
 # Open land a building or field may stand on: not water, mountain, forest, or a deposit.
 func is_open_land(map_point: Vector2) -> bool:
@@ -122,13 +148,14 @@ func is_open_land(map_point: Vector2) -> bool:
 	return tile["has_forest"] == false and tile["resource"] == "none"
 
 func is_cleared(map_point: Vector2) -> bool:
-	var cell: Vector2i = Vector2i((map_point / RegionMapStyle.TILE * CLEAR_CELLS_PER_TILE).floor())
+	var cell: Vector2i = Vector2i(((map_point - map_origin()) / RegionMapStyle.TILE * CLEAR_CELLS_PER_TILE).floor())
 	var width: int = map_size.x * CLEAR_CELLS_PER_TILE
 	if cell.x < 0 or cell.y < 0 or cell.x >= width or cell.y >= map_size.y * CLEAR_CELLS_PER_TILE:
 		return false
 	return clear_grid[cell.y * width + cell.x] == 1
 
-func mark_cleared(center: Vector2, radius: float) -> void:
+func mark_cleared(map_center: Vector2, radius: float) -> void:
+	var center: Vector2 = map_center - map_origin()
 	var cell_size: float = RegionMapStyle.TILE / CLEAR_CELLS_PER_TILE
 	var width: int = map_size.x * CLEAR_CELLS_PER_TILE
 	var height: int = map_size.y * CLEAR_CELLS_PER_TILE
@@ -183,12 +210,18 @@ func build_roads(road_paths: Array[Array]) -> void:
 	# Wider roads draw last so they cover the paths that share their roadbed.
 	roads.sort_custom(func(a: RoadShape, b: RoadShape) -> bool: return a.road_class < b.road_class)
 	for road: RoadShape in roads:
-		for i in range(road.points.size() - 1):
-			var a: Vector2 = road.points[i]
-			var b: Vector2 = road.points[i + 1]
-			var steps: int = maxi(1, ceili(a.distance_to(b) / 2.0))
-			for step in range(steps + 1):
-				mark_cleared(a.lerp(b, float(step) / steps), ROAD_HALF_WIDTHS[road.road_class] + ROAD_VERGE)
+		mark_road_cleared(road)
+
+func mark_road_cleared(road: RoadShape) -> void:
+	var map_bounds: Rect2 = Rect2(map_origin(), Vector2(map_size) * RegionMapStyle.TILE).grow(RegionMapStyle.TILE)
+	for i in range(road.points.size() - 1):
+		var a: Vector2 = road.points[i]
+		var b: Vector2 = road.points[i + 1]
+		if not map_bounds.has_point(a) and not map_bounds.has_point(b):
+			continue
+		var steps: int = maxi(1, ceili(a.distance_to(b) / 2.0))
+		for step in range(steps + 1):
+			mark_cleared(a.lerp(b, float(step) / steps), ROAD_HALF_WIDTHS[road.road_class] + ROAD_VERGE)
 
 func is_edge_tile(tile: Vector2) -> bool:
 	return tile.x <= 0 or tile.y <= 0 or tile.x >= map_size.x - 1 or tile.y >= map_size.y - 1
@@ -216,11 +249,17 @@ func nearest_world_exit(edge_tile: Vector2) -> RegionGeography.RoadExit:
 
 # A bridge spans each stretch of road that lies over river tiles (the data's fords).
 func build_bridges() -> void:
+	build_bridges_where(func(point: Vector2) -> bool:
+		var tile: Dictionary = tile_at(point)
+		return not tile.is_empty() and tile["type"] == "river")
+
+func build_bridges_where(is_over_river: Callable) -> void:
 	for road: RoadShape in roads:
+		if road.is_context:
+			continue
 		var run_start: int = -1
 		for i in range(road.points.size()):
-			var tile: Dictionary = tile_at(road.points[i])
-			var over_river: bool = not tile.is_empty() and tile["type"] == "river"
+			var over_river: bool = is_over_river.call(road.points[i])
 			if over_river and run_start < 0:
 				run_start = i
 			elif not over_river and run_start >= 0:
@@ -272,6 +311,8 @@ func settlement_tier(city: City) -> int:
 		for site: RegionGeography.SettlementSite in geography.settlements:
 			if site.name == city.name:
 				tier = maxi(tier, mini(site.tier, RegionMapStyle.TIER_LARGE_TOWN))
+	if world_tiers.has(city.name):
+		tier = maxi(tier, mini(int(world_tiers[city.name]), RegionMapStyle.TIER_LARGE_TOWN))
 	return tier
 
 func building_target(city: City, tier: int) -> int:
@@ -282,19 +323,27 @@ func building_target(city: City, tier: int) -> int:
 
 func build_settlement(city_index: int) -> void:
 	var city: City = cities[city_index]
+	var tier: int = settlement_tier(city)
+	add_settlement(city_index, city.name, city.tile, tier, city.is_player_city(), building_target(city, tier))
+
+# A world settlement the simulation does not run, drawn from its world tier alone.
+func add_world_settlement(settlement_name: String, tile: Vector2, world_tier: int) -> SettlementShape:
+	var tier: int = mini(world_tier, RegionMapStyle.TIER_LARGE_TOWN)
+	return add_settlement(-1, settlement_name, tile, tier, false, [5, 11, 22, 38][tier])
+
+func add_settlement(city_index: int, settlement_name: String, tile: Vector2, tier: int, is_player: bool, target: int) -> SettlementShape:
 	var shape: SettlementShape = SettlementShape.new()
 	shape.city_index = city_index
-	shape.name = city.name
-	shape.center = tile_center(city.tile)
-	shape.is_player = city.is_player_city()
-	shape.tier = settlement_tier(city)
+	shape.name = settlement_name
+	shape.center = tile_center(tile)
+	shape.is_player = is_player
+	shape.tier = tier
 	shape.radius = [15.0, 24.0, 34.0, 46.0][shape.tier]
 	if shape.tier >= RegionMapStyle.TIER_TOWN:
 		shape.plaza_radius = 4.5 + shape.tier * 1.2
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
-	rng.seed = hash(city.name + str(city.tile))
+	rng.seed = hash(settlement_name + str(tile))
 	var grid_angle: float = rng.randf_range(-0.6, 0.6)
-	var target: int = building_target(city, shape.tier)
 	var roof_choices: Array[Color] = roof_palette(shape.tier)
 
 	# The landmark: a hall in villages, a church with a tower in towns.
@@ -332,6 +381,7 @@ func build_settlement(city_index: int) -> void:
 		shape.enclosure = "wall"
 	shape.enclosure_radius = reach + 1.5
 	settlements.append(shape)
+	return shape
 
 const COLOR_LANDMARK_ROOF: Color = Color(0.45, 0.42, 0.44)
 
@@ -408,6 +458,8 @@ func can_place_building(shape: SettlementShape, position: Vector2) -> bool:
 # --- Fields and extraction ------------------------------------------------------------
 
 func cultivation_radius(settlement: SettlementShape) -> float:
+	if settlement.city_index < 0:
+		return RegionMapStyle.TILE * [2.0, 3.5, 5.0, 6.5][settlement.tier]
 	var city: City = cities[settlement.city_index]
 	if city.is_player_city():
 		var farms: int = 0

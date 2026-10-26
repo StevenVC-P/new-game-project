@@ -14,7 +14,7 @@ func draw_world() -> void:
 			continue
 		var width: float = WorldMapStyle.road_width_px(road_class, zoom) / zoom
 		for road: WorldMapData.Road in data.roads:
-			if road.road_class != road_class:
+			if road.road_class != road_class or not is_in_view(road_bounds(road).grow(width * 2.0)):
 				continue
 			match road_class:
 				WorldMapData.ROAD_MAJOR:
@@ -26,6 +26,13 @@ func draw_world() -> void:
 					var dashes: PackedVector2Array = dash_polyline(road.points, LOCAL_DASH_PX / zoom, LOCAL_GAP_PX / zoom)
 					if not dashes.is_empty():
 						draw_multiline(dashes, faded(WorldMapStyle.COLOR_ROAD_LOCAL, visibility * 0.9), width, true)
+
+var bounds_by_road: Dictionary = {}
+
+func road_bounds(road: WorldMapData.Road) -> Rect2:
+	if not bounds_by_road.has(road.id):
+		bounds_by_road[road.id] = points_rect(road.points)
+	return bounds_by_road[road.id]
 
 # Dashes measured along the whole road, so the pattern does not restart at every vertex.
 static func dash_polyline(points: PackedVector2Array, dash: float, gap: float) -> PackedVector2Array:

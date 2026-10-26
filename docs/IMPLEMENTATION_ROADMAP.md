@@ -301,6 +301,8 @@ Next implementation step: draw regional deposits onto town maps as resource tile
 
 **Regional map art direction v1 (2026-10-26, owner-requested):** the regional map is drawn as a miniature landscape with a pan and zoom camera and follows its world region (rivers, coast, lakes, high ground, climate, woods, roads, settlement). Founding is presented on the landscape with the unchanged survey. Maps made without the world are byte-identical to before. No economy formula changed; world-driven land does change what towns start with (a probe across 14 regions of every climate got 40/42 towns off the ground, against 47/48 on the original maps). Details: `docs/REGIONAL_MAP.md`.
 
+**Continuous regional map (2026-10-26, owner-requested):** the regional map became one continuous, true-scale map of the planet that scrolls from region to region and hands off to the atlas by zooming, with kingdom land view-only. No economy formula changed; the map-luck probe got 42/42 towns off the ground across 14 frontier regions. Details: `docs/REGIONAL_MAP.md`.
+
 **Later in this track (after the first playable village):**
 
 1. Living neighbors and rivals on the world map. (The regional map generated from its world region's geography is done: see below.)
