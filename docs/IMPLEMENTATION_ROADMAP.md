@@ -289,10 +289,13 @@ Owner direction: the map is part of the plan now; art and presentation wait for 
 - Stone and ore deposits never appear on town maps: the "stone cluster" step paints rough ground, and quarries can be placed anywhere. A site's stone and ore currently have no effect on the town.
 - The `isolated` site tag applies to 44/48 sites (it mostly measures nearby roads, which barely exist before founding), so it carries little information.
 
-**Decisions needed (owner):**
+**Owner decisions (2026-10-25):**
 
-1. What should a site mean economically, beyond how much room its map has? For example: farmland richness changing farm yields, forest density changing gatherer and woodcutter yields, a river adding trade or fishing, nearby stone enabling quarries.
-2. Should stone and ore appear on town maps, with quarries (tier 2's raw material) placed on them?
+1. **A site means which resources the town can reach.** Some resources must be built on (a quarry sits on stone); others only need to be near the building (a camp near trees, as today).
+2. **Stone appears on town maps** as a real deposit.
+3. **Not every site has every resource.** More kinds of resources will be added later, so the resource model should be easy to extend.
+
+Next implementation step: draw regional deposits onto town maps as resource tiles, give each resource an access rule (on-site or nearby), require quarries to sit on stone, and show available resources in the founding site survey.
 
 **Later in this track (after the first playable village):**
 
