@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A household-rooted civilization sandbox: founding families on a frontier grow into lineages, Houses, and settlements, with culture and economics building on each other. Identity and status live in `project.md`.
 
-**Read `AGENTS.md` first.** It holds the binding working rules: branch from `develop`, never work on or merge to `main` without review, high-risk files, and validation. This file adds commands and pointers, not a second rule set.
+**Read `AGENTS.md` first.** It holds the binding working rules: branch from `develop`, never work on or merge to `main` without review, high-risk files, and validation. This file adds commands and pointers, not a second rule set. Current status, open owner decisions, and gotchas: `docs/HANDOFF.md`.
 
 ## Design Sources
 
@@ -65,7 +65,7 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 
 ## Architecture
 
-- `scripts/main.gd` - large central scene script: map input, drawing, UI, day ticking, trade. High-risk; avoid adding new simulation logic here.
+- `scripts/main.gd` - large central scene script: map input, drawing, UI, day ticking, trade. High-risk; avoid adding new simulation logic here. A click that switches views must call `get_viewport().set_input_as_handled()`, or the newly shown view receives the same click.
 - `scripts/domain/` - simulation model: `city.gd` (resources, households, buildings, growth, lifecycle orchestration), `household.gd` (family structure, lifecycle, labor), `building.gd`.
 - `scripts/simulation/` - `calendar.gd` and `simulation_clock.gd` (1 day = 1 real second at 1x).
 - `scripts/world/` - regional and local map generation, founding-site helpers, and the world map's data (`world_map_data.gd`), authored planet (`fixed_world_definition.gd`), and builder (`world_field_builder.gd`).
