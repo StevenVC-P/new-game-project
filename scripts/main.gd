@@ -41,6 +41,14 @@ const WORK_PREF_NEUTRAL: String = "neutral"
 const WORK_PREF_AGRARIAN: String = "agrarian"
 const WORK_PREF_INDUSTRIAL: String = "industrial"
 const CITY_TREND_STABLE_THRESHOLD: float = 0.15
+# Gameplay neighbourhood on the continuous regional map: about four of the old regional maps.
+const NEIGHBOURHOOD_SIZE: Vector2i = Vector2i(160, 100)
+# Before founding, the neighbourhood follows the camera once it settles closer than this to
+# the neighbourhood's edge, so founding sites are wherever the player looks.
+const NEIGHBOURHOOD_MARGIN_TILES: int = 30
+const REGION_ENTRY_ZOOM: float = 1.2
+# Atlas zoom when the World button opens it from the regional map: the surrounding regions.
+const WORLD_BUTTON_ATLAS_ZOOM: float = 1.2
 
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var tiles: Array = []
@@ -89,6 +97,16 @@ var region_map_layer: CanvasLayer = null
 var region_map_view: RegionMapView = null
 # Tiles where a town may be founded, refreshed when towns change rather than every frame.
 var region_founding_sites: Array[Vector2i] = []
+# The continuous regional map: the whole planet at regional scale, built on first use. Its
+# game rules run on a neighbourhood of it: tiles, cities, and roads are the window of
+# region_map_size tiles starting at the global tile neighbourhood_origin. Without it (scripts
+# that build a bounded region directly) the window is the whole bounded map.
+var regional_terrain: RegionalTerrain = null
+var region_map_size: Vector2i = Vector2i(MAP_WIDTH, MAP_HEIGHT)
+var neighbourhood_origin: Vector2i = Vector2i.ZERO
+# The calendar waits until the regional map has been shown once.
+var has_shown_region_map: bool = false
+var last_region_in_view_id: int = -1
 
 func get_city_pressure_debug_city() -> City:
 	if selected_city_index >= 0 and selected_city_index < cities.size():
@@ -109,17 +127,6 @@ func _ready():
 	# The game opens on the world atlas; the regional map is generated when a region is entered.
 	open_world_map()
 
-func generate_region_content():
-	generate_map()
-	place_cities()
-	analyze_city_site_profiles()
-	generate_city_local_maps()
-	generate_roads()
-	analyze_city_site_profiles()
-	refresh_founding_sites()
-	if region_map_view != null:
-		region_map_view.set_region(tiles, cities, roads, region_geography)
-
 func _ensure_region_map_view() -> void:
 	if region_map_view != null:
 		return
@@ -130,6 +137,7 @@ func _ensure_region_map_view() -> void:
 	region_map_view.visible = false
 	region_map_layer.add_child(region_map_view)
 	region_map_view.map_clicked.connect(on_region_map_clicked)
+	region_map_view.zoom_out_past_min.connect(on_region_zoom_out_past_min)
 
 # Called after towns or roads change (founding, growth, building in the town view).
 func notify_region_map_changed() -> void:
@@ -141,8 +149,8 @@ func refresh_founding_sites() -> void:
 	region_founding_sites.clear()
 	if has_player_city() or tiles.is_empty():
 		return
-	for y in range(MAP_HEIGHT):
-		for x in range(MAP_WIDTH):
+	for y in range(region_map_size.y):
+		for x in range(region_map_size.x):
 			if is_valid_founding_tile(Vector2i(x, y)):
 				region_founding_sites.append(Vector2i(x, y))
 
@@ -206,10 +214,12 @@ func _ensure_world_map_view() -> void:
 	world_map_layer.add_child(world_map_view)
 	world_map_view.setup(world_map_data)
 	world_map_view.region_entry_requested.connect(on_world_region_entry_requested)
+	world_map_view.zoom_in_past_max.connect(on_world_zoom_in_past_max)
 	world_map_view.return_requested.connect(close_world_map)
 
 func open_world_map() -> void:
 	_ensure_world_map_view()
+	var coming_from_region: bool = current_view == VIEW_REGION and is_continuous_region_map()
 	current_view = VIEW_WORLD
 	hovered_tile = Vector2i(-1, -1)
 	hovered_city_index = -1
@@ -222,45 +232,174 @@ func open_world_map() -> void:
 	world_map_view.set_home_region(entered_world_region_id, has_player_city())
 	world_map_layer.visible = true
 	world_map_view.set_active(true)
-	if entered_world_region_id >= 0:
+	if coming_from_region and region_map_view != null:
+		# The atlas opens over the place the regional map was showing.
+		var world_position: Vector2 = region_map_view.screen_to_world(region_map_view.screen_rect.get_center())
+		world_map_view.focus_on(world_position, WORLD_BUTTON_ATLAS_ZOOM)
+		world_map_view.select_region(world_map_data.region_id_at(world_position))
+	elif entered_world_region_id >= 0:
 		world_map_view.select_region(entered_world_region_id)
 	queue_redraw()
 
 func close_world_map() -> void:
-	if entered_world_region_id < 0:
+	if not has_shown_region_map:
 		return
 	world_map_layer.visible = false
 	world_map_view.set_active(false)
 	current_view = VIEW_REGION
 	queue_redraw()
 
+# Entering a region looks at its main settlement. Before founding, the founding
+# neighbourhood moves there; after, the home town stays where it is and the region is only viewed.
 func on_world_region_entry_requested(region_id: int) -> void:
-	if region_id != entered_world_region_id:
-		if has_player_city():
-			return
-		generate_region_for_world(world_map_data.get_region(region_id))
-	close_world_map()
+	var region: WorldMapData.Region = world_map_data.get_region(region_id)
+	if region == null:
+		return
+	_ensure_regional_terrain()
+	var focus: Vector2 = regional_terrain.region_focus(region)
+	var player_index: int = get_player_city_index()
+	if player_index >= 0 and region_id == entered_world_region_id:
+		focus = regional_terrain.tile_center_to_world(local_to_global_tile(Vector2i(cities[player_index].tile)))
+	enter_regional_map_at(focus, REGION_ENTRY_ZOOM, Vector2(-1.0, -1.0))
+	print("Entered world region: ", region.name, " (", region.climate, "; ", region.landscape, ")")
 
-# Seeding from the world region makes each region's map the same every time it is
-# entered. The seed is dropped afterwards so founding families stay unpredictable.
-func generate_region_for_world(region: WorldMapData.Region) -> void:
-	rng.seed = region.regional_map_seed
-	region_geography = RegionGeography.from_world(world_map_data, region.id, Vector2i(MAP_WIDTH, MAP_HEIGHT))
+# Zooming into the atlas past its closest view lands on the regional map at the same
+# place and scale. Open water has no regional map, so the atlas stays.
+func on_world_zoom_in_past_max(world_position: Vector2, screen_position: Vector2) -> void:
+	if not world_map_data.is_land_at(world_position):
+		return
+	enter_regional_map_at(world_position, RegionMapView.HANDOFF_ZOOM, screen_position)
+
+# Zooming out of the regional map past its widest view lands on the atlas at the same place
+# and scale, keeping the point under the cursor where it was.
+func on_region_zoom_out_past_min(screen_position: Vector2) -> void:
+	var world_position: Vector2 = region_map_view.screen_to_world(screen_position)
+	open_world_map()
+	var atlas_zoom: float = WorldMapStyle.MAX_ZOOM
+	var atlas_center: Vector2 = world_position - (screen_position - world_map_view.map_screen_rect().get_center()) / atlas_zoom
+	world_map_view.focus_on(atlas_center, atlas_zoom)
+	world_map_view.select_region(world_map_data.region_id_at(world_position))
+	get_viewport().set_input_as_handled()
+
+# Shows the regional map with world_position under screen_position (the view's middle when
+# screen_position is negative).
+func enter_regional_map_at(world_position: Vector2, zoom: float, screen_position: Vector2) -> void:
+	_ensure_regional_terrain()
+	var tile: Vector2i = regional_terrain.wrap_tile(regional_terrain.world_to_tile_index(world_position))
+	if not has_player_city():
+		place_neighbourhood(tile)
+	has_shown_region_map = true
+	close_world_map()
+	if region_map_view != null:
+		region_map_view.set_screen_rect(get_region_map_screen_rect())
+		var anchor: Vector2 = screen_position if screen_position.x >= 0.0 else region_map_view.screen_rect.get_center()
+		var center_tile: Vector2 = regional_terrain.world_to_tile(world_position) - (anchor - region_map_view.screen_rect.get_center()) / (zoom * RegionMapStyle.TILE)
+		region_map_view.focus_on_global_tile(center_tile, zoom)
+
+func _ensure_regional_terrain() -> void:
+	if regional_terrain != null:
+		return
+	_ensure_world_map_view()
+	regional_terrain = RegionalTerrain.new(world_map_data)
+	if region_map_view != null:
+		region_map_view.set_terrain(regional_terrain)
+
+func is_continuous_region_map() -> bool:
+	return regional_terrain != null
+
+func local_to_global_tile(tile: Vector2i) -> Vector2i:
+	if regional_terrain == null:
+		return tile
+	return Vector2i(regional_terrain.wrap_tile_x(neighbourhood_origin.x + tile.x), neighbourhood_origin.y + tile.y)
+
+func global_to_local_tile(tile: Vector2i) -> Vector2i:
+	var dx: int = posmod(tile.x - neighbourhood_origin.x, regional_terrain.size_tiles.x)
+	if dx > regional_terrain.size_tiles.x / 2:
+		dx -= regional_terrain.size_tiles.x
+	return Vector2i(dx, tile.y - neighbourhood_origin.y)
+
+# The neighbourhood's origin when centered on a global tile, kept off the poles.
+func neighbourhood_origin_around(center: Vector2i) -> Vector2i:
+	var y: int = clampi(center.y - NEIGHBOURHOOD_SIZE.y / 2, 0, regional_terrain.size_tiles.y - NEIGHBOURHOOD_SIZE.y)
+	return Vector2i(regional_terrain.wrap_tile_x(center.x - NEIGHBOURHOOD_SIZE.x / 2), y)
+
+# Before founding: the gameplay neighbourhood becomes the window of the planet around a
+# global tile, with the world's settlements in it as neutral towns. A chosen site inside the
+# new window is kept.
+func place_neighbourhood(center: Vector2i) -> void:
+	var kept_site: Vector2i = local_to_global_tile(pending_founding_tile) if has_pending_founding_tile() else Vector2i(-1, -1)
+	neighbourhood_origin = neighbourhood_origin_around(center)
+	region_map_size = NEIGHBOURHOOD_SIZE
+	tiles = regional_terrain.extract_window(neighbourhood_origin, region_map_size)
+	var neighbourhood_cities: Array[City] = []
+	for pair: Array in regional_terrain.settlements_in_window(neighbourhood_origin, region_map_size):
+		var settlement: WorldMapData.Settlement = pair[0]
+		neighbourhood_cities.append(City.new(settlement.name, Vector2((pair[1] as Vector2i) - neighbourhood_origin), City.ROLE_NEUTRAL))
+	cities = neighbourhood_cities
+	roads = []
+	region_geography = null
 	clear_pending_founding_tile()
 	trade_routes.clear()
+	trade_menu.close()
 	selected_city_index = -1
-	generate_region_content()
-	rng.randomize()
-	entered_world_region_id = region.id
-	print("Entered world region: ", region.name, " (", region.climate, "; ", region.landscape, ")")
+	analyze_city_site_profiles()
+	generate_city_local_maps()
+	refresh_founding_sites()
+	entered_world_region_id = world_map_data.region_id_at(regional_terrain.tile_center_to_world(center))
+	if region_map_view != null:
+		region_map_view.set_neighbourhood(tiles, cities, roads, neighbourhood_origin)
+	if kept_site.x >= 0:
+		var local_site: Vector2i = global_to_local_tile(kept_site)
+		if is_inside_map(local_site.x, local_site.y):
+			set_pending_founding_tile(local_site)
+
+# Before founding, the neighbourhood follows the camera once it comes to rest near the
+# neighbourhood's edge.
+func follow_camera_with_neighbourhood() -> void:
+	if not is_continuous_region_map() or has_player_city() or region_map_view == null:
+		return
+	if region_map_view.press_button != MOUSE_BUTTON_NONE or not is_equal_approx(region_map_view.zoom, region_map_view.target_zoom):
+		return
+	var center: Vector2i = Vector2i(region_map_view.camera_global_tile().floor())
+	var local: Vector2i = global_to_local_tile(center)
+	var margin: int = NEIGHBOURHOOD_MARGIN_TILES
+	if local.x >= margin and local.y >= margin and local.x < region_map_size.x - margin and local.y < region_map_size.y - margin:
+		return
+	if neighbourhood_origin_around(center) == neighbourhood_origin:
+		return
+	place_neighbourhood(center)
+	queue_redraw()
+
+# Free settlers may not found towns on land a kingdom holds; null where none does.
+func get_kingdom_holding_tile(tile_pos: Vector2i) -> WorldMapData.Kingdom:
+	if regional_terrain == null:
+		return null
+	var region: WorldMapData.Region = world_map_data.get_region(regional_terrain.region_id_at_tile(local_to_global_tile(tile_pos)))
+	if region == null:
+		return null
+	return world_map_data.get_kingdom(region.owner_kingdom_id)
+
+# The world region the regional map is showing: the one under the camera.
+func get_region_in_view() -> WorldMapData.Region:
+	if regional_terrain == null or region_map_view == null:
+		return world_map_data.get_region(entered_world_region_id) if world_map_data != null else null
+	return world_map_data.get_region(regional_terrain.region_vote_at(region_map_view.camera_global_tile() * RegionalTerrain.TILE_WORLD_UNITS))
 
 func _process(_delta: float):
 	if region_map_view != null:
 		region_map_view.visible = current_view == VIEW_REGION
 		region_map_view.set_screen_rect(get_region_map_screen_rect())
-	if current_view == VIEW_WORLD and entered_world_region_id < 0:
+	if current_view == VIEW_WORLD and not has_shown_region_map:
 		# Nothing lives in the world simulation yet, so the calendar waits for the first region.
 		return
+	if current_view == VIEW_REGION:
+		follow_camera_with_neighbourhood()
+		# The title and inspector describe the region in view, which changes as the camera pans.
+		var region_in_view: WorldMapData.Region = get_region_in_view() if world_map_data != null else null
+		var region_in_view_id: int = region_in_view.id if region_in_view != null else -1
+		if region_in_view_id != last_region_in_view_id:
+			last_region_in_view_id = region_in_view_id
+			queue_redraw()
 
 	if not simulation_clock.is_paused:
 		city_walker_time += _delta * max(1.0, simulation_clock.get_speed_multiplier())
@@ -454,26 +593,44 @@ func update_city_hovered_tile(mouse_pos: Vector2):
 		city_hovered_tile = new_hovered_tile
 		queue_redraw()
 
-func generate_map():
-	var generator: RegionMapGenerator = make_region_map_generator()
-	var result: Dictionary = generator.generate_region()
-	tiles = result["tiles"] as Array
-	cities = result["cities"] as Array[City]
-	roads.clear()
-
-func place_cities():
-	trade_routes.clear()
-	trade_menu.close()
-
 func generate_roads():
 	var generator: RegionMapGenerator = make_region_map_generator()
 	generator.tiles = tiles
-	roads = generator.generate_roads_for_cities(cities)
+	if is_continuous_region_map():
+		roads = generate_spur_roads(generator)
+	else:
+		roads = generator.generate_roads_for_cities(cities)
+
+# On the continuous map the world's roads are already on the land; the player's town gets a
+# track to the nearest of them.
+func generate_spur_roads(generator: RegionMapGenerator) -> Array[Array]:
+	var spurs: Array[Array] = []
+	var player_index: int = get_player_city_index()
+	if player_index < 0:
+		return spurs
+	var town: Vector2i = Vector2i(cities[player_index].tile)
+	var target: Vector2i = Vector2i(-1, -1)
+	var best: float = INF
+	for y in range(region_map_size.y):
+		for x in range(region_map_size.x):
+			if tiles[y][x]["has_road"] != true:
+				continue
+			var distance: float = Vector2(x - town.x, y - town.y).length_squared()
+			if distance < best:
+				best = distance
+				target = Vector2i(x, y)
+	if target.x < 0 or target == town:
+		return spurs
+	generator.add_routed_road(generator.make_road_astar(), town, target, spurs)
+	return spurs
 
 func make_region_map_generator() -> RegionMapGenerator:
-	var generator: RegionMapGenerator = RegionMapGenerator.new(rng, MAP_WIDTH, MAP_HEIGHT, MIN_CITY_DISTANCE, RIVER_NEAR_RANGE, CITY_RESOURCE_RANGE)
+	var generator: RegionMapGenerator = RegionMapGenerator.new(rng, region_map_size.x, region_map_size.y, MIN_CITY_DISTANCE, RIVER_NEAR_RANGE, CITY_RESOURCE_RANGE)
 	generator.geography = region_geography
 	return generator
+
+func make_local_map_generator() -> LocalCityMapGenerator:
+	return LocalCityMapGenerator.new(rng, CITY_MAP_WIDTH, CITY_MAP_HEIGHT, region_map_size.x, region_map_size.y, RIVER_NEAR_RANGE, CITY_RESOURCE_RANGE)
 
 func analyze_city_site_profiles():
 	for city: City in cities:
@@ -481,13 +638,13 @@ func analyze_city_site_profiles():
 		print(city.name, " site profile: ", city.site_profile.get_debug_summary())
 
 func generate_city_local_maps():
-	var generator: LocalCityMapGenerator = LocalCityMapGenerator.new(rng, CITY_MAP_WIDTH, CITY_MAP_HEIGHT, MAP_WIDTH, MAP_HEIGHT, RIVER_NEAR_RANGE, CITY_RESOURCE_RANGE)
+	var generator: LocalCityMapGenerator = make_local_map_generator()
 	for city_index in range(cities.size()):
 		var city: City = cities[city_index]
 		city.local_map = generator.generate(city, tiles, city_index)
 
 func is_inside_map(x: int, y: int) -> bool:
-	return x >= 0 and x < MAP_WIDTH and y >= 0 and y < MAP_HEIGHT
+	return x >= 0 and x < region_map_size.x and y >= 0 and y < region_map_size.y
 
 func try_open_city_at_position(mouse_pos: Vector2) -> bool:
 	var city_index: int = get_city_index_at_position(mouse_pos)
@@ -507,6 +664,12 @@ func try_open_city_at_position(mouse_pos: Vector2) -> bool:
 
 func try_select_founding_tile_at_position(mouse_pos: Vector2) -> bool:
 	var tile_pos: Vector2i = get_region_tile_at_position(mouse_pos)
+	if not is_inside_map(tile_pos.x, tile_pos.y) and is_continuous_region_map() and not has_player_city() and not is_over_region_panels(mouse_pos):
+		# A site beyond the neighbourhood: the neighbourhood moves there first.
+		var global_tile: Vector2i = region_map_view.screen_to_global_tile(mouse_pos)
+		if global_tile.x >= 0:
+			place_neighbourhood(global_tile)
+			tile_pos = get_region_tile_at_position(mouse_pos)
 	if not is_inside_map(tile_pos.x, tile_pos.y):
 		return false
 	if set_pending_founding_tile(tile_pos):
@@ -524,10 +687,17 @@ func get_region_tile_at_position(mouse_pos: Vector2) -> Vector2i:
 	return Vector2i(int(floor(mouse_pos.x / TILE_SIZE)), int(floor(mouse_pos.y / TILE_SIZE)))
 
 func is_valid_founding_tile(tile_pos: Vector2i) -> bool:
-	return FoundingSiteHelper.is_valid_founding_tile(tiles, cities, tile_pos, MIN_CITY_DISTANCE)
+	if not FoundingSiteHelper.is_valid_founding_tile(tiles, cities, tile_pos, MIN_CITY_DISTANCE):
+		return false
+	return get_kingdom_holding_tile(tile_pos) == null
 
 func get_founding_tile_invalid_reason(tile_pos: Vector2i) -> String:
-	return FoundingSiteHelper.get_founding_tile_invalid_reason(tiles, cities, tile_pos, MIN_CITY_DISTANCE)
+	var reason: String = FoundingSiteHelper.get_founding_tile_invalid_reason(tiles, cities, tile_pos, MIN_CITY_DISTANCE)
+	if reason == FoundingSiteHelper.VALID_FOUNDING_SITE:
+		var kingdom: WorldMapData.Kingdom = get_kingdom_holding_tile(tile_pos)
+		if kingdom != null:
+			return FoundingSiteHelper.kingdom_land_reason(kingdom.name)
+	return reason
 
 func set_pending_founding_tile(tile_pos: Vector2i) -> bool:
 	if not is_valid_founding_tile(tile_pos):
@@ -541,7 +711,7 @@ func survey_pending_site(tile_pos: Vector2i) -> void:
 	var preview_city: City = City.new("Player Town", Vector2(tile_pos.x, tile_pos.y), City.ROLE_PLAYER, 0)
 	pending_site_profile = SettlementSiteProfile.analyze(preview_city.tile, tiles, CITY_RESOURCE_RANGE)
 	preview_city.site_profile = pending_site_profile
-	var generator: LocalCityMapGenerator = LocalCityMapGenerator.new(rng, CITY_MAP_WIDTH, CITY_MAP_HEIGHT, MAP_WIDTH, MAP_HEIGHT, RIVER_NEAR_RANGE, CITY_RESOURCE_RANGE)
+	var generator: LocalCityMapGenerator = make_local_map_generator()
 	# The founded town will take the next city index, which the map generator uses.
 	pending_local_map = generator.generate(preview_city, tiles, cities.size())
 	pending_site_survey = SiteSurvey.get_lines(pending_local_map, pending_site_profile)
@@ -587,6 +757,9 @@ func found_player_city_at_pending_site() -> bool:
 	clear_pending_founding_tile()
 	generate_roads()
 	notify_region_map_changed()
+	if is_continuous_region_map():
+		# The town's region is home now: the neighbourhood stays around it.
+		entered_world_region_id = regional_terrain.region_id_at_tile(local_to_global_tile(Vector2i(founded_city.tile)))
 
 	selected_city_index = founded_city_index
 	current_view = VIEW_CITY
@@ -602,7 +775,7 @@ func create_player_city_at_tile(tile_pos: Vector2i) -> City:
 
 func configure_new_city_map(city: City, city_index: int) -> void:
 	city.site_profile = SettlementSiteProfile.analyze(city.tile, tiles, CITY_RESOURCE_RANGE)
-	var generator: LocalCityMapGenerator = LocalCityMapGenerator.new(rng, CITY_MAP_WIDTH, CITY_MAP_HEIGHT, MAP_WIDTH, MAP_HEIGHT, RIVER_NEAR_RANGE, CITY_RESOURCE_RANGE)
+	var generator: LocalCityMapGenerator = make_local_map_generator()
 	city.local_map = generator.generate(city, tiles, city_index)
 
 func get_city_index_at_position(mouse_pos: Vector2) -> int:
@@ -1032,8 +1205,8 @@ func _draw():
 		sync_region_map_view()
 		draw_trade_routes()
 	else:
-		for y in range(MAP_HEIGHT):
-			for x in range(MAP_WIDTH):
+		for y in range(region_map_size.y):
+			for x in range(region_map_size.x):
 				draw_tile(x, y)
 
 		draw_roads()
@@ -1086,8 +1259,8 @@ func draw_trade_routes():
 		MapElementVisuals.draw_trade_route(self, source_center, destination_center)
 
 func draw_fords():
-	for y in range(MAP_HEIGHT):
-		for x in range(MAP_WIDTH):
+	for y in range(region_map_size.y):
+		for x in range(region_map_size.x):
 			if not tiles[y][x]["has_ford"]:
 				continue
 
@@ -1160,8 +1333,10 @@ func draw_top_bar():
 func get_top_bar_title() -> String:
 	if current_view == VIEW_CITY:
 		return get_selected_city_name() + " Local Map"
-	if world_map_data != null and entered_world_region_id >= 0:
-		return world_map_data.get_region(entered_world_region_id).name
+	if world_map_data != null and (entered_world_region_id >= 0 or is_continuous_region_map()):
+		var region: WorldMapData.Region = get_region_in_view()
+		if region != null:
+			return region.name
 
 	return "Regional Map"
 
@@ -1799,9 +1974,13 @@ func draw_inspector_panel():
 
 	var y: float = text_pos.y + 32.0
 	y = draw_region_section_title(font, "Region Overview", text_pos.x, y)
-	if region_geography != null:
-		y = draw_region_label_value(font, font_size, "Climate", region_geography.climate_label, text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_UI_TEXT_SOFT)
-		y = draw_region_label_value(font, font_size, "Land", region_geography.landscape_label, text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_UI_TEXT_SOFT)
+	var region_in_view: WorldMapData.Region = get_region_in_view() if world_map_data != null else null
+	if region_in_view != null:
+		y = draw_region_label_value(font, font_size, "Climate", region_in_view.climate, text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_UI_TEXT_SOFT)
+		y = draw_region_label_value(font, font_size, "Land", region_in_view.landscape, text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_UI_TEXT_SOFT)
+		var kingdom: WorldMapData.Kingdom = world_map_data.get_kingdom(region_in_view.owner_kingdom_id)
+		var status: String = "Held by " + kingdom.name if kingdom != null else ("Contested frontier" if region_in_view.is_contested() else "Open frontier")
+		y = draw_region_label_value(font, font_size, "Status", status, text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_UI_TEXT_SOFT)
 		y += 4.0
 	if is_inside_map(hovered_tile.x, hovered_tile.y):
 		y = draw_region_hover_summary(font, font_size, text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2)

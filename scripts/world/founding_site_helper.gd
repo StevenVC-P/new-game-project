@@ -12,6 +12,11 @@ const REASON_OCCUPIED: String = "Tile already occupied"
 const REASON_TOO_CLOSE_NEUTRAL: String = "Too close to neutral town"
 const REASON_TOO_CLOSE_TOWN: String = "Too close to existing town"
 
+# Free settlers may not found towns on land a kingdom holds (checked by the owner of the
+# continuous regional map, which knows the political map).
+static func kingdom_land_reason(kingdom_name: String) -> String:
+	return "Held by %s: free settlers cannot found here" % kingdom_name
+
 static func is_valid_founding_tile(tiles: Array, cities: Array[City], tile_pos: Vector2i, min_city_distance: int) -> bool:
 	return get_founding_tile_invalid_reason(tiles, cities, tile_pos, min_city_distance) == VALID_FOUNDING_SITE
 

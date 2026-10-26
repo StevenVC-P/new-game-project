@@ -42,12 +42,44 @@ static func build(world: WorldMapData, region_name: String, with_grown_town: boo
 	var roads: Array[Array] = generator.generate_roads_for_cities(cities)
 	return {"tiles": tiles, "cities": cities, "roads": roads, "geography": generator.geography, "label": region_name}
 
-# The valid founding tile with the most fertile land around it.
-static func best_founding_site(tiles: Array, cities: Array[City]) -> Vector2i:
+# Size of the gameplay neighbourhood on the continuous map (main.gd uses the same).
+const NEIGHBOURHOOD_SIZE: Vector2i = Vector2i(160, 100)
+
+# The showcase as a neighbourhood of the continuous map, centered on the region's main
+# settlement. Returns {"origin", "tiles", "cities", "roads", "focus", "label"}; focus is the
+# global tile to look at, and the rest is in the neighbourhood's tile coordinates.
+static func build_continuous(world: WorldMapData, terrain: RegionalTerrain, region_name: String, with_grown_town: bool) -> Dictionary:
+	var region: WorldMapData.Region = world.find_region_by_name(region_name)
+	var settlements: Array[WorldMapData.Settlement] = world.get_settlements_in_region(region.id)
+	var anchor: Vector2i = terrain.settlement_tile(settlements[0]) if not settlements.is_empty() else terrain.world_to_tile_index(region.centroid)
+	var origin: Vector2i = anchor - NEIGHBOURHOOD_SIZE / 2
+	var tiles: Array = terrain.extract_window(origin, NEIGHBOURHOOD_SIZE)
+	var cities: Array[City] = []
+	for pair: Array in terrain.settlements_in_window(origin, NEIGHBOURHOOD_SIZE):
+		var settlement: WorldMapData.Settlement = pair[0]
+		cities.append(City.new(settlement.name, Vector2((pair[1] as Vector2i) - origin), City.ROLE_NEUTRAL))
+	var focus: Vector2 = Vector2(anchor) + Vector2(0.5, 0.5)
+	if with_grown_town:
+		var site: Vector2i = best_founding_site(tiles, cities, NEIGHBOURHOOD_SIZE / 2, 34)
+		if site.x >= 0:
+			cities.append(make_grown_town(site))
+			focus = Vector2(origin + site) + Vector2(0.5, 0.5)
+	var roads: Array[Array] = []
+	return {"origin": origin, "tiles": tiles, "cities": cities, "roads": roads, "focus": focus, "label": region_name}
+
+# The valid founding tile with the most fertile land around it, within reach of a tile
+# (the whole bounded map when reach is 0).
+static func best_founding_site(tiles: Array, cities: Array[City], around: Vector2i = Vector2i.ZERO, reach: int = 0) -> Vector2i:
 	var best: Vector2i = Vector2i(-1, -1)
 	var best_score: int = -1
-	for y in range(2, MAP_SIZE.y - 2):
-		for x in range(2, MAP_SIZE.x - 2):
+	var size: Vector2i = Vector2i((tiles[0] as Array).size(), tiles.size())
+	var low: Vector2i = Vector2i(2, 2)
+	var high: Vector2i = size - Vector2i(2, 2)
+	if reach > 0:
+		low = Vector2i(maxi(2, around.x - reach), maxi(2, around.y - reach))
+		high = Vector2i(mini(size.x - 2, around.x + reach), mini(size.y - 2, around.y + reach))
+	for y in range(low.y, high.y):
+		for x in range(low.x, high.x):
 			if not FoundingSiteHelper.is_valid_founding_tile(tiles, cities, Vector2i(x, y), MIN_CITY_DISTANCE):
 				continue
 			var profile: SettlementSiteProfile = SettlementSiteProfile.analyze(Vector2(x, y), tiles, CITY_RESOURCE_RANGE)

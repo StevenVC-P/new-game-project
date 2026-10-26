@@ -26,6 +26,23 @@ uniform float zoom = 1.5;
 // Ground under the drawn trees; matches the climate's tree style (RegionMapStyle.tree_style).
 uniform vec3 forest_floor = vec3(0.18, 0.29, 0.16);
 
+// Continuous map (one quad per chunk of the planet; see RegionalTerrain). With planet_tiles
+// at 0 the quad is a whole bounded region on its board, drawn exactly as before.
+uniform float planet_tiles = 0.0;
+// Global tile of the quad's origin; noise is anchored to the planet, so chunks join.
+uniform vec2 tile_origin = vec2(0.0);
+// Tiles of margin the masks hold around the quad.
+uniform float mask_offset = 0.0;
+// How strongly the forest floor shows a canopy texture: 1 when individual trees are not drawn.
+uniform float canopy_strength = 0.0;
+// Political borders, voted on exactly like the world atlas (shaders/world_terrain.gdshader).
+uniform sampler2D political_tex : filter_nearest, repeat_enable;
+uniform sampler2D kingdom_palette : filter_nearest;
+uniform vec2 political_size = vec2(512.0, 256.0);
+// World units per tile.
+uniform float tile_world = 1.2;
+uniform float show_borders = 0.0;
+
 // How far the warp may move a feature edge, in tiles.
 const float EDGE_WARP = 0.22;
 // Steepness of the lit relief.
@@ -58,15 +75,29 @@ vec4 smooth_mask(sampler2D tex, vec2 p) {
 		+ g1.y * (g0.x * texture(tex, vec2(h0.x, h1.y)) + g1.x * texture(tex, h1));
 }
 
+// The masks at a global tile position (the masks start mask_offset tiles before the quad).
+vec4 mask_at(sampler2D tex, vec2 global_p) {
+	return smooth_mask(tex, global_p - tile_origin + mask_offset);
+}
+
 // Fractal noise in tile units. Octaves smaller than a few screen pixels fade to their mean,
-// so the zoomed-out board stays calm instead of shimmering.
+// so the zoomed-out board stays calm instead of shimmering. On the continuous map each
+// octave's wavelength is nudged so a whole number of cells fits around the planet: the
+// noise then repeats exactly at the date line.
 float fbm(vec2 p, float wavelength, int octaves) {
 	float sum = 0.0;
 	float amplitude = 0.5;
 	float norm = 0.0;
 	for (int o = 0; o < octaves; o++) {
 		float fade = smoothstep(1.5, 4.0, wavelength * tile_units * zoom);
-		sum += amplitude * mix(0.5, vnoise(p / wavelength, 1.0e6), fade);
+		float value;
+		if (planet_tiles > 0.0) {
+			float period = max(1.0, round(planet_tiles / wavelength));
+			value = vnoise(vec2(p.x * period / planet_tiles, p.y / wavelength), period);
+		} else {
+			value = vnoise(p / wavelength, 1.0e6);
+		}
+		sum += amplitude * mix(0.5, value, fade);
 		norm += amplitude;
 		amplitude *= 0.5;
 		wavelength *= 0.5;
@@ -77,19 +108,130 @@ float fbm(vec2 p, float wavelength, int octaves) {
 // Large-scale ground height from the data: blurred hills and mountains, banks sloping into
 // water. Sampled at three points for the lit slope; fine detail adds its slope separately.
 float base_height(vec2 p) {
-	vec4 d = smooth_mask(masks_d, p);
+	vec4 d = mask_at(masks_d, p);
 	return d.r - smoothstep(0.3, 0.7, d.g) * 0.22;
 }
 
+vec4 bspline_weights(float f) {
+	float f2 = f * f;
+	float f3 = f2 * f;
+	return vec4(
+		(1.0 - 3.0 * f + 3.0 * f2 - f3) / 6.0,
+		(4.0 - 6.0 * f2 + 3.0 * f3) / 6.0,
+		(1.0 + 3.0 * f + 3.0 * f2 - 3.0 * f3) / 6.0,
+		f3 / 6.0);
+}
+
+// Kingdom and region borders by the world atlas's smooth vote over political cells, so a
+// border lies on exactly the same curve on both maps. Returns the color to lay over land.
+vec3 political_overlay(vec3 col, vec2 p, float land) {
+	// The planet is twice as wide as it is tall.
+	vec2 uv = p / vec2(planet_tiles, planet_tiles * 0.5);
+	vec2 pc = uv * political_size - 0.5;
+	vec2 base_cell = floor(pc);
+	vec2 cell_f = pc - base_cell;
+	vec4 wx = bspline_weights(cell_f.x);
+	vec4 wy = bspline_weights(cell_f.y);
+	float wxa[4] = float[](wx.x, wx.y, wx.z, wx.w);
+	float wya[4] = float[](wy.x, wy.y, wy.z, wy.w);
+	int k_ids[16];
+	float k_w[16];
+	int k_n = 0;
+	int r_ids[16];
+	float r_w[16];
+	int r_n = 0;
+	float contested = 0.0;
+	for (int j = 0; j < 4; j++) {
+		int cy = clamp(int(base_cell.y) - 1 + j, 0, int(political_size.y) - 1);
+		for (int i = 0; i < 4; i++) {
+			int cx = int(mod(base_cell.x - 1.0 + float(i), political_size.x));
+			vec4 s = texelFetch(political_tex, ivec2(cx, cy), 0);
+			float w = wxa[i] * wya[j];
+			int kid = int(s.r * 255.0 + 0.5);
+			int rid = int(s.g * 255.0 + 0.5);
+			contested += s.b * w;
+			int k_slot = -1;
+			for (int q = 0; q < 16; q++) {
+				if (q >= k_n) { break; }
+				if (k_ids[q] == kid) { k_slot = q; break; }
+			}
+			if (k_slot < 0) { k_slot = k_n; k_ids[k_slot] = kid; k_w[k_slot] = 0.0; k_n++; }
+			k_w[k_slot] += w;
+			int r_slot = -1;
+			for (int q = 0; q < 16; q++) {
+				if (q >= r_n) { break; }
+				if (r_ids[q] == rid) { r_slot = q; break; }
+			}
+			if (r_slot < 0) { r_slot = r_n; r_ids[r_slot] = rid; r_w[r_slot] = 0.0; r_n++; }
+			r_w[r_slot] += w;
+		}
+	}
+	int best_k = 0;
+	int second_k = 0;
+	float best_kw = -1.0;
+	float second_kw = 0.0;
+	for (int q = 0; q < 16; q++) {
+		if (q >= k_n) { break; }
+		if (k_w[q] > best_kw) {
+			second_kw = max(best_kw, 0.0);
+			second_k = best_k;
+			best_kw = k_w[q];
+			best_k = k_ids[q];
+		} else if (k_w[q] > second_kw) {
+			second_kw = k_w[q];
+			second_k = k_ids[q];
+		}
+	}
+	float best_rw = -1.0;
+	float second_rw = 0.0;
+	for (int q = 0; q < 16; q++) {
+		if (q >= r_n) { break; }
+		if (r_w[q] > best_rw) {
+			second_rw = max(best_rw, 0.0);
+			best_rw = r_w[q];
+		} else if (r_w[q] > second_rw) {
+			second_rw = r_w[q];
+		}
+	}
+	// Distance to the nearest border in screen pixels, from how evenly the vote is split.
+	float k_margin = best_kw - second_kw;
+	float k_px = k_margin / max(fwidth(k_margin), 1e-5);
+	float r_margin = best_rw - second_rw;
+	float r_px = r_margin / max(fwidth(r_margin), 1e-5);
+	float political = land * show_borders;
+	if (best_k > 0) {
+		vec3 kingdom_col = texelFetch(kingdom_palette, ivec2(best_k - 1, 0), 0).rgb;
+		float ribbon = (1.0 - smoothstep(0.0, 18.0, k_px)) * step(0.0001, second_kw);
+		col = mix(col, kingdom_col, ribbon * 0.38 * political);
+	}
+	float k_line = (1.0 - smoothstep(1.2, 2.4, k_px)) * step(0.0001, second_kw);
+	vec3 line_col = vec3(0.22, 0.16, 0.13);
+	if (best_k > 0 && second_k == 0) {
+		line_col = texelFetch(kingdom_palette, ivec2(best_k - 1, 0), 0).rgb * 0.55;
+	} else if (best_k == 0 && second_k > 0) {
+		line_col = texelFetch(kingdom_palette, ivec2(second_k - 1, 0), 0).rgb * 0.55;
+	}
+	col = mix(col, line_col, k_line * 0.85 * political);
+	// Region boundaries: a faint dashed line.
+	float dash = step(0.5, fract((p.x + p.y) * 0.5));
+	float r_line = (1.0 - smoothstep(0.6, 1.4, r_px)) * step(0.0001, second_rw) * (1.0 - k_line);
+	col = mix(col, vec3(0.24, 0.21, 0.17), r_line * (0.35 + 0.2 * dash) * political);
+	// Contested ground: diagonal hatching anchored to the land, spaced in screen pixels.
+	float hatch_px = abs(fract((p.x + p.y) * tile_units * zoom / 10.0) - 0.5) * 10.0;
+	float hatch = (1.0 - smoothstep(0.55, 1.35, hatch_px)) * smoothstep(0.35, 0.65, contested);
+	col = mix(col, vec3(0.48, 0.17, 0.12), hatch * 0.18 * political);
+	return col;
+}
+
 void fragment() {
-	vec2 p = map_pos / tile_units;
+	vec2 p = map_pos / tile_units + tile_origin;
 	float pixel = 1.0 / (tile_units * zoom);
 	vec2 warp = (vec2(fbm(p + vec2(3.1, 9.2), 1.6, 2), fbm(p + vec2(17.3, 1.7), 1.6, 2)) - 0.5) * 2.0 * EDGE_WARP;
 	vec2 q = p + warp;
 
-	vec4 a = smooth_mask(masks_a, q);
-	vec4 b = smooth_mask(masks_b, q);
-	vec4 c = smooth_mask(masks_c, p);
+	vec4 a = mask_at(masks_a, q);
+	vec4 b = mask_at(masks_b, q);
+	vec4 c = mask_at(masks_c, p);
 	float edge = max(pixel * 1.2, 0.02);
 	float water = smoothstep(0.5 - edge, 0.5 + edge, a.b);
 	float sea = smoothstep(0.35, 0.65, b.a);
@@ -138,6 +280,12 @@ void fragment() {
 	// Forest floor under the drawn trees.
 	float forest = smoothstep(0.34, 0.5, b.r);
 	land = mix(land, forest_floor, forest * 0.88);
+	if (canopy_strength > 0.0 && forest > 0.0) {
+		// From afar, where single trees are not drawn, woods read as clumped canopy.
+		float crowns = fbm(p + vec2(207.0, 61.0), 1.2, 3);
+		vec3 canopy = forest_floor * 1.35 * (0.78 + 0.5 * crowns);
+		land = mix(land, canopy, forest * canopy_strength * 0.85);
+	}
 
 	// Mountains: banded rock and scree, snow on the cold crests.
 	float mountain = smoothstep(0.3, 0.7, a.g);
@@ -202,9 +350,13 @@ void fragment() {
 	float waterline = 1.0 - smoothstep(0.0, edge * 2.5, abs(a.b - 0.5));
 	col = mix(col, vec3(0.86, 0.92, 0.90), waterline * 0.35 * (0.4 + 0.6 * still_water));
 
-	// The board's edge darkens slightly, like the rim of a model base.
-	float border = min(min(p.x, p.y), min(map_tiles.x - p.x, map_tiles.y - p.y));
-	col *= mix(0.8, 1.0, smoothstep(0.0, 0.7, border));
+	if (planet_tiles > 0.0) {
+		col = political_overlay(col, p, 1.0 - still_water);
+	} else {
+		// The board's edge darkens slightly, like the rim of a model base.
+		float border = min(min(p.x, p.y), min(map_tiles.x - p.x, map_tiles.y - p.y));
+		col *= mix(0.8, 1.0, smoothstep(0.0, 0.7, border));
+	}
 
 	COLOR = vec4(col, 1.0);
 }

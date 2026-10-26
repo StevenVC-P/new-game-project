@@ -51,15 +51,19 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # World map screenshots for visual review (needs a window, so no --headless)
 & (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/world_map_capture.gd -- <output_dir>
 
-# Regional map: data checks (world-driven generation, unchanged original maps, decoration follows data, founding)
+# Continuous regional map: seamless chunks (also across the date line), determinism, matches the world, view coordinates ([PERF] lines)
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/regional_terrain_validation.gd
+
+# Regional map: unchanged original maps (fingerprints), bounded-mode decoration, clicking the landscape founds a town
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/region_map_validation.gd
 
-# Regional map screenshots: showcases with [PERF] render times, and the real enter/found/return flow (needs a window)
+# Regional map screenshots: showcases near and far, border, date line, [PERF] render and panning times; and the real
+# atlas zoom-in / found / cross a border / zoom-out flow (both need a window)
 & (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/region_map_capture.gd -- <output_dir>
 & (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/region_flow_capture.gd -- <output_dir>
 ```
 
-`scenes/region_map_demo.tscn` shows the regional map showcases on their own (keys 1-6, G for a grown town).
+`scenes/region_map_demo.tscn` opens the continuous regional map on the showcase regions (keys 1-6, G for a grown town).
 
 `tests/expanded_goods_production_validation.gd` extends `RefCounted`, so it cannot be run with `--script` directly; load it from a small `SceneTree` wrapper and call `run_all()`.
 
@@ -70,7 +74,7 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 - `scripts/simulation/` - `calendar.gd` and `simulation_clock.gd` (1 day = 1 real second at 1x).
 - `scripts/world/` - regional and local map generation, founding-site helpers, and the world map's data (`world_map_data.gd`), authored planet (`fixed_world_definition.gd`), and builder (`world_field_builder.gd`).
 - `scripts/visuals/world_map/` and `shaders/world_terrain.gdshader` - the world atlas renderer; the game opens on it (`VIEW_WORLD` in `main.gd`). Design, decisions, and remaining integration work: `docs/WORLD_MAP.md`.
-- `scripts/world/region_geography.gd`, `scripts/visuals/region_map/`, and `shaders/region_terrain.gdshader` - the regional map: world geography steers `region_map_generator.gd` (whose original path must stay byte-identical; `tests/region_map_validation.gd` checks fingerprints), and `RegionMapView` draws the miniature landscape under `main.gd`'s panels. Decoration must never show what the tile data does not hold. Details: `docs/REGIONAL_MAP.md`.
+- `scripts/world/regional_terrain.gd` (+ `regional_chunk_generator.gd`), `scripts/visuals/region_map/`, and `shaders/region_terrain.gdshader` - the regional map: the whole planet at true scale (1 tile = 1.2 world units), generated in 60x60 chunks on worker threads; every tile must stay a pure function of its global position, or chunks stop joining. `main.gd` runs its rules on a 160x100 neighbourhood (`extract_window`), and `RegionMapView` streams the landscape under `main.gd`'s panels. The original `region_map_generator.gd` path must stay byte-identical (`tests/region_map_validation.gd` checks fingerprints). Decoration must never show what the tile data does not hold. Call `RegionalTerrain.wait_for_tasks()` before quitting a script that streamed chunks, or Godot hangs on exit. Details: `docs/REGIONAL_MAP.md`.
 - `scripts/ui/`, `scripts/visuals/` - panels, helpers, drawing.
 - Daily `City.tick()`, monthly `advance_household_lifecycle_month()`, and seasonal birth rolls are driven by calendar signals in `main.gd`.
 - Performance limits and their causes are measured in `docs/HOUSEHOLD_SIM_BENCHMARK.md`.

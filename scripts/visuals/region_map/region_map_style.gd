@@ -131,7 +131,14 @@ static func forest_color(t: float) -> Color:
 
 # Tree kinds by climate: broadleaf woods, conifer forest, dry scrub, or tall jungle.
 static func tree_style(geography: RegionGeography) -> Dictionary:
-	var t: float = region_temperature(geography)
+	return tree_style_for(region_temperature(geography), climate_family(geography))
+
+# Ground under the drawn trees, for the terrain shader's forest floor.
+static func forest_floor_color(t: float, family: String) -> Color:
+	var tree_dark: Color = tree_style_for(t, family)["dark"]
+	return tree_dark.lerp(Color(0.5, 0.48, 0.32), 0.25) if family == RegionGeography.CLIMATE_ARID else tree_dark.darkened(0.08)
+
+static func tree_style_for(t: float, family: String) -> Dictionary:
 	var base: Color = forest_color(t)
 	var style: Dictionary = {
 		"kind": "broadleaf",
@@ -141,7 +148,7 @@ static func tree_style(geography: RegionGeography) -> Dictionary:
 		"base": base.lightened(0.04),
 		"light": base.lightened(0.30),
 	}
-	match climate_family(geography):
+	match family:
 		RegionGeography.CLIMATE_COLD:
 			style["conifer_share"] = 0.85
 			style["radius"] = Vector2(2.1, 2.9)
