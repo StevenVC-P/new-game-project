@@ -16,6 +16,11 @@ extends RefCounted
 const TERRAIN_BUILDS_PER_FRAME: int = 3
 const DETAIL_BUILDS_PER_FRAME: int = 2
 const FEATURE_BUILDS_PER_FRAME: int = 1
+# Tree strips collected and repainted per frame. One strip (5 tile rows of a chunk) takes
+# about 2-4 ms to collect and 1-2 ms to paint; with vsync, a frame that runs past 16.7 ms
+# waits for the next refresh, so more than one per frame halves the frame rate while woods
+# fill in. Strips nearest the middle of the view go first.
+const STRIP_PAINTS_PER_FRAME: int = 1
 # Tiles of land kept around a world settlement for its houses and fields.
 const SETTLEMENT_WINDOW_RADIUS: int = 12
 
@@ -27,6 +32,7 @@ class ChunkVisual:
 	var terrain: RegionChunkTerrain = null
 	var features: RegionChunkFeatureLayer = null
 	var features_dirty: bool = true
+	var features_shown: bool = true
 	var detail_built: bool = false
 	# Roads and bridges, in map units from the chunk's first core tile.
 	var road_geometry: RegionMapGeometry = null
@@ -58,6 +64,8 @@ var structure_root: Node2D = null
 var shared_textures: Dictionary = {}
 var visuals: Dictionary = {}
 var features_visible: bool = false
+# Tree strips waiting to be repainted (see paint_pending_strips).
+var pending_strips: Array = []
 var planet_map_width: float = 0.0
 var chunk_map_size: float = RegionalTerrain.CHUNK_TILES * RegionMapStyle.TILE
 
@@ -95,7 +103,6 @@ func update(visible: Rect2, zoom: float, show_features: bool, show_borders: bool
 			visuals.erase(key)
 
 	features_visible = show_features
-	var canopy: float = 0.0 if show_features else 1.0
 	var terrain_budget: int = TERRAIN_BUILDS_PER_FRAME
 	var detail_budget: int = DETAIL_BUILDS_PER_FRAME
 	var feature_budget: int = FEATURE_BUILDS_PER_FRAME
@@ -118,17 +125,23 @@ func update(visible: Rect2, zoom: float, show_features: bool, show_borders: bool
 			visuals[key] = visual
 			terrain_budget -= 1
 		place_visual(visual, unwrapped_x)
-		visual.terrain.set_view(zoom, canopy, show_borders)
+		# Woods keep their canopy texture until the chunk's trees are all drawn, so they never look bare.
+		var trees_drawn: bool = visual.features != null and not visual.features_dirty and visual.features.is_fully_drawn()
+		visual.terrain.set_view(zoom, 0.0 if show_features and trees_drawn else 1.0, show_borders)
 		if not visual.detail_built and detail_budget > 0:
 			if build_detail(visual):
 				detail_budget -= 1
 		elif not visual.pending_settlements.is_empty() and detail_budget > 0:
 			retry_settlements(visual)
-		if visual.features != null:
-			visual.features.visible = show_features
+		if visual.features != null and visual.features_shown != show_features:
+			# Hidden in the rendering server, not through `visible`: showing a node queues a full
+			# redraw, and repainting every chunk's trees at once stalled the frame for 0.2-0.3 s.
+			visual.features_shown = show_features
+			RenderingServer.canvas_item_set_visible(visual.features.get_canvas_item(), show_features)
 		if show_features and visual.detail_built and visual.features_dirty and feature_budget > 0 and is_on_screen(visual, visible):
 			build_features(visual)
 			feature_budget -= 1
+	paint_pending_strips(visible)
 	for key: int in visuals:
 		var visual: ChunkVisual = visuals[key]
 		for node: Node in visual.nodes():
@@ -151,7 +164,7 @@ func is_ready() -> bool:
 				return false
 			if features_visible and visual.features_dirty:
 				return false
-	return true
+	return not features_visible or pending_strips.is_empty()
 
 func make_visual(chunk: RegionalChunk) -> ChunkVisual:
 	var visual: ChunkVisual = ChunkVisual.new()
@@ -336,10 +349,33 @@ func build_features(visual: ChunkVisual) -> void:
 	if visual.features == null:
 		visual.features = RegionChunkFeatureLayer.new()
 		visual.features.setup_chunk(view, visual.chunk, func(map_point: Vector2) -> bool: return is_cleared(visual, map_point))
+		visual.features.strip_scheduler = schedule_strip
 		visual.features.position = Vector2(visual.chunk.core_origin) * RegionMapStyle.TILE + Vector2(visual.shift, 0.0)
 		feature_root.add_child(visual.features)
 	visual.features.rebuild()
 	visual.features_dirty = false
+
+func schedule_strip(strip: RegionMapLayer.Strip) -> void:
+	if not pending_strips.has(strip):
+		pending_strips.append(strip)
+
+# Repaints the waiting tree strips nearest the middle of the view, a few per frame.
+func paint_pending_strips(visible: Rect2) -> void:
+	pending_strips = pending_strips.filter(func(strip: Variant) -> bool: return is_instance_valid(strip))
+	if pending_strips.is_empty():
+		return
+	var center: Vector2 = visible.get_center()
+	var strip_height: float = RegionMapStyle.STRIP_ROWS * RegionMapStyle.TILE
+	pending_strips.sort_custom(func(a: RegionMapLayer.Strip, b: RegionMapLayer.Strip) -> bool:
+		return strip_center(a, strip_height).distance_squared_to(center) < strip_center(b, strip_height).distance_squared_to(center))
+	for _i in range(mini(STRIP_PAINTS_PER_FRAME, pending_strips.size())):
+		var strip: RegionMapLayer.Strip = pending_strips.pop_front()
+		strip.may_paint = true
+		strip.queue_redraw()
+
+static func strip_center(strip: RegionMapLayer.Strip, strip_height: float) -> Vector2:
+	var layer: Node2D = strip.get_parent() as Node2D
+	return layer.position + Vector2(RegionalTerrain.CHUNK_TILES * RegionMapStyle.TILE * 0.5, (strip.index + 0.5) * strip_height)
 
 # Trees keep clear of roads, houses, and the neighbourhood's development. map_point is in
 # canonical global map units of the chunk.

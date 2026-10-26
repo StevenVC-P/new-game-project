@@ -518,12 +518,14 @@ func get_chunk_if_ready(chunk: Vector2i) -> RegionalChunk:
 	mutex.lock()
 	var found: RegionalChunk = chunks.get(key, null)
 	mutex.unlock()
-	if found != null:
+	if found != null and is_main_thread():
 		use_counter += 1
 		chunk_last_used[key] = use_counter
 	return found
 
-# The chunk, generated on this thread if it is not cached yet.
+# The chunk, generated on this thread if it is not cached yet. Safe on worker threads too
+# (preparing a neighbourhood): only the main thread touches the task list and the usage
+# counts, and the cache itself is shared under the mutex.
 func get_chunk_now(chunk: Vector2i) -> RegionalChunk:
 	if not is_chunk_on_planet(chunk):
 		return null
@@ -531,17 +533,24 @@ func get_chunk_now(chunk: Vector2i) -> RegionalChunk:
 	if ready != null:
 		return ready
 	var key: int = chunk_key(chunk)
-	if pending_tasks.has(key):
+	if is_main_thread() and pending_tasks.has(key):
 		WorkerThreadPool.wait_for_task_completion(pending_tasks[key])
 		pending_tasks.erase(key)
 		return get_chunk_if_ready(chunk)
 	var generated: RegionalChunk = make_chunk(Vector2i(posmod(chunk.x, chunk_counts.x), chunk.y))
 	mutex.lock()
-	chunks[key] = generated
+	if chunks.has(key):
+		generated = chunks[key]
+	else:
+		chunks[key] = generated
 	mutex.unlock()
-	use_counter += 1
-	chunk_last_used[key] = use_counter
+	if is_main_thread():
+		use_counter += 1
+		chunk_last_used[key] = use_counter
 	return generated
+
+static func is_main_thread() -> bool:
+	return OS.get_thread_caller_id() == OS.get_main_thread_id()
 
 func trim_cache() -> void:
 	# Worker threads add to chunks, so it is only read under the lock.
@@ -551,6 +560,11 @@ func trim_cache() -> void:
 	mutex.unlock()
 	if keys.is_empty():
 		return
+	# Chunks a worker added never got a usage count: they count as just used.
+	for key: int in keys:
+		if not chunk_last_used.has(key):
+			use_counter += 1
+			chunk_last_used[key] = use_counter
 	var by_age: Array = []
 	for key: int in keys:
 		by_age.append(Vector2i(chunk_last_used.get(key, 0), key))
@@ -593,6 +607,25 @@ func extract_window(origin: Vector2i, size: Vector2i) -> Array:
 					else:
 						row[gx - origin.x] = chunk.tile_dictionary(Vector2i(gx, gy))
 	return rows
+
+# Region id per tile of a window (row-major; -1 on water), as region_id_at_tile gives it.
+func region_ids_in_window(origin: Vector2i, size: Vector2i) -> PackedInt32Array:
+	var ids: PackedInt32Array = PackedInt32Array()
+	ids.resize(size.x * size.y)
+	ids.fill(-1)
+	var first_chunk: Vector2i = Vector2i(floori(float(origin.x) / CHUNK_TILES), floori(float(origin.y) / CHUNK_TILES))
+	var last_chunk: Vector2i = Vector2i(floori(float(origin.x + size.x - 1) / CHUNK_TILES), floori(float(origin.y + size.y - 1) / CHUNK_TILES))
+	for cy in range(first_chunk.y, last_chunk.y + 1):
+		for cx in range(first_chunk.x, last_chunk.x + 1):
+			var chunk: RegionalChunk = get_chunk_now(Vector2i(cx, cy))
+			if chunk == null:
+				continue
+			for gy in range(maxi(origin.y, cy * CHUNK_TILES), mini(origin.y + size.y, (cy + 1) * CHUNK_TILES)):
+				for gx in range(maxi(origin.x, cx * CHUNK_TILES), mini(origin.x + size.x, (cx + 1) * CHUNK_TILES)):
+					var i: int = chunk.index_of(Vector2i(gx, gy))
+					if not RegionalChunk.is_water_type(chunk.types[i]):
+						ids[(gy - origin.y) * size.x + gx - origin.x] = chunk.regions[i] - 1
+	return ids
 
 # --- Settlements -------------------------------------------------------------------------------
 
@@ -643,7 +676,9 @@ func settlements_in_window(origin: Vector2i, size: Vector2i) -> Array:
 	for settlement: WorldMapData.Settlement in world.settlements:
 		var approximate: Vector2 = world_to_tile(settlement.position)
 		var dx: float = world.wrapped_delta_x(origin.x * TILE_WORLD_UNITS, settlement.position.x) / TILE_WORLD_UNITS
-		if dx < -CHUNK_TILES or dx > size.x + CHUNK_TILES or approximate.y < origin.y - CHUNK_TILES or approximate.y > origin.y + size.y + CHUNK_TILES:
+		# A settlement stands at most SETTLEMENT_SNAP_TILES from its world position.
+		var reach: float = SETTLEMENT_SNAP_TILES + 1.0
+		if dx < -reach or dx > size.x + reach or approximate.y < origin.y - reach or approximate.y > origin.y + size.y + reach:
 			continue
 		var tile: Vector2i = settlement_tile(settlement)
 		# Bring the wrapped tile next to the window.

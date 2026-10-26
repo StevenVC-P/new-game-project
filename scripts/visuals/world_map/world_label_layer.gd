@@ -46,7 +46,7 @@ func draw_world() -> void:
 
 func reserve_settlement_icons() -> void:
 	for settlement: WorldMapData.Settlement in data.settlements:
-		if WorldMapStyle.settlement_visibility(settlement, zoom) <= 0.3:
+		if WorldMapStyle.settlement_visibility(settlement, zoom) <= 0.3 or not is_in_any_view(Rect2(settlement.position, Vector2.ZERO)):
 			continue
 		var radius: float = WorldMapStyle.settlement_icon_radius(settlement, zoom)
 		var center: Vector2 = settlement.position * zoom
@@ -130,6 +130,10 @@ func place_region_labels() -> void:
 		add_label(region.name.to_upper(), WorldMapStyle.serif_font(), 10, WorldMapStyle.COLOR_LABEL_REGION, region.centroid, Vector2.ZERO, 0.0, 1.6, visibility * 0.75, true)
 
 func add_label(text: String, font: Font, size: int, color: Color, world_position: Vector2, screen_offset: Vector2, angle: float, tracking: float, alpha: float, avoid_collisions: bool, outline_color: Color = OUTLINE_LIGHT, ignored_rect: int = -1) -> bool:
+	# Labels far from the view are skipped; the view's margin keeps every label that could
+	# meet one on screen, so what shows is placed exactly as without culling.
+	if not is_in_any_view(Rect2(world_position, Vector2.ZERO)):
+		return false
 	var text_size: Vector2 = measure(text, font, size, tracking)
 	var center: Vector2 = world_position * zoom + screen_offset
 	var extent: Vector2 = text_size

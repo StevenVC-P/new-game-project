@@ -199,10 +199,11 @@ func test_clicking_the_landscape_picks_that_tile() -> void:
 	var main: Node2D = MainScript.new()
 	root.add_child(main)
 	main.world_map_view.request_region_entry(main.world_map_data.find_region_by_name("Meander Plains").id)
+	main.wait_for_neighbourhood_job()
 	# process_frame fires before nodes process, so main.gd's frame update needs a second one.
 	await process_frame
 	await process_frame
-	_check(main.region_map_view != null and main.region_map_view.visible, "the regional landscape should show after entering a region")
+	_check(main.region_map_view != null and main.region_map_view.is_shown(), "the regional landscape should show after entering a region")
 	_check(not main.region_founding_sites.is_empty(), "founding sites should be listed for the landscape")
 	var site: Vector2i = main.region_founding_sites[main.region_founding_sites.size() / 2]
 	main.region_map_view.focus_on((Vector2(site) + Vector2(0.5, 0.5)) * main.TILE_SIZE, 2.5)

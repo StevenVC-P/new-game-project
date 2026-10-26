@@ -24,6 +24,7 @@ func run_all() -> void:
 	var frontier: WorldMapData.Region = test_entering_frontier_shows_its_land(main)
 	test_same_region_gives_same_map(main, frontier)
 	test_neighbourhood_follows_the_camera(main, frontier)
+	await test_wheel_zoom_keeps_the_point_under_the_cursor(main)
 	await test_zoom_hands_off_between_maps(main, frontier)
 	test_founding_keeps_the_home_town(main, frontier)
 	await test_world_button_opens_the_world_map(main)
@@ -52,7 +53,7 @@ func test_kingdom_land_is_view_only(main: Node2D) -> void:
 	var held: WorldMapData.Region = main.world_map_data.find_region_by_name("Highmoor")
 	var status: Dictionary = main.world_map_view.get_region_entry_status(held)
 	_check(bool(status["allowed"]) and not bool(status["can_settle"]), "kingdom land should be viewable but not settleable")
-	main.world_map_view.request_region_entry(held.id)
+	_enter(main, held)
 	_check(main.current_view == MainScript.VIEW_REGION, "viewing kingdom land should open the regional map")
 	var center: Vector2i = main.NEIGHBOURHOOD_SIZE / 2
 	var refused: int = 0
@@ -71,7 +72,7 @@ func test_entering_frontier_shows_its_land(main: Node2D) -> WorldMapData.Region:
 	var frontier: WorldMapData.Region = main.world_map_data.find_region_by_name("Meander Plains")
 	var status: Dictionary = main.world_map_view.get_region_entry_status(frontier)
 	_check(bool(status["allowed"]) and bool(status["can_settle"]), "contested frontier should be enterable and settleable")
-	main.world_map_view.request_region_entry(frontier.id)
+	_enter(main, frontier)
 	_check(main.current_view == MainScript.VIEW_REGION, "entering a region should open the regional map")
 	_check(main.entered_world_region_id == frontier.id, "main should remember which world region it entered")
 	_check(main.tiles.size() == main.NEIGHBOURHOOD_SIZE.y and (main.tiles[0] as Array).size() == main.NEIGHBOURHOOD_SIZE.x, "the founding neighbourhood should be loaded")
@@ -87,11 +88,11 @@ func test_same_region_gives_same_map(main: Node2D, frontier: WorldMapData.Region
 	main.open_world_map()
 	_check(main.current_view == MainScript.VIEW_WORLD, "the world button should reopen the world map")
 	var other: WorldMapData.Region = main.world_map_data.find_region_by_name("Tall Pines")
-	main.world_map_view.request_region_entry(other.id)
+	_enter(main, other)
 	_check(main.entered_world_region_id == other.id, "before founding, the player may choose another region")
 	var other_map: String = _describe_tiles(main.tiles)
 	main.open_world_map()
-	main.world_map_view.request_region_entry(frontier.id)
+	_enter(main, frontier)
 	_check(_describe_tiles(main.tiles) == first_map, "re-entering a region should show the same land")
 	_check(other_map != first_map, "different regions should show different land")
 
@@ -102,12 +103,28 @@ func test_neighbourhood_follows_the_camera(main: Node2D, frontier: WorldMapData.
 	var start: Vector2 = view.camera_global_tile()
 	view.focus_on_global_tile(start + Vector2(140.0, 0.0), view.zoom)
 	main.follow_camera_with_neighbourhood()
+	_check(main.neighbourhood_origin == start_origin, "the neighbourhood should wait for the camera to come to rest")
+	_rest_camera(main)
+	main.follow_camera_with_neighbourhood()
+	main.wait_for_neighbourhood_job()
 	_check(main.neighbourhood_origin != start_origin, "the neighbourhood should follow the camera before founding")
 	var local: Vector2i = main.global_to_local_tile(Vector2i(view.camera_global_tile().floor()))
 	_check(main.is_inside_map(local.x, local.y), "the camera should be over the neighbourhood after it moves")
 	# Back to the region's settlement for the rest of the flow.
 	main.open_world_map()
-	main.world_map_view.request_region_entry(frontier.id)
+	_enter(main, frontier)
+
+func test_wheel_zoom_keeps_the_point_under_the_cursor(main: Node2D) -> void:
+	var view: RegionMapView = main.region_map_view
+	view.focus_on_global_tile(view.camera_global_tile(), 1.0)
+	var cursor: Vector2 = view.screen_rect.get_center() + Vector2(-120.0, 80.0)
+	var world_point: Vector2 = view.screen_to_world(cursor)
+	for button: MouseButton in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		_wheel(button, cursor)
+		for _frame in range(30):
+			await process_frame
+		var drift: float = view.screen_to_world(cursor).distance_to(world_point)
+		_check(drift < 0.5, "wheel zoom on the regional map should keep the point under the cursor (off by %.2f world units)" % drift)
 
 func test_zoom_hands_off_between_maps(main: Node2D, frontier: WorldMapData.Region) -> void:
 	var view: RegionMapView = main.region_map_view
@@ -118,13 +135,15 @@ func test_zoom_hands_off_between_maps(main: Node2D, frontier: WorldMapData.Regio
 	await _settle()
 	_check(main.current_view == MainScript.VIEW_WORLD, "zooming out past the regional map's widest view should open the world map")
 	var atlas: WorldMapView = main.world_map_view
-	_check(is_equal_approx(atlas.zoom, WorldMapStyle.MAX_ZOOM), "the world map should open at its closest view")
+	_check(atlas.zoom <= WorldMapStyle.MAX_ZOOM and atlas.target_zoom < WorldMapStyle.MAX_ZOOM * 0.95, "the zoom-out should carry on into the world map (zoom %.2f, aiming at %.2f)" % [atlas.zoom, atlas.target_zoom])
 	_check(atlas.screen_to_world(cursor).distance_to(world_point) < 1.0, "the place under the cursor should stay under the cursor (off by %.2f world units)" % atlas.screen_to_world(cursor).distance_to(world_point))
 
+	# Back at the closest view, one more step in carries on into the regional map.
+	atlas.focus_on(world_point - (cursor - atlas.map_screen_rect().get_center()) / WorldMapStyle.MAX_ZOOM, WorldMapStyle.MAX_ZOOM)
 	_wheel(MOUSE_BUTTON_WHEEL_UP, cursor)
 	await _settle()
 	_check(main.current_view == MainScript.VIEW_REGION, "zooming in past the world map's closest view should open the regional map")
-	_check(is_equal_approx(view.zoom, RegionMapView.HANDOFF_ZOOM), "the regional map should open at its widest view")
+	_check(view.zoom >= RegionMapView.HANDOFF_ZOOM and view.target_zoom > RegionMapView.HANDOFF_ZOOM * 1.05, "the zoom-in should carry on into the regional map (zoom %.2f, aiming at %.2f)" % [view.zoom, view.target_zoom])
 	_check(view.screen_to_world(cursor).distance_to(world_point) < 1.0, "the place under the cursor should stay under the cursor coming back (off by %.2f)" % view.screen_to_world(cursor).distance_to(world_point))
 
 	# Zooming into the sea stays on the atlas.
@@ -135,7 +154,7 @@ func test_zoom_hands_off_between_maps(main: Node2D, frontier: WorldMapData.Regio
 		_wheel(MOUSE_BUTTON_WHEEL_UP, sea_cursor)
 		await _settle()
 		_check(main.current_view == MainScript.VIEW_WORLD, "zooming into open sea should stay on the world map")
-	main.world_map_view.request_region_entry(frontier.id)
+	_enter(main, frontier)
 
 func test_founding_keeps_the_home_town(main: Node2D, frontier: WorldMapData.Region) -> void:
 	var site: Vector2i = _find_valid_founding_tile(main)
@@ -151,15 +170,17 @@ func test_founding_keeps_the_home_town(main: Node2D, frontier: WorldMapData.Regi
 	var other: WorldMapData.Region = main.world_map_data.find_region_by_name("Tall Pines")
 	var status: Dictionary = main.world_map_view.get_region_entry_status(other)
 	_check(bool(status["allowed"]) and not bool(status["can_settle"]), "after founding, other regions should be viewable but not settleable")
-	main.world_map_view.request_region_entry(other.id)
+	_enter(main, other)
 	_check(main.current_view == MainScript.VIEW_REGION and main.has_player_city(), "viewing another region should keep the founded town")
 	_check(main.neighbourhood_origin == home_origin, "the home neighbourhood should stay put after founding")
 	main.region_map_view.focus_on_global_tile(main.region_map_view.camera_global_tile() + Vector2(200.0, 0.0), 1.0)
+	_rest_camera(main)
 	main.follow_camera_with_neighbourhood()
+	main.wait_for_neighbourhood_job()
 	_check(main.neighbourhood_origin == home_origin, "after founding the neighbourhood should not follow the camera")
 	main.open_world_map()
 	_check(bool(main.world_map_view.get_region_entry_status(frontier)["allowed"]), "the home region should stay enterable")
-	main.world_map_view.request_region_entry(frontier.id)
+	_enter(main, frontier)
 	_check(main.current_view == MainScript.VIEW_REGION and main.has_player_city(), "returning home should keep the founded town")
 
 # Clicks pushed through the whole input chain. The atlas's "Back to (region)" button sits
@@ -177,6 +198,16 @@ func test_world_button_opens_the_world_map(main: Node2D) -> void:
 		_click(Vector2(30.0, 21.0))
 		await _settle()
 		_check(main.current_view == MainScript.VIEW_REGION, "the atlas's Back button should return to the region (trip %d)" % trip)
+
+# Enters a region from the atlas and waits for its founding neighbourhood, which is prepared
+# on a worker thread.
+func _enter(main: Node2D, region: WorldMapData.Region) -> void:
+	main.world_map_view.request_region_entry(region.id)
+	main.wait_for_neighbourhood_job()
+
+# As if the camera had been still long enough for the neighbourhood to follow it.
+func _rest_camera(main: Node2D) -> void:
+	main.region_map_view.last_camera_change_msec -= main.NEIGHBOURHOOD_FOLLOW_REST_MSEC + 100
 
 func _click(position: Vector2) -> void:
 	for pressed: bool in [true, false]:

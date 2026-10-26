@@ -12,6 +12,8 @@ const MOUNTAIN_HEIGHT: float = 1.0
 
 var chunk: RegionalChunk = null
 var shader_material: ShaderMaterial = null
+# Zoom, canopy strength, and borders last given to the shader.
+var view_state: Vector3 = Vector3(-1.0, -1.0, -1.0)
 
 # Mask bytes for the shader (RGBA8, stored size squared): see the shader for the channels.
 # Pure data, so RegionalTerrain runs it on the worker thread right after generation.
@@ -81,9 +83,14 @@ func setup(regional_chunk: RegionalChunk, shared: Dictionary) -> void:
 	queue_redraw()
 
 func set_view(zoom: float, canopy_strength: float, borders: bool) -> void:
+	# Called every frame for every chunk; uniforms are set only when they change.
+	var state: Vector3 = Vector3(zoom, canopy_strength, 1.0 if borders else 0.0)
+	if state == view_state:
+		return
+	view_state = state
 	shader_material.set_shader_parameter("zoom", zoom)
 	shader_material.set_shader_parameter("canopy_strength", canopy_strength)
-	shader_material.set_shader_parameter("show_borders", 1.0 if borders else 0.0)
+	shader_material.set_shader_parameter("show_borders", state.z)
 
 func _draw() -> void:
 	var extent: float = RegionalTerrain.CHUNK_TILES * RegionMapStyle.TILE

@@ -29,6 +29,12 @@ var strip_details: Array = []
 var tree_style: Dictionary = {}
 var rock_light: Color = RegionMapStyle.COLOR_ROCK_LIGHT
 var rock_dark: Color = RegionMapStyle.COLOR_ROCK_DARK
+# Whether the recorded strips include the close-up ground details.
+var details_drawn: bool = false
+# Called with each strip to repaint, when painting is spread over frames (see redraw_strips).
+var strip_scheduler: Callable = Callable()
+# Strip index -> true for strips whose features must be collected again before they paint.
+var stale_strips: Dictionary = {}
 
 func rebuild() -> void:
 	var size: Vector2i = source_size()
@@ -39,20 +45,53 @@ func rebuild() -> void:
 		strip.painter = paint_strip
 		add_child(strip)
 		strips.append(strip)
-	strip_items.clear()
-	strip_details.clear()
-	for _i in range(strips.size()):
-		strip_items.append([])
-		strip_details.append([])
-
 	setup_style()
-	for y in range(size.y):
+	if strip_scheduler.is_valid():
+		# Each strip collects its own rows just before it paints, a few strips per frame (see
+		# paint_strip); until then it keeps showing what it last drew.
+		while strip_items.size() < strips.size():
+			strip_items.append([])
+			strip_details.append([])
+		stale_strips.clear()
+		for i in range(strips.size()):
+			stale_strips[i] = true
+			strips[i].may_paint = false
+	else:
+		strip_items.clear()
+		strip_details.clear()
+		for _i in range(strips.size()):
+			strip_items.append([])
+			strip_details.append([])
+		for y in range(size.y):
+			for x in range(size.x):
+				collect_tile_features(x, y)
+		for items: Array in strip_items:
+			items.sort_custom(func(a: PackedFloat32Array, b: PackedFloat32Array) -> bool: return a[2] < b[2])
+	redraw_strips()
+	details_drawn = lod >= 2
+
+# Collects one strip's rows; features of a tile always fall in its own row's strip.
+func collect_strip(index: int) -> void:
+	strip_items[index] = []
+	strip_details[index] = []
+	var size: Vector2i = source_size()
+	for y in range(index * RegionMapStyle.STRIP_ROWS, mini((index + 1) * RegionMapStyle.STRIP_ROWS, size.y)):
 		for x in range(size.x):
 			collect_tile_features(x, y)
-	for items: Array in strip_items:
-		items.sort_custom(func(a: PackedFloat32Array, b: PackedFloat32Array) -> bool: return a[2] < b[2])
+	(strip_items[index] as Array).sort_custom(func(a: PackedFloat32Array, b: PackedFloat32Array) -> bool: return a[2] < b[2])
+	stale_strips.erase(index)
+
+func is_fully_drawn() -> bool:
+	return stale_strips.is_empty()
+
+# Painting a strip builds thousands of shapes, so a scheduler (the chunk streamer) may spread
+# the strips over several frames; without one they all repaint next frame.
+func redraw_strips() -> void:
 	for strip: Strip in strips:
-		strip.queue_redraw()
+		if strip_scheduler.is_valid():
+			strip_scheduler.call(strip)
+		else:
+			strip.queue_redraw()
 
 func setup_style() -> void:
 	apply_climate_style(RegionMapStyle.region_temperature(view.geography), RegionMapStyle.climate_family(view.geography))
@@ -98,8 +137,13 @@ func tile_temperature(x: int, y: int) -> float:
 	return view.geography.temperature[view.geography.tile_index(x, y)]
 
 func on_lod_changed() -> void:
-	for strip: Strip in strips:
-		strip.queue_redraw()
+	# Only the ground details (shrubs, flowers) depend on the level of detail; re-recording
+	# every strip on other changes stalls the frame once many chunks are on screen.
+	var draws_details: bool = lod >= 2
+	if draws_details == details_drawn:
+		return
+	details_drawn = draws_details
+	redraw_strips()
 
 static func hash01(x: int, y: int, salt: int) -> float:
 	return float(hash(Vector3i(x, y, salt)) & 0xFFFF) / 65535.0
@@ -183,6 +227,10 @@ func count_forest_neighbors(x: int, y: int) -> int:
 func paint_strip(canvas: CanvasItem, index: int) -> void:
 	if index >= strip_items.size():
 		return
+	if stale_strips.has(index):
+		if not (canvas as Strip).may_paint:
+			return
+		collect_strip(index)
 	var batch: TriangleBatch = TriangleBatch.new()
 	if lod >= 2:
 		for detail: PackedFloat32Array in strip_details[index]:

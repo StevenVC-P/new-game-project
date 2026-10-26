@@ -115,6 +115,9 @@ class Strip:
 	extends Node2D
 	var painter: Callable
 	var index: int = 0
+	# Cleared while a scheduler spreads the work over frames: a strip entering the scene draws
+	# at once, before its turn, and must not do its expensive work then.
+	var may_paint: bool = true
 
 	func _draw() -> void:
 		painter.call(self, index)
