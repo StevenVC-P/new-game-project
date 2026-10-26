@@ -27,6 +27,8 @@ func run() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args()
 	var output_dir: String = args[0] if args.size() > 0 else "user://world_map_capture"
 	DirAccess.make_dir_recursive_absolute(output_dir)
+	# The game opens maximized; leave that so screenshots have a fixed size.
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	DisplayServer.window_set_size(WINDOW_SIZE)
 	for _frame in range(3):
 		await process_frame
