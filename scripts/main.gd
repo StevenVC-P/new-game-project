@@ -319,7 +319,8 @@ func _input(event: InputEvent):
 
 	if event is InputEventMouseButton:
 		var mouse_event: InputEventMouseButton = event as InputEventMouseButton
-		var local_mouse_pos: Vector2 = get_local_mouse_position()
+		# Where this click happened (this node sits at the screen origin, so it is local too).
+		var local_mouse_pos: Vector2 = mouse_event.position
 		if current_view == VIEW_REGION and trade_menu.handle_mouse_button(mouse_event, local_mouse_pos):
 			queue_redraw()
 			return
@@ -348,6 +349,9 @@ func _input(event: InputEvent):
 			return
 
 		if try_handle_top_bar_click(local_mouse_pos):
+			# The World button opens the atlas during this press; unhandled, the same press
+			# would reach the atlas and hit its "Back to" button in the same spot.
+			get_viewport().set_input_as_handled()
 			queue_redraw()
 			return
 
