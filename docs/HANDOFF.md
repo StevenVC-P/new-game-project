@@ -11,7 +11,7 @@ The map leg is done again, now with one continuous regional map: it matches the 
 ## Status
 
 - **Working:** world atlas (`docs/WORLD_MAP.md`); continuous regional map with streamed chunks, borders matching the atlas, founding anywhere on frontier land, view-only kingdom land, and zoom hand-off both ways (`docs/REGIONAL_MAP.md`). All 19 headless test scripts pass; import validation is clean; the windowed captures were reviewed by eye.
-- **Branches:** the work is on `feature/continuous-region-map` (from `develop`), merged into `develop`. `main` waits for owner review (AGENTS.md).
+- **Branches:** the work was done on `feature/continuous-region-map` and `fix/zoom-handoff` (from `develop`). The owner reviewed it and `develop` was merged into `main` on 2026-10-26; both are pushed.
 - **Unchanged:** the town map, economy numbers, and the original region generator (maps made without the world are byte-identical, checked by fingerprints in `tests/region_map_validation.gd`).
 
 ## Decisions Made (Don't Re-litigate Without The Owner)
