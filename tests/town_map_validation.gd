@@ -97,24 +97,26 @@ func test_town_follows_the_region() -> void:
 				tally[category][0] += 1 if agrees else 0
 				tally[category][1] += 1
 	print("[TOWN] agreement with the region (agreeing / interior tiles): ", tally)
-	_check(tally["water"][1] > 200 and tally["forest"][1] > 200 and tally["open"][1] > 1000, "the probed sites should cover water, woods, and open land")
+	_check(tally["water"][1] >= 100 and tally["forest"][1] >= 100 and tally["open"][1] >= 1000, "the probed sites should cover water, woods, and open land")
 	_check(tally["water"][0] == tally["water"][1], "deep regional water should always be water in town")
 	_check(tally["mountain"][0] == tally["mountain"][1], "deep regional mountains should always be rock in town")
 	_check(tally["forest"][0] >= tally["forest"][1] * (1.0 - LocalCityMapGenerator.GLADE_SHARE - 0.02), "deep regional woods should be wooded in town, apart from glades")
 	_check(tally["open"][0] >= tally["open"][1] * 0.9, "open regional land should be open in town, apart from copses")
 
-# The category all four blended regional tiles share, or "" where they differ.
+# The category the 3x3 regional tiles around a town tile's sample share, or "" where they
+# differ. The generator blends the four tiles around a sample it may move by up to
+# WARP_TILES (under half a tile), and those always lie in this block.
 func interior_category(window: Array, reach: Vector2i, x: int, y: int) -> String:
 	var regional: Vector2 = Vector2(reach) + Vector2(0.5, 0.5) + (Vector2(x, y) + Vector2(0.5, 0.5) - Vector2(MainScript.CITY_MAP_WIDTH, MainScript.CITY_MAP_HEIGHT) * 0.5) / LocalCityMapGenerator.TOWN_TILES_PER_REGIONAL_TILE
-	var base: Vector2i = Vector2i((regional - Vector2(0.5, 0.5)).floor())
+	var center: Vector2i = Vector2i(regional.floor())
 	var shared: String = ""
-	for corner in range(4):
-		var tile: Dictionary = window[base.y + corner / 2][base.x + corner % 2]
-		var category: String = regional_category(tile)
-		if corner == 0:
-			shared = category
-		elif category != shared:
-			return ""
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			var category: String = regional_category(window[center.y + dy][center.x + dx])
+			if shared == "":
+				shared = category
+			elif category != shared:
+				return ""
 	return shared
 
 static func regional_category(tile: Dictionary) -> String:

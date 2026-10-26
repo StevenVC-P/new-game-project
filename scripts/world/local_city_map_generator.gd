@@ -34,6 +34,10 @@ const FIELD_COUNT: int = 7
 # threshold, after EDGE_NOISE has moved the edge. Water's threshold is below one half so a
 # river stamped diagonally on the regional map stays one connected stream.
 const EDGE_NOISE: float = 0.2
+# How far, in regional tiles, a town tile's sample of the regional land may be moved along a
+# slow noise: straight regional edges bend into curves while interiors stay put. Kept under
+# half a tile, so a feature never moves past the regional tiles around it.
+const WARP_TILES: float = 0.45
 const WATER_THRESHOLD: float = 0.42
 const FEATURE_THRESHOLD: float = 0.5
 const DEPOSIT_THRESHOLD: float = 0.55
@@ -66,6 +70,8 @@ var edge_noise: FastNoiseLite = make_noise(4101, 0.11)
 var detail_noise: FastNoiseLite = make_noise(4102, 0.23)
 var pocket_noise: FastNoiseLite = make_noise(4103, 0.055)
 var copse_noise: FastNoiseLite = make_noise(4104, 0.16)
+var warp_noise_x: FastNoiseLite = make_noise(4105, 0.045)
+var warp_noise_y: FastNoiseLite = make_noise(4106, 0.045)
 
 # Regional window read by generate(): fields per regional tile, and which kind of water and
 # deposit each tile holds.
@@ -116,8 +122,9 @@ func generate(site: Vector2i, regional_tiles: Array, hash_origin: Vector2i, clim
 	for y in range(height):
 		var row: Array = []
 		for x in range(width):
-			var regional: Vector2 = Vector2(site) + Vector2(0.5, 0.5) + (Vector2(x, y) + Vector2(0.5, 0.5) - Vector2(width, height) * 0.5) / TOWN_TILES_PER_REGIONAL_TILE
 			var global: Vector2 = town_origin + Vector2(x, y)
+			var regional: Vector2 = Vector2(site) + Vector2(0.5, 0.5) + (Vector2(x, y) + Vector2(0.5, 0.5) - Vector2(width, height) * 0.5) / TOWN_TILES_PER_REGIONAL_TILE
+			regional += Vector2(warp_noise_x.get_noise_2d(global.x, global.y), warp_noise_y.get_noise_2d(global.x, global.y)).limit_length(1.0) * WARP_TILES
 			var fields: PackedFloat32Array = blended_fields(regional)
 			var edge: float = edge_noise.get_noise_2d(global.x, global.y) * EDGE_NOISE
 			var tile: Dictionary = {"type": "ground", "has_trees": false, "is_fertile": false, "occupied": false, "water_kind": "", "resource": "none", "has_road": false}

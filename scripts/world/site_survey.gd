@@ -7,7 +7,7 @@ extends RefCounted
 #
 # Thresholds come from the spread of real town maps on the continuous regional map
 # (tests/sim/town_map_probe.gd, 80 sites in 20 frontier regions, 2026-10-26): fertile tiles
-# 119-1218 (quartiles 183 / 367 / 627), tree tiles 96-2117 (quartiles 194 / 277 / 518). About a
+# 118-1196 (quartiles 182 / 364 / 619), tree tiles 90-2115 (quartiles 191 / 290 / 512). About a
 # quarter of sites read as limited and a quarter as rich.
 
 const FARMLAND_RICH_TILES: int = 600
