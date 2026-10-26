@@ -16,6 +16,10 @@ const BuildingPlacementScript = preload("res://scripts/ui/building_placement.gd"
 
 const WORLDS: int = 8
 const SITES_PER_WORLD: int = 6
+# The continuous regional map: frontier regions spread across the world's climates, each a
+# founding neighbourhood around its main settlement, as the game shows it.
+const CONTINUOUS_REGIONS: int = 14
+const SITES_PER_REGION: int = 3
 const DAYS: int = 720
 # Capacity counting stops here; more than this is plenty for a first village.
 const CAPACITY_CAP: int = 12
@@ -27,7 +31,11 @@ func run_all() -> void:
 	var results: Array[Dictionary] = []
 	for world in range(WORLDS):
 		results.append_array(_play_world(1000 + world))
+	_summarize(results, "original regional maps, %d worlds" % WORLDS)
+	_summarize(_play_continuous_map(), "continuous regional map, %d frontier regions" % CONTINUOUS_REGIONS)
+	quit()
 
+func _summarize(results: Array[Dictionary], label: String) -> void:
 	var made_it: int = 0
 	var by_tag: Dictionary = {}
 	for result: Dictionary in results:
@@ -40,7 +48,7 @@ func run_all() -> void:
 			if result["off_the_ground"]:
 				by_tag[tag][0] += 1
 
-	_report("%d/%d towns off the ground across %d worlds (%d founding families, sensible opening, real town maps)" % [made_it, results.size(), WORLDS, EconomyBalanceScript.FOUNDING_FAMILIES])
+	_report("%d/%d towns off the ground on the %s (%d founding families, sensible opening, real town maps)" % [made_it, results.size(), label, EconomyBalanceScript.FOUNDING_FAMILIES])
 	var min_farms: int = CAPACITY_CAP
 	var min_camps: int = CAPACITY_CAP
 	for result: Dictionary in results:
@@ -51,9 +59,46 @@ func run_all() -> void:
 		_report("  %-18s %d/%d" % [tag, by_tag[tag][0], by_tag[tag][1]])
 	for result: Dictionary in results:
 		if not result["off_the_ground"]:
-			_report("  failed world %d site %s [%s]: farms room %d, camps room %d, people %d; %s" % [
-				result["world"], str(result["site"]), ", ".join(result["tags"]), result["farm_capacity"], result["camp_capacity"], result["population"], ", ".join(result["reasons"])])
-	quit()
+			_report("  failed %s site %s [%s]: farms room %d, camps room %d, people %d; %s" % [
+				str(result["world"]), str(result["site"]), ", ".join(result["tags"]), result["farm_capacity"], result["camp_capacity"], result["population"], ", ".join(result["reasons"])])
+
+func _play_continuous_map() -> Array[Dictionary]:
+	var world: WorldMapData = FixedWorldDefinition.build()
+	var terrain: RegionalTerrain = RegionalTerrain.new(world)
+	var frontier: Array[WorldMapData.Region] = []
+	for region: WorldMapData.Region in world.regions:
+		if region.owner_kingdom_id == -1:
+			frontier.append(region)
+	# Spread the picks across climates: sort by climate, then take evenly spaced regions.
+	frontier.sort_custom(func(a: WorldMapData.Region, b: WorldMapData.Region) -> bool: return a.climate + a.name < b.climate + b.name)
+	var size: Vector2i = MainScript.NEIGHBOURHOOD_SIZE
+	var results: Array[Dictionary] = []
+	for pick in range(CONTINUOUS_REGIONS):
+		var region: WorldMapData.Region = frontier[pick * frontier.size() / CONTINUOUS_REGIONS]
+		var focus: Vector2i = terrain.world_to_tile_index(terrain.region_focus(region))
+		var origin: Vector2i = Vector2i(terrain.wrap_tile_x(focus.x - size.x / 2), clampi(focus.y - size.y / 2, 0, terrain.size_tiles.y - size.y))
+		var tiles: Array = terrain.extract_window(origin, size)
+		var cities: Array[City] = []
+		for pair: Array in terrain.settlements_in_window(origin, size):
+			cities.append(City.new((pair[0] as WorldMapData.Settlement).name, Vector2((pair[1] as Vector2i) - origin), City.ROLE_NEUTRAL))
+		var valid_sites: Array[Vector2i] = []
+		for y in range(size.y):
+			for x in range(size.x):
+				if not FoundingSiteHelper.is_valid_founding_tile(tiles, cities, Vector2i(x, y), MainScript.MIN_CITY_DISTANCE):
+					continue
+				var held_by: int = world.get_region(terrain.region_id_at_tile(Vector2i(terrain.wrap_tile_x(origin.x + x), origin.y + y))).owner_kingdom_id
+				if held_by == -1:
+					valid_sites.append(Vector2i(x, y))
+		_report("%s (%s): %d valid founding sites in the neighbourhood" % [region.name, region.climate, valid_sites.size()])
+		if valid_sites.is_empty():
+			continue
+		var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+		rng.seed = 5000 + region.id
+		for _site in range(SITES_PER_REGION):
+			var site: Vector2i = valid_sites[rng.randi_range(0, valid_sites.size() - 1)]
+			results.append(_play_site(region.name, rng, tiles, cities, site, size))
+	terrain.wait_for_tasks()
+	return results
 
 func _play_world(world_seed: int) -> Array[Dictionary]:
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -74,18 +119,18 @@ func _play_world(world_seed: int) -> Array[Dictionary]:
 		return results
 	for pick in range(SITES_PER_WORLD):
 		var site: Vector2i = valid_sites[rng.randi_range(0, valid_sites.size() - 1)]
-		results.append(_play_site(world_seed, rng, tiles, cities, site))
+		results.append(_play_site(world_seed, rng, tiles, cities, site, Vector2i(MainScript.MAP_WIDTH, MainScript.MAP_HEIGHT)))
 	return results
 
-func _play_site(world_seed: int, rng: RandomNumberGenerator, tiles: Array, cities: Array[City], site: Vector2i) -> Dictionary:
+func _play_site(world: Variant, rng: RandomNumberGenerator, tiles: Array, cities: Array[City], site: Vector2i, map_size: Vector2i) -> Dictionary:
 	var city = CityScript.new("Player Town", Vector2(site), CityScript.ROLE_PLAYER, EconomyBalanceScript.FOUNDING_FAMILIES, rng.randi())
 	city.site_profile = SettlementSiteProfile.analyze(city.tile, tiles, MainScript.CITY_RESOURCE_RANGE)
-	city.local_map = LocalCityMapGenerator.new(rng, MainScript.CITY_MAP_WIDTH, MainScript.CITY_MAP_HEIGHT, MainScript.MAP_WIDTH, MainScript.MAP_HEIGHT, MainScript.RIVER_NEAR_RANGE, MainScript.CITY_RESOURCE_RANGE).generate(city, tiles, cities.size())
+	city.local_map = LocalCityMapGenerator.new(rng, MainScript.CITY_MAP_WIDTH, MainScript.CITY_MAP_HEIGHT, map_size.x, map_size.y, MainScript.RIVER_NEAR_RANGE, MainScript.CITY_RESOURCE_RANGE).generate(city, tiles, cities.size())
 
 	var farm_capacity: int = _count_capacity(city.local_map, "farm")
 	var camp_capacity: int = _count_capacity(city.local_map, "gatherer_camp")
 	var result: Dictionary = StandInPlayerScript.new().play(city, {}, DAYS)
-	result["world"] = world_seed
+	result["world"] = world
 	result["site"] = site
 	result["tags"] = city.site_profile.tags.duplicate() if not city.site_profile.tags.is_empty() else ["ordinary_site"]
 	result["farm_capacity"] = farm_capacity

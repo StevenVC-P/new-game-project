@@ -1,6 +1,8 @@
 extends SceneTree
 
-# The world map's hand-off into the existing regional and founding flow in main.gd.
+# The world map's hand-off into the continuous regional map and the founding flow in main.gd:
+# entering regions, kingdom land as view-only, the founding neighbourhood following the
+# camera, zooming between the two maps at the same place and scale, and founding.
 
 const MainScript = preload("res://scripts/main.gd")
 
@@ -10,18 +12,24 @@ func _init() -> void:
 	call_deferred("run_all")
 
 func run_all() -> void:
+	# Headless runs report a 64x64 window; give the panels their normal layout.
+	root.size = Vector2i(1600, 900)
 	var main: Node2D = MainScript.new()
 	root.add_child(main)
+	await _settle()
 
 	test_game_opens_on_world_map(main)
 	test_calendar_waits_until_a_region_is_entered(main)
-	test_kingdom_land_cannot_be_entered(main)
-	var frontier: WorldMapData.Region = test_entering_frontier_builds_regional_map(main)
+	test_kingdom_land_is_view_only(main)
+	var frontier: WorldMapData.Region = test_entering_frontier_shows_its_land(main)
 	test_same_region_gives_same_map(main, frontier)
-	test_founding_locks_player_to_home_region(main, frontier)
+	test_neighbourhood_follows_the_camera(main, frontier)
+	await test_zoom_hands_off_between_maps(main, frontier)
+	test_founding_keeps_the_home_town(main, frontier)
 	await test_world_button_opens_the_world_map(main)
 
 	main.queue_free()
+	await _settle()
 	if failure_count > 0:
 		push_error("World map flow validation failed: " + str(failure_count) + " failure(s)")
 		quit(1)
@@ -40,21 +48,38 @@ func test_calendar_waits_until_a_region_is_entered(main: Node2D) -> void:
 	main._process(30.0)
 	_check(main.world_calendar.get_formatted_date() == date_before, "the calendar should not advance before any region exists")
 
-func test_kingdom_land_cannot_be_entered(main: Node2D) -> void:
+func test_kingdom_land_is_view_only(main: Node2D) -> void:
 	var held: WorldMapData.Region = main.world_map_data.find_region_by_name("Highmoor")
-	_check(not bool(main.world_map_view.get_region_entry_status(held)["allowed"]), "free settlers should not enter kingdom land")
+	var status: Dictionary = main.world_map_view.get_region_entry_status(held)
+	_check(bool(status["allowed"]) and not bool(status["can_settle"]), "kingdom land should be viewable but not settleable")
 	main.world_map_view.request_region_entry(held.id)
-	_check(main.current_view == MainScript.VIEW_WORLD, "requesting kingdom land should leave the player on the world map")
+	_check(main.current_view == MainScript.VIEW_REGION, "viewing kingdom land should open the regional map")
+	var center: Vector2i = main.NEIGHBOURHOOD_SIZE / 2
+	var refused: int = 0
+	var checked: int = 0
+	for y in range(center.y - 10, center.y + 10):
+		for x in range(center.x - 10, center.x + 10):
+			if main.get_kingdom_holding_tile(Vector2i(x, y)) == null:
+				continue
+			checked += 1
+			if not main.is_valid_founding_tile(Vector2i(x, y)) and (FoundingSiteHelper.VALID_FOUNDING_SITE != main.get_founding_tile_invalid_reason(Vector2i(x, y))):
+				refused += 1
+	_check(checked > 0 and refused == checked, "no town may be founded on land a kingdom holds (%d of %d refused)" % [refused, checked])
+	main.open_world_map()
 
-func test_entering_frontier_builds_regional_map(main: Node2D) -> WorldMapData.Region:
+func test_entering_frontier_shows_its_land(main: Node2D) -> WorldMapData.Region:
 	var frontier: WorldMapData.Region = main.world_map_data.find_region_by_name("Meander Plains")
-	_check(bool(main.world_map_view.get_region_entry_status(frontier)["allowed"]), "contested frontier should be enterable")
+	var status: Dictionary = main.world_map_view.get_region_entry_status(frontier)
+	_check(bool(status["allowed"]) and bool(status["can_settle"]), "contested frontier should be enterable and settleable")
 	main.world_map_view.request_region_entry(frontier.id)
 	_check(main.current_view == MainScript.VIEW_REGION, "entering a region should open the regional map")
 	_check(main.entered_world_region_id == frontier.id, "main should remember which world region it entered")
-	_check(main.tiles.size() == MainScript.MAP_HEIGHT, "the regional map should be generated")
+	_check(main.tiles.size() == main.NEIGHBOURHOOD_SIZE.y and (main.tiles[0] as Array).size() == main.NEIGHBOURHOOD_SIZE.x, "the founding neighbourhood should be loaded")
 	_check(not main.world_map_view.visible, "the world map should hide behind the regional map")
-	_check(main.get_top_bar_title() == frontier.name, "the regional map should be titled with the world region")
+	_check(main.get_top_bar_title() == frontier.name, "the regional map should be titled with the region in view")
+	_check(not main.region_founding_sites.is_empty(), "the frontier should offer founding sites")
+	var has_callow_ford: bool = main.cities.any(func(city: City) -> bool: return city.name == "Callow Ford")
+	_check(has_callow_ford, "the world's settlements should be towns of the neighbourhood")
 	return frontier
 
 func test_same_region_gives_same_map(main: Node2D, frontier: WorldMapData.Region) -> void:
@@ -67,21 +92,72 @@ func test_same_region_gives_same_map(main: Node2D, frontier: WorldMapData.Region
 	var other_map: String = _describe_tiles(main.tiles)
 	main.open_world_map()
 	main.world_map_view.request_region_entry(frontier.id)
-	_check(_describe_tiles(main.tiles) == first_map, "re-entering a region should rebuild the same regional map")
-	_check(other_map != first_map, "different regions should get different regional maps")
+	_check(_describe_tiles(main.tiles) == first_map, "re-entering a region should show the same land")
+	_check(other_map != first_map, "different regions should show different land")
 
-func test_founding_locks_player_to_home_region(main: Node2D, frontier: WorldMapData.Region) -> void:
+# Before founding, panning away and stopping moves the founding neighbourhood with the camera.
+func test_neighbourhood_follows_the_camera(main: Node2D, frontier: WorldMapData.Region) -> void:
+	var view: RegionMapView = main.region_map_view
+	var start_origin: Vector2i = main.neighbourhood_origin
+	var start: Vector2 = view.camera_global_tile()
+	view.focus_on_global_tile(start + Vector2(140.0, 0.0), view.zoom)
+	main.follow_camera_with_neighbourhood()
+	_check(main.neighbourhood_origin != start_origin, "the neighbourhood should follow the camera before founding")
+	var local: Vector2i = main.global_to_local_tile(Vector2i(view.camera_global_tile().floor()))
+	_check(main.is_inside_map(local.x, local.y), "the camera should be over the neighbourhood after it moves")
+	# Back to the region's settlement for the rest of the flow.
+	main.open_world_map()
+	main.world_map_view.request_region_entry(frontier.id)
+
+func test_zoom_hands_off_between_maps(main: Node2D, frontier: WorldMapData.Region) -> void:
+	var view: RegionMapView = main.region_map_view
+	view.focus_on_global_tile(view.camera_global_tile(), RegionMapView.HANDOFF_ZOOM)
+	var cursor: Vector2 = view.screen_rect.get_center() + Vector2(60.0, 30.0)
+	var world_point: Vector2 = view.screen_to_world(cursor)
+	_wheel(MOUSE_BUTTON_WHEEL_DOWN, cursor)
+	await _settle()
+	_check(main.current_view == MainScript.VIEW_WORLD, "zooming out past the regional map's widest view should open the world map")
+	var atlas: WorldMapView = main.world_map_view
+	_check(is_equal_approx(atlas.zoom, WorldMapStyle.MAX_ZOOM), "the world map should open at its closest view")
+	_check(atlas.screen_to_world(cursor).distance_to(world_point) < 1.0, "the place under the cursor should stay under the cursor (off by %.2f world units)" % atlas.screen_to_world(cursor).distance_to(world_point))
+
+	_wheel(MOUSE_BUTTON_WHEEL_UP, cursor)
+	await _settle()
+	_check(main.current_view == MainScript.VIEW_REGION, "zooming in past the world map's closest view should open the regional map")
+	_check(is_equal_approx(view.zoom, RegionMapView.HANDOFF_ZOOM), "the regional map should open at its widest view")
+	_check(view.screen_to_world(cursor).distance_to(world_point) < 1.0, "the place under the cursor should stay under the cursor coming back (off by %.2f)" % view.screen_to_world(cursor).distance_to(world_point))
+
+	# Zooming into the sea stays on the atlas.
+	main.open_world_map()
+	atlas.focus_on(Vector2(3600.0, 3500.0), WorldMapStyle.MAX_ZOOM)
+	var sea_cursor: Vector2 = atlas.map_screen_rect().get_center()
+	if not main.world_map_data.is_land_at(atlas.screen_to_world(sea_cursor)):
+		_wheel(MOUSE_BUTTON_WHEEL_UP, sea_cursor)
+		await _settle()
+		_check(main.current_view == MainScript.VIEW_WORLD, "zooming into open sea should stay on the world map")
+	main.world_map_view.request_region_entry(frontier.id)
+
+func test_founding_keeps_the_home_town(main: Node2D, frontier: WorldMapData.Region) -> void:
 	var site: Vector2i = _find_valid_founding_tile(main)
 	_check(site.x >= 0, "the entered region should offer a founding site")
 	if site.x < 0:
 		return
 	_check(main.set_pending_founding_tile(site), "the founding site should be accepted")
 	_check(main.found_player_city_at_pending_site(), "founding should still work after entering from the world map")
+	var home_origin: Vector2i = main.neighbourhood_origin
 
 	main.try_return_to_region(Vector2.ZERO)
 	main.open_world_map()
 	var other: WorldMapData.Region = main.world_map_data.find_region_by_name("Tall Pines")
-	_check(not bool(main.world_map_view.get_region_entry_status(other)["allowed"]), "after founding, other regions should be locked")
+	var status: Dictionary = main.world_map_view.get_region_entry_status(other)
+	_check(bool(status["allowed"]) and not bool(status["can_settle"]), "after founding, other regions should be viewable but not settleable")
+	main.world_map_view.request_region_entry(other.id)
+	_check(main.current_view == MainScript.VIEW_REGION and main.has_player_city(), "viewing another region should keep the founded town")
+	_check(main.neighbourhood_origin == home_origin, "the home neighbourhood should stay put after founding")
+	main.region_map_view.focus_on_global_tile(main.region_map_view.camera_global_tile() + Vector2(200.0, 0.0), 1.0)
+	main.follow_camera_with_neighbourhood()
+	_check(main.neighbourhood_origin == home_origin, "after founding the neighbourhood should not follow the camera")
+	main.open_world_map()
 	_check(bool(main.world_map_view.get_region_entry_status(frontier)["allowed"]), "the home region should stay enterable")
 	main.world_map_view.request_region_entry(frontier.id)
 	_check(main.current_view == MainScript.VIEW_REGION and main.has_player_city(), "returning home should keep the founded town")
@@ -90,8 +166,6 @@ func test_founding_locks_player_to_home_region(main: Node2D, frontier: WorldMapD
 # where the regional map's World button is, so a click that opened the atlas must not also
 # reach the atlas and close it again.
 func test_world_button_opens_the_world_map(main: Node2D) -> void:
-	# Headless runs report a 64x64 window; give the panels their normal layout.
-	root.size = Vector2i(1600, 900)
 	var world_button: Vector2 = Vector2(50.0, 21.0)
 	for trip in range(3):
 		await _settle()
@@ -113,13 +187,21 @@ func _click(position: Vector2) -> void:
 		event.global_position = position
 		root.push_input(event)
 
+func _wheel(button: MouseButton, position: Vector2) -> void:
+	var event: InputEventMouseButton = InputEventMouseButton.new()
+	event.button_index = button
+	event.pressed = true
+	event.position = position
+	event.global_position = position
+	root.push_input(event)
+
 func _settle() -> void:
 	for _frame in range(3):
 		await process_frame
 
 func _find_valid_founding_tile(main: Node2D) -> Vector2i:
-	for y in range(MainScript.MAP_HEIGHT):
-		for x in range(MainScript.MAP_WIDTH):
+	for y in range(main.region_map_size.y):
+		for x in range(main.region_map_size.x):
 			if main.is_valid_founding_tile(Vector2i(x, y)):
 				return Vector2i(x, y)
 	return Vector2i(-1, -1)

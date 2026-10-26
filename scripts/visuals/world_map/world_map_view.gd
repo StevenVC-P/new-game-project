@@ -10,6 +10,8 @@ extends Node2D
 # on its own CanvasLayer without disturbing the screen-space drawing in main.gd.
 
 signal region_entry_requested(region_id: int)
+# The player zoomed in past the atlas's closest view; the regional map takes over there.
+signal zoom_in_past_max(world_position: Vector2, screen_position: Vector2)
 signal return_requested
 
 const ZOOM_STEP: float = 1.25
@@ -242,7 +244,11 @@ func handle_mouse_button(event: InputEventMouseButton) -> void:
 	match event.button_index:
 		MOUSE_BUTTON_WHEEL_UP:
 			if event.pressed:
-				zoom_toward(ZOOM_STEP, event.position)
+				if zoom >= WorldMapStyle.MAX_ZOOM * 0.99 and target_zoom >= WorldMapStyle.MAX_ZOOM * 0.999:
+					var world_position: Vector2 = screen_to_world(event.position)
+					zoom_in_past_max.emit(Vector2(data.wrap_x(world_position.x), world_position.y), event.position)
+				else:
+					zoom_toward(ZOOM_STEP, event.position)
 		MOUSE_BUTTON_WHEEL_DOWN:
 			if event.pressed:
 				zoom_toward(1.0 / ZOOM_STEP, event.position)
@@ -370,22 +376,23 @@ func refresh_highlights() -> void:
 
 # --- Entering regions ------------------------------------------------------
 
-# The player starts as free settlers, so only land no kingdom holds can be settled.
+# Every region can be looked at on the regional map. The player starts as free settlers, so
+# only land no kingdom holds can be settled, and only one settlement is supported today.
 func get_region_entry_status(region: WorldMapData.Region) -> Dictionary:
 	if region == null:
-		return {"allowed": false, "button": "Enter region", "reason": ""}
-	if region.id == home_region_id:
-		return {"allowed": true, "button": "Return to region", "reason": "Your people live here."}
+		return {"allowed": false, "button": "Enter region", "reason": "", "can_settle": false}
+	if region.id == home_region_id and other_regions_locked:
+		return {"allowed": true, "button": "Return to region", "reason": "Your people live here.", "can_settle": false}
 	var kingdom: WorldMapData.Kingdom = data.get_kingdom(region.owner_kingdom_id)
 	if kingdom != null:
-		return {"allowed": false, "button": "Held by " + kingdom.name, "reason": "Free settlers can only found towns on land no kingdom holds."}
+		return {"allowed": true, "button": "View region", "reason": "Held by " + kingdom.name + ". Free settlers can only found towns on land no kingdom holds.", "can_settle": false}
 	if other_regions_locked and home_region_id >= 0:
 		var home: WorldMapData.Region = data.get_region(home_region_id)
-		return {"allowed": false, "button": "Enter region", "reason": "Your settlement is in " + home.name + ". Settling a second region is not possible yet."}
+		return {"allowed": true, "button": "View region", "reason": "Your settlement is in " + home.name + ". Settling a second region is not possible yet.", "can_settle": false}
 	var reason: String = "Open frontier. Enter to survey founding sites."
 	if region.is_contested():
 		reason = "Contested frontier: claimed by kingdoms but held by none. Enter to survey founding sites."
-	return {"allowed": true, "button": "Enter region", "reason": reason}
+	return {"allowed": true, "button": "Enter region", "reason": reason, "can_settle": true}
 
 func request_region_entry(region_id: int) -> void:
 	var region: WorldMapData.Region = data.get_region(region_id)

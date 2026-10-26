@@ -266,6 +266,25 @@ func region_id_at_tile(tile: Vector2i) -> int:
 		return -1
 	return chunk.region_at(tile)
 
+# Where the regional map looks first when a region is entered: its main settlement, or for a
+# region without one, the region's land nearest its middle.
+func region_focus(region: WorldMapData.Region) -> Vector2:
+	var settlements: Array[WorldMapData.Settlement] = world.get_settlements_in_region(region.id)
+	if not settlements.is_empty():
+		return tile_center_to_world(settlement_tile(settlements[0]))
+	var best: Vector2 = region.centroid
+	var best_distance: float = INF
+	for cell_y in range(world.political_size.y):
+		for cell_x in range(world.political_size.x):
+			if world.region_grid[cell_y * world.political_size.x + cell_x] != region.id:
+				continue
+			var center: Vector2 = world.political_cell_center(Vector2i(cell_x, cell_y))
+			var distance: float = world.wrapped_distance(center, region.centroid)
+			if distance < best_distance and world.is_land_at(center):
+				best_distance = distance
+				best = center
+	return best
+
 # Frontier land (no kingdom holds it) is where the player may settle.
 func is_frontier_region(region_id: int) -> bool:
 	var region: WorldMapData.Region = world.get_region(region_id)
