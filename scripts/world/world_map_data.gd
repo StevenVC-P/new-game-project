@@ -88,6 +88,12 @@ class River:
 	# World-unit width at each point; rivers widen toward the mouth.
 	var widths: PackedFloat32Array = PackedFloat32Array()
 
+class Lake:
+	var name: String = ""
+	var center: Vector2 = Vector2.ZERO
+	# World-unit radii of the shoreline ellipse.
+	var radius: Vector2 = Vector2.ONE
+
 class GeoLabel:
 	var text: String = ""
 	var kind: String = LABEL_LANDFORM
@@ -110,6 +116,7 @@ var regions: Array[Region] = []
 var settlements: Array[Settlement] = []
 var roads: Array[Road] = []
 var rivers: Array[River] = []
+var lakes: Array[Lake] = []
 var geo_labels: Array[GeoLabel] = []
 
 # Problems found while building from a definition (unroutable roads, settlements at sea).
@@ -150,8 +157,12 @@ func political_cell_center(cell: Vector2i) -> Vector2:
 	return Vector2((cell.x + 0.5) * world_size.x / political_size.x, (cell.y + 0.5) * world_size.y / political_size.y)
 
 func elevation_at(world_pos: Vector2) -> float:
+	return terrain_at(world_pos).r
+
+# All four geography fields, bilinearly interpolated (see terrain_image for the channels).
+func terrain_at(world_pos: Vector2) -> Color:
 	if terrain_image == null:
-		return 0.0
+		return Color(0.0, 0.0, 0.0, 0.0)
 	var wrapped: Vector2 = wrap_position(world_pos)
 	var fx: float = wrapped.x / world_size.x * terrain_size.x - 0.5
 	var fy: float = clampf(wrapped.y / world_size.y * terrain_size.y - 0.5, 0.0, terrain_size.y - 1.0)
@@ -162,12 +173,20 @@ func elevation_at(world_pos: Vector2) -> float:
 	var x1: int = posmod(x0 + 1, terrain_size.x)
 	x0 = posmod(x0, terrain_size.x)
 	var y1: int = mini(y0 + 1, terrain_size.y - 1)
-	var top: float = lerpf(terrain_image.get_pixel(x0, y0).r, terrain_image.get_pixel(x1, y0).r, tx)
-	var bottom: float = lerpf(terrain_image.get_pixel(x0, y1).r, terrain_image.get_pixel(x1, y1).r, tx)
-	return lerpf(top, bottom, ty)
+	var top: Color = terrain_image.get_pixel(x0, y0).lerp(terrain_image.get_pixel(x1, y0), tx)
+	var bottom: Color = terrain_image.get_pixel(x0, y1).lerp(terrain_image.get_pixel(x1, y1), tx)
+	return top.lerp(bottom, ty)
 
 func is_land_at(world_pos: Vector2) -> bool:
 	return elevation_at(world_pos) > 0.0
+
+# The lake whose shoreline ellipse, scaled by reach, contains the position; null if none.
+func lake_at(world_pos: Vector2, reach: float = 1.0) -> Lake:
+	for lake: Lake in lakes:
+		var offset: Vector2 = Vector2(wrapped_delta_x(lake.center.x, world_pos.x), world_pos.y - lake.center.y)
+		if (offset / lake.radius).length() <= reach:
+			return lake
+	return null
 
 # Region under a world position, or -1 over water.
 func region_id_at(world_pos: Vector2) -> int:

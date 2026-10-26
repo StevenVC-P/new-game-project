@@ -32,7 +32,7 @@ static func get_lines(local_map: Array, profile: SettlementSiteProfile) -> Array
 	var lines: Array[String] = []
 	lines.append("Farmland: " + _level(fertile, FARMLAND_RICH_TILES, FARMLAND_FAIR_TILES, "rich", "fair", "limited"))
 	lines.append("Forest: " + _level(trees, FOREST_DENSE_TILES, FOREST_SOME_TILES, "dense", "some", "light"))
-	lines.append("Water: " + ("river runs through" if water > 0 else "none"))
+	lines.append("Water: " + (_water_text(profile) if water > 0 else "none"))
 	lines.append("Rough ground: " + ("some" if rough > 0 else "none"))
 	# Stone and ore are not drawn on town maps yet, so this comes from the surrounding region.
 	if profile != null and profile.nearest_resource_distance >= 0:
@@ -40,6 +40,13 @@ static func get_lines(local_map: Array, profile: SettlementSiteProfile) -> Array
 	else:
 		lines.append("Stone/ore: none nearby")
 	return lines
+
+static func _water_text(profile: SettlementSiteProfile) -> String:
+	if profile != null and profile.nearest_water_kind == "sea":
+		return "sea coast"
+	if profile != null and profile.nearest_water_kind == "lake":
+		return "lakeshore"
+	return "river runs through"
 
 static func _level(value: int, high: int, middle: int, high_word: String, middle_word: String, low_word: String) -> String:
 	if value >= high:

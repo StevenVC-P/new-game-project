@@ -140,6 +140,11 @@ func build_coast() -> void:
 		var radius: Vector2 = lake["radius"] as Vector2
 		var rx: float = radius.x / 360.0 * tw
 		var ry: float = radius.y / 180.0 * th
+		var world_lake: WorldMapData.Lake = WorldMapData.Lake.new()
+		world_lake.name = lake["name"]
+		world_lake.center = deg_to_world(lake["center"])
+		world_lake.radius = Vector2(radius.x / 360.0 * data.world_size.x, radius.y / 180.0 * data.world_size.y)
+		data.lakes.append(world_lake)
 		for y in range(int(center.y - ry * 1.3), int(center.y + ry * 1.3) + 1):
 			for x in range(int(center.x - rx * 1.3), int(center.x + rx * 1.3) + 1):
 				var q: float = Vector2((x + 0.5 - center.x) / rx, (y + 0.5 - center.y) / ry).length()
