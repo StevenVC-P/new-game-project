@@ -1,9 +1,11 @@
 extends SceneTree
 
 # The town view in the real game (main.gd + TownMapView): it opens fitted beside the sidebar;
-# screen and tile coordinates agree at every zoom; a click on the map places the chosen building
-# on the tile under the cursor; a drag pans instead of placing; the wheel zooms; a click on the
-# sidebar never reaches the map; and decoration stands only where the town map allows it.
+# screen and tile coordinates agree at every zoom; a click on the map plans the chosen building
+# on the tile under the cursor, and the town builds it there; the road tool lays a road between
+# two clicks and the plot tool sets land aside; a click on a site selects it; a drag pans instead
+# of placing; the wheel zooms; a click on the sidebar never reaches the map; and decoration
+# stands only where the town map allows it.
 
 const MainScript = preload("res://scripts/main.gd")
 
@@ -23,7 +25,8 @@ func run_all() -> void:
 
 	test_view_opens_fitted(main, view)
 	test_coordinates_round_trip(view)
-	await test_click_places_building(main, view)
+	await test_click_plans_a_site(main, view)
+	await test_planning_tools(main, view)
 	await test_drag_pans_without_placing(main, view)
 	await test_wheel_zooms(main, view)
 	await test_sidebar_click_stays_off_the_map(main, view)
@@ -77,22 +80,66 @@ func test_coordinates_round_trip(view: TownMapView) -> void:
 		_check(checked >= 1, "some tiles should be on screen at zoom %.2f" % zoom)
 	view.reset_camera()
 
-func test_click_places_building(main: Node2D, view: TownMapView) -> void:
+func test_click_plans_a_site(main: Node2D, view: TownMapView) -> void:
 	var city: City = main.cities[main.selected_city_index]
-	main.selected_building_type = MainScript.BUILDING_HOUSE
-	main.is_placing_building = true
+	main.select_building_type(MainScript.BUILDING_HOUSE)
 	var tile: Vector2i = _valid_spot(main, MainScript.BUILDING_HOUSE)
 	_check(tile.x >= 0, "the town should have room for a house")
 	view.focus_on(TownMapStyle.tile_rect(tile).get_center(), 2.5)
 	var position: Vector2 = view.tile_rect_to_screen(tile).get_center()
 	var before: int = city.buildings.size()
+	var planned: int = city.construction.projects.size()
 	_click(position)
 	await _settle()
-	_check(city.buildings.size() == before + 1, "a click on the map should place the chosen building")
-	if city.buildings.size() == before + 1:
-		_check(city.buildings[-1].tile == tile, "the building should stand on the clicked tile, got " + str(city.buildings[-1].tile) + " for " + str(tile))
+	_check(city.construction.projects.size() == planned + 1, "a click on the map should plan the chosen building")
+	_check(city.buildings.size() == before, "nothing stands until the town has built it")
+	if city.construction.projects.size() != planned + 1:
+		return
+	var project: ConstructionProject = city.construction.projects[-1]
+	_check(project.tile == tile, "the site should be on the clicked tile, got " + str(project.tile) + " for " + str(tile))
+	for _day in range(90):
+		city.tick()
+		if not city.construction.projects.has(project):
+			break
+	_check(city.buildings.size() == before + 1 and city.buildings[-1].tile == tile, "the house should stand on the clicked tile once built")
 	await _settle()
 	_check(view.development_signature != 0, "the view should notice the new building")
+
+func test_planning_tools(main: Node2D, view: TownMapView) -> void:
+	var city: City = main.cities[main.selected_city_index]
+	var start: Vector2i = _roadable_spot(city, Vector2i(26, 30))
+	var end: Vector2i = _roadable_spot(city, Vector2i(38, 30))
+	_check(start.x >= 0 and end.x >= 0, "the town should have open ground for a road")
+	main.select_building_type(TownConstruction.ROAD)
+	view.reset_camera()
+	var planned: int = city.construction.projects.size()
+	_click(view.tile_rect_to_screen(start).get_center())
+	await _settle()
+	_check(city.construction.projects.size() == planned, "the first click only marks where the road starts")
+	main.update_city_hovered_tile(view.tile_rect_to_screen(end).get_center())
+	main.sync_town_map_view()
+	_check(view.road_preview.size() >= 2, "the road to be laid should show while the player picks its end")
+	_click(view.tile_rect_to_screen(end).get_center())
+	await _settle()
+	_check(city.construction.projects.size() == planned + 1 and city.construction.projects[-1].kind == ConstructionProject.KIND_ROAD, "the second click should plan the road")
+
+	main.select_building_type(TownConstruction.PLOT)
+	var plot_tile: Vector2i = _valid_spot(main, TownConstruction.PLOT)
+	var plots: int = city.construction.plots.size()
+	_click(view.tile_rect_to_screen(plot_tile).get_center())
+	await _settle()
+	_check(city.construction.plots.size() == plots + 1, "the plot tool should set land aside")
+	main.select_building_type(MainScript.BUILDING_HOUSE)
+	_click(view.tile_rect_to_screen(plot_tile + Vector2i.ONE).get_center())
+	await _settle()
+	_check(city.construction.projects[-1].plot_id == int(city.construction.plots[-1]["id"]), "a house placed on a plot is built on that plot")
+
+	main.is_placing_building = false
+	_click(view.tile_rect_to_screen(plot_tile).get_center())
+	await _settle()
+	_check(main.city_building_overlay.inspected_project_id == city.construction.projects[-1].id, "a click on a site should select it")
+	main.clear_selected_household()
+	view.focus_on(Vector2(view.map_size) * TownMapStyle.TILE * 0.5, 2.5)
 
 func test_drag_pans_without_placing(main: Node2D, view: TownMapView) -> void:
 	var city: City = main.cities[main.selected_city_index]
@@ -107,9 +154,10 @@ func test_drag_pans_without_placing(main: Node2D, view: TownMapView) -> void:
 		motion.position = start + Vector2(step * 12.0, 0.0)
 		motion.global_position = motion.position
 		root.push_input(motion)
+	var planned: int = city.construction.projects.size()
 	_mouse_button(MOUSE_BUTTON_LEFT, false, start + Vector2(60.0, 0.0))
 	await _settle()
-	_check(city.buildings.size() == before, "a drag should not place a building")
+	_check(city.buildings.size() == before and city.construction.projects.size() == planned, "a drag should not place a building")
 	_check(view.camera_center.x < camera_before.x - 1.0, "dragging right should move the view toward the west")
 
 # From a middle zoom: near the fitted view the camera keeps the board on screen, which takes
@@ -128,9 +176,11 @@ func test_wheel_zooms(_main: Node2D, view: TownMapView) -> void:
 func test_sidebar_click_stays_off_the_map(main: Node2D, view: TownMapView) -> void:
 	var city: City = main.cities[main.selected_city_index]
 	var before: int = city.buildings.size()
+	var planned: int = city.construction.projects.size()
+	main.select_building_type(MainScript.BUILDING_HOUSE)
 	_click(main.get_city_sidebar_rect().get_center())
 	await _settle()
-	_check(city.buildings.size() == before, "a click on the sidebar should not place a building")
+	_check(city.buildings.size() == before and city.construction.projects.size() == planned, "a click on the sidebar should not place a building")
 	_check(view.press_button == MOUSE_BUTTON_NONE, "a click on the sidebar should not start a drag on the map")
 
 # Trees only on tree tiles; ground details never on occupied, wooded, rough, road, or water tiles.
@@ -157,6 +207,14 @@ func _valid_spot(main: Node2D, building_type: String) -> Vector2i:
 		for y in range(center.y - radius, center.y + radius + 1):
 			for x in range(center.x - radius, center.x + radius + 1):
 				if main.is_valid_building_placement(main.selected_city_index, building_type, Vector2i(x, y)):
+					return Vector2i(x, y)
+	return Vector2i(-1, -1)
+
+func _roadable_spot(city: City, near: Vector2i) -> Vector2i:
+	for radius in range(0, 12):
+		for y in range(near.y - radius, near.y + radius + 1):
+			for x in range(near.x - radius, near.x + radius + 1):
+				if city.construction.is_roadable(Vector2i(x, y)):
 					return Vector2i(x, y)
 	return Vector2i(-1, -1)
 

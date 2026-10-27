@@ -34,6 +34,7 @@ const PROFILES: Dictionary = {
 	"carver": {"drawing": "carver", "roof": ROOF_TIMBER, "wall": WALL_TIMBER},
 	"tileworks": {"drawing": "tileworks", "roof": ROOF_TILE, "wall": WALL_TIMBER},
 	"paver_yard": {"drawing": "paver_yard", "roof": ROOF_SLATE, "wall": WALL_STONE},
+	"storehouse": {"drawing": "storehouse", "roof": ROOF_TIMBER, "wall": WALL_TIMBER},
 }
 
 const TIER0_DRAWINGS: Dictionary = {

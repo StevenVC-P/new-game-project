@@ -6,6 +6,9 @@ extends SceneTree
 #  2. A town grown by the stand-in player for a year and a half: houses, workplaces, walkers.
 #  3. Every building type, tier 1 and tier 0, side by side.
 #  4. The real game: a town founded through main.gd, grown, with a house selected.
+#  5. Building in the real game: sites at every stage, plots, a road being built, a site's card;
+#     then a town grown with families building their own homes on plots, and a workplace selected
+#     with its routes to the store and from home.
 # Needs a real window and GPU, so run it without --headless:
 #   & (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/town_map_capture.gd -- <output_dir>
 
@@ -173,7 +176,8 @@ func make_catalog_town(entry: Dictionary) -> City:
 	var placement: BuildingPlacement = BuildingPlacement.new(MainScript.CITY_MAP_WIDTH, MainScript.CITY_MAP_HEIGHT, MainScript.WOODCUTTER_TREE_RADIUS)
 	var types: Array[String] = []
 	for data: Dictionary in BuildMenuHelper.get_building_catalog():
-		types.append(str(data["id"]))
+		if data["id"] != TownConstruction.ROAD and data["id"] != TownConstruction.PLOT:
+			types.append(str(data["id"]))
 	for tier0: String in BuildingTiers.TIER0_TO_TIER1.keys():
 		if not types.has(tier0):
 			types.append(tier0)
@@ -274,6 +278,75 @@ func capture_game_flow() -> void:
 	main.queue_redraw()
 	await shot("game_house_selected")
 	await measure("game town view")
+	main.clear_selected_household()
+	main.regional_terrain.wait_for_tasks()
+	main.queue_free()
+	await process_frame
+	await capture_construction()
+
+func nearest_roadable(town: City, near: Vector2i) -> Vector2i:
+	for radius in range(0, 14):
+		for y in range(near.y - radius, near.y + radius + 1):
+			for x in range(near.x - radius, near.x + radius + 1):
+				if town.construction.is_roadable(Vector2i(x, y)):
+					return Vector2i(x, y)
+	return near
+
+# Building in the real game: plan a start, let a few days pass, look at the sites; then grow a
+# town where families build their own homes on plots.
+func capture_construction() -> void:
+	var main: Node2D = (load("res://scenes/main.tscn") as PackedScene).instantiate()
+	root.add_child(main)
+	for _frame in range(10):
+		await process_frame
+	var region: WorldMapData.Region = main.world_map_data.find_region_by_name("Meander Plains")
+	main.on_world_region_entry_requested(region.id)
+	var deadline: int = Time.get_ticks_msec() + 20000
+	while (main.region_founding_sites.is_empty() or main.is_neighbourhood_pending()) and Time.get_ticks_msec() < deadline:
+		await process_frame
+	main.set_pending_founding_tile(main.region_founding_sites[main.region_founding_sites.size() / 3])
+	main.found_player_city_at_pending_site()
+	var town: City = main.cities[main.selected_city_index]
+	var player = StandInPlayerScript.new()
+	for building_type: String in ["woodcutter", "farm", "farm", "house"]:
+		player.try_build(town, building_type, {}, 0)
+	for _plot in range(3):
+		player.set_aside_plot(town, {})
+	var store: Vector2i = town.logistics.get_store_tiles()[0]
+	var route: Array[Vector2i] = town.construction.plan_road(nearest_roadable(town, store + Vector2i(3, 0)), nearest_roadable(town, store + Vector2i(16, 4)))
+	print("[CAPTURE] road planned: %d tiles" % route.size())
+	if not route.is_empty():
+		town.construction.request_road(route)
+	for _day in range(5):
+		town.tick()
+	print("[CAPTURE] after 5 days: %s" % [str(ConstructionDisplayHelper.get_sidebar_lines(town))])
+	main.town_map_view.focus_on(TownMapStyle.tile_rect(store).get_center(), 2.4)
+	main.queue_redraw()
+	await shot("build_sites")
+	main.town_map_view.focus_on(TownMapStyle.tile_rect(store).get_center(), 4.5)
+	await shot("build_sites_near")
+	if not town.construction.projects.is_empty():
+		main.city_building_overlay.inspected_project_id = town.construction.projects[0].id
+		main.town_map_view.focus_on(TownMapStyle.tile_rect(town.construction.projects[0].tile).get_center(), 2.6)
+		main.queue_redraw()
+		await shot("build_site_selected")
+		main.clear_selected_household()
+	player.play(town, {"homes_on_plots": true}, 360)
+	print("[CAPTURE] grown with plots: %d buildings, %d households, %d homes built by families, sites: %s" % [town.buildings.size(), town.households.size(), town.construction.completed_by_households, str(ConstructionDisplayHelper.get_sidebar_lines(town))])
+	for _frame in range(4):
+		await process_frame
+	await shot("build_grown")
+	var far: int = -1
+	for index in range(town.buildings.size()):
+		var building: Building = town.buildings[index]
+		if building.is_production_building() and building.assigned_workers > 0 and (far < 0 or town.logistics.get_travel_share(building) > town.logistics.get_travel_share(town.buildings[far])):
+			far = index
+	if far >= 0:
+		main.city_building_overlay.inspected_building_index = far
+		main.town_map_view.focus_on(TownMapStyle.tile_rect(town.buildings[far].tile).get_center().lerp(TownMapStyle.tile_rect(store).get_center(), 0.5), 2.2)
+		main.queue_redraw()
+		await shot("build_workplace_routes")
+	await measure("town with construction")
 	main.regional_terrain.wait_for_tasks()
 	main.queue_free()
 	await process_frame

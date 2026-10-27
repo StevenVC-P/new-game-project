@@ -6,9 +6,12 @@ extends TownMapLayer
 # where they live: tents for temporary shelter, a bedroll by the fire for the unsheltered,
 # camped on open ground near the town's heart.
 #
+# What is being built shows too: the founders' stockpile, staked residential plots, building
+# sites (TownConstructionPainter), planned roads, and scaffolding around upgrades.
+#
 # Recorded again only when the development signature changes (TownMapView), never per frame:
-# a building's type and place, its upkeep in steps of ten, whether a family works it, and how
-# many families are camped.
+# a building's type and place, its upkeep in steps of ten, whether a family works it, how many
+# families are camped, and how far each site has come.
 
 func on_lod_changed() -> void:
 	queue_redraw()
@@ -17,6 +20,7 @@ func _draw() -> void:
 	if view == null or view.city == null:
 		return
 	var city: City = view.city
+	draw_planning(city)
 	var order: Array[int] = []
 	for index in range(city.buildings.size()):
 		order.append(index)
@@ -25,7 +29,28 @@ func _draw() -> void:
 		var building: Building = city.buildings[index]
 		var rect: Rect2 = TownMapStyle.tile_rect(building.tile, building.size)
 		TownBuildingPainter.draw(self, rect, BuildingVisuals.get_profile(building.type), building_state(building))
+		var upgrade: ConstructionProject = city.construction.get_upgrade_project(building.id)
+		if upgrade != null:
+			TownConstructionPainter.scaffold(self, rect, upgrade.get_progress())
 	draw_camp(city)
+
+# Flat things first: the stockpile, plots, sites, and planned roads lie under the buildings.
+func draw_planning(city: City) -> void:
+	var stockpile: Vector2i = city.logistics.stockpile_tile
+	if stockpile.x >= 0:
+		TownConstructionPainter.stockpile(self, TownMapStyle.tile_rect(stockpile, TownLogistics.STOCKPILE_SIZE), lod)
+	for plot: Dictionary in city.construction.plots:
+		if int(plot["project_id"]) < 0:
+			TownConstructionPainter.plot(self, TownMapStyle.tile_rect(plot["tile"], plot["size"]), false)
+	for project: ConstructionProject in city.construction.projects:
+		match project.kind:
+			ConstructionProject.KIND_ROAD:
+				for tile: Vector2i in project.road_tiles:
+					var center: Vector2 = TownMapStyle.tile_rect(tile).get_center()
+					RegionMapLayer.draw_blob(self, center, Vector2(TownMapStyle.TILE * 0.42, TownMapStyle.TILE * 0.36), TownConstructionPainter.CLEARED, 8)
+					TownConstructionPainter.stake(self, center + Vector2(-TownMapStyle.TILE * 0.3, -TownMapStyle.TILE * 0.3), 0.7)
+			ConstructionProject.KIND_BUILDING:
+				TownConstructionPainter.site(self, TownMapStyle.tile_rect(project.tile, project.size), project.get_supply_fraction(), project.get_progress(), lod)
 
 func building_bottom(building: Building) -> float:
 	return building.tile.y + building.size.y + building.tile.x * 0.001

@@ -30,6 +30,22 @@ const TOOLMAKER_TOOLS_PER_DAY: float = 1.0
 # Wood the toolmaker consumes for each tool it makes.
 const TOOLMAKER_WOOD_PER_TOOL: int = 2
 const EXPANDED_GOODS_PER_DAY: float = 2.0
+# What each workplace makes and the inputs it uses per unit made (tier 0 uses its tier 1 type's).
+const PRODUCTION: Dictionary = {
+	"farm": {"output": "food", "inputs": {}},
+	"woodcutter": {"output": "wood", "inputs": {}},
+	"toolmaker": {"output": "tools", "inputs": {"wood": TOOLMAKER_WOOD_PER_TOOL}},
+	"quarry": {"output": "stone_blocks", "inputs": {}},
+	"stonecutter": {"output": "cut_stone", "inputs": {"stone_blocks": 1}},
+	"brickworks": {"output": "bricks", "inputs": {"wood": 1}},
+	"lime_kiln": {"output": "lime", "inputs": {"stone_blocks": 1, "wood": 1}},
+	"mortar_yard": {"output": "mortar", "inputs": {"lime": 1, "stone_blocks": 1}},
+	"mason_yard": {"output": "masonry", "inputs": {"cut_stone": 1, "mortar": 1}},
+	"sculptor": {"output": "statues", "inputs": {"cut_stone": 1, "tools": 1}},
+	"carver": {"output": "carved_goods", "inputs": {"wood": 1, "tools": 1}},
+	"tileworks": {"output": "tiles", "inputs": {"bricks": 1, "wood": 1}},
+	"paver_yard": {"output": "paving_stones", "inputs": {"stone_blocks": 1}}
+}
 # Working adults in the family the output values above assume.
 const FULL_FAMILY_WORKING_ADULTS: float = 2.0
 
@@ -75,11 +91,56 @@ const BUILD_COSTS: Dictionary = {
 	"sculptor": {"wood": 8, "tools": 2},
 	"carver": {"wood": 8, "tools": 1},
 	"tileworks": {"wood": 8, "tools": 1},
-	"paver_yard": {"wood": 8, "tools": 1}
+	"paver_yard": {"wood": 8, "tools": 1},
+	"storehouse": {"wood": 8, "tools": 0}
 }
+
+# --- Construction (docs/TOWN_BUILDING_MODEL.md) ---
+# Work to raise a building, in family-days: one two-adult family working a whole day. Builders
+# first carry the materials from a store to the site, then build; carrying is extra work that
+# grows with distance (see Logistics below).
+const BUILD_WORK_DAYS: Dictionary = {
+	"hut": 3.0,
+	"forager_garden": 2.0,
+	"gatherer_camp": 2.0,
+	"tool_mender": 3.0,
+	"house": 8.0,
+	"farm": 6.0,
+	"woodcutter": 6.0,
+	"toolmaker": 10.0,
+	"storehouse": 8.0
+}
+const BUILD_WORK_DEFAULT_DAYS: float = 12.0
+# An upgrade in place reuses the site, so it takes this share of building the tier 1 type new.
+const UPGRADE_WORK_FRACTION: float = 0.75
+const ROAD_WORK_DAYS_PER_TILE: float = 0.25
+# Families that can work one site at once.
+const MAX_CREW_TIER0: int = 2
+const MAX_CREW: int = 3
+# A family that works a holding can still give this share of its day to its own home or to tier 0
+# hand work, at the same cost to its holding's output that day.
+const SPARE_TIME_SHARE: float = 0.2
+
+# --- Logistics (docs/TOWN_BUILDING_MODEL.md) ---
+# Goods move between workplaces and stores on foot. Distances are in effort-tiles: a tile of open
+# ground is 1, a road tile ROAD_EFFORT, woods, yards, and rock cost more, and water cannot be
+# crossed. A family covers DAY_EFFORT_TILES in a working day and carries CARRY_LOAD units a trip.
+const DAY_EFFORT_TILES: float = 500.0
+const CARRY_LOAD: float = 5.0
+const ROAD_EFFORT: float = 0.5
+const WOODS_EFFORT: float = 1.5
+const BUILT_EFFORT: float = 2.0
+const ROUGH_EFFORT: float = 3.0
+# Travel (hauling plus walking to work) never takes more than this share of a family's day.
+const MAX_TRAVEL_SHARE: float = 0.6
+# Each unit carried also takes a moment to load and stack, however short the trip.
+const HANDLING_DAYS_PER_UNIT: float = 0.01
 
 static func get_build_cost(building_type: String) -> Dictionary:
 	return (BUILD_COSTS.get(building_type, {}) as Dictionary).duplicate()
+
+static func get_build_work_days(building_type: String) -> float:
+	return float(BUILD_WORK_DAYS.get(building_type, BUILD_WORK_DEFAULT_DAYS))
 
 static func get_maintenance_interval(building_type: String) -> int:
 	return int(MAINTENANCE_INTERVAL_DAYS.get(building_type, MAINTENANCE_INTERVAL_DEFAULT_DAYS))
