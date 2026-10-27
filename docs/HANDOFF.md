@@ -6,13 +6,13 @@ Snapshot for whoever picks the project up next. Update it when a milestone close
 
 ## Current Objective
 
-Town building is settled before it is locked in (`docs/TOWN_BUILDING_MODEL.md`): the player plans, families build over time, materials are carried from stores, layout costs or saves travel, and families build their own homes on residential plots. The owner reviews the judgment calls and open decisions there, then the main track resumes: the first playable village (`docs/IMPLEMENTATION_ROADMAP.md`).
+Town building is settled before it is locked in (`docs/TOWN_BUILDING_MODEL.md`): the player plans, families build over time, materials are carried from stores, layout costs or saves travel, and families build their own homes on residential plots. The owner approved it for `main`; the open decisions there remain for tuning, and the main track resumes: the first playable village (`docs/IMPLEMENTATION_ROADMAP.md`).
 
 ## Status
 
 - **Working:** world atlas (`docs/WORLD_MAP.md`); continuous regional map (`docs/REGIONAL_MAP.md`); town map (`docs/TOWN_MAP.md`); town building: construction sites, builders, carried materials, travel costs, roads, storehouses, residential plots, families building homes (`docs/TOWN_BUILDING_MODEL.md`). All 23 headless test scripts pass; import validation is clean; `town_map_capture` (now with construction scenes) was reviewed by eye.
 - **Balance:** with construction, the sensible opening stays 20/20 and map luck matches building instantly (46/48, 40/42); an opening that queues every house before the woodcutter falls from 20/20 to 13/20 (queue order). Numbers in the model doc.
-- **Branches:** the town building work is on `feature/town-building-model` (from `develop`), merged into `develop` and pushed. `main` waits for the owner's review of `develop`.
+- **Branches:** the town building work is on `feature/town-building-model` (from `develop`), merged into `develop`, and `develop` into `main` on the owner's approval (2026-10-26). `main` now carries the town map art and the town building model.
 - **Unchanged:** the original region generator (fingerprints in `tests/region_map_validation.gd`); economy numbers other than the new construction and travel ones.
 
 ## Decisions Made (Don't Re-litigate Without The Owner)
