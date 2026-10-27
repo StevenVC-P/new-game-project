@@ -30,7 +30,9 @@ var blocked_by_map: Dictionary = {}
 # town map, "homes_on_plots" (set aside residential plots and let families build their own homes
 # instead of placing houses) and "scattered" (build far out instead of close to the stockpile);
 # and "instant" (the rules before construction: pay and place finished buildings at once), as a
-# control for measuring what construction changes.
+# control for measuring what construction changes; and "planned" (every month after the first
+# few, fence fields people walk through and put a storehouse beside a workplace that loses much
+# of its day to carrying), for the planning check.
 func play(city, scenario: Dictionary, days: int) -> Dictionary:
 	var uses_map: bool = not city.local_map.is_empty()
 	for entry: String in scenario.get("prebuild", []):
@@ -68,6 +70,8 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 			ran_out_of_tools = true
 			if tools_out_day < 0:
 				tools_out_day = day
+		if scenario.get("planned", false) and uses_map and day >= PLANNING_START_DAY and day % PLANNING_INTERVAL_DAYS == 0:
+			plan_town(city)
 		if day % POLICY_INTERVAL_DAYS == 0 and day >= int(scenario.get("idle_until", 0)):
 			upgrade_one(city, scenario, day)
 			var wanted: String = choose_build(city, scenario, day)
@@ -110,7 +114,11 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 		"first_home_day": first_home_day,
 		"travel_share": average_travel_share(city),
 		"buildings": city.buildings.size(),
-		"homes_by_families": homes_by_families
+		"homes_by_families": homes_by_families,
+		"households": city.households.size(),
+		"food": int(city.resources["food"]),
+		"fences": count_fences(city),
+		"storehouses": count_kinds(city).get("storehouse", 0)
 	}
 
 func choose_build(city, scenario: Dictionary, day: int) -> String:
@@ -163,6 +171,11 @@ func try_build(city, building_type: String, scenario: Dictionary, day: int) -> b
 	var origin: Vector2i = Vector2i.ZERO
 	if not city.local_map.is_empty():
 		origin = find_spot(city, building_type, scenario.get("scattered", false))
+		# A planner puts a new home beside the workplace whose family walks farthest to it.
+		if scenario.get("planned", false) and BuildingTiersScript.get_base_type(building_type) == Building.BUILDING_HOUSE:
+			var near_work: Vector2i = home_spot_near_work(city, building_type)
+			if near_work.x >= 0:
+				origin = near_work
 		if origin.x < 0:
 			blocked_by_map[BuildingTiersScript.get_base_type(building_type)] = true
 			return false
@@ -187,6 +200,62 @@ const SCATTERED_RADIUS: float = 22.0
 func set_aside_plot(city, scenario: Dictionary) -> bool:
 	var origin: Vector2i = find_spot(city, "plot", scenario.get("scattered", false))
 	return origin.x >= 0 and city.construction.designate_plot(origin) >= 0
+
+const PLANNING_START_DAY: int = 120
+const PLANNING_INTERVAL_DAYS: int = 30
+# A workplace losing more than this share of its day to travel earns a storehouse beside it.
+const STOREHOUSE_TRAVEL_SHARE: float = 0.08
+# Daily trips through a field before the planner fences it.
+const FENCE_TRAMPLING_TRIPS: float = 0.5
+
+# What a thoughtful player does once the town is running: fence the fields people trample, and
+# bring a store to the workplace that carries farthest.
+func plan_town(city) -> void:
+	for building: Building in city.buildings:
+		if TownLogistics.is_field(building) and float(city.logistics.trampled_trips.get(building.id, 0.0)) >= FENCE_TRAMPLING_TRIPS and city.construction.can_fence(building.id) and city.construction.can_supply(EconomyBalanceScript.get_fence_cost(building.size)):
+			city.construction.request_fence(building.id)
+	var farthest: Building = null
+	var worst: float = STOREHOUSE_TRAVEL_SHARE
+	for building: Building in city.buildings:
+		if building.is_production_building() and building.assigned_workers > 0:
+			var share: float = city.logistics.get_travel_share(building)
+			if share > worst:
+				worst = share
+				farthest = building
+	if farthest == null or count_kinds(city).get("storehouse", 0) >= 3 or not city.construction.can_supply(EconomyBalanceScript.get_build_cost("storehouse")):
+		return
+	var spot: Vector2i = find_spot_near(city, "storehouse", TownLogistics.center_tile(farthest.tile, farthest.size))
+	if spot.x >= 0:
+		city.construction.request_building("storehouse", spot)
+
+# A spot for a home next to the workplace whose family has the longest walk to it.
+func home_spot_near_work(city, building_type: String) -> Vector2i:
+	var farthest: Building = null
+	var longest: float = 0.0
+	for building: Building in city.buildings:
+		if building.is_production_building() and building.assigned_workers > 0:
+			var walk: float = city.logistics.get_commute_effort(building)
+			if walk > longest:
+				longest = walk
+				farthest = building
+	if farthest == null:
+		return Vector2i(-1, -1)
+	return find_spot_near(city, building_type, TownLogistics.center_tile(farthest.tile, farthest.size))
+
+# The valid spot nearest a tile, within a few tiles.
+func find_spot_near(city, building_type: String, near: Vector2i) -> Vector2i:
+	for radius in range(1, 8):
+		for y in range(near.y - radius, near.y + radius + 1):
+			for x in range(near.x - radius, near.x + radius + 1):
+				if maxi(absi(x - near.x), absi(y - near.y)) == radius and city.construction.validate(building_type, Vector2i(x, y))["is_valid"] == true:
+					return Vector2i(x, y)
+	return Vector2i(-1, -1)
+
+static func count_fences(city) -> int:
+	var count: int = 0
+	for building: Building in city.buildings:
+		count += 1 if building.fenced else 0
+	return count
 
 # Mean share of the working day the town's workplaces lose to travel.
 static func average_travel_share(city) -> float:

@@ -1879,8 +1879,6 @@ func draw_city_sidebar(font: Font, font_size: int):
 	for key_line: String in key_lines:
 		y = draw_sidebar_line(font, font_size, key_line, text_x, y, VisualStyle.COLOR_MUTED)
 	y = draw_sidebar_line(font, font_size, "B: build menu, Right click/Esc: clear", text_x, y, VisualStyle.COLOR_MUTED)
-	if int(resources["maintenance_grace_ticks"]) > 0:
-		y = draw_sidebar_line(font, font_size, "Grace: " + str(resources["maintenance_grace_ticks"]) + " ticks", text_x, y, VisualStyle.COLOR_MUTED)
 	y += 4.0
 	draw_sidebar_line(font, font_size, placement_status, text_x, y, placement_color)
 

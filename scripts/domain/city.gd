@@ -38,7 +38,6 @@ const STARTING_POPULATION: int = STARTING_HOUSEHOLD_COUNT * STARTING_HOUSEHOLD_P
 const HOUSE_CAPACITY: int = 4
 const FOOD_PER_POPULATION_DIVISOR: int = EconomyBalanceScript.PEOPLE_FED_PER_FOOD
 const OLDER_CHILD_SUPPORT_TICK_INTERVAL: int = 4
-const STARTING_MAINTENANCE_GRACE_TICKS: int = EconomyBalanceScript.MAINTENANCE_GRACE_DAYS
 const RESOURCE_HISTORY_LIMIT: int = 16
 const BIRTH_FOOD_SURPLUS_DAYS: float = 10.0
 const BIRTH_MIN_FOOD_DAYS: float = 5.0
@@ -160,8 +159,7 @@ func make_starting_resources(starter_household_count: int = STARTING_HOUSEHOLD_C
 		"idle_workers": 0,
 		"food_consumption_rate": 2,
 		"food_shortage": false,
-		"production_tick_count": 0,
-		"maintenance_grace_ticks": STARTING_MAINTENANCE_GRACE_TICKS
+		"production_tick_count": 0
 	}
 	starting.merge(HouseholdMigrationScript.make_starting_resources())
 	return starting
@@ -915,10 +913,12 @@ func get_day_of_year() -> int:
 		return day_of_year
 	return posmod(construction.day - 1, Calendar.DAYS_PER_YEAR) + 1
 
+# 0 spring, 1 summer, 2 autumn, 3 winter.
+func get_season_index() -> int:
+	return clampi((get_day_of_year() - 1) / Calendar.DAYS_PER_MONTH / 3, 0, 3)
+
 func tick():
 	update_shelter_counts()
-	if int(resources["maintenance_grace_ticks"]) > 0:
-		resources["maintenance_grace_ticks"] = int(resources["maintenance_grace_ticks"]) - 1
 	resources["production_tick_count"] = int(resources["production_tick_count"]) + 1
 	update_worker_counts()
 	consume_food()
@@ -930,8 +930,11 @@ func tick():
 	for building: Building in buildings:
 		if building.is_house():
 			continue
-		if building.needs_maintenance() and int(resources["maintenance_grace_ticks"]) <= 0:
-			update_building_maintenance(building)
+		if building.needs_maintenance():
+			if building.upkeep_grace_days > 0:
+				building.upkeep_grace_days -= 1
+			else:
+				update_building_maintenance(building)
 		if building.can_produce():
 			apply_building_production(building)
 	logistics.advance_day()
@@ -1337,8 +1340,10 @@ func get_base_building_output_amount(building_type: String) -> float:
 
 func apply_building_output_modifiers(base_output: float, tick_count: int, building: Building) -> int:
 	var family_output: float = base_output * get_family_labor_factor(get_household_by_id(building.assigned_household_id)) * get_work_time_factor(building)
-	# A field people walk through loses some of its harvest underfoot.
+	# A field people walk through loses some of its harvest underfoot, and fields yield by season.
 	family_output *= 1.0 - logistics.get_field_trample_loss(building)
+	if TownLogistics.is_field(building):
+		family_output *= EconomyBalanceScript.FARM_SEASON_YIELD[get_season_index()]
 	var output_amount: int = apply_output_percent(family_output, building, get_worker_output_percent(building))
 	return apply_older_child_support_output_modifier(output_amount, tick_count, building)
 
@@ -1556,6 +1561,7 @@ func complete_upgrade(building_index: int) -> void:
 	building.type = upgrade_type
 	building.maintenance_level = 100
 	building.maintenance_timer = 0
+	building.upkeep_grace_days = EconomyBalanceScript.MAINTENANCE_GRACE_DAYS
 	update_shelter_counts()
 	update_worker_counts()
 

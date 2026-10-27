@@ -15,7 +15,7 @@ Survival is the foundation. The rewards are thoughtful planning, economic develo
 - **Red lines.** Households stay the core unit (no anonymous worker slots). Nothing silently takes control away from the player. The pace stays slow and contemplative. Hardships are not tuned away to make numbers look good (`AGENTS.md`). No money, government, or warfare beyond village defense in this stage. `main` only after owner review.
 - **Formulas may change to fix balance**, including in `city.gd` and `household.gd`, with before/after measurements recorded in the doc that owns them.
 - **Freedom to improve.** If testing shows a mechanic causes excessive micromanagement, needless waiting, or dull play, it may be changed. Watch closely how family autonomy and direct player control interact as a town grows: the player should have meaningful control without having to manage every household activity personally.
-- **Check-ins.** After each milestone, a short summary with screenshots, measured effects, and the judgment calls made. **Owner playtests** after milestones 2 and 6: fun cannot be measured, but survival, pacing, variety, and the payoff of planning can.
+- **Check-ins.** After each milestone, a short summary with screenshots, measured effects, and the judgment calls made (Milestone Log, below). **Owner playtest after milestone 6** (owner, 2026-10-27: the one after milestone 2 is dropped; work continues straight through): fun cannot be measured, but survival, pacing, variety, and the payoff of planning can.
 
 ## Planning Pays Off
 
@@ -85,13 +85,34 @@ Measured by the balance tools on every milestone (`tests/sim/`), plus the new si
 Each milestone is a feature branch from `develop` with tests, balance runs, screenshots, and doc updates, merged to `develop` when the gate passes.
 
 1. **Balance foundation.** Fix the tool cliff (per-building upkeep grace, open decision 3 in `docs/HANDOFF.md`). Add the site variety and planning checks. Add a seasonal harvest: farms sow in spring and harvest in summer and autumn, and winter lives on stores, with winter work (felling, indoor crafts, planning) so it is not idle.
-2. **Geography shapes the town.** First two opportunities (the fisher's hut and the hunter's lodge) and first two hazards (high water and wolves near the woods' edge), each with its counter, available wherever the land allows. **Owner playtest.**
+2. **Geography shapes the town.** First two opportunities (the fisher's hut and the hunter's lodge) and first two hazards (high water and wolves near the woods' edge), each with its counter, available wherever the land allows.
 3. **Family ambitions (M4).** Three ambitions (a better home, a workshop for the family's calling, a fence or a field of their own) that feed satisfaction, departures, and newcomers, and that let families act on their own where the player has set the frame.
 4. **The first neighbour (M6).** Visiting traders and barter with the neutral town, with prices in grain; a road out opens trade for isolated towns.
 5. **Village defense (M5, light).** Bandit raids where the land and roads make a town tempting; militia from families; no army.
 6. **Village completion (M8).** Stage display and chronicle; herder and wool for clothing; a pacing pass toward Village by about year 3. **Owner playtest.**
 
 Later opportunities (clay and bricks, woods planted on open land, ore) follow milestone 2's pattern once it proves itself.
+
+## Milestone Log
+
+### Milestone 1: balance foundation (2026-10-27)
+
+- **Upkeep grace per building.** Each new or upgraded workplace runs 60 days before it needs tools (`Building.upkeep_grace_days`), replacing the town-wide grace from founding. Alone it ends the tool cliff: a toolmaker built by day 150 now gets 19/20 towns off the ground (was 6/20).
+- **The farming year.** Fields yield 80% in spring, 100% in summer, 140% in autumn, and 80% in winter (`EconomyBalance.FARM_SEASON_YIELD`), the same harvest over a year. Founders bring 300 food (was 60): enough to carry them through their first lean spring. Woodcutters fell twice as fast in winter, so winter has its own work. Towns know the calendar's day of the year.
+- **Two new checks.** `tests/sim/planning_check.gd` (five years, careless / compact / planned) and `tests/sim/site_variety_check.gd` (four openings by kind of land).
+- **Measured** against the start of the milestone:
+
+  | Check | Before | After |
+  | --- | --- | --- |
+  | Map luck, original / continuous | 46/48, 42/42 | 48/48, 39/42 |
+  | Opening: sensible / owner's first playtest / four farms first | 20, 20, 20 of 20 | 19, 20, 20 |
+  | Opening: all wood on houses first / idle 60 days / toolmaker by day 150 | 13, 12, 6 | 17, 18, 19 |
+  | Town building: houses / homes on plots / scattered | 19 (43 people), 19 (33), 12 (26) | 19 (46), 19 (36), 13 (29) |
+  | Planning, five years: careless / compact / planned | | 13/20 (65 people), 19/20 (105), 18/20 (98) |
+  | Different best openings across kinds of land | | 2 |
+
+- **Tuning tried:** a sharp year (40/100/220/40%) starved towns founded in spring (map luck 32/48). 70/100/160/70% with 300 food still lost three sensible openings. 80/100/140/80% keeps the shape and the towns. The three continuous-map towns that fail are tool shortages with founders of few farming callings; watched in later milestones.
+- **Findings for later milestones.** Planning pays: a compact town ends five years with 60% more people than a careless one. The stand-in's extra planning (storehouses beside far workplaces, homes beside work) does not add to that: storehouses cost 8 wood for a modest saving, and homes beside far workplaces spread the town and lengthen errands. Storehouse cost and value, and why homes cluster, are for the ambitions and village milestones. Openings barely differ by land yet (two best openings): milestone 2's purpose.
 
 ## Approved Decisions
 
@@ -104,5 +125,5 @@ All approved by the owner on 2026-10-27, with the amendments above.
 5. **Trade opens with a visiting trader,** barter only with the neutral town: sooner where roads meet; isolated towns start without traders but can build a road out. Trade is not required for Village.
 6. **Three family ambitions** as in milestone 3.
 7. **Defense stays light in this stage:** raids and militia only.
-8. **The milestone order** above, with playtests after milestones 2 and 6.
+8. **The milestone order** above, with the owner playtest after milestone 6.
 9. **Site variety target:** the best opening differs between kinds of land, and more than one strategy works on each. Alongside it, the **planning target:** a well-planned town clearly outdoes a careless one.
