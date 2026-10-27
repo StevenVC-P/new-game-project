@@ -35,16 +35,6 @@ static func draw_region_tile(canvas: CanvasItem, rect: Rect2, tile: Dictionary, 
 	elif resource == "iron":
 		draw_iron_deposit(canvas, rect, tile_pos)
 
-static func draw_city_tile(canvas: CanvasItem, rect: Rect2, tile: Dictionary, tile_pos: Vector2i):
-	var profile: Dictionary = get_city_profile(tile)
-	draw_profile_tile(canvas, rect, tile_pos, profile)
-
-	if tile["has_trees"] == true:
-		draw_forest_overlay(canvas, rect, tile_pos, 0.55)
-
-	if tile["type"] == "rough":
-		draw_stone_deposit(canvas, rect, tile_pos)
-
 static func get_region_profile(tile: Dictionary) -> Dictionary:
 	var tile_type: String = tile["type"] as String
 	if tile_type == "river":
@@ -57,19 +47,6 @@ static func get_region_profile(tile: Dictionary) -> Dictionary:
 		return make_profile(TERRAIN_FERTILE, VisualStyle.COLOR_TERRAIN_FERTILE, VisualStyle.COLOR_TERRAIN_FERTILE_ACCENT, MOTIF_FERTILE, 0.55, "fertile_tile")
 
 	return make_profile(TERRAIN_GRASS, VisualStyle.COLOR_TERRAIN_GRASS, VisualStyle.COLOR_TERRAIN_GRASS_ACCENT, MOTIF_GRASS, 0.35, "grass_tile")
-
-static func get_city_profile(tile: Dictionary) -> Dictionary:
-	var tile_type: String = tile["type"] as String
-	if tile_type == "water":
-		return make_profile(TERRAIN_WATER, VisualStyle.COLOR_TERRAIN_CITY_WATER, VisualStyle.COLOR_TERRAIN_WATER_ACCENT, MOTIF_WATER, 0.75, "water_tile")
-	if tile_type == "clearing":
-		return make_profile(TERRAIN_CLEARING, VisualStyle.COLOR_TERRAIN_CLEARING, VisualStyle.COLOR_TERRAIN_CLEARING_ACCENT, MOTIF_CLEARING, 0.30, "clearing_tile")
-	if tile_type == "rough":
-		return make_profile(TERRAIN_ROUGH, VisualStyle.COLOR_TERRAIN_ROUGH, VisualStyle.COLOR_TERRAIN_ROUGH_ACCENT, MOTIF_ROUGH, 0.60, "rough_tile")
-	if tile["is_fertile"] == true:
-		return make_profile(TERRAIN_FERTILE, VisualStyle.COLOR_TERRAIN_FERTILE, VisualStyle.COLOR_TERRAIN_FERTILE_ACCENT, MOTIF_FERTILE, 0.45, "fertile_ground_tile")
-
-	return make_profile(TERRAIN_GRASS, VisualStyle.COLOR_TERRAIN_CITY_GRASS, VisualStyle.COLOR_TERRAIN_GRASS_ACCENT, MOTIF_GRASS, 0.25, "ground_tile")
 
 static func make_profile(terrain_type: String, base_color: Color, accent_color: Color, motif: String, density: float, tile_hint: String) -> Dictionary:
 	return {

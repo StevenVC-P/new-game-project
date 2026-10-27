@@ -96,7 +96,7 @@ func _play_continuous_map() -> Array[Dictionary]:
 		rng.seed = 5000 + region.id
 		for _site in range(SITES_PER_REGION):
 			var site: Vector2i = valid_sites[rng.randi_range(0, valid_sites.size() - 1)]
-			results.append(_play_site(region.name, rng, tiles, cities, site, size))
+			results.append(_play_site(region.name, rng, tiles, cities, site, size, terrain, origin))
 	terrain.wait_for_tasks()
 	return results
 
@@ -122,10 +122,17 @@ func _play_world(world_seed: int) -> Array[Dictionary]:
 		results.append(_play_site(world_seed, rng, tiles, cities, site, Vector2i(MainScript.MAP_WIDTH, MainScript.MAP_HEIGHT)))
 	return results
 
-func _play_site(world: Variant, rng: RandomNumberGenerator, tiles: Array, cities: Array[City], site: Vector2i, map_size: Vector2i) -> Dictionary:
+# terrain and origin are given on the continuous map (origin: the neighbourhood's global tile).
+func _play_site(world: Variant, rng: RandomNumberGenerator, tiles: Array, cities: Array[City], site: Vector2i, _map_size: Vector2i, terrain: RegionalTerrain = null, origin: Vector2i = Vector2i.ZERO) -> Dictionary:
 	var city = CityScript.new("Player Town", Vector2(site), CityScript.ROLE_PLAYER, EconomyBalanceScript.FOUNDING_FAMILIES, rng.randi())
 	city.site_profile = SettlementSiteProfile.analyze(city.tile, tiles, MainScript.CITY_RESOURCE_RANGE)
-	city.local_map = LocalCityMapGenerator.new(rng, MainScript.CITY_MAP_WIDTH, MainScript.CITY_MAP_HEIGHT, map_size.x, map_size.y, MainScript.RIVER_NEAR_RANGE, MainScript.CITY_RESOURCE_RANGE).generate(city, tiles, cities.size())
+	var generator: LocalCityMapGenerator = LocalCityMapGenerator.new(MainScript.CITY_MAP_WIDTH, MainScript.CITY_MAP_HEIGHT)
+	if terrain != null:
+		var global_site: Vector2i = Vector2i(terrain.wrap_tile_x(origin.x + site.x), origin.y + site.y)
+		city.site_profile.climate = terrain.climate_at(global_site)
+		city.local_map = generator.generate_from_terrain(terrain, global_site, city.site_profile.climate)
+	else:
+		city.local_map = generator.generate(site, tiles, Vector2i.ZERO, city.site_profile.climate)
 
 	var farm_capacity: int = _count_capacity(city.local_map, "farm")
 	var camp_capacity: int = _count_capacity(city.local_map, "gatherer_camp")

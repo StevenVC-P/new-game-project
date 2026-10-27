@@ -18,6 +18,7 @@ const BUILDING_SCULPTOR: String = "sculptor"
 const BUILDING_CARVER: String = "carver"
 const BUILDING_TILEWORKS: String = "tileworks"
 const BUILDING_PAVER_YARD: String = "paver_yard"
+const BUILDING_STOREHOUSE: String = "storehouse"
 const WORK_PREF_NEUTRAL: String = "neutral"
 const ASSIGNMENT_NONE: String = "none"
 const ASSIGNMENT_AUTO: String = "auto"
@@ -49,14 +50,18 @@ func _init(building_id: int = -1, building_type: String = BUILDING_HOUSE, tile_p
 	type = building_type
 	tile = tile_pos
 	size = footprint_size
-	if is_house():
+	if is_house() or is_store():
 		required_workers = 0
 
 func is_house() -> bool:
 	return BuildingTiersScript.get_base_type(type) == BUILDING_HOUSE
 
+# A store holds the town's goods; nobody works it and it needs no upkeep yet.
+func is_store() -> bool:
+	return type == BUILDING_STOREHOUSE
+
 func is_production_building() -> bool:
-	return not is_house()
+	return not is_house() and not is_store()
 
 func is_tier0() -> bool:
 	return BuildingTiersScript.is_tier0(type)
@@ -103,7 +108,7 @@ func clear_work_succession_preference():
 	succession_vacancy_months = -1
 
 func toggle_maintenance():
-	if is_house():
+	if not is_production_building():
 		return
 
 	receives_maintenance = not receives_maintenance

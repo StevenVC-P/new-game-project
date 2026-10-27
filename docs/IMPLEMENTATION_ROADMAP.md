@@ -274,6 +274,30 @@ Tier 0 is hand work a family can always do, so no shortage of wood or tools is a
 
 Mild mistakes now cost time instead of the town; obviously bad play still fails.
 
+## Town Building Model (2026-10-26, owner brief)
+
+How towns get built, settled before it is locked in. Owner decisions: homes and workplaces stay separate (a nucleated village); construction takes builder families and time; goods physically move; no rigid slot caps (capacity comes from land, labor, materials, and logistics); player and town-driven construction share one pipeline; tier 0 must never deadlock. Implemented in `TownConstruction`, `TownLogistics`, and `FamilyDevelopment`; design, judgment calls, and remaining work in `docs/TOWN_BUILDING_MODEL.md`; tested by `tests/town_construction_validation.gd`.
+
+- **Placement plans, families build.** Every building choice plans a construction site; builders carry the materials from the nearest store, then build over game days. Families without a holding build full time; families at work give 20% spare time (and lose that much output). Every new building is built for a family: a home for a family that needs one, a workplace for the free family that will work it.
+- **Logistics as aggregated carrying.** Routes on the town map (roads fast, water impassable) set the share of a family's day lost to hauling goods to the nearest store and walking from home, shown on each workplace's card with its routes. Storehouses and roads cut it.
+- **Plots and family autonomy.** The player sets residential plots aside (P) and lays roads (G); families build homes on plots, upgrade huts in place, and build a home for a grown child when none stands empty, steered by Home and Place values.
+
+**Authorized formula changes:** buildings appear only when built; workplace output reduced by travel and spare time; the migration food estimate counts travel; the production chain moved into `EconomyBalance.PRODUCTION` unchanged.
+
+**Measured effect** (the stand-in player builds through the pipeline; "before" builds instantly):
+
+| Check | Before | With construction |
+| --- | --- | --- |
+| Opening check, sensible (20 towns, no map) | 20/20, 48 people | 20/20, 47 people |
+| Opening check, all wood on houses first | 20/20 | 13/20 |
+| Opening check, idle for the first 60 days | 15/20 | 12/20 |
+| Opening check, toolmaker deadline (day 90 / 120 / 150) | 19 / 18 / 6 of 20 | unchanged |
+| Map luck, original maps | 46/48 | 46/48 |
+| Map luck, continuous map | 40/42 | 40/42 |
+| Town building check: houses placed / homes on plots / scattered layout | 18/20, 42 people | 17/20 (39), 18/20 (33), 14/20 (27) |
+
+Map luck "before" already counts travel; without it (`develop` before this work) the continuous map was 42/42. Measuring found three ways construction stalled a town, each fixed and recorded as a judgment call in the model doc: spare time limited to homes and tier 0 left spare houses unbuilt and stopped growth; a finished workplace could stand empty because its family had been pulled onto another vacancy; towns that left homes to families never had a spare home for marriages.
+
 ## Map And Presentation Track (2026-10-20)
 
 Owner direction: the map is part of the plan now; art and presentation wait for mechanics to settle.
@@ -295,7 +319,7 @@ Owner direction: the map is part of the plan now; art and presentation wait for 
 2. **Stone appears on town maps** as a real deposit.
 3. **Not every site has every resource.** More kinds of resources will be added later, so the resource model should be easy to extend.
 
-Next implementation step: draw regional deposits onto town maps as resource tiles, give each resource an access rule (on-site or nearby), require quarries to sit on stone, and show available resources in the founding site survey.
+Next implementation step: draw regional deposits onto town maps as resource tiles, give each resource an access rule (on-site or nearby), require quarries to sit on stone, and show available resources in the founding site survey. *Since 2026-10-26 deposits are on town maps and the survey names them (town map art and terrain, below); the access rules and quarries on stone remain.*
 
 **World atlas v1 (2026-10-25, owner-requested ahead of the village):** a fixed, hand-authored planet drawn as a painterly atlas, with kingdoms, regions, settlements, and roads as data a later simulation can change. The game opens on it, and entering an unclaimed region opens the existing regional map. It sets the global art direction. Details and remaining integration work are in `docs/WORLD_MAP.md`.
 
@@ -303,11 +327,13 @@ Next implementation step: draw regional deposits onto town maps as resource tile
 
 **Continuous regional map (2026-10-26, owner-requested):** the regional map became one continuous, true-scale map of the planet that scrolls from region to region and hands off to the atlas by zooming, with kingdom land view-only. No economy formula changed; the map-luck probe got 42/42 towns off the ground across 14 frontier regions. Details: `docs/REGIONAL_MAP.md`.
 
+**Town map art and terrain (2026-10-26, owner-requested ahead of the village):** the town map became the regional land around the site magnified four times (64x44 town tiles over 16x11 regional tiles), so the river, lake or coast, woods, rock, deposits, and roads seen around a site are the town's; and the town is drawn in the regional map's miniature style under a pan and zoom camera, with every building type drawn as its own miniature and the layout filling the window. No economy formula changed. Measured effect: map-luck 42/42 on the continuous map (unchanged) and 46/48 on the original maps (was 47/48; both failures had full room); farmland per town rose (median 364 fertile tiles, was 160); most sites have no water on the town map. Details: `docs/TOWN_MAP.md`.
+
 **Later in this track (after the first playable village):**
 
 1. Living neighbors and rivals on the world map. (The regional map generated from its world region's geography is done: see below.)
 2. Readability pass: tell tier 0 from tier 1, who works where, who is struggling, at a glance.
-3. Art direction decision (style, perspective, scope), then art, the UI overhaul, and audio replacing code-drawn shapes. `BuildingVisuals` profiles are the intended hook for sprites.
+3. Art direction decision (style, perspective, scope), then art, the UI overhaul, and audio replacing code-drawn shapes. `BuildingVisuals` profiles are the intended hook for sprites. (All three map scales now share the miniature style, so in practice the direction is set; sprites, UI, and audio remain.)
 
 ## Future Feature Notes
 

@@ -1,0 +1,267 @@
+class_name TownOverlayLayer
+extends TownMapLayer
+
+# What the player needs to read off the town, redrawn every frame: the building being placed
+# (a ghost of it on a green or red footprint), hover and selection, the selected family's home
+# and work, who works each workplace (a badge in the family's color, or a red vacancy badge),
+# upkeep (a slim plate under each workplace), each house's family (a pennant in its color),
+# families walking between home and work and builders walking to their sites, how far each site
+# has come (a plate: materials, then work), the road being laid, and for the selected workplace
+# the routes its goods and family travel (to the nearest store, from home).
+#
+# Badges and plates keep their size on screen so they stay readable when zoomed out; walkers
+# and pennants are part of the scene and scale with it.
+
+const BADGE_RADIUS_PX: float = 5.5
+const PLATE_HEIGHT_PX: float = 4.0
+const COLOR_SUPPLY: Color = Color(0.72, 0.52, 0.30)
+const COLOR_WORK: Color = Color(0.96, 0.80, 0.36)
+const COLOR_HAUL_ROUTE: Color = Color(0.96, 0.72, 0.30, 0.9)
+const COLOR_COMMUTE_ROUTE: Color = Color(0.70, 0.86, 0.98, 0.9)
+
+# Routes shown for the selected workplace, kept until the selection or the layout changes.
+var route_key: Array = []
+var routes: Array = []
+
+var ghost: TownFeatureLayer.Canvas = null
+
+func setup(map_view: TownMapView) -> void:
+	super.setup(map_view)
+	ghost = TownFeatureLayer.Canvas.new()
+	ghost.name = "Ghost"
+	ghost.painter = paint_ghost
+	ghost.modulate = Color(1.0, 1.0, 1.0, 0.6)
+	add_child(ghost)
+
+func refresh() -> void:
+	queue_redraw()
+	ghost.queue_redraw()
+
+func _draw() -> void:
+	if view == null or view.city == null:
+		return
+	var city: City = view.city
+	for index in range(city.buildings.size()):
+		var building: Building = city.buildings[index]
+		if building.is_house():
+			draw_pennant(city, building, index)
+	draw_walkers(city)
+	draw_builders(city)
+	for index in range(city.buildings.size()):
+		var building: Building = city.buildings[index]
+		if building.is_production_building():
+			draw_workplace_marks(building)
+	draw_site_plates(city)
+	draw_routes(city)
+	draw_selection(city)
+	draw_site_selection(city)
+	draw_road_preview()
+	draw_placement()
+
+# --- Families --------------------------------------------------------------------------------
+
+func draw_pennant(city: City, house: Building, index: int) -> void:
+	if city.get_household_for_building_id(index) == null:
+		return
+	var rect: Rect2 = TownMapStyle.tile_rect(house.tile, house.size)
+	var base: Vector2 = rect.position + rect.size * Vector2(0.14, 0.5)
+	var top: Vector2 = base + Vector2(0.0, -TownMapStyle.TILE * 0.75)
+	draw_line(base + Vector2(0.8, 0.6), top + Vector2(3.0, 3.0), RegionMapStyle.COLOR_SHADOW, 0.6)
+	draw_line(base, top, TownMapStyle.COLOR_TIMBER_DARK, 0.6, true)
+	var color: Color = TownMapStyle.preference_color(city.get_household_preference_for_building(index))
+	draw_colored_polygon(PackedVector2Array([top, top + Vector2(4.6, 1.3), top + Vector2(0.0, 2.8)]), color)
+
+func draw_walkers(city: City) -> void:
+	for index in range(city.buildings.size()):
+		var workplace: Building = city.buildings[index]
+		if not workplace.is_production_building() or workplace.assigned_workers <= 0 or workplace.assigned_household_id < 0:
+			continue
+		var home: Vector2 = household_home(city, workplace.assigned_household_id, city.get_assigned_house_building_id(workplace))
+		var work: Vector2 = TownMapStyle.tile_rect(workplace.tile, workplace.size).get_center()
+		var color: Color = TownMapStyle.preference_color(city.get_household_preference_for_worker_modifier(workplace))
+		for walker_index in range(workplace.assigned_workers):
+			draw_walker(walker_position(home, work, walker_index, workplace.assigned_household_id * 10 + index), color)
+
+# Home is the family's house, or its tent at the camp.
+func household_home(city: City, household_id: int, house_index: int) -> Vector2:
+	if house_index >= 0 and house_index < city.buildings.size():
+		var house: Building = city.buildings[house_index]
+		return TownMapStyle.tile_rect(house.tile, house.size).get_center()
+	var spots: Array[Vector2i] = view.camp_spots(TownMapView.camped_households(city).size())
+	if spots.is_empty():
+		return Vector2(view.map_size) * TownMapStyle.TILE * 0.5
+	return (Vector2(spots[posmod(household_id, spots.size())]) + Vector2(0.5, 0.5)) * TownMapStyle.TILE
+
+# Out to work for the first half of the cycle, home for the second, walking side by side.
+func walker_position(home: Vector2, work: Vector2, walker_index: int, key: int) -> Vector2:
+	var cycle: float = view.walker_time / maxf(view.walker_cycle_seconds, 0.01)
+	var travel: float = cycle * 2.0 if cycle < 0.5 else 1.0 - (cycle - 0.5) * 2.0
+	var position: Vector2 = home.lerp(work, travel)
+	var direction: Vector2 = work - home
+	if direction.length() > 0.1:
+		var side: Vector2 = Vector2(-direction.normalized().y, direction.normalized().x)
+		var lane: float = (float(walker_index) - 0.5) * 2.6
+		var bob: float = sin(view.walker_time * 5.0 + float(key + walker_index)) * 0.4
+		position += side * (lane + bob)
+	return position
+
+# A small figure seen from above: shadow, tunic in the family's color, head.
+func draw_walker(position: Vector2, tunic: Color) -> void:
+	RegionMapLayer.draw_blob(self, position + Vector2(0.9, 1.1), Vector2(1.5, 1.0), RegionMapStyle.COLOR_SHADOW, 8)
+	RegionMapLayer.draw_blob(self, position, Vector2(1.3, 1.5), tunic, 8)
+	draw_circle(position + Vector2(0.0, -1.3), 0.85, TownMapStyle.COLOR_SKIN)
+
+# Builders walk between home and the site they work today.
+func draw_builders(city: City) -> void:
+	for project: ConstructionProject in city.construction.projects:
+		var site: Vector2 = TownMapStyle.tile_rect(project.get_site_tile()).get_center()
+		for i in range(project.crew_household_ids.size()):
+			var household: Household = city.get_household_by_id(project.crew_household_ids[i])
+			if household == null:
+				continue
+			var color: Color = TownMapStyle.preference_color(household.preference)
+			draw_walker(walker_position(household_home(city, household.id, household.residence_building_id), site, i, project.id * 7 + household.id), color)
+
+# --- Building sites ------------------------------------------------------------------------------
+
+# A plate over each site: the brown part fills as materials arrive, the gold part as work is done.
+func draw_site_plates(city: City) -> void:
+	for project: ConstructionProject in city.construction.projects:
+		var rect: Rect2 = TownMapStyle.tile_rect(project.get_site_tile()) if project.kind == ConstructionProject.KIND_ROAD else TownMapStyle.tile_rect(project.tile, project.size)
+		var width: float = maxf(rect.size.x * 0.8, px(26.0))
+		var plate: Rect2 = Rect2(Vector2(rect.get_center().x - width * 0.5, rect.position.y - px(PLATE_HEIGHT_PX) - px(2.0)), Vector2(width, px(PLATE_HEIGHT_PX)))
+		draw_rect(plate.grow(px(1.0)), TownMapStyle.COLOR_PLATE)
+		draw_rect(Rect2(plate.position, Vector2(plate.size.x * 0.3 * project.get_supply_fraction(), plate.size.y)), COLOR_SUPPLY)
+		if project.get_progress() > 0.0:
+			draw_rect(Rect2(plate.position + Vector2(plate.size.x * 0.3, 0.0), Vector2(plate.size.x * 0.7 * project.get_progress(), plate.size.y)), COLOR_WORK)
+		if project.blocked_reason != "":
+			draw_circle(Vector2(plate.end.x + px(5.0), plate.get_center().y), px(3.0), TownMapStyle.COLOR_VACANT)
+
+func draw_road_preview() -> void:
+	for tile: Vector2i in view.road_preview:
+		var rect: Rect2 = TownMapStyle.tile_rect(tile).grow(-px(1.0))
+		draw_rect(rect, RegionMapLayer.faded(TownMapStyle.COLOR_VALID, 0.35))
+		draw_rect(rect, TownMapStyle.COLOR_VALID, false, px(1.0))
+
+# The selected workplace's routes: its goods to the nearest store, its family from home.
+func draw_routes(city: City) -> void:
+	var index: int = view.inspected_index
+	if index < 0 or index >= city.buildings.size() or not city.buildings[index].is_production_building():
+		return
+	var building: Building = city.buildings[index]
+	var key: Array = [index, city.logistics.layout_version, building.assigned_household_id]
+	if key != route_key:
+		route_key = key
+		var work: Vector2i = TownLogistics.center_tile(building.tile, building.size)
+		var store: Vector2i = city.logistics.get_travel(building)["store_tile"]
+		var household: Household = city.get_household_by_id(building.assigned_household_id)
+		routes = [
+			city.logistics.find_route(work, store) if store.x >= 0 else [],
+			city.logistics.find_route(city.logistics.get_home_tile(household), work) if household != null else [],
+		]
+	draw_route(routes[0], COLOR_HAUL_ROUTE)
+	draw_route(routes[1], COLOR_COMMUTE_ROUTE)
+
+func draw_route(route: Array, color: Color) -> void:
+	if route.size() < 2:
+		return
+	var points: PackedVector2Array = PackedVector2Array()
+	for tile: Vector2i in route:
+		points.append(TownMapStyle.tile_rect(tile).get_center())
+	draw_polyline(points, Color(0.05, 0.05, 0.05, 0.55), px(4.0), true)
+	draw_polyline(points, color, px(2.0), true)
+	draw_circle(points[points.size() - 1], px(3.5), color)
+
+# --- Workplaces --------------------------------------------------------------------------------
+
+func draw_workplace_marks(building: Building) -> void:
+	var rect: Rect2 = TownMapStyle.tile_rect(building.tile, building.size)
+	var radius: float = px(BADGE_RADIUS_PX)
+	var badge: Vector2 = rect.position + Vector2(rect.size.x - radius * 1.4, radius * 1.4)
+	draw_circle(badge + Vector2(px(1.0), px(1.2)), radius, RegionMapStyle.COLOR_SHADOW)
+	draw_circle(badge, radius, TownMapStyle.COLOR_BADGE_RIM)
+	if building.assigned_workers > 0:
+		draw_circle(badge, radius * 0.72, TownMapStyle.preference_color(building.assigned_preference))
+	else:
+		draw_circle(badge, radius * 0.72, TownMapStyle.COLOR_VACANT)
+		draw_line(badge - Vector2(radius * 0.4, 0.0), badge + Vector2(radius * 0.4, 0.0), Color.WHITE, px(1.4))
+	# Upkeep shows only when it needs attention: below full, or switched off.
+	if not building.needs_maintenance() or (building.maintenance_level >= 100 and building.receives_maintenance):
+		return
+	var plate: Rect2 = Rect2(Vector2(rect.position.x + rect.size.x * 0.12, rect.end.y - px(PLATE_HEIGHT_PX) - px(3.0)), Vector2(rect.size.x * 0.76, px(PLATE_HEIGHT_PX)))
+	draw_rect(plate.grow(px(1.0)), TownMapStyle.COLOR_PLATE)
+	var level: float = clampf(building.maintenance_level / 100.0, 0.0, 1.0)
+	draw_rect(Rect2(plate.position, Vector2(plate.size.x * level, plate.size.y)), upkeep_color(building))
+
+# The sidebar's upkeep colors, toned down to sit on the land.
+static func upkeep_color(building: Building) -> Color:
+	if not building.receives_maintenance:
+		return VisualStyle.COLOR_MAINTENANCE_DISABLED
+	if building.maintenance_level < 50:
+		return VisualStyle.COLOR_MAINTENANCE_BAD.darkened(0.1)
+	if building.maintenance_level < 75:
+		return VisualStyle.COLOR_MAINTENANCE_WARNING.darkened(0.1)
+	return VisualStyle.COLOR_MAINTENANCE_GOOD.darkened(0.3)
+
+# --- Selection and placement ---------------------------------------------------------------------
+
+func draw_selection(city: City) -> void:
+	for index: int in [view.inspected_index, view.selected_house_index]:
+		if index < 0 or index >= city.buildings.size():
+			continue
+		var building: Building = city.buildings[index]
+		var rect: Rect2 = TownMapStyle.tile_rect(building.tile, building.size).grow(px(2.0))
+		draw_rect(rect, RegionMapLayer.faded(TownMapStyle.COLOR_SELECTION, 0.16))
+		draw_rect(rect, TownMapStyle.COLOR_SELECTION, false, px(2.0))
+	if view.inspected_index < 0 or view.inspected_index >= city.buildings.size():
+		return
+	var start: Vector2 = building_center(city, view.inspected_index)
+	for related: int in view.linked_indices:
+		if related < 0 or related >= city.buildings.size():
+			continue
+		var end: Vector2 = building_center(city, related)
+		draw_line(start + Vector2(px(1.0), px(1.0)), end + Vector2(px(1.0), px(1.0)), Color(0.05, 0.05, 0.05, 0.7), px(4.0))
+		draw_line(start, end, TownMapStyle.COLOR_LINK, px(2.0))
+		draw_circle(start, px(4.0), TownMapStyle.COLOR_LINK)
+		draw_circle(end, px(5.0), TownMapStyle.COLOR_LINK)
+
+# The selected building site or plot.
+func draw_site_selection(city: City) -> void:
+	var site: Rect2 = Rect2()
+	var project: ConstructionProject = city.construction.get_project(view.inspected_project_id)
+	if project != null:
+		if project.kind == ConstructionProject.KIND_ROAD:
+			for tile: Vector2i in project.road_tiles:
+				draw_rect(TownMapStyle.tile_rect(tile), TownMapStyle.COLOR_SELECTION, false, px(1.5))
+		else:
+			site = TownMapStyle.tile_rect(project.tile, project.size)
+	var plot: Dictionary = city.construction.get_plot(view.inspected_plot_id)
+	if not plot.is_empty():
+		site = TownMapStyle.tile_rect(plot["tile"], plot["size"])
+	if site.has_area():
+		draw_rect(site.grow(px(2.0)), RegionMapLayer.faded(TownMapStyle.COLOR_SELECTION, 0.16))
+		draw_rect(site.grow(px(2.0)), TownMapStyle.COLOR_SELECTION, false, px(2.0))
+
+func building_center(city: City, index: int) -> Vector2:
+	var building: Building = city.buildings[index]
+	return TownMapStyle.tile_rect(building.tile, building.size).get_center()
+
+func draw_placement() -> void:
+	if view.hovered_tile.x < 0:
+		return
+	if view.preview_type == "":
+		draw_rect(TownMapStyle.tile_rect(view.hovered_tile), TownMapStyle.COLOR_HOVER, false, px(1.5))
+		return
+	var rect: Rect2 = TownMapStyle.tile_rect(view.hovered_tile, view.preview_size)
+	var color: Color = TownMapStyle.COLOR_VALID if view.preview_valid else TownMapStyle.COLOR_INVALID
+	draw_rect(rect, RegionMapLayer.faded(color, 0.28))
+	draw_rect(rect, color, false, px(2.0))
+
+func paint_ghost(canvas: CanvasItem) -> void:
+	if view == null or view.city == null or view.hovered_tile.x < 0 or view.preview_type == "" or not view.preview_valid:
+		return
+	var rect: Rect2 = TownMapStyle.tile_rect(view.hovered_tile, view.preview_size)
+	if view.preview_type == TownConstruction.PLOT:
+		TownConstructionPainter.plot(canvas, rect, false)
+	elif view.preview_type != TownConstruction.ROAD:
+		TownBuildingPainter.draw(canvas, rect, BuildingVisuals.get_profile(view.preview_type), {"variant": 0.3, "lod": lod})
