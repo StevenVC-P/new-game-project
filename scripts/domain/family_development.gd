@@ -2,19 +2,23 @@ class_name FamilyDevelopment
 extends RefCounted
 
 # Families developing their town on their own: the first piece of a town that grows without the
-# player placing every building (docs/TOWN_BUILDING_MODEL.md). Once a month, families who need a
+# player placing every building (docs/TOWN_BUILDING_MODEL.md). Every week, families who need a
 # better home act through the same construction pipeline as the player (TownConstruction):
 #
 # - a family in a hut upgrades it in place to a house, when the stores can spare the materials;
 # - a family without a home claims one of the residential plots the player designated and
-#   builds a house there, or a hut when the stores cannot spare a house's materials.
+#   builds a house there, or a hut when the stores cannot spare a house's materials;
+# - when the town has no empty home, a family with a grown child ready to marry builds one on a
+#   plot for the new family (a marriage needs a home), Leave the Nest families first.
 #
 # Values decide who acts and where. Hearth-Proud families want a proper house at once; Simple
 # Living families are content in a hut and build one; Town-Loving families settle near the
 # town's heart and Open Country families toward its edge; every family prefers a plot close to
 # its work.
 
-const MAX_PROJECTS_PER_MONTH: int = 2
+# How often families look at their homes, and how many new projects they start at most each time.
+const INTERVAL_DAYS: int = 7
+const MAX_PROJECTS_PER_PASS: int = 2
 # Months a family lives in a hut before it upgrades it (Hearth-Proud families do not wait).
 const HUT_PATIENCE_MONTHS: int = 3
 # Families leave this much in the stores for the town's workshops.
@@ -23,14 +27,14 @@ const STORE_RESERVE: Dictionary = {"wood": 10}
 # work: Town-Loving families pay to live closer, Open Country families walk farther for space.
 const HEART_PULL: float = 1.5
 
-static func advance_month(city: City) -> Array[ConstructionProject]:
+static func advance(city: City) -> Array[ConstructionProject]:
 	var started: Array[ConstructionProject] = []
 	var construction: TownConstruction = city.construction
 	construction.families_without_plot = 0
 	if city.local_map.is_empty():
 		return started
 	for household: Household in city.households:
-		if started.size() >= MAX_PROJECTS_PER_MONTH:
+		if started.size() >= MAX_PROJECTS_PER_PASS:
 			break
 		if construction.get_home_project_for(household.id) != null:
 			continue
@@ -45,7 +49,32 @@ static func advance_month(city: City) -> Array[ConstructionProject]:
 				construction.families_without_plot += 1
 		if project != null:
 			started.append(project)
+	if started.size() < MAX_PROJECTS_PER_PASS:
+		var for_children: ConstructionProject = build_for_new_family(city)
+		if for_children != null:
+			started.append(for_children)
 	return started
+
+# One home at a time for a family about to form, when no home stands empty for it.
+static func build_for_new_family(city: City) -> ConstructionProject:
+	if not city.get_empty_house_building_ids().is_empty():
+		return null
+	for project: ConstructionProject in city.construction.projects:
+		if project.is_home() and project.requested_by == ConstructionProject.REQUESTED_BY_HOUSEHOLD and project.claimant_household_id < 0:
+			return null
+	var parents: Array[Household] = []
+	for household: Household in city.households:
+		if household.can_form_new_family():
+			parents.append(household)
+	parents.sort_custom(func(a: Household, b: Household) -> bool:
+		var a_first: bool = CultureEffects.has_family_formation_priority(a.values)
+		var b_first: bool = CultureEffects.has_family_formation_priority(b.values)
+		return a_first and not b_first or (a_first == b_first and a.id < b.id))
+	for household: Household in parents:
+		var project: ConstructionProject = claim_plot(city, household, false)
+		if project != null:
+			return project
+	return null
 
 static func get_hut(city: City, household: Household) -> Building:
 	if household.housing_status != Household.RESIDENCE_HOUSED:
@@ -62,15 +91,16 @@ static func wants_better_home(household: Household) -> bool:
 		return true
 	return household.rough_housing_months >= HUT_PATIENCE_MONTHS
 
-# Claims the best open plot and starts a home on it; null when there is no plot to claim.
-static func claim_plot(city: City, household: Household) -> ConstructionProject:
+# Claims the best open plot and starts a home on it, for the family itself or (for_itself false)
+# for whichever family needs it when it stands; null when there is no plot to claim.
+static func claim_plot(city: City, household: Household, for_itself: bool = true) -> ConstructionProject:
 	var plot: Variant = choose_plot(city, household)
 	if plot == null:
 		return null
 	var home_type: String = "hut"
 	if not CultureValues.has_value(household.values, "simple_living") and city.construction.can_supply(EconomyBalance.get_build_cost(Building.BUILDING_HOUSE), STORE_RESERVE):
 		home_type = Building.BUILDING_HOUSE
-	return city.construction.request_building(home_type, plot["tile"], ConstructionProject.REQUESTED_BY_HOUSEHOLD, household.id, household.id)
+	return city.construction.request_building(home_type, plot["tile"], ConstructionProject.REQUESTED_BY_HOUSEHOLD, household.id, household.id if for_itself else -1)
 
 # The open plot a family likes best: the shortest walk to its work (or to the stockpile when it
 # has none), pulled toward or away from the town's heart by its Home and Place values.

@@ -14,9 +14,11 @@ extends RefCounted
 #
 # Labor, in family-days: families without a holding are the town's builders and work a site full
 # time, up to a crew per site. A family that works a holding can still give a little time
-# (EconomyBalance.SPARE_TIME_SHARE) to its own new home or to tier 0 hand work, and its holding
-# makes that much less that day. Tier 0 needs no materials, so a town can always raise huts,
-# gardens, and camps, even with every family at work. Projects are worked in queue order.
+# (EconomyBalance.SPARE_TIME_SHARE) to its own project, else to the first site in the queue with
+# room, and its holding makes that much less that day. So nothing stalls for want of hands even
+# with every family at work, but a family free of a holding builds five times as fast. Tier 0
+# needs no materials, so a town can always raise huts, gardens, and camps. Projects are worked in
+# queue order.
 # Design: docs/TOWN_BUILDING_MODEL.md.
 
 const ROAD: String = "road"
@@ -48,6 +50,10 @@ var builders_today: Array[int] = []
 var recent_completions: Array[Dictionary] = []
 # Families who wanted to build a home last month but found no open residential plot.
 var families_without_plot: int = 0
+# Bumped when a road is finished, so views redraw the ground.
+var roads_version: int = 0
+# Homes families asked for themselves and finished (FamilyDevelopment), for balance tools.
+var completed_by_households: int = 0
 
 func _init(owner: City) -> void:
 	_city_ref = weakref(owner)
@@ -116,9 +122,12 @@ func request_upgrade(building_id: int, requested_by: String = ConstructionProjec
 	project.target_building_id = building_id
 	project.materials_needed = EconomyBalance.get_build_cost(upgrade_type)
 	project.work_required = EconomyBalance.get_build_work_days(upgrade_type) * EconomyBalance.UPGRADE_WORK_FRACTION
+	# The family living or working there takes the upgrade on as its own.
 	if building.is_house():
 		var resident: Household = city.get_household_for_building_id(building_id)
 		project.claimant_household_id = resident.id if resident != null else -1
+	else:
+		project.claimant_household_id = building.assigned_household_id
 	return add_project(project)
 
 # Plans a road over the given tiles; tiles that already carry a road are skipped.
@@ -286,9 +295,31 @@ func get_upgrade_project(building_id: int) -> ConstructionProject:
 
 func get_home_project_for(household_id: int) -> ConstructionProject:
 	for project: ConstructionProject in projects:
-		if project.claimant_household_id == household_id:
+		if project.claimant_household_id == household_id and project.is_home():
 			return project
 	return null
+
+# Every new home is meant for a family: one the player planned goes to the first family still in
+# a tent or out in the open, else to a family in a hut (for a proper house). That family can give
+# its spare time to it while working a holding.
+func assign_home_claimants() -> void:
+	for project: ConstructionProject in projects:
+		if not project.is_home() or project.kind != ConstructionProject.KIND_BUILDING:
+			continue
+		if project.claimant_household_id >= 0 and city.get_household_by_id(project.claimant_household_id) != null:
+			continue
+		project.claimant_household_id = find_family_needing_home(project)
+
+func find_family_needing_home(project: ConstructionProject) -> int:
+	var in_hut: int = -1
+	for household: Household in city.households:
+		if get_home_project_for(household.id) != null:
+			continue
+		if household.housing_status != Household.RESIDENCE_HOUSED:
+			return household.id
+		if in_hut < 0 and not project.is_tier0() and FamilyDevelopment.get_hut(city, household) != null:
+			in_hut = household.id
+	return in_hut
 
 # Projects of a building type (or its tier 0 counterpart) not yet finished, upgrades included.
 func count_planned(base_type: String) -> int:
@@ -344,6 +375,7 @@ func advance_day() -> void:
 	if projects.is_empty():
 		return
 	logistics().ensure_ready()
+	assign_home_claimants()
 	for project: ConstructionProject in projects:
 		project.crew_household_ids.clear()
 		project.blocked_reason = ""
@@ -392,8 +424,8 @@ func project_add_spare(project: ConstructionProject, household: Household) -> vo
 	spare_time_today[household.id] = EconomyBalance.SPARE_TIME_SHARE
 	apply_labor(project, get_builder_labor(household) * EconomyBalance.SPARE_TIME_SHARE)
 
-# A family at work on a holding gives spare time to its own home first, else to tier 0 work or a
-# road, where the crew has room.
+# A family at work on a holding gives spare time to its own project first (its home, or its
+# workplace's upgrade), else to the first site in the queue whose crew has room.
 func get_spare_time_project(household: Household, workable: Array[ConstructionProject]) -> ConstructionProject:
 	var fallback: ConstructionProject = null
 	for project: ConstructionProject in workable:
@@ -401,7 +433,7 @@ func get_spare_time_project(household: Household, workable: Array[ConstructionPr
 			continue
 		if project.claimant_household_id == household.id:
 			return project
-		if fallback == null and (project.is_tier0() or project.kind == ConstructionProject.KIND_ROAD) and project.claimant_household_id < 0:
+		if fallback == null:
 			fallback = project
 	return fallback
 
@@ -485,6 +517,7 @@ func complete(project: ConstructionProject) -> void:
 				var data: Dictionary = city.local_map[tile.y][tile.x]
 				data["occupied"] = false
 				data["has_road"] = true
+			roads_version += 1
 			logistics().mark_layout_changed()
 		ConstructionProject.KIND_UPGRADE:
 			city.complete_upgrade(project.target_building_id)
@@ -498,6 +531,8 @@ func complete(project: ConstructionProject) -> void:
 			if claimant != null and not wants_to_move_in(claimant, building):
 				claimant = null
 			city.add_building(building, claimant)
+	if project.requested_by == ConstructionProject.REQUESTED_BY_HOUSEHOLD:
+		completed_by_households += 1
 	recent_completions.append({"label": get_display_name(project), "day": day})
 	while recent_completions.size() > 5:
 		recent_completions.pop_front()
@@ -510,7 +545,7 @@ func wants_to_move_in(household: Household, home: Building) -> bool:
 
 func move_claimant_in(project: ConstructionProject, building_id: int) -> void:
 	var claimant: Household = city.get_household_by_id(project.claimant_household_id)
-	if claimant == null or claimant.residence_building_id == building_id:
+	if claimant == null or claimant.residence_building_id == building_id or not city.buildings[building_id].is_house():
 		return
 	if city.get_household_for_building_id(building_id) == null and wants_to_move_in(claimant, city.buildings[building_id]):
 		claimant.move_to_house(building_id)

@@ -4,28 +4,33 @@ extends RefCounted
 # It plays a town for a number of days and reports whether it got off the ground.
 #
 # Policy: a wood source first, then shelter, food, tools, and room to grow. Workplaces are only
-# built when a family has labor free to work them. When a proper (tier 1) building is
-# unaffordable it falls back to tier 0 hand work, and it upgrades tier 0 when it can afford to.
-# It never reassigns families between jobs, so it is somewhat worse than a real player.
+# planned when a family is free to work them (counting workplaces already planned). Everything is
+# built through the town's construction pipeline (TownConstruction): it plans a building only
+# when the stores can supply it on top of what other sites still need, and the town's families
+# build it over the following days. When a proper (tier 1) building is unaffordable it falls back
+# to tier 0 hand work, and it upgrades tier 0 in place when it can. It never reassigns families
+# between jobs, so it is somewhat worse than a real player.
 #
 # With a town map (`city.local_map` filled), every building must find a valid spot on it
-# (fertile land for farms, trees for camps, nothing blocked), searched outward from the center.
-# Without one, buildings are placed without terrain, as before.
+# (fertile land for farms, trees for camps, nothing blocked), searched outward from the town's
+# stockpile at its heart. Without one, buildings are placed without terrain or travel.
 
 const EconomyBalanceScript = preload("res://scripts/domain/economy_balance.gd")
 const HouseholdMigrationScript = preload("res://scripts/domain/household_migration.gd")
 const BuildingTiersScript = preload("res://scripts/domain/building_tiers.gd")
-const BuildingPlacementScript = preload("res://scripts/ui/building_placement.gd")
 
 const POLICY_INTERVAL_DAYS: int = 5
 const SHORTAGE_WINDOW_DAYS: int = 90
 const STUCK_WOOD_DAYS: int = 60
 
-var placement = BuildingPlacementScript.new()
 # Building kinds that could not find a valid spot on the map at least once.
 var blocked_by_map: Dictionary = {}
 
-# scenario: see opening_check.gd (prebuild, never, not_before, idle_until, max_count).
+# scenario: see opening_check.gd (prebuild, never, not_before, idle_until, max_count), plus, on a
+# town map, "homes_on_plots" (set aside residential plots and let families build their own homes
+# instead of placing houses) and "scattered" (build far out instead of close to the stockpile);
+# and "instant" (the rules before construction: pay and place finished buildings at once), as a
+# control for measuring what construction changes.
 func play(city, scenario: Dictionary, days: int) -> Dictionary:
 	var uses_map: bool = not city.local_map.is_empty()
 	for entry: String in scenario.get("prebuild", []):
@@ -41,6 +46,8 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 	var stuck_on_wood: bool = false
 	var ran_out_of_tools: bool = false
 	var tools_out_day: int = -1
+	var stalled_site_days: int = 0
+	var first_home_day: int = -1
 	for day in range(days):
 		var month_before: int = calendar.current_month
 		var season_before: String = calendar.get_current_season()
@@ -52,6 +59,11 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 			city.advance_household_birth_rolls_season(calendar, 0)
 		if city.resources["food_shortage"] == true:
 			last_shortage_day = day
+		for project: ConstructionProject in city.construction.projects:
+			if project.blocked_reason == "no builders free":
+				stalled_site_days += 1
+		if first_home_day < 0 and int(city.resources["house_shelter_capacity"]) > 0:
+			first_home_day = day
 		if day > 30 and int(city.resources["tools"]) == 0:
 			ran_out_of_tools = true
 			if tools_out_day < 0:
@@ -74,6 +86,7 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 			all_housed = false
 	var fed: bool = days - 1 - last_shortage_day > SHORTAGE_WINDOW_DAYS
 	var kept_families: bool = city.households.size() >= EconomyBalanceScript.FOUNDING_FAMILIES
+	var homes_by_families: int = city.construction.completed_by_households
 	var reasons: Array[String] = []
 	if not kept_families:
 		reasons.append("families left")
@@ -92,12 +105,17 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 		"off_the_ground": all_housed and fed and kept_families,
 		"reasons": reasons,
 		"population": city.get_total_population(),
-		"tools_out_day": tools_out_day
+		"tools_out_day": tools_out_day,
+		"stalled_site_days": stalled_site_days,
+		"first_home_day": first_home_day,
+		"travel_share": average_travel_share(city),
+		"buildings": city.buildings.size(),
+		"homes_by_families": homes_by_families
 	}
 
 func choose_build(city, scenario: Dictionary, day: int) -> String:
 	var counts: Dictionary = count_kinds(city)
-	var idle_labor: bool = int(city.resources["idle_workers"]) > 0
+	var idle_labor: bool = int(city.resources["idle_workers"]) - count_planned_workplaces(city) > 0
 	var houses: int = int(counts.get("house", 0))
 	var woodcutters: int = int(counts.get("woodcutter", 0))
 	var toolmakers: int = int(counts.get("toolmaker", 0))
@@ -138,51 +156,94 @@ func try_build(city, building_type: String, scenario: Dictionary, day: int) -> b
 		return false
 	if not allowed(building_type, scenario, day, count_kinds(city)):
 		return false
-	var cost: Dictionary = EconomyBalanceScript.get_build_cost(building_type)
-	if not city.can_afford_cost(cost):
+	if scenario.get("homes_on_plots", false) and not city.local_map.is_empty() and BuildingTiersScript.get_base_type(building_type) == Building.BUILDING_HOUSE:
+		return set_aside_plot(city, scenario)
+	if not city.construction.can_supply(EconomyBalanceScript.get_build_cost(building_type)):
 		return false
-	if city.local_map.is_empty():
-		city.pay_cost(cost)
-		city.add_building(Building.new(-1, building_type))
-		return true
+	var origin: Vector2i = Vector2i.ZERO
+	if not city.local_map.is_empty():
+		origin = find_spot(city, building_type, scenario.get("scattered", false))
+		if origin.x < 0:
+			blocked_by_map[BuildingTiersScript.get_base_type(building_type)] = true
+			return false
+	if scenario.get("instant", false):
+		return build_at_once(city, building_type, origin)
+	return city.construction.request_building(building_type, origin) != null
 
-	var origin: Vector2i = find_spot(city, building_type)
-	if origin.x < 0:
-		blocked_by_map[BuildingTiersScript.get_base_type(building_type)] = true
-		return false
-	var size: Vector2i = placement.get_building_size(building_type)
-	for y in range(origin.y, origin.y + size.y):
-		for x in range(origin.x, origin.x + size.x):
-			(city.local_map[y][x] as Dictionary)["occupied"] = true
-	city.pay_cost(cost)
+func build_at_once(city, building_type: String, origin: Vector2i) -> bool:
+	var size: Vector2i = city.construction.get_size(building_type)
+	city.construction.set_occupied(TownLogistics.footprint(origin, size), true)
+	city.pay_cost(EconomyBalanceScript.get_build_cost(building_type))
 	city.add_building(Building.new(-1, building_type, origin, size))
 	return true
 
 # Map positions sorted by distance from the center, computed once per map size.
 var _origins_by_distance: Array[Vector2i] = []
+# How far out a scattered town builds, in tiles from its stockpile.
+const SCATTERED_RADIUS: float = 22.0
 
-# The valid spot closest to the town center, as a player building outward would choose.
-func find_spot(city, building_type: String) -> Vector2i:
+# Sets one more plot aside for a family that needs a home, nearest the stockpile first (open plots
+# count as planned homes in count_kinds).
+func set_aside_plot(city, scenario: Dictionary) -> bool:
+	var origin: Vector2i = find_spot(city, "plot", scenario.get("scattered", false))
+	return origin.x >= 0 and city.construction.designate_plot(origin) >= 0
+
+# Mean share of the working day the town's workplaces lose to travel.
+static func average_travel_share(city) -> float:
+	var total: float = 0.0
+	var count: int = 0
+	for building: Building in city.buildings:
+		if building.is_production_building() and building.assigned_workers > 0:
+			total += city.logistics.get_travel_share(building)
+			count += 1
+	return total / count if count > 0 else 0.0
+
+# The valid spot closest to the town center, as a player building outward would choose; or, for a
+# scattered town, the farthest one within SCATTERED_RADIUS.
+func find_spot(city, building_type: String, scattered: bool = false) -> Vector2i:
 	if _origins_by_distance.is_empty():
 		var height: int = city.local_map.size()
 		var width: int = (city.local_map[0] as Array).size()
-		var center: Vector2 = Vector2(width * 0.5, height * 0.5)
+		city.logistics.ensure_ready()
+		var center: Vector2 = Vector2(city.logistics.stockpile_tile) if city.logistics.stockpile_tile.x >= 0 else Vector2(width * 0.5, height * 0.5)
 		for y in range(height):
 			for x in range(width):
 				_origins_by_distance.append(Vector2i(x, y))
 		_origins_by_distance.sort_custom(func(a: Vector2i, b: Vector2i): return center.distance_squared_to(Vector2(a)) < center.distance_squared_to(Vector2(b)))
+	var center: Vector2 = Vector2(city.logistics.stockpile_tile)
+	var found: Vector2i = Vector2i(-1, -1)
 	for origin: Vector2i in _origins_by_distance:
-		var result: Dictionary = placement.validate(city, city.local_map, building_type, origin)
+		if scattered and Vector2(origin).distance_to(center) > SCATTERED_RADIUS:
+			break
+		var result: Dictionary = city.construction.validate(building_type, origin)
 		if result["is_valid"] == true:
-			return origin
-	return Vector2i(-1, -1)
+			found = origin
+			if not scattered:
+				return found
+	return found
 
+# Buildings standing and planned, by kind.
 func count_kinds(city) -> Dictionary:
 	var counts: Dictionary = {}
 	for building: Building in city.buildings:
 		var kind: String = BuildingTiersScript.get_base_type(building.type)
 		counts[kind] = int(counts.get(kind, 0)) + 1
+	for project: ConstructionProject in city.construction.projects:
+		if project.kind != ConstructionProject.KIND_BUILDING:
+			continue
+		var kind: String = BuildingTiersScript.get_base_type(project.building_type)
+		counts[kind] = int(counts.get(kind, 0)) + 1
+	# An open plot is a home a family will build.
+	counts[Building.BUILDING_HOUSE] = int(counts.get(Building.BUILDING_HOUSE, 0)) + city.construction.get_open_plots().size()
 	return counts
+
+# Workplaces planned but not yet built: each will take a family when it is done.
+func count_planned_workplaces(city) -> int:
+	var count: int = 0
+	for project: ConstructionProject in city.construction.projects:
+		if project.kind == ConstructionProject.KIND_BUILDING and not project.is_home():
+			count += 1
+	return count
 
 func tier0_fallback(building_type: String) -> String:
 	for tier0_type in BuildingTiersScript.TIER0_TO_TIER1.keys():
@@ -190,12 +251,20 @@ func tier0_fallback(building_type: String) -> String:
 			return str(tier0_type)
 	return ""
 
-# Upgrade one tier 0 building per policy step when affordable: wood and tools first.
+# Plans one upgrade of a tier 0 building per policy step when the stores can supply it: wood and
+# tools first.
 func upgrade_one(city, scenario: Dictionary, day: int) -> void:
 	for tier0_type: String in ["gatherer_camp", "tool_mender", "forager_garden", "hut"]:
 		var upgrade_type: String = BuildingTiersScript.get_upgrade_type(tier0_type)
 		if day < int((scenario.get("not_before", {}) as Dictionary).get(upgrade_type, 0)):
 			continue
+		if not city.construction.can_supply(EconomyBalanceScript.get_build_cost(upgrade_type)):
+			return
 		for building: Building in city.buildings:
-			if building.type == tier0_type and city.upgrade_building(building.id):
+			if building.type != tier0_type or city.construction.get_upgrade_project(building.id) != null:
+				continue
+			if scenario.get("instant", false):
+				if city.upgrade_building(building.id):
+					return
+			elif city.construction.request_upgrade(building.id) != null:
 				return

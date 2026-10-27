@@ -264,7 +264,6 @@ func advance_household_lifecycle_month(city_index: int = 0):
 	recalculate_household_succession_pressures(city_index)
 	advance_work_succession_vacancies(city_index)
 	HouseholdMigrationScript.advance_month(self, city_index)
-	FamilyDevelopment.advance_month(self)
 	update_shelter_counts()
 	update_worker_counts()
 
@@ -905,6 +904,8 @@ func tick():
 	consume_food()
 	refresh_operating_building_counts()
 	construction.advance_day()
+	if construction.day % FamilyDevelopment.INTERVAL_DAYS == 0:
+		FamilyDevelopment.advance(self)
 
 	for building: Building in buildings:
 		if building.is_house():
@@ -1841,7 +1842,11 @@ func get_labor_pressure() -> Dictionary:
 	var idle_workers: int = int(resources["idle_workers"])
 	var unassigned_jobs: int = count_unassigned_production_buildings()
 	var production_buildings: int = get_production_building_count()
-	var detail: String = str(assigned_workers) + "/" + str(total_labor_capacity) + " labor assigned, " + str(idle_workers) + " idle"
+	# Families without a holding build (TownConstruction); only those not on a site are idle.
+	var building_families: int = mini(idle_workers, construction.builders_today.size())
+	var detail: String = str(assigned_workers) + "/" + str(total_labor_capacity) + " labor assigned, " + str(idle_workers - building_families) + " idle"
+	if building_families > 0:
+		detail += ", " + str(building_families) + " building"
 	var values: Dictionary = {
 		"assigned": assigned_workers,
 		"capacity": total_labor_capacity,
@@ -1856,7 +1861,7 @@ func get_labor_pressure() -> Dictionary:
 		return make_pressure("Overextended", "danger", str(unassigned_jobs) + " production buildings unstaffed", values)
 	if unassigned_jobs > 0:
 		return make_pressure("Labor Shortage", "warning", str(unassigned_jobs) + " production buildings unstaffed", values)
-	if idle_workers >= 2:
+	if idle_workers - building_families >= 2:
 		return make_pressure("Idle Labor", "neutral", detail, values)
 	if assigned_workers >= total_labor_capacity and total_labor_capacity > 0:
 		return make_pressure("Balanced", "positive", detail, values)

@@ -1,7 +1,8 @@
 extends SceneTree
 
 # Town building (docs/TOWN_BUILDING_MODEL.md): construction takes materials carried from a store,
-# builder labor, and time; tier 0 hand work never stalls; upgrades happen in place while the
+# builder labor, and time; nothing stalls for want of hands, and families free of a holding build
+# fastest; upgrades happen in place while the
 # building keeps working; travel to stores and from home costs output, and roads and storehouses
 # reduce it; families claim residential plots and build their own homes through the same
 # pipeline as the player.
@@ -21,6 +22,7 @@ func run_all() -> void:
 	test_roads()
 	test_cancel_returns_materials()
 	test_families_build_on_plots()
+	test_parents_build_for_new_families()
 	test_family_values_shape_homes()
 	test_without_a_town_map()
 
@@ -116,17 +118,17 @@ func test_tier0_never_stalls() -> void:
 	city.resources["tools"] = 0
 	for index in range(EconomyBalance.FOUNDING_FAMILIES):
 		city.add_building(Building.new(-1, "forager_garden", Vector2i(2 + index * 3, 2), Vector2i(3, 3)))
-	var house: ConstructionProject = city.construction.request_building("house", Vector2i(30, 14))
+	var workshop: ConstructionProject = city.construction.request_building("toolmaker", Vector2i(40, 14))
 	var hut: ConstructionProject = city.construction.request_building("hut", Vector2i(34, 14))
+	var house: ConstructionProject = city.construction.request_building("house", Vector2i(30, 14))
 	city.resources["wood"] = 50
 	run_days(city, 1)
-	_check(not city.construction.spare_time_today.is_empty(), "families at work should give spare time to tier 0 work")
-	var hut_days: int = run_until_built(city, hut, 120)
-	_check(hut_days > 0, "a hut should go up from spare time alone, with every family at work")
-	_check(city.construction.projects.has(house) and house.work_done == 0.0, "a house needs builders free of a holding")
-	_check(house.blocked_reason == "no builders free", "a site without builders should say so, got '%s'" % house.blocked_reason)
-	city.unassign_building_worker(0)
-	_check(run_until_built(city, house, 120) > 0, "freeing a family should get the house built")
+	_check(not city.construction.spare_time_today.is_empty(), "families at work should give spare time to tier 0 work and their own homes")
+	_check(house.claimant_household_id >= 0, "a planned house is taken on by a family without a home")
+	_check(run_until_built(city, hut, 120) > 0, "a hut should go up from spare time alone, with every family at work")
+	_check(run_until_built(city, house, 240) > 0, "a family builds its own house in spare time")
+	_check(run_until_built(city, workshop, 240) > 0, "even a tier 1 workplace goes up in spare time: nothing stalls for want of hands")
+	_check(city.buildings.size() == EconomyBalance.FOUNDING_FAMILIES + 3, "everything planned should stand")
 
 func test_upgrade_in_place_keeps_working() -> void:
 	var city: City = make_city()
@@ -201,15 +203,15 @@ func test_cancel_returns_materials() -> void:
 
 func test_families_build_on_plots() -> void:
 	var city: City = make_city()
-	FamilyDevelopment.advance_month(city)
+	FamilyDevelopment.advance(city)
 	_check(city.construction.projects.is_empty(), "families build only where the town has set land aside")
 	_check(city.construction.families_without_plot > 0, "families without a plot are counted for the player")
 	var plot_id: int = city.construction.designate_plot(Vector2i(30, 14))
 	_check(plot_id >= 0, "a residential plot can be designated on open ground")
 	_check(city.construction.designate_plot(Vector2i(31, 15)) < 0, "plots cannot overlap")
 	city.construction.designate_plot(Vector2i(40, 26))
-	var started: Array[ConstructionProject] = FamilyDevelopment.advance_month(city)
-	_check(started.size() == FamilyDevelopment.MAX_PROJECTS_PER_MONTH, "families should claim the open plots")
+	var started: Array[ConstructionProject] = FamilyDevelopment.advance(city)
+	_check(started.size() == 2, "families should claim the open plots")
 	var home: ConstructionProject = started[0]
 	_check(home.requested_by == ConstructionProject.REQUESTED_BY_HOUSEHOLD and home.claimant_household_id == home.requester_household_id, "a family's own home records the family")
 	_check(home.building_type == "house" or home.building_type == "hut", "families build homes")
@@ -223,7 +225,7 @@ func test_families_build_on_plots() -> void:
 	var poor: City = make_city()
 	poor.resources["wood"] = 0
 	poor.construction.designate_plot(Vector2i(30, 14))
-	var huts: Array[ConstructionProject] = FamilyDevelopment.advance_month(poor)
+	var huts: Array[ConstructionProject] = FamilyDevelopment.advance(poor)
 	_check(huts.size() == 1 and huts[0].building_type == "hut", "families short of wood build a hut")
 	_check(run_until_built(poor, huts[0], 90) > 0, "a hut goes up without materials")
 	# Once the stores have wood again and the family has waited, it upgrades the hut in place.
@@ -231,8 +233,24 @@ func test_families_build_on_plots() -> void:
 	family.values.erase(CultureValues.CATEGORY_HOME_PLACE)
 	family.rough_housing_months = FamilyDevelopment.HUT_PATIENCE_MONTHS
 	poor.resources["wood"] = 100
-	var upgrades: Array[ConstructionProject] = FamilyDevelopment.advance_month(poor)
+	var upgrades: Array[ConstructionProject] = FamilyDevelopment.advance(poor)
 	_check(upgrades.size() >= 1 and upgrades[0].kind == ConstructionProject.KIND_UPGRADE and upgrades[0].claimant_household_id == family.id, "a family in a hut upgrades it when it can")
+
+func test_parents_build_for_new_families() -> void:
+	var city: City = make_city()
+	for index in range(EconomyBalance.FOUNDING_FAMILIES):
+		city.add_building(Building.new(-1, "house", Vector2i(2 + index * 3, 20), Vector2i(2, 2)))
+	var parent: Household = city.households[2]
+	parent.adult_children = 1
+	city.construction.designate_plot(Vector2i(30, 14))
+	var started: Array[ConstructionProject] = FamilyDevelopment.advance(city)
+	_check(started.size() == 1 and started[0].requester_household_id == parent.id and started[0].claimant_household_id < 0, "a family with a grown child builds a home for the new family when none stands empty")
+	if started.size() != 1:
+		return
+	_check(run_until_built(city, started[0], 90) > 0, "the new family's home should get built")
+	_check(not city.get_empty_house_building_ids().is_empty(), "the home stands empty, ready for the marriage")
+	city.construction.designate_plot(Vector2i(40, 26))
+	_check(FamilyDevelopment.advance(city).is_empty(), "no new home while one stands empty")
 
 func test_family_values_shape_homes() -> void:
 	var city: City = make_city()
