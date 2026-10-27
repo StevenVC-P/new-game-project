@@ -44,7 +44,7 @@ var shore_depth: PackedByteArray = PackedByteArray()
 var regions: PackedByteArray = PackedByteArray()
 
 # Climate of the chunk as a whole (palette choices that are not per tile).
-var climate_family: String = RegionGeography.CLIMATE_TEMPERATE
+var climate_family: String = RegionalTerrain.CLIMATE_TEMPERATE
 var mean_temperature: float = 0.5
 var mean_moisture: float = 0.5
 
@@ -85,6 +85,11 @@ func is_water(tile: Vector2i) -> bool:
 
 func region_at(tile: Vector2i) -> int:
 	return regions[index_of(tile)] - 1
+
+# Too cold to settle: the tile's own temperature is at or below the frozen line, where the
+# regional map paints the ground as snow.
+func is_frozen(tile: Vector2i) -> bool:
+	return temperature[index_of(tile)] / 255.0 <= RegionalChunkGenerator.FROZEN_TEMPERATURE
 
 # A town could stand here: open or hill land without forest or a deposit.
 func is_buildable(tile: Vector2i) -> bool:

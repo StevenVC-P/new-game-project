@@ -32,6 +32,12 @@ const MAX_CACHED_CHUNKS: int = 220
 # How far a world settlement may move to stand on buildable ground (the old regional town's reach).
 const SETTLEMENT_SNAP_TILES: int = 14
 
+# Climate families: they pick tree kinds and palettes, per chunk and on town maps.
+const CLIMATE_TEMPERATE: String = "temperate"
+const CLIMATE_COLD: String = "cold"
+const CLIMATE_ARID: String = "arid"
+const CLIMATE_TROPICAL: String = "tropical"
+
 # Minor streams: the world map draws only major rivers. Sources sit on a jittered grid.
 const STREAM_SOURCE_SPACING_WORLD: float = 150.0
 const STREAM_STEP_WORLD: float = 2.5
@@ -641,6 +647,24 @@ func region_ids_in_window(origin: Vector2i, size: Vector2i) -> PackedInt32Array:
 					if not RegionalChunk.is_water_type(chunk.types[i]):
 						ids[(gy - origin.y) * size.x + gx - origin.x] = chunk.regions[i] - 1
 	return ids
+
+# 1 per tile of a window where the land is frozen (RegionalChunk.is_frozen), row-major; the
+# founding rules refuse it.
+func frozen_in_window(origin: Vector2i, size: Vector2i) -> PackedByteArray:
+	var frozen: PackedByteArray = PackedByteArray()
+	frozen.resize(size.x * size.y)
+	var first_chunk: Vector2i = Vector2i(floori(float(origin.x) / CHUNK_TILES), floori(float(origin.y) / CHUNK_TILES))
+	var last_chunk: Vector2i = Vector2i(floori(float(origin.x + size.x - 1) / CHUNK_TILES), floori(float(origin.y + size.y - 1) / CHUNK_TILES))
+	for cy in range(first_chunk.y, last_chunk.y + 1):
+		for cx in range(first_chunk.x, last_chunk.x + 1):
+			var chunk: RegionalChunk = get_chunk_now(Vector2i(cx, cy))
+			if chunk == null:
+				continue
+			for gy in range(maxi(origin.y, cy * CHUNK_TILES), mini(origin.y + size.y, (cy + 1) * CHUNK_TILES)):
+				for gx in range(maxi(origin.x, cx * CHUNK_TILES), mini(origin.x + size.x, (cx + 1) * CHUNK_TILES)):
+					if chunk.is_frozen(Vector2i(gx, gy)):
+						frozen[(gy - origin.y) * size.x + gx - origin.x] = 1
+	return frozen
 
 # --- Settlements -------------------------------------------------------------------------------
 

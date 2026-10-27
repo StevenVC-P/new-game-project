@@ -93,11 +93,11 @@ func redraw_strips() -> void:
 			strip.queue_redraw()
 
 func setup_style() -> void:
-	apply_climate_style(RegionMapStyle.region_temperature(view.geography), RegionMapStyle.climate_family(view.geography))
+	apply_climate_style(RegionMapStyle.BOUNDED_TEMPERATURE, RegionalTerrain.CLIMATE_TEMPERATE)
 
 func apply_climate_style(temperature: float, family: String) -> void:
 	tree_style = RegionMapStyle.tree_style_for(temperature, family)
-	var arid: bool = family == RegionGeography.CLIMATE_ARID
+	var arid: bool = family == RegionalTerrain.CLIMATE_ARID
 	rock_light = Color(0.74, 0.58, 0.42) if arid else Color(0.68, 0.64, 0.58)
 	rock_dark = Color(0.46, 0.33, 0.25) if arid else Color(0.40, 0.37, 0.35)
 
@@ -130,10 +130,9 @@ func hash_tile(x: int, y: int) -> Vector2i:
 func is_cleared_at(position: Vector2) -> bool:
 	return view.geometry.is_cleared(position)
 
-func tile_temperature(x: int, y: int) -> float:
-	if view.geography == null:
-		return 0.6
-	return view.geography.temperature[view.geography.tile_index(x, y)]
+# A bounded region has no world behind it, so no climate per tile.
+func tile_temperature(_x: int, _y: int) -> float:
+	return 0.6
 
 func on_lod_changed() -> void:
 	# Only the ground details (shrubs, flowers) depend on the level of detail; re-recording

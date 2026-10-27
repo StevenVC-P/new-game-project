@@ -190,6 +190,11 @@ func lake_at(world_pos: Vector2, reach: float = 1.0) -> Lake:
 			return lake
 	return null
 
+# The region's heart is frozen ground, which the founding rules refuse (RegionalChunk.is_frozen).
+func is_frozen_region(region: Region) -> bool:
+	var land_elevation: float = maxf(elevation_at(region.centroid), 0.0)
+	return WorldFieldBuilder.temperature(latitude_at(region.centroid.y), land_elevation) <= RegionalChunkGenerator.FROZEN_TEMPERATURE
+
 # Region under a world position, or -1 over water.
 func region_id_at(world_pos: Vector2) -> int:
 	if region_grid.is_empty() or not is_land_at(world_pos):

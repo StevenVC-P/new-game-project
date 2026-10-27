@@ -2,9 +2,9 @@ class_name RegionShowcase
 extends RefCounted
 
 # Fixed development examples of the regional map style: real world-atlas regions chosen for
-# their character, generated exactly as the game generates them on entry (same seed, same
-# world geography). Optionally adds a grown player town to show developed settlements,
-# fields, roads, and a quarry. Used by the demo scene and the screenshot capture.
+# their character, shown on the continuous map around each region's main settlement.
+# Optionally adds a grown player town to show developed settlements, fields, roads, and a
+# quarry. Used by the demo scene and the screenshot capture.
 
 const SHOWCASES: Array[Dictionary] = [
 	{"label": "Fertile river valley", "region": "Meander Plains"},
@@ -15,32 +15,13 @@ const SHOWCASES: Array[Dictionary] = [
 	{"label": "Northern taiga", "region": "Taigard"},
 ]
 
-const MAP_SIZE: Vector2i = Vector2i(80, 50)
 const MIN_CITY_DISTANCE: int = 24
-const RIVER_NEAR_RANGE: int = 5
 const CITY_RESOURCE_RANGE: int = 7
 const GROWN_TOWN_HOUSEHOLDS: int = 32
 const GROWN_TOWN_BUILDINGS: Array[String] = [
 	"house", "house", "house", "house", "house", "house", "house", "house", "house", "house",
 	"house", "house", "house", "house", "house", "house", "farm", "farm", "farm", "farm",
 	"farm", "farm", "woodcutter", "woodcutter", "quarry", "toolmaker"]
-
-# Returns {"tiles", "cities", "roads", "geography", "label"}.
-static func build(world: WorldMapData, region_name: String, with_grown_town: bool) -> Dictionary:
-	var region: WorldMapData.Region = world.find_region_by_name(region_name)
-	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
-	rng.seed = region.regional_map_seed
-	var generator: RegionMapGenerator = RegionMapGenerator.new(rng, MAP_SIZE.x, MAP_SIZE.y, MIN_CITY_DISTANCE, RIVER_NEAR_RANGE, CITY_RESOURCE_RANGE)
-	generator.geography = RegionGeography.from_world(world, region.id, MAP_SIZE)
-	var result: Dictionary = generator.generate_region()
-	var tiles: Array = result["tiles"]
-	var cities: Array[City] = result["cities"] as Array[City]
-	if with_grown_town:
-		var site: Vector2i = best_founding_site(tiles, cities)
-		if site.x >= 0:
-			cities.append(make_grown_town(site))
-	var roads: Array[Array] = generator.generate_roads_for_cities(cities)
-	return {"tiles": tiles, "cities": cities, "roads": roads, "geography": generator.geography, "label": region_name}
 
 # Size of the gameplay neighbourhood on the continuous map (main.gd uses the same).
 const NEIGHBOURHOOD_SIZE: Vector2i = Vector2i(160, 100)

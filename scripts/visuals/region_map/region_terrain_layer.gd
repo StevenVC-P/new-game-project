@@ -39,9 +39,8 @@ func rebuild() -> void:
 	var height: PackedFloat32Array = PackedFloat32Array()
 	height.resize(count)
 	var depth: PackedFloat32Array = shore_distance(size)
-	var geography: RegionGeography = view.geography
-	var default_temperature: float = RegionMapStyle.region_temperature(geography)
-	var default_moisture: float = RegionMapStyle.region_moisture(geography)
+	var temperature: int = int(RegionMapStyle.BOUNDED_TEMPERATURE * 255.0)
+	var moisture: int = int(RegionMapStyle.BOUNDED_MOISTURE * 255.0)
 
 	for y in range(size.y):
 		for x in range(size.x):
@@ -57,10 +56,8 @@ func rebuild() -> void:
 			masks_b[i * 4 + 1] = 255 if tile["resource"] == "stone" else 0
 			masks_b[i * 4 + 2] = 255 if tile["resource"] == "iron" else 0
 			masks_b[i * 4 + 3] = 255 if tile_type == "sea" else 0
-			var temperature: float = geography.temperature[i] if geography != null else default_temperature
-			var moisture: float = geography.moisture[i] if geography != null else default_moisture
-			masks_c[i * 4] = int(clampf(temperature, 0.0, 1.0) * 255.0)
-			masks_c[i * 4 + 1] = int(clampf(moisture, 0.0, 1.0) * 255.0)
+			masks_c[i * 4] = temperature
+			masks_c[i * 4 + 1] = moisture
 			masks_c[i * 4 + 2] = int(clampf(depth[i] / DEPTH_TILES, 0.0, 1.0) * 255.0)
 			masks_c[i * 4 + 3] = 255 if tile_type == "lake" else 0
 			if tile_type == "hill":
@@ -80,7 +77,7 @@ func rebuild() -> void:
 	set_mask("masks_c", masks_c, size)
 	set_mask("masks_d", masks_d, size)
 	shader_material.set_shader_parameter("map_tiles", Vector2(size))
-	var floor_color: Color = RegionMapStyle.forest_floor_color(RegionMapStyle.region_temperature(geography), RegionMapStyle.climate_family(geography))
+	var floor_color: Color = RegionMapStyle.forest_floor_color(RegionMapStyle.BOUNDED_TEMPERATURE, RegionalTerrain.CLIMATE_TEMPERATE)
 	shader_material.set_shader_parameter("forest_floor", Vector3(floor_color.r, floor_color.g, floor_color.b))
 	queue_redraw()
 

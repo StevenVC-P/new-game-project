@@ -428,6 +428,8 @@ func get_region_entry_status(region: WorldMapData.Region) -> Dictionary:
 	if other_regions_locked and home_region_id >= 0:
 		var home: WorldMapData.Region = data.get_region(home_region_id)
 		return {"allowed": true, "button": "View region", "reason": "Your settlement is in " + home.name + ". Settling a second region is not possible yet.", "can_settle": false}
+	if data.is_frozen_region(region):
+		return {"allowed": true, "button": "View region", "reason": "Frozen land: too cold for free settlers to found a town.", "can_settle": false}
 	var reason: String = "Open frontier. Enter to survey founding sites."
 	if region.is_contested():
 		reason = "Contested frontier: claimed by kingdoms but held by none. Enter to survey founding sites."

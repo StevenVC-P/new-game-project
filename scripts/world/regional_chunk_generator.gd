@@ -326,7 +326,7 @@ func distance_field(is_source: Callable) -> PackedFloat32Array:
 	return distance
 
 # Hills and mountains where the world is high or rough, with valleys along rivers. The local
-# shares follow RegionMapGenerator.generate_world_relief's region-wide formulas.
+# shares follow the formulas the earlier per-region maps applied region-wide.
 func place_relief(river_distance: PackedFloat32Array) -> void:
 	for y in range(width):
 		for x in range(width):
@@ -347,12 +347,12 @@ func place_relief(river_distance: PackedFloat32Array) -> void:
 
 static func climate_family_of(local_temp: float, local_moist: float) -> String:
 	if local_temp < 0.33:
-		return RegionGeography.CLIMATE_COLD
+		return RegionalTerrain.CLIMATE_COLD
 	if local_moist < 0.4:
-		return RegionGeography.CLIMATE_ARID
+		return RegionalTerrain.CLIMATE_ARID
 	if local_temp >= 0.74 and local_moist > 0.5:
-		return RegionGeography.CLIMATE_TROPICAL
-	return RegionGeography.CLIMATE_TEMPERATE
+		return RegionalTerrain.CLIMATE_TROPICAL
+	return RegionalTerrain.CLIMATE_TEMPERATE
 
 static func is_open_land(tile_type: int) -> bool:
 	return tile_type == RegionalChunk.TYPE_GRASS or tile_type == RegionalChunk.TYPE_HILL
@@ -367,13 +367,13 @@ func place_farmland(fresh_water: PackedFloat32Array) -> void:
 			var near_scale: float = 1.0
 			var far_scale: float = 1.0
 			match climate_family_of(local_temperature[i], local_moisture[i]):
-				RegionGeography.CLIMATE_ARID:
+				RegionalTerrain.CLIMATE_ARID:
 					near_scale = 0.85
 					far_scale = 0.15
-				RegionGeography.CLIMATE_COLD:
+				RegionalTerrain.CLIMATE_COLD:
 					near_scale = 0.55
 					far_scale = 0.55
-				RegionGeography.CLIMATE_TROPICAL:
+				RegionalTerrain.CLIMATE_TROPICAL:
 					near_scale = 0.9
 					far_scale = 0.9
 			var distance: float = fresh_water[i]
@@ -396,7 +396,7 @@ func place_woods(fresh_water: PackedFloat32Array) -> void:
 			var i: int = y * width + x
 			if not is_open_land(types[i]) or local_temperature[i] <= FROZEN_TEMPERATURE:
 				continue
-			var arid: bool = climate_family_of(local_temperature[i], local_moisture[i]) == RegionGeography.CLIMATE_ARID
+			var arid: bool = climate_family_of(local_temperature[i], local_moisture[i]) == RegionalTerrain.CLIMATE_ARID
 			var share: float = clampf(local_forest[i] * 0.75 + 0.06, 0.05, 0.7)
 			if arid:
 				share = minf(share, 0.07)

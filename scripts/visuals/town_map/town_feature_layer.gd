@@ -38,7 +38,7 @@ func setup(map_view: TownMapView) -> void:
 
 func rebuild() -> void:
 	var climate: Dictionary = view.climate
-	tree_style = RegionMapStyle.tree_style_for(float(climate.get("tree_temperature", 0.55)), str(climate.get("family", RegionGeography.CLIMATE_TEMPERATE)))
+	tree_style = RegionMapStyle.tree_style_for(float(climate.get("tree_temperature", 0.55)), str(climate.get("family", RegionalTerrain.CLIMATE_TEMPERATE)))
 	queue_redraw()
 	rebuild_details()
 
