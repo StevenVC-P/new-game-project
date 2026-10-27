@@ -65,7 +65,12 @@ func draw_top_bar(font: Font) -> void:
 		x += 8.0
 	draw_string(font, Vector2(x, baseline), "World Atlas", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, VisualStyle.COLOR_UI_TITLE)
 	x += 108.0
-	draw_string(font, Vector2(x, baseline), "Drag to pan, wheel to zoom, click a region to inspect", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, VisualStyle.COLOR_UI_TEXT_MUTED)
+	var help: String = "Drag to pan, wheel to zoom, click a region to inspect"
+	draw_string(font, Vector2(x, baseline), help, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, VisualStyle.COLOR_UI_TEXT_MUTED)
+	if view.data.world_seed >= 0:
+		# The seed replays this planet: --world-seed=N on the command line.
+		x += font.get_string_size(help, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + 24.0
+		draw_string(font, Vector2(x, baseline), "World seed %d" % view.data.world_seed, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, VisualStyle.COLOR_UI_TEXT_MUTED)
 
 	var toggles: Array = [["Borders (B)", "toggle_borders", view.show_borders], ["Roads (R)", "toggle_roads", view.show_roads],
 		["Towns (T)", "toggle_settlements", view.show_settlements], ["Labels (L)", "toggle_labels", view.show_labels],

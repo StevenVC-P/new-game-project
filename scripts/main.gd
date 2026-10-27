@@ -93,6 +93,11 @@ var town_map_view: TownMapView = null
 var world_map_layer: CanvasLayer = null
 var world_map_view: WorldMapView = null
 var world_map_data: WorldMapData = null
+# Each game is played on a newly generated planet. Set world_seed (or pass --world-seed=N
+# after "--" on the command line) to replay one; tests that look up places by name set
+# use_authored_world for the hand-authored planet.
+var world_seed: int = -1
+var use_authored_world: bool = false
 # World region the current regional map was generated for; -1 before any region is entered.
 var entered_world_region_id: int = -1
 # What the world says about the entered region; steers the generator and the landscape's
@@ -307,7 +312,11 @@ func sync_region_map_view() -> void:
 func _ensure_world_map_view() -> void:
 	if world_map_view != null:
 		return
-	world_map_data = FixedWorldDefinition.build()
+	if use_authored_world:
+		world_map_data = FixedWorldDefinition.build()
+	else:
+		world_map_data = WorldGenerator.build(resolve_world_seed())
+		print("World seed: ", world_map_data.world_seed)
 	world_map_layer = CanvasLayer.new()
 	world_map_layer.layer = 1
 	add_child(world_map_layer)
@@ -321,6 +330,18 @@ func _ensure_world_map_view() -> void:
 	terrain_being_built = null
 	var world: WorldMapData = world_map_data
 	terrain_build_task = WorkerThreadPool.add_task(func() -> void: terrain_being_built = RegionalTerrain.new(world), false, "Regional terrain")
+
+func resolve_world_seed() -> int:
+	if world_seed >= 0:
+		return world_seed
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--world-seed=") and arg.trim_prefix("--world-seed=").is_valid_int():
+			world_seed = int(arg.trim_prefix("--world-seed="))
+			return world_seed
+	var seed_source: RandomNumberGenerator = RandomNumberGenerator.new()
+	seed_source.randomize()
+	world_seed = seed_source.randi_range(1, 999999)
+	return world_seed
 
 func _exit_tree() -> void:
 	if neighbourhood_job >= 0:

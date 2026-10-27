@@ -4,6 +4,7 @@ extends SceneTree
 # founds towns at valid sites, generates their town maps exactly as the game does, and plays two
 # years with the stand-in player placing every building on the real map.
 # Run: <godot> --headless --path . --script res://tests/sim/map_luck_check.gd   (filter for [MAP])
+# Add "-- --world-seed=N" to play only the continuous map of a generated world (WorldGenerator).
 #
 # Reports how many farms and gatherer's camps each site's map can hold before play, and which
 # kinds of sites (by site profile tag) struggle.
@@ -28,11 +29,17 @@ func _init() -> void:
 	call_deferred("run_all")
 
 func run_all() -> void:
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--world-seed="):
+			var world_seed: int = int(arg.trim_prefix("--world-seed="))
+			_summarize(_play_continuous_map(WorldGenerator.build(world_seed)), "continuous regional map of generated world %d, %d frontier regions" % [world_seed, CONTINUOUS_REGIONS])
+			quit()
+			return
 	var results: Array[Dictionary] = []
 	for world in range(WORLDS):
 		results.append_array(_play_world(1000 + world))
 	_summarize(results, "original regional maps, %d worlds" % WORLDS)
-	_summarize(_play_continuous_map(), "continuous regional map, %d frontier regions" % CONTINUOUS_REGIONS)
+	_summarize(_play_continuous_map(FixedWorldDefinition.build()), "continuous regional map, %d frontier regions" % CONTINUOUS_REGIONS)
 	quit()
 
 func _summarize(results: Array[Dictionary], label: String) -> void:
@@ -62,8 +69,7 @@ func _summarize(results: Array[Dictionary], label: String) -> void:
 			_report("  failed %s site %s [%s]: farms room %d, camps room %d, people %d; %s" % [
 				str(result["world"]), str(result["site"]), ", ".join(result["tags"]), result["farm_capacity"], result["camp_capacity"], result["population"], ", ".join(result["reasons"])])
 
-func _play_continuous_map() -> Array[Dictionary]:
-	var world: WorldMapData = FixedWorldDefinition.build()
+func _play_continuous_map(world: WorldMapData) -> Array[Dictionary]:
 	var terrain: RegionalTerrain = RegionalTerrain.new(world)
 	var frontier: Array[WorldMapData.Region] = []
 	for region: WorldMapData.Region in world.regions:

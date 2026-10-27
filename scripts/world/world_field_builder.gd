@@ -58,11 +58,18 @@ static func build(world_definition: Dictionary) -> WorldMapData:
 	return builder.build_world(world_definition)
 
 func build_world(world_definition: Dictionary) -> WorldMapData:
+	begin_world(world_definition)
+	return finish_world()
+
+# The build in two halves, so a world generator can read the land (land_binary, elevation)
+# and fill in the definition's rivers, regions, settlements, and roads before finish_world().
+func begin_world(world_definition: Dictionary) -> void:
 	definition = world_definition
 	data = WorldMapData.new()
 	data.world_size = definition["world_size"]
 	data.terrain_size = definition["terrain_size"]
 	data.political_size = definition["political_size"]
+	data.world_seed = int(definition.get("world_seed", -1))
 	tw = data.terrain_size.x
 	th = data.terrain_size.y
 	pw = data.political_size.x
@@ -70,6 +77,8 @@ func build_world(world_definition: Dictionary) -> WorldMapData:
 
 	build_coast()
 	build_elevation()
+
+func finish_world() -> WorldMapData:
 	build_rivers()
 	build_climate_and_store_terrain()
 	trim_river_mouths()
@@ -103,8 +112,9 @@ func latitude_of_terrain_row(y: int) -> float:
 
 static func temperature(latitude: float, land_elevation: float) -> float:
 	# Same formula as the terrain shader, so derived forests agree with drawn biomes.
-	# The far south runs colder than the far north, so the polar shelf stays ice.
-	var southern_cold: float = smoothstep(55.0, 72.0, -latitude) * 0.25
+	# The far south runs a little colder than the far north. Kept small and close to the pole:
+	# a strong southern chill turned everything beyond 60 degrees south into an ice cap.
+	var southern_cold: float = smoothstep(60.0, 80.0, -latitude) * 0.12
 	return clampf(1.0 - pow(absf(latitude) / 90.0, 1.45) * 1.02 - land_elevation * 0.4 - southern_cold, 0.0, 1.0)
 
 # --- Coast and elevation ---------------------------------------------------
@@ -434,15 +444,7 @@ func kingdom_id_for_key(key: String) -> int:
 	return -1
 
 func build_regions() -> void:
-	var owner: PackedInt32Array = PackedInt32Array()
-	owner.resize(pw * ph)
-	owner.fill(-1)
-	var cost: PackedFloat32Array = make_field(pw, ph)
-	cost.fill(INF)
-	heap_keys = PackedFloat32Array()
-	heap_values = PackedInt32Array()
-	heap_size = 0
-
+	var seed_cells: Array[int] = []
 	for region_definition: Dictionary in definition["regions"]:
 		var region: WorldMapData.Region = WorldMapData.Region.new()
 		region.id = data.regions.size()
@@ -457,13 +459,43 @@ func build_regions() -> void:
 		var seed_cell: Vector2i = nearest_political_land(data.political_cell_at(region.seed_position), 10)
 		if seed_cell.x < 0:
 			data.build_warnings.append("Region seed is not near land: " + region.name)
+			seed_cells.append(-1)
 			continue
 		var seed_index: int = seed_cell.y * pw + seed_cell.x
-		if owner[seed_index] != -1:
+		if seed_cells.has(seed_index):
 			data.build_warnings.append("Region seed shares a cell with another region: " + region.name)
+			seed_cells.append(-1)
+			continue
+		seed_cells.append(seed_index)
+
+	var owner: PackedInt32Array
+	if definition.has("region_grid"):
+		# A generator that already grew the regions (WorldGenerator) hands its partition over.
+		# Carving rivers can turn a shore cell to water since then; water belongs to no region.
+		owner = (definition["region_grid"] as PackedInt32Array).duplicate()
+		for i in range(pw * ph):
+			if political_land[i] == 0:
+				owner[i] = -1
+	else:
+		owner = grow_regions(seed_cells)
+		assign_unreached_land(owner)
+	data.region_grid = owner
+	summarize_regions()
+
+# Region i grows from political cell seed_cells[i] (-1: no seed). Needs build_political_fields().
+func grow_regions(seed_cells: Array[int]) -> PackedInt32Array:
+	var owner: PackedInt32Array = PackedInt32Array()
+	owner.resize(pw * ph)
+	owner.fill(-1)
+	var cost: PackedFloat32Array = make_field(pw, ph)
+	cost.fill(INF)
+	heap_reset()
+	for region_id in range(seed_cells.size()):
+		var seed_index: int = seed_cells[region_id]
+		if seed_index < 0:
 			continue
 		cost[seed_index] = 0.0
-		owner[seed_index] = region.id
+		owner[seed_index] = region_id
 		heap_push(0.0, seed_index)
 
 	# Regions grow over land; ranges, high ground, and rivers are expensive to cross,
@@ -491,10 +523,7 @@ func build_regions() -> void:
 				cost[neighbor] = next_cost
 				owner[neighbor] = owner[current]
 				heap_push(next_cost, neighbor)
-
-	assign_unreached_land(owner)
-	data.region_grid = owner
-	summarize_regions()
+	return owner
 
 func assign_unreached_land(owner: PackedInt32Array) -> void:
 	# Islets with no authored region join the nearest region across the water.
@@ -800,6 +829,11 @@ func noise_field(noise_seed: int, frequency: float, octaves: int) -> PackedFloat
 	for i in range(tw * th):
 		field[i] = bytes[i] / 255.0
 	return field
+
+func heap_reset() -> void:
+	heap_keys = PackedFloat32Array()
+	heap_values = PackedInt32Array()
+	heap_size = 0
 
 func heap_push(key: float, value: int) -> void:
 	if heap_size == heap_keys.size():

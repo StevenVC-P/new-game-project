@@ -4,6 +4,8 @@ extends SceneTree
 # Needs a real window and GPU, so run it without --headless:
 #   & (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/world_map_capture.gd -- <output_dir>
 # Without an output directory, images go to user://world_map_capture.
+# Add seed=N after the directory to review a generated world (WorldGenerator) instead:
+#   ... -- <output_dir> seed=12
 
 const WINDOW_SIZE: Vector2i = Vector2i(1600, 900)
 
@@ -26,6 +28,10 @@ func _init() -> void:
 func run() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args()
 	var output_dir: String = args[0] if args.size() > 0 else "user://world_map_capture"
+	var world_seed: int = -1
+	for arg: String in args:
+		if arg.begins_with("seed="):
+			world_seed = int(arg.trim_prefix("seed="))
 	DirAccess.make_dir_recursive_absolute(output_dir)
 	# The game opens maximized; leave that so screenshots have a fixed size.
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
@@ -33,12 +39,12 @@ func run() -> void:
 	for _frame in range(3):
 		await process_frame
 
-	var world: WorldMapData = FixedWorldDefinition.build()
+	var world: WorldMapData = FixedWorldDefinition.build() if world_seed < 0 else WorldGenerator.build(world_seed)
 	var view: WorldMapView = WorldMapView.new()
 	root.add_child(view)
 	view.setup(world)
 
-	for shot: Dictionary in SHOTS:
+	for shot: Dictionary in (SHOTS if world_seed < 0 else generated_world_shots(world, world_seed)):
 		print("[CAPTURE] rendering ", shot["name"])
 		var at: Vector2 = shot["at"]
 		var world_position: Vector2 = Vector2(at.x / 360.0 * world.world_size.x, (90.0 - at.y) / 180.0 * world.world_size.y)
@@ -57,3 +63,27 @@ func run() -> void:
 		print("[CAPTURE] ", path)
 
 	quit()
+
+# A generated world has no fixed places, so frame what it made: the planet, its continents,
+# a capital up close, a frontier region selected, and the date line.
+func generated_world_shots(world: WorldMapData, world_seed: int) -> Array:
+	var prefix: String = "seed%d_" % world_seed
+	var shots: Array = [{"name": prefix + "01_planet", "at": Vector2(180, 0), "zoom": 0.0}]
+	var continent_number: int = 0
+	for label: WorldMapData.GeoLabel in world.geo_labels:
+		if label.kind == WorldMapData.LABEL_CONTINENT and continent_number < 3:
+			continent_number += 1
+			shots.append({"name": prefix + "02_continent_%d" % continent_number, "at": to_degrees(world, label.position), "zoom": 0.42})
+	if not world.kingdoms.is_empty():
+		var capital: WorldMapData.Settlement = world.get_settlement(world.kingdoms[0].capital_settlement_id)
+		shots.append({"name": prefix + "03_capital", "at": to_degrees(world, capital.position), "zoom": 1.0})
+		shots.append({"name": prefix + "04_capital_close", "at": to_degrees(world, capital.position), "zoom": 3.0})
+	for region: WorldMapData.Region in world.regions:
+		if region.owner_kingdom_id < 0 and region.has_river:
+			shots.append({"name": prefix + "05_frontier_selected", "at": to_degrees(world, region.centroid), "zoom": 0.6, "select": region.name})
+			break
+	shots.append({"name": prefix + "06_wrap_seam", "at": Vector2(0, 20), "zoom": 0.3})
+	return shots
+
+func to_degrees(world: WorldMapData, world_position: Vector2) -> Vector2:
+	return Vector2(world_position.x / world.world_size.x * 360.0, 90.0 - world_position.y / world.world_size.y * 180.0)
