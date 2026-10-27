@@ -18,7 +18,10 @@ func run_all() -> void:
 	test_routes_avoid_woods()
 	test_woodcutters_clear_marked_woods()
 	test_marking_toggles()
-	test_only_woodcutters_fell()
+	test_gatherers_camps_fell_too()
+	test_woodcutters_cut_the_nearest_trees()
+	test_woods_beyond_the_edge_count()
+	test_fields_till_marked_land()
 	test_single_wooded_tile()
 	test_compact_forest()
 	test_narrow_forest()
@@ -27,7 +30,7 @@ func run_all() -> void:
 	test_influence_cap()
 	test_simultaneous_annual_update()
 	test_lone_tile_spreads_slowly_and_irregularly()
-	test_spreads_once_a_year_in_play()
+	test_spreads_through_the_growing_season()
 	test_loaded_town_spreads_the_same()
 
 	if failure_count > 0:
@@ -98,14 +101,64 @@ func test_marking_toggles() -> void:
 	city.woodland.mark_block(Vector2i(56, 0), Vector2i(63, 43))
 	_check(city.woodland.marked.size() == 8 * TownWoodland.MAX_MARK_SIDE, "one marking covers at most %d tiles a side" % TownWoodland.MAX_MARK_SIDE)
 
-func test_only_woodcutters_fell() -> void:
+# Any tier fells: a gatherer's camp at its tier's pace.
+func test_gatherers_camps_fell_too() -> void:
 	var city: City = ConstructionTest.make_city()
 	city.logistics.ensure_ready()
-	city.add_building(Building.new(-1, "gatherer_camp", Vector2i(52, 20), Vector2i(2, 2)))
-	city.woodland.mark_block(Vector2i(56, 20), Vector2i(56, 20))
-	ConstructionTest.run_days(city, 10)
-	_check(city.woodland.felled_count == 0, "a gatherer's camp does not fell woods")
+	_check(city.woodland.mark_block(Vector2i(56, 20), Vector2i(56, 20)) == 1, "a tile of woods can be marked")
 	_check(ConstructionDisplayHelper.get_sidebar_lines(city).has("Woods to clear: 1 tile (needs a working woodcutter)"), "the sidebar says marked woods wait for a woodcutter")
+	city.add_building(Building.new(-1, "gatherer_camp", Vector2i(52, 20), Vector2i(2, 2)))
+	var days: int = 0
+	while city.woodland.felled_count == 0 and days < 60:
+		city.tick()
+		days += 1
+	print("[WOOD] a gatherer's camp felled its marked tile in %d days" % days)
+	_check(city.woodland.felled_count == 1 and days > 4, "a gatherer's camp fells marked woods, more slowly than a woodcutter")
+
+# With nothing marked, a woodcutter slowly cuts the trees nearest it.
+func test_woodcutters_cut_the_nearest_trees() -> void:
+	var city: City = ConstructionTest.make_city()
+	city.logistics.ensure_ready()
+	city.add_building(Building.new(-1, "woodcutter", Vector2i(52, 20), Vector2i(2, 2)))
+	var first: int = -1
+	for day in range(1, 121):
+		city.tick()
+		if first < 0 and city.woodland.felled_count > 0:
+			first = day
+	print("[WOOD] a woodcutter with nothing marked: first tree down on day %d, %d in 120 days" % [first, city.woodland.felled_count])
+	_check(first > 10, "unmarked trees fall slowly")
+	_check(city.woodland.felled_count >= 2 and city.woodland.felled_count <= 8, "a few tiles a season, got %d" % city.woodland.felled_count)
+	_check(city.local_map[20][56]["has_trees"] == false, "the trees nearest the woodcutter go first")
+	_check(city.local_map[20][62]["has_trees"] == true, "trees further in stand")
+
+# Woods beyond the map's edge pull too: the edge's woods are taken to go on.
+func test_woods_beyond_the_edge_count() -> void:
+	var city: City = make_open_city()
+	plant(city, [Vector2i(0, 20)])
+	var influence: float = city.woodland.get_forest_influence(Vector2i(1, 20))
+	_check(is_equal_approx(influence, 1.75), "beside a wooded edge tile: 1, plus 0.5 and 0.25 for the woods beyond, got %.2f" % influence)
+	_check(is_equal_approx(city.woodland.get_forest_influence(Vector2i(31, 20)), 0.0), "far from any woods, nothing")
+
+# Clearing only clears; tilling makes farmland, done by the families working the fields.
+func test_fields_till_marked_land() -> void:
+	var city: City = ConstructionTest.make_city()
+	city.logistics.ensure_ready()
+	_check(city.farmland.mark_block(Vector2i(60, 5), Vector2i(61, 6)) == 0, "woods cannot be tilled before they are cleared")
+	_check(city.farmland.mark_block(Vector2i(20, 2), Vector2i(21, 3)) == 0, "farmland needs no tilling")
+	var origin: Vector2i = Vector2i(30, 14)
+	_check(city.construction.validate("farm", origin)["is_valid"] != true, "a farm needs farmland")
+	_check(city.farmland.mark_block(origin, origin + Vector2i(2, 2)) == 9, "a 3x3 block of open ground marks 9 tiles")
+	_check(ConstructionDisplayHelper.get_sidebar_lines(city).has("Land to till: 9 tiles (needs a working field)"), "the sidebar says marked land waits for a field")
+	city.add_building(Building.new(-1, "farm", Vector2i(28, 4), Vector2i(3, 3)))
+	var days: int = 0
+	while not city.farmland.marked.is_empty() and days < 120:
+		city.tick()
+		days += 1
+	print("[WOOD] one farm tilled a 3x3 block in %d days" % days)
+	_check(city.farmland.tilled_count == 9 and city.local_map[15][31]["is_fertile"] == true, "the field's family tills the marked land")
+	_check(city.construction.validate("farm", origin)["is_valid"] == true, "a farm can stand on tilled land")
+	city.woodland.fell(Vector2i(56, 30))
+	_check(city.farmland.mark_block(Vector2i(56, 30), Vector2i(56, 30)) == 1, "cleared woods can be marked for tilling")
 
 # --- Spreading ---------------------------------------------------------------------------------
 
@@ -272,15 +325,37 @@ func test_lone_tile_spreads_slowly_and_irregularly() -> void:
 	_check(sizes[0] < sizes[3], "a lone wooded tile slowly spreads")
 	_check(wooded < (rect.size.x + 1) * (rect.size.y + 1), "the spread is irregular, not a filled block")
 
-func test_spreads_once_a_year_in_play() -> void:
-	var city: City = ConstructionTest.make_city()
-	ConstructionTest.run_days(city, Calendar.DAYS_PER_YEAR - 1)
-	_check(city.woodland.spread_years == 0, "woods do not spread before the year is out")
-	var version: int = city.woodland.land_version
-	ConstructionTest.run_days(city, 1)
-	_check(city.woodland.spread_years == 1, "woods spread once a year")
-	print("[WOOD] the test town's first year: %d tiles became woods" % city.woodland.spread_count)
-	_check(city.woodland.spread_count == 0 or city.woodland.land_version > version, "views are told when woods spread")
+# The year's spread is chosen on the first day of spring and grows in a tile at a time, each on
+# its own day, through spring, summer, and autumn; nothing grows in winter.
+func test_spreads_through_the_growing_season() -> void:
+	var city: City = make_open_city()
+	plant(city, block(Vector2i(10, 10), Vector2i(20, 20)))
+	city.day_of_year = 1
+	city.tick()
+	var chosen: int = city.woodland.scheduled.size() + city.woodland.spread_count
+	_check(city.woodland.spread_years == 1 and chosen > 2, "the spread is chosen on the first day of spring, got %d tiles" % chosen)
+	var days: Dictionary = {}
+	for day: int in city.woodland.scheduled.values():
+		days[day] = true
+		_check(day >= 1 and day <= EconomyBalance.FOREST_GROWING_DAYS, "each grows in between spring and the end of autumn")
+	_check(days.size() > 1, "the year's woods grow in on different days, not all at once")
+	var grew_on: Dictionary = {}
+	for day in range(2, Calendar.DAYS_PER_YEAR + 1):
+		var before: int = city.woodland.spread_count
+		city.day_of_year = day
+		city.tick()
+		if city.woodland.spread_count > before:
+			grew_on[day] = true
+	print("[WOOD] a 20x20 wood: %d tiles chosen in spring, grown in on %d different days" % [chosen, grew_on.size()])
+	_check(city.woodland.scheduled.is_empty() and city.woodland.spread_count == chosen, "every chosen tile grows in by the end of autumn")
+	var winter: bool = false
+	for day: int in grew_on.keys():
+		winter = winter or day > EconomyBalance.FOREST_GROWING_DAYS
+	_check(not winter, "nothing grows in winter")
+	_check(city.woodland.spread_years == 1, "one choice a year")
+	city.day_of_year = 1
+	city.tick()
+	_check(city.woodland.spread_years == 2, "the next spring chooses again")
 
 # A loaded town finds its frontier again and draws the same numbers, so it spreads the same.
 func test_loaded_town_spreads_the_same() -> void:

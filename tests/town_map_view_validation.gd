@@ -148,11 +148,21 @@ func test_planning_tools(main: Node2D, view: TownMapView) -> void:
 	_check(city.woodland.marked.is_empty(), "the first click only marks where the block starts")
 	main.update_city_hovered_tile(view.tile_rect_to_screen(far_corner).get_center())
 	main.sync_town_map_view()
-	_check(view.clear_preview.has_point(woods) and view.clear_preview.has_point(far_corner), "the block to be marked should show while the player picks its corner")
+	_check(view.block_preview.has_point(woods) and view.block_preview.has_point(far_corner), "the block to be marked should show while the player picks its corner")
 	_click(view.tile_rect_to_screen(far_corner).get_center())
 	await _settle()
 	_check(city.woodland.is_marked(woods), "the second click should mark the woods in the block for clearing")
-	_check(view.clear_preview.size == Vector2i.ZERO, "the preview goes once the block is marked")
+	_check(view.block_preview.size == Vector2i.ZERO, "the preview goes once the block is marked")
+
+	# The tilling tool marks open ground the same way.
+	var open: Vector2i = _valid_spot(main, MainScript.BUILDING_HOUSE)
+	var tillable: int = city.farmland.get_tillable_in_block(open, open + Vector2i(2, 2)).size()
+	main.select_building_type(TownFarmland.TILL)
+	_click(view.tile_rect_to_screen(open).get_center())
+	await _settle()
+	_click(view.tile_rect_to_screen(open + Vector2i(2, 2)).get_center())
+	await _settle()
+	_check(tillable > 0 and city.farmland.marked.size() == tillable, "the tilling tool should mark the open ground in the block (%d of %d)" % [city.farmland.marked.size(), tillable])
 	main.select_building_type(MainScript.BUILDING_HOUSE)
 
 	main.is_placing_building = false

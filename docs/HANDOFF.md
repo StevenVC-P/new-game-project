@@ -6,7 +6,9 @@ Snapshot for whoever picks the project up next. Update it when a milestone close
 
 ## Current Objective
 
-New focus: the gameplay loop inside towns. Fourth step, owner answers on paths (`feature/route-lines-and-fences`, from `develop`, 2026-10-27): the road tool is back; routes run on the lines between tiles as well as through them; walking through a field tramples its harvest and a field can be fenced; paths in woods wear slowly and stay trails; trails draw thin and paths up to a tile wide (`docs/TOWN_BUILDING_MODEL.md`, Routes, Paths, Fields and fences).
+New focus: the gameplay loop inside towns. Fifth step, owner answers on woods (`feature/woodcutters-and-seasons`, from `develop`, 2026-10-27): woodcutters of any tier, and with nothing marked they slowly cut the nearest trees; land is tilled into farmland as a second step (F); woods past the map's edge count toward spreading; the year's spread is chosen in spring and grows in one tile at a time through autumn.
+
+Fourth step, owner answers on paths (`feature/route-lines-and-fences`, from `develop`, 2026-10-27): the road tool is back; routes run on the lines between tiles as well as through them; walking through a field tramples its harvest and a field can be fenced; paths in woods wear slowly and stay trails; trails draw thin and paths up to a tile wide (`docs/TOWN_BUILDING_MODEL.md`, Routes, Paths, Fields and fences).
 
 Third step, forest expansion (`feature/forest-expansion`, from `develop`, owner specification 2026-10-27): once a year woods spread onto open land beside them, by influence of woods within 3 steps, capped; it replaces the first growing-back model (`docs/TOWN_BUILDING_MODEL.md`, Woodland).
 

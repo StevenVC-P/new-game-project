@@ -7,7 +7,7 @@ extends RefCounted
 # around the player from the planet (RegionalTerrain.extract_window). A fingerprint of the
 # world refuses a save whose planet this build would rebuild differently. Everything play
 # changes is saved: every town in the neighbourhood (families, buildings, stores, town map,
-# construction, woodland), the player's road spur, trade routes, the calendar, and where the player was
+# construction, woodland, farmland), the player's road spur, trade routes, the calendar, and where the player was
 # looking. Town maps are saved whole rather than regenerated, so construction marks on them and
 # changes to the town map generator cannot shift a town under its buildings.
 
@@ -114,6 +114,7 @@ static func capture_city(city: City) -> Dictionary:
 		"construction": SaveCodec.capture(city.construction),
 		"projects": projects,
 		"woodland": SaveCodec.capture(city.woodland),
+		"farmland": SaveCodec.capture(city.farmland),
 	}
 
 static func restore_city(data: Dictionary) -> City:
@@ -139,6 +140,7 @@ static func restore_city(data: Dictionary) -> City:
 	SaveCodec.restore(city.construction, data["construction"])
 	# Saves from before woodland have nothing marked or felled.
 	SaveCodec.restore(city.woodland, data.get("woodland", {}))
+	SaveCodec.restore(city.farmland, data.get("farmland", {}))
 	var projects: Array[ConstructionProject] = []
 	for project_data: Dictionary in data["projects"]:
 		var project: ConstructionProject = ConstructionProject.new()
