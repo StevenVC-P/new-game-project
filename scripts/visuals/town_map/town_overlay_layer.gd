@@ -22,6 +22,12 @@ const COLOR_HAUL_ROUTE: Color = Color(0.96, 0.72, 0.30, 0.9)
 const COLOR_COMMUTE_ROUTE: Color = Color(0.70, 0.86, 0.98, 0.9)
 const COLOR_CLEARING: Color = Color(0.95, 0.56, 0.22)
 const COLOR_TILLING: Color = Color(0.62, 0.42, 0.22)
+# What an errand brings home: water, firewood, goods.
+const ERRAND_LOADS: Dictionary = {
+	"water": Color(0.42, 0.62, 0.78),
+	"firewood": Color(0.50, 0.36, 0.22),
+	"store": Color(0.80, 0.72, 0.52),
+}
 
 # Routes shown for the selected workplace, kept until the selection or the layout changes.
 var route_key: Array = []
@@ -53,6 +59,7 @@ func _draw() -> void:
 		if building.is_house():
 			draw_pennant(city, building, index)
 	draw_walkers(city)
+	draw_errand_walkers(city)
 	draw_builders(city)
 	for index in range(city.buildings.size()):
 		var building: Building = city.buildings[index]
@@ -183,9 +190,31 @@ func draw_walker(position: Vector2, tunic: Color) -> void:
 	RegionMapLayer.draw_blob(self, position, Vector2(1.3, 1.5), tunic, 8)
 	draw_circle(position + Vector2(0.0, -1.3), 0.85, TownMapStyle.COLOR_SKIN)
 
-# A load on a carrier's back: a sack of goods.
-func draw_load(position: Vector2) -> void:
-	RegionMapLayer.draw_blob(self, position + Vector2(1.1, 0.2), Vector2(0.9, 1.0), TownConstructionPainter.SACK, 8)
+# A load on a carrier's back: a sack of goods by default.
+func draw_load(position: Vector2, color: Color = TownConstructionPainter.SACK) -> void:
+	RegionMapLayer.draw_blob(self, position + Vector2(1.1, 0.2), Vector2(0.9, 1.0), color, 8)
+
+# One of each family out on an errand (TownErrands), a different one each walk: water from the
+# bank, firewood from the woods, goods from the store, or a visit to kin, bringing back what the
+# errand is for.
+func draw_errand_walkers(city: City) -> void:
+	if not city.logistics.has_map():
+		return
+	var cycle: float = view.walker_time / maxf(view.walker_cycle_seconds, 0.01)
+	for household: Household in city.households:
+		var offset: float = fposmod(float(household.id) * 0.37 + 0.25, 1.0)
+		var round_index: int = int(floor(cycle + offset))
+		var kind: String = TownErrands.KINDS[posmod(round_index + household.id, TownErrands.KINDS.size())]
+		var errand: Dictionary = city.errands.get_errand(household, kind)
+		if (errand["route"] as Array).size() < 2:
+			continue
+		var key: Array = ["errand", household.id, kind]
+		if not walker_paths.has(key):
+			walker_paths[key] = make_path(errand["route"])
+		var position: Vector2 = position_on(walker_paths[key], out_and_back(offset), 0, household.id * 13)
+		draw_walker(position, TownMapStyle.preference_color(household.preference))
+		if not phase_outbound(offset) and ERRAND_LOADS.has(kind):
+			draw_load(position, ERRAND_LOADS[kind])
 
 # Builders carry materials from the store along the site's delivery route while a site waits
 # for them, then work on the site.

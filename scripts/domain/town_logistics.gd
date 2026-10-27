@@ -41,6 +41,12 @@ const OWNER_PROJECT: int = 1000000
 const OWNER_PLOT: int = 2000000
 const OWNER_STOCKPILE: int = 3000000
 const OWNER_OTHER: int = 4000000
+const TILE_WOODED: int = 1
+const TILE_WATER: int = 2
+const TILE_ROAD: int = 4
+const CELL_WEARABLE: int = 1
+const CELL_IN_WOODS: int = 2
+const CELL_BETWEEN_BUILDINGS: int = 4
 
 # The town this belongs to, held weakly: City owns this object, and a strong reference back
 # would keep both alive forever.
@@ -64,6 +70,9 @@ var cell_inside: PackedInt32Array = PackedInt32Array()
 var tile_base: PackedFloat32Array = PackedFloat32Array()
 var tile_margin: PackedFloat32Array = PackedFloat32Array()
 var tile_open: PackedByteArray = PackedByteArray()
+# Per tile: 1 wooded, 2 water, 4 road. Per cell: CELL_WEARABLE and CELL_IN_WOODS.
+var tile_kind: PackedByteArray = PackedByteArray()
+var cell_flags: PackedByteArray = PackedByteArray()
 # Cells closed to every route that does not start or end in their footprint, by footprint owner.
 var closed_cells: Dictionary = {}
 # Travel figures for the current routes: building id -> store route, [building id, household
@@ -234,42 +243,22 @@ func owner_of(tile: Vector2i) -> int:
 	return tile_owner[tile.y * map_size().x + tile.x] if not tile_owner.is_empty() else OWNER_NONE
 
 # Cells foot traffic wears: open ground, and the lines and corners between things, but not water,
-# roads, built land, or the inside of a footprint.
+# roads, built land, or the inside of a footprint. Worked out per cell with the grid
+# (compute_cell), as wear is laid on thousands of cells a day.
 func is_cell_wearable(cell: Vector2i) -> bool:
-	var tiles: Array[Vector2i] = cell_tiles(cell)
-	if cell_inside_owner(cell) != OWNER_NONE:
-		return false
-	if is_tile_cell(cell):
-		var tile: Dictionary = tile_data(tiles[0])
-		return tile["type"] != "water" and tile.get("has_road", false) != true and tile["occupied"] != true
-	var land: bool = false
-	for tile: Vector2i in tiles:
-		var data: Dictionary = tile_data(tile)
-		if data.get("has_road", false) == true:
-			return false
-		land = land or data["type"] != "water"
-	return land
+	ensure_grid()
+	return cell_flags[cell.y * cell_size().x + cell.x] & CELL_WEARABLE != 0
 
 # A cell in woods: every tile it touches is wooded. Paths there wear slowly and stay trails.
 func is_cell_in_woods(cell: Vector2i) -> bool:
-	for tile: Vector2i in cell_tiles(cell):
-		if tile_data(tile)["has_trees"] != true:
-			return false
-	return true
+	ensure_grid()
+	return cell_flags[cell.y * cell_size().x + cell.x] & CELL_IN_WOODS != 0
 
 # A line or corner with built land on every side: a strip between buildings. People walk it,
 # but it stays a trail (owner, 2026-10-27); a line between a building and open land is open land.
 func is_cell_between_buildings(cell: Vector2i) -> bool:
-	if is_tile_cell(cell):
-		return false
 	ensure_grid()
-	var tiles: Array[Vector2i] = cell_tiles(cell)
-	if tiles.size() < 2:
-		return false
-	for tile: Vector2i in tiles:
-		if owner_of(tile) == OWNER_NONE:
-			return false
-	return true
+	return cell_flags[cell.y * cell_size().x + cell.x] & CELL_BETWEEN_BUILDINGS != 0
 
 # Kept per tile so a full rebuild reads each tile once: who occupies it.
 func build_tile_owners() -> void:
@@ -306,10 +295,12 @@ func build_tile_values() -> void:
 	tile_base.resize(size.x * size.y)
 	tile_margin.resize(size.x * size.y)
 	tile_open.resize(size.x * size.y)
+	tile_kind.resize(size.x * size.y)
 	for y in range(size.y):
 		for x in range(size.x):
 			var i: int = y * size.x + x
 			var tile: Dictionary = city.local_map[y][x]
+			tile_kind[i] = (TILE_WOODED if tile["has_trees"] == true else 0) | (TILE_WATER if tile["type"] == "water" else 0) | (TILE_ROAD if tile.get("has_road", false) == true else 0)
 			if tile_owner[i] != OWNER_NONE and tile["occupied"] != true and tile["type"] != "water" and tile.get("has_road", false) != true:
 				tile = tile.duplicate()
 				tile["occupied"] = true
@@ -329,11 +320,17 @@ func compute_cell(cx: int, cy: int) -> void:
 		var i: int = span.position.y * size.x + span.position.x
 		cell_inside[index] = tile_owner[i]
 		cell_effort[index] = tile_base[i] * (path_factor(level) if tile_open[i] == 1 else 1.0)
+		cell_flags[index] = (CELL_WEARABLE if tile_open[i] == 1 else 0) | (CELL_IN_WOODS if tile_kind[i] & TILE_WOODED != 0 else 0)
 		return
 	var effort: float = INF
 	var owner: int = OWNER_NONE
 	var one_footprint: bool = true
 	var first: bool = true
+	var all_wooded: bool = true
+	var all_owned: bool = true
+	var tiles_in_map: int = 0
+	var any_land: bool = false
+	var any_road: bool = false
 	for ty in range(span.position.y, span.end.y):
 		for tx in range(span.position.x, span.end.x):
 			if tx < 0 or ty < 0 or tx >= size.x or ty >= size.y:
@@ -346,11 +343,20 @@ func compute_cell(cx: int, cy: int) -> void:
 			elif tile_owner[i] != owner:
 				one_footprint = false
 			effort = minf(effort, tile_margin[i])
+			all_wooded = all_wooded and tile_kind[i] & TILE_WOODED != 0
+			all_owned = all_owned and tile_owner[i] != OWNER_NONE
+			tiles_in_map += 1
+			any_land = any_land or tile_kind[i] & TILE_WATER == 0
+			any_road = any_road or tile_kind[i] & TILE_ROAD != 0
+	var woods: int = CELL_IN_WOODS if all_wooded and not first else 0
 	if one_footprint and owner != OWNER_NONE:
 		cell_inside[index] = owner
 		cell_effort[index] = EconomyBalance.BUILT_EFFORT
+		cell_flags[index] = woods
 		return
 	cell_inside[index] = OWNER_NONE
+	var between: int = CELL_BETWEEN_BUILDINGS if all_owned and tiles_in_map >= 2 else 0
+	cell_flags[index] = woods | between | (CELL_WEARABLE if any_land and not any_road else 0)
 	if not is_inf(effort) and effort != EconomyBalance.ROAD_EFFORT:
 		effort *= path_factor(level)
 	cell_effort[index] = effort
@@ -375,6 +381,7 @@ func ensure_grid() -> void:
 	grid.update()
 	cell_effort.resize(size.x * size.y)
 	cell_inside.resize(size.x * size.y)
+	cell_flags.resize(size.x * size.y)
 	closed_cells.clear()
 	var closed: Dictionary = get_closed_owners()
 	var cheapest: float = cheapest_effort()
@@ -626,12 +633,16 @@ func add_traffic(route: Array, trips: float) -> void:
 	ensure_grid()
 	var crossed: Dictionary = {}
 	var ends: Array[int] = [owner_of(cell_tile(route[0])), owner_of(cell_tile(route[route.size() - 1]))]
+	# Read straight from the per-cell arrays: wear is laid on thousands of cells a day.
+	var width: int = cell_size().x
+	var in_woods: float = trips * EconomyBalance.FOREST_WEAR_FACTOR
 	for cell: Vector2i in route:
-		if is_cell_wearable(cell):
-			var amount: float = trips * (EconomyBalance.FOREST_WEAR_FACTOR if is_cell_in_woods(cell) else 1.0)
-			cell_wear[cell] = float(cell_wear.get(cell, 0.0)) + amount
+		var index: int = cell.y * width + cell.x
+		var flags: int = cell_flags[index]
+		if flags & CELL_WEARABLE != 0:
+			cell_wear[cell] = float(cell_wear.get(cell, 0.0)) + (in_woods if flags & CELL_IN_WOODS != 0 else trips)
 			continue
-		var inside: int = cell_inside_owner(cell)
+		var inside: int = cell_inside[index]
 		if inside >= 0 and inside < OWNER_PROJECT and not ends.has(inside) and is_field(city.buildings[inside]):
 			crossed[inside] = true
 	for field: int in crossed.keys():
@@ -646,7 +657,8 @@ func record_site_delivery(site_tile: Vector2i) -> void:
 		add_traffic(get_site_store_route(site_tile)["route"], 2.0 / EconomyBalance.CARRY_LOAD)
 
 # End of a day: every workplace that worked lays its family's walk from home (there and back)
-# and its carrying trips to the store, the same travel get_travel charges it for. Then wear
+# and its carrying trips to the store, the same travel get_travel charges it for, and every
+# family lays its errands (TownErrands), which cost no one's work. Then wear
 # fades, cells whose wear crossed a threshold change path level (and their routes with them),
 # and today's trampling becomes what the fields' harvests pay for tomorrow.
 func advance_day() -> void:
@@ -661,6 +673,7 @@ func advance_day() -> void:
 			continue
 		add_traffic(get_commute(building)["route"], 2.0)
 		add_traffic(get_store_route(building)["route"], get_daily_units(city, building) / EconomyBalance.CARRY_LOAD * 2.0)
+	city.errands.add_daily_traffic()
 	trampled_trips = trampling_today
 	trampling_today = {}
 	var changed: Array[Vector2i] = update_path_levels()
@@ -674,11 +687,14 @@ func advance_day() -> void:
 # changed.
 func update_path_levels() -> Array[Vector2i]:
 	var changed: Array[Vector2i] = []
+	ensure_grid()
+	var width: int = cell_size().x
 	for cell: Vector2i in cell_wear.keys():
-		var amount: float = float(cell_wear[cell]) if is_cell_wearable(cell) else 0.0
-		var current: int = get_cell_path_level(cell)
+		var flags: int = cell_flags[cell.y * width + cell.x]
+		var amount: float = float(cell_wear[cell]) if flags & CELL_WEARABLE != 0 else 0.0
+		var current: int = int(cell_levels.get(cell, PATH_NONE))
 		var level: int = get_path_level_for(amount, current)
-		if is_cell_in_woods(cell) or is_cell_between_buildings(cell):
+		if flags & (CELL_IN_WOODS | CELL_BETWEEN_BUILDINGS) != 0:
 			level = mini(level, PATH_TRAIL)
 		if level != current:
 			set_cell_path_level(cell, level)
