@@ -38,6 +38,10 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # Map luck: 48 towns on real generated maps and sites (filter for [MAP])
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/map_luck_check.gd
 
+# Town building: construction, travel, and families building homes on plots, on 20 real town maps
+# (write to a file, then filter for [BUILD]; piping Godot's household log stalls it on Windows)
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/town_building_check.gd > building.log
+
 # Multi-year settlement run, yearly report (filter output for [SIM])
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/settlement_growth_run.gd
 
@@ -89,4 +93,5 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 - `scripts/ui/`, `scripts/visuals/` - panels, helpers, drawing.
 - Daily `City.tick()`, monthly `advance_household_lifecycle_month()`, and seasonal birth rolls are driven by calendar signals in `main.gd`.
 - Performance limits and their causes are measured in `docs/HOUSEHOLD_SIM_BENCHMARK.md`.
-- Every economy number (starting stock, outputs, upkeep, construction costs) lives in `scripts/domain/economy_balance.gd`.
+- Every economy number (starting stock, outputs, upkeep, construction costs and work, travel) lives in `scripts/domain/economy_balance.gd`.
+- Building goes through one pipeline for the player and for families: `TownConstruction` (`city.construction`: requests, queue, builders, completion), `TownLogistics` (`city.logistics`: stores, routes on the town map, the share of a workplace's day lost to travel), and `FamilyDevelopment` (families building homes on residential plots, weekly). Nothing is placed finished in play: `City.add_building` is what a finished project calls. Design and judgment calls: `docs/TOWN_BUILDING_MODEL.md`.

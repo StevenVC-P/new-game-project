@@ -6,7 +6,7 @@ The town map is the smallest scale under the world atlas and the regional map: t
 
 - **In the game:** found a town on the regional map; the town view opens fitted to the window beside the sidebar. Wheel zooms toward the cursor (up to 6x), left or middle drag pans, arrow keys pan (letters and digits choose buildings here), Home refits. A click is a press and release without a drag.
 - **Generator checks:** `tests/town_map_validation.gd` (headless): the same site always gives the same town; deep inside regional water or mountains the town has water or rock, woods are wooded apart from glades, open land is open apart from copses; every town keeps its floors; original (bounded) regional maps still get towns.
-- **View checks:** `tests/town_map_view_validation.gd` (headless, plays the real flow): the town opens fitted beside a full-height sidebar; screen and tile coordinates agree at every zoom; a click places the chosen building on the tile under the cursor; a drag pans without placing; the wheel keeps the point under the cursor; sidebar clicks never reach the map; ground details stand only on open ground.
+- **View checks:** `tests/town_map_view_validation.gd` (headless, plays the real flow): the town opens fitted beside a full-height sidebar; screen and tile coordinates agree at every zoom; a click plans the chosen building on the tile under the cursor and the town builds it there, the road and plot tools work (`docs/TOWN_BUILDING_MODEL.md`); a drag pans without placing; the wheel keeps the point under the cursor; sidebar clicks never reach the map; ground details stand only on open ground.
 - **What town maps hold:** `tests/sim/town_map_probe.gd` prints the spread of farmland, trees, water, rock, deposits, roads, and buildable land over 160 real sites, and generation times. The site survey's thresholds come from it.
 - **Screenshots:** `tests/visual/town_map_capture.gd` finds showcase sites (river, lakeshore, coast, woods, stone, arid, cold, plains) and renders each fitted and close up, a town grown by the stand-in player, every building type in both tiers, and the real game with a house selected, with `[PERF]` lines. Needs a window (command in `CLAUDE.md`).
 
@@ -82,7 +82,8 @@ Town maps changed, so balance was re-measured (2026-10-26):
 - **The quarry access rule** (quarries on stone, owner decision 2026-10-25) is not built; the deposits it needs are on the map.
 - **The regional map still draws the player's town by rule.** With the town map at a real scale, its buildings could now be placed on the regional map where they stand in town.
 - **The player's spur road is not on the town map** (it is made after founding); world roads crossing the town's land are.
-- **Seasons do not show** (fields keep one crop color), and walkers still walk in straight lines between home and work, across water too, as before.
+- **Seasons do not show** (fields keep one crop color), and walkers still walk in straight lines between home and work, across water too, as before (travel itself is routed: `TownLogistics`; the selected workplace's routes are drawn).
+- Construction (sites, plots, the stockpile, storehouses, roads, routes) is drawn by `TownConstructionPainter` and the overlay; the design is in `docs/TOWN_BUILDING_MODEL.md`.
 - **Generation runs on the main thread** at site pick (about 40 ms).
 - **Bounded (original) regional maps carry no climate**, so their towns use temperate colors.
 - **Integrated GPUs are untested.**

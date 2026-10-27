@@ -308,7 +308,7 @@ func capture_construction() -> void:
 	main.found_player_city_at_pending_site()
 	var town: City = main.cities[main.selected_city_index]
 	var player = StandInPlayerScript.new()
-	for building_type: String in ["gatherer_camp", "farm", "woodcutter", "house", "house", "toolmaker"]:
+	for building_type: String in ["woodcutter", "farm", "farm", "house"]:
 		player.try_build(town, building_type, {}, 0)
 	for _plot in range(3):
 		player.set_aside_plot(town, {})
