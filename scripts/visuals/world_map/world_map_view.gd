@@ -23,6 +23,8 @@ const REDRAW_ZOOM_DRIFT: float = 1.15
 var recorded_zoom: float = -1.0
 var recorded_area: Rect2 = Rect2()
 signal return_requested
+# The top bar's Menu button: save, load, quit (scripts/app.gd).
+signal menu_requested
 
 const ZOOM_STEP: float = 1.25
 const ZOOM_SMOOTHING: float = 14.0
@@ -350,6 +352,8 @@ func apply_hud_action(action: String) -> void:
 			request_region_entry(selected_region_id)
 		"return":
 			return_requested.emit()
+		"open_menu":
+			menu_requested.emit()
 	panel.queue_redraw()
 
 # --- Hover and selection ---------------------------------------------------
