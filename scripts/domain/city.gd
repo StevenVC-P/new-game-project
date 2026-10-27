@@ -80,6 +80,8 @@ var construction: TownConstruction = null
 var woodland: TownWoodland = null
 # Land marked to till into farmland.
 var farmland: TownFarmland = null
+# Families' own trips from home: the store, water, firewood, kin.
+var errands: TownErrands = null
 # Today's day of the year (1-360), set by the game before each day's tick; -1 where nothing sets
 # it (tests, balance tools), which count years from founding instead.
 var day_of_year: int = -1
@@ -94,6 +96,7 @@ func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO, city_r
 	construction = TownConstruction.new(self)
 	woodland = TownWoodland.new(self)
 	farmland = TownFarmland.new(self)
+	errands = TownErrands.new(self)
 	founding_seed = random_seed
 	var normalized_household_count: int = max(0, starter_household_count)
 	resources = make_starting_resources(normalized_household_count)

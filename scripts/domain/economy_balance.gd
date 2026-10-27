@@ -158,14 +158,28 @@ const PATH_EFFORT_FACTOR: float = 0.65
 # trail: wear never fells a tree. The strips between buildings never pass a trail either.
 const FOREST_WEAR_FACTOR: float = 0.5
 
+# --- Errands (docs/TOWN_BUILDING_MODEL.md, Errands) ---
+# Round trips a day each family makes from home besides work (TownErrands): to the store for
+# food and goods every three days, to the nearest bank for water daily, to the woods' edge for
+# firewood every four days, and to visit kin weekly. They wear paths and trample fields, and cost
+# the family's workplace nothing. Cultural values will shape them per family later.
+const ERRAND_ROUND_TRIPS_PER_DAY: Dictionary = {
+	"store": 1.0 / 3.0,
+	"water": 1.0,
+	"firewood": 0.25,
+	"kin": 1.0 / 7.0,
+}
+
 # --- Fields (docs/TOWN_BUILDING_MODEL.md, Fields and fences) ---
 # People who walk through a field (not along its edge) trample it: each daily trip across a field
 # costs it this share of its harvest, up to the max. A field's own family does not count.
 const FIELD_TRAMPLE_LOSS_PER_TRIP: float = 0.02
 const FIELD_TRAMPLE_MAX_LOSS: float = 0.4
-# A fence keeps everyone else out; it is built like anything else.
-const FENCE_WOOD: int = 4
-const FENCE_WORK_DAYS: float = 2.0
+# A fence keeps everyone else out of a field or a yard, and off its edges; it is built like
+# anything else. Wood and work follow the fence's length: a 3x3 field takes 4 wood and 2
+# family-days, a 2x2 house 3 wood and about 1.3.
+const FENCE_EDGE_TILES_PER_WOOD: float = 3.0
+const FENCE_WORK_DAYS_PER_EDGE_TILE: float = 1.0 / 6.0
 
 # --- Woodland (docs/TOWN_BUILDING_MODEL.md, Woodland) ---
 # A woodcutter's family fells the woods the player marked for clearing as the place it cuts its
@@ -196,6 +210,12 @@ const FOREST_INFLUENCE_DECAY: float = 0.5
 # The year's spread is chosen at the start of spring and grows in a tile at a time, each on its
 # own day between spring and the end of autumn (owner, 2026-10-27): the first three seasons.
 const FOREST_GROWING_DAYS: int = 270
+
+static func get_fence_cost(size: Vector2i) -> Dictionary:
+	return {"wood": int(ceil(float(2 * (size.x + size.y)) / FENCE_EDGE_TILES_PER_WOOD))}
+
+static func get_fence_work_days(size: Vector2i) -> float:
+	return float(2 * (size.x + size.y)) * FENCE_WORK_DAYS_PER_EDGE_TILE
 
 static func get_build_cost(building_type: String) -> Dictionary:
 	return (BUILD_COSTS.get(building_type, {}) as Dictionary).duplicate()

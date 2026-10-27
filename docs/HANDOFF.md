@@ -6,7 +6,9 @@ Snapshot for whoever picks the project up next. Update it when a milestone close
 
 ## Current Objective
 
-New focus: the gameplay loop inside towns. Fifth step, owner answers on woods (`feature/woodcutters-and-seasons`, from `develop`, 2026-10-27): woodcutters of any tier, and with nothing marked they slowly cut the nearest trees; land is tilled into farmland as a second step (F); woods past the map's edge count toward spreading; the year's spread is chosen in spring and grows in one tile at a time through autumn.
+New focus: the gameplay loop inside towns. Sixth step (`feature/yard-fences-and-errands`, 2026-10-27): fences for any building with an open yard, and families' errands (store, water, firewood, kin) wearing paths. Next: homes 1x1 (owner, 2026-10-27), then the first-stage loop the owner approved in outline: site-driven opportunities and hazards, a seasonal rhythm, family ambitions (M4), defense (M5), the first neighbour (M6), and a chronicle (M8). Owner red lines stand; formulas may be changed to fix balance.
+
+Fifth step, owner answers on woods (`feature/woodcutters-and-seasons`, from `develop`, 2026-10-27): woodcutters of any tier, and with nothing marked they slowly cut the nearest trees; land is tilled into farmland as a second step (F); woods past the map's edge count toward spreading; the year's spread is chosen in spring and grows in one tile at a time through autumn.
 
 Fourth step, owner answers on paths (`feature/route-lines-and-fences`, from `develop`, 2026-10-27): the road tool is back; routes run on the lines between tiles as well as through them; walking through a field tramples its harvest and a field can be fenced; paths in woods wear slowly and stay trails; trails draw thin and paths up to a tile wide (`docs/TOWN_BUILDING_MODEL.md`, Routes, Paths, Fields and fences).
 
@@ -89,6 +91,7 @@ In rough priority order; details in each doc's "Remaining Work" section.
 - **New `class_name` scripts** are unknown until an import pass: run `scripts/validate_project.ps1` before running tests or captures.
 - **Balance tools print a long household log.** Write their output to a file and filter it (`> log`); piping it through a shell pipe on Windows stalls Godot at a few percent CPU.
 - **Town maps change in play.** Felled and spread woods and path levels are written onto `City.local_map`; anything that draws or caches from the town map must watch `TownWoodland.land_version` and `TownLogistics.paths_version` (the town view does). Town maps are saved whole, so this survives saving.
+- **A route-grid rebuild costs about 40 ms** (every layout change: buildings, sites, plots, felled or spread woods), a visible hitch at speed. A grown town's day costs about 5 ms. Rebuilding only the changed area is the next step if it bothers play.
 - **Routes are cells, not tiles.** `TownLogistics.find_route` takes tiles but returns route cells at half-tile spacing (tile middles, lines, corners); convert with `cell_position` to draw. Path levels and wear are per cell (`cell_levels`, `cell_wear`); `get_tile_path_level` reads a tile's middle. A full route-grid rebuild is about 40 ms, so avoid layout changes in tight loops.
 - **Path levels change routes.** A tile's `path_level` changing is a layout change (`TownLogistics.advance_day`); anything that caches routes must key on `layout_version`. Wear is saved with the town (`TownLogistics.wear`), levels on the town map's tiles.
 - **Buildings are never placed finished in play.** Everything goes through `TownConstruction`; `City.add_building` is the completion step (tests may still call it directly). City's helpers (`logistics`, `construction`) hold the city weakly, or towns leak.

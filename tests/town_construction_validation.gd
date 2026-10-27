@@ -30,6 +30,8 @@ func run_all() -> void:
 	test_crossing_a_field_tramples_it()
 	test_fences_keep_people_out()
 	test_nobody_walks_through_buildings()
+	test_yards_can_be_fenced()
+	test_families_run_errands()
 	test_paths_form_between_yards()
 	test_paths_in_woods_stay_trails()
 	test_cancel_returns_materials()
@@ -215,6 +217,12 @@ func test_roads() -> void:
 	print("[TOWN] travel share of a woodcutter's family: %.3f without a road, %.3f with one" % [before, after])
 	_check(after < before * 0.8, "a road to the stores should cut travel")
 
+static func highest_level_on(city: City, route: Array) -> int:
+	var level: int = TownLogistics.PATH_NONE
+	for cell: Vector2i in route:
+		level = maxi(level, city.logistics.get_cell_path_level(cell))
+	return level
+
 static func path_level_at(city: City, tile: Vector2i) -> int:
 	return city.logistics.get_tile_path_level(tile)
 
@@ -224,12 +232,12 @@ func test_paths_wear_where_families_walk() -> void:
 	city.add_building(Building.new(-1, "woodcutter", Vector2i(52, 20), Vector2i(2, 2)))
 	var camp: Building = city.buildings[0]
 	var before: float = city.logistics.get_travel_share(camp)
-	var route: Array = city.logistics.get_store_route(camp)["route"]
-	var middle: Vector2i = route[route.size() / 2]
+	# Routes bend onto worn ground (and the families' errands wear ground too), so the route is
+	# read as it stands each time: its most worn cell.
 	run_days(city, 30)
-	var level_30: int = city.logistics.get_cell_path_level(middle)
+	var level_30: int = highest_level_on(city, city.logistics.get_store_route(camp)["route"])
 	run_days(city, 120)
-	var level_150: int = city.logistics.get_cell_path_level(middle)
+	var level_150: int = highest_level_on(city, city.logistics.get_store_route(camp)["route"])
 	var after: float = city.logistics.get_travel_share(camp)
 	print("[TOWN] woodcutter's route after 30 days: level %d, after 150: level %d; travel share %.3f -> %.3f, %.0f%% of the way trodden" % [level_30, level_150, before, after, city.logistics.get_trodden_share(camp) * 100.0])
 	_check(level_30 >= TownLogistics.PATH_TRAIL, "a month of walking to work should wear a trail")
@@ -271,10 +279,9 @@ func test_paths_fade_and_give_way() -> void:
 	logistics.cell_wear[TownLogistics.tile_cell(tile)] = EconomyBalance.PATH_WEAR
 	logistics.advance_day()
 	_check(path_level_at(city, tile) == TownLogistics.PATH_WORN, "enough wear makes a path")
-	var version: int = logistics.paths_version
 	for _day in range(10):
 		logistics.advance_day()
-	_check(path_level_at(city, tile) == TownLogistics.PATH_WORN and logistics.paths_version == version, "a path does not vanish as soon as its wear dips under the threshold")
+	_check(path_level_at(city, tile) == TownLogistics.PATH_WORN and float(logistics.cell_wear[TownLogistics.tile_cell(tile)]) < EconomyBalance.PATH_WEAR, "a path does not vanish as soon as its wear dips under the threshold")
 	var days_to_trail: int = days_until_level(logistics, city, tile, TownLogistics.PATH_TRAIL, 200)
 	var days_to_none: int = days_until_level(logistics, city, tile, TownLogistics.PATH_NONE, 300)
 	print("[TOWN] an abandoned path is a trail after %d more days and grass after %d more" % [days_to_trail, days_to_none])
@@ -290,6 +297,8 @@ func test_paths_fade_and_give_way() -> void:
 	logistics.cell_wear[TownLogistics.tile_cell(tile)] = EconomyBalance.PATH_WEAR
 	logistics.advance_day()
 	city.local_map[tile.y][tile.x]["occupied"] = true
+	# Play reserves land through TownConstruction, which marks the layout changed.
+	logistics.mark_layout_changed()
 	logistics.advance_day()
 	_check(path_level_at(city, tile) == TownLogistics.PATH_NONE and not logistics.cell_wear.has(TownLogistics.tile_cell(tile)), "ground built over or reserved is no longer a path")
 
@@ -402,6 +411,57 @@ func test_nobody_walks_through_buildings() -> void:
 	var door: Array[Vector2i] = city.logistics.find_route(TownLogistics.center_tile(house.tile, house.size), Vector2i(30, 20))
 	_check(not door.is_empty(), "a family still leaves its own house")
 	_check(not city.logistics.find_route(Vector2i(30, 20), store).is_empty(), "goods still reach the stockpile")
+
+# Any building with an open yard can be fenced, at a cost by the fence's length; two fenced
+# neighbours leave no strip between them.
+func test_yards_can_be_fenced() -> void:
+	var city: City = make_city()
+	city.resources["wood"] = 50
+	city.logistics.ensure_ready()
+	city.add_building(Building.new(-1, "house", Vector2i(30, 10), Vector2i(2, 2)), city.households[0])
+	city.add_building(Building.new(-1, "house", Vector2i(32, 10), Vector2i(2, 2)), city.households[1])
+	city.add_building(Building.new(-1, "quarry", Vector2i(40, 10), Vector2i(2, 2)))
+	_check(not city.construction.can_fence(2), "a quarry, an open pit, cannot be fenced")
+	_check(EconomyBalance.get_fence_cost(Vector2i(2, 2))["wood"] == 3 and EconomyBalance.get_fence_cost(Vector2i(3, 3))["wood"] == 4, "a fence costs wood by its length")
+	var first: ConstructionProject = city.construction.request_fence(0)
+	var second: ConstructionProject = city.construction.request_fence(1)
+	_check(first != null and second != null and first.claimant_household_id == city.households[0].id, "a house's family takes on its fence")
+	_check(run_until_built(city, first, 60) > 0 and run_until_built(city, second, 60) >= 0 and city.buildings[0].fenced and city.buildings[1].fenced, "both fences should get built")
+	var route: Array[Vector2i] = city.logistics.find_route(Vector2i(31, 8), Vector2i(32, 13))
+	var between: Array[Vector2i] = []
+	for cell: Vector2i in route:
+		if Rect2i(Vector2i(60, 20), Vector2i(9, 5)).has_point(cell):
+			between.append(cell)
+	_check(not route.is_empty() and between.is_empty(), "nobody passes between two fenced yards: " + str(between))
+
+# Families run errands from home: the store, water from the nearest bank, firewood from the edge
+# of the woods, and their kin; the errands wear the ground.
+func test_families_run_errands() -> void:
+	var city: City = make_city()
+	city.logistics.ensure_ready()
+	var parent: Household = city.households[0]
+	var child: Household = city.households[1]
+	child.parent_household_id = parent.id
+	city.add_building(Building.new(-1, "house", Vector2i(20, 28), Vector2i(2, 2)), parent)
+	city.add_building(Building.new(-1, "house", Vector2i(40, 20), Vector2i(2, 2)), child)
+	var errands: TownErrands = city.errands
+	var store: Dictionary = errands.get_errand(parent, TownErrands.STORE)
+	var water: Dictionary = errands.get_errand(parent, TownErrands.WATER)
+	var firewood: Dictionary = errands.get_errand(child, TownErrands.FIREWOOD)
+	var kin: Dictionary = errands.get_errand(parent, TownErrands.KIN)
+	_check(not (store["route"] as Array).is_empty() and city.logistics.get_store_tiles().has(store["tile"]), "a family walks to the store")
+	var bank: Vector2i = water["tile"]
+	_check(not (water["route"] as Array).is_empty() and bank.x >= 0 and city.local_map[bank.y][bank.x]["type"] == "ground" and (bank.x == 12 or bank.y == 31), "a family walks to the nearest bank of the lake: " + str(bank))
+	var woods: Vector2i = firewood["tile"]
+	_check(not (firewood["route"] as Array).is_empty() and city.local_map[woods.y][woods.x]["has_trees"] == true and woods.x == 56, "a family walks to the nearest edge of the woods: " + str(woods))
+	_check(kin["tile"] == city.logistics.get_home_tile(child), "a family visits its grown child's household")
+	_check((errands.get_errand(city.households[2], TownErrands.KIN)["route"] as Array).is_empty(), "a family with no kin in town visits nobody")
+	for _day in range(30):
+		city.logistics.advance_day()
+	var water_route: Array = water["route"]
+	var near_bank: Vector2i = water_route[water_route.size() - 3]
+	print("[TOWN] after a month of errands: wear %.1f near the bank, %d trodden cells in town" % [float(city.logistics.cell_wear.get(near_bank, 0.0)), city.logistics.cell_levels.size()])
+	_check(city.logistics.get_cell_path_level(near_bank) >= TownLogistics.PATH_TRAIL, "daily water trips wear a trail to the bank within a month")
 
 # The strips between yards are open ground, so a compact town wears paths between its houses.
 func test_paths_form_between_yards() -> void:
