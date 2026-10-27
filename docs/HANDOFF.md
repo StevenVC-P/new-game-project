@@ -2,11 +2,13 @@
 
 Snapshot for whoever picks the project up next. Update it when a milestone closes; durable detail lives in the linked docs, not here.
 
-*Last updated: 2026-10-27, after the world-window cleanup and frozen-ground founding.*
+*Last updated: 2026-10-27, after paths worn by foot traffic.*
 
 ## Current Objective
 
-Owner answers on three open decisions (2026-10-27), on `chore/remove-world-window-and-frozen-founding` from `develop`: the unused world-window code is removed; frozen ground refuses founding; balance waits for the next design pass.
+New focus: the gameplay loop inside towns. First step, paths (`feature/desire-paths`, from `develop`, owner request 2026-10-27): people move faster on paths and roads, but instead of the player building roads, trails and paths wear where families walk, and routes prefer the quickest ways (`docs/TOWN_BUILDING_MODEL.md`, Paths). The player's road tool is gone from the controls.
+
+Before that, owner answers on three open decisions (2026-10-27), on `chore/remove-world-window-and-frozen-founding` from `develop`: the unused world-window code is removed; frozen ground refuses founding; balance waits for the next design pass.
 
 Saved games (`feature/saved-games`, from `develop`, owner request 2026-10-27): a start menu, an in-game menu, named saves, and an autosave each season and on quit (`docs/SAVED_GAMES.md`). Merged into `develop` and, on the owner's approval, into `main` (2026-10-27).
 
@@ -17,11 +19,14 @@ Before that: town building is settled before it is locked in (`docs/TOWN_BUILDIN
 ## Status
 
 - **Working:** saved games and the start/in-game menus (`docs/SAVED_GAMES.md`): a town saved, loaded, and played 120 more days stays identical to the original; generated worlds (`WorldGenerator`; design in `docs/WORLD_MAP.md`): 30 seeds build without warnings, openings on generated planets get off the ground about as often as on the authored one (38/42 and 40/42 on seeds 1 and 2, authored now 41/42 continuous, since frozen regions are no longer picked, and 46/48 original); world atlas (`docs/WORLD_MAP.md`); continuous regional map (`docs/REGIONAL_MAP.md`); town map (`docs/TOWN_MAP.md`); town building: construction sites, builders, carried materials, travel costs, roads, storehouses, residential plots, families building homes (`docs/TOWN_BUILDING_MODEL.md`). All 25 headless test scripts pass (with `world_generator_validation` and `save_game_validation`); import validation is clean; generated planets were reviewed by eye (`world_map_capture` with `seed=`); `town_map_capture` (now with construction scenes) was reviewed by eye.
+- **Paths** (`docs/TOWN_BUILDING_MODEL.md`, Paths): all 25 headless test scripts pass; balance is unchanged or better (scattered towns 14/20 to 15/20, travel 13% to 11%); `town_map_capture` was reviewed by eye.
 - **Balance:** with construction, the sensible opening stays 20/20 and map luck matches building instantly (46/48, 40/42); an opening that queues every house before the woodcutter falls from 20/20 to 13/20 (queue order). Numbers in the model doc.
 - **Branches:** generated worlds, saved games, and the world-window cleanup with frozen-ground founding are on `develop`; the owner approved them and `develop` was merged into `main` on 2026-10-27. Both are pushed.
 - **Unchanged:** the original region generator (fingerprints in `tests/region_map_validation.gd`); economy numbers other than the new construction and travel ones.
 
 ## Decisions Made (Don't Re-litigate Without The Owner)
+
+- **Paths develop from walking; the player does not build roads (owner, 2026-10-27).** Routing prefers the quickest ways. Numbers and the judgment calls made implementing it are open (`docs/TOWN_BUILDING_MODEL.md`, Paths).
 
 - **Saved games (owner, 2026-10-27).** Named slots plus one autosave; a start menu (Continue, New world, Load game); autosave each in-game season and on quit.
 - **Town building (owner brief, 2026-10-26).** Plan the town, families develop it; homes and workplaces separate; construction takes builder families, materials, and time; goods physically move (aggregated, not per item); no rigid slot caps; one construction pipeline for the player and for families or a future government; tier 0 never deadlocks. Implementation judgment calls are marked in `docs/TOWN_BUILDING_MODEL.md` and open to veto.
@@ -40,7 +45,7 @@ Before that: town building is settled before it is locked in (`docs/TOWN_BUILDIN
 
 - **Generated worlds** (details in `docs/WORLD_MAP.md`): a new planet every launch with no way to pick one in the game yet (the seed shows in the atlas top bar; `-- --world-seed=N` replays it); is that the wanted default, or should the player choose or reroll? How much ice: generated land stops at about 72 N / 58 S, pack ice from 77 N / 72 S. Frontier tends to be tropical or dry, because kingdoms start on the most habitable land.
 
-0. **Town building** (details in `docs/TOWN_BUILDING_MODEL.md`, Open Owner Decisions): helpers' spare time cannot be turned off; strict queue order vs builders favoring workplaces; upkeep grace counted from founding rather than per building; first-pass travel numbers; families building only on player-set plots.
+0. **Town building** (details in `docs/TOWN_BUILDING_MODEL.md`, Open Owner Decisions): helpers' spare time cannot be turned off; strict queue order vs builders favoring workplaces; upkeep grace counted from founding rather than per building; first-pass travel numbers; families building only on player-set plots; first-pass path numbers, and whether the road tool should come back later as paving a worn path.
 
 1. **Upkeep plates only when they need attention?** The town view shows a workplace's upkeep plate only below full or when upkeep is off ("no plate" = fully maintained). The old view always showed a bar. Easy to reverse.
 2. **Balance after the town terrain.** Farmland per town rose (median 364 fertile tiles, was 160); map-luck is 41/42 continuous (frozen regions are no longer picked, 2026-10-27), 46/48 original (was 47/48); most towns have no water. The owner will revisit it with the next design work (2026-10-27); don't tune it before then.
@@ -72,6 +77,7 @@ In rough priority order; details in each doc's "Remaining Work" section.
 - **Headless tests:** the root window is 64x64; tests that click set `root.size` first. Streaming takes several seconds; wait on wall-clock time.
 - **New `class_name` scripts** are unknown until an import pass: run `scripts/validate_project.ps1` before running tests or captures.
 - **Balance tools print a long household log.** Write their output to a file and filter it (`> log`); piping it through a shell pipe on Windows stalls Godot at a few percent CPU.
+- **Path levels change routes.** A tile's `path_level` changing is a layout change (`TownLogistics.advance_day`); anything that caches routes must key on `layout_version`. Wear is saved with the town (`TownLogistics.wear`), levels on the town map's tiles.
 - **Buildings are never placed finished in play.** Everything goes through `TownConstruction`; `City.add_building` is the completion step (tests may still call it directly). City's helpers (`logistics`, `construction`) hold the city weakly, or towns leak.
 - **Git:** this repo's `.git` belongs to another Windows account; run git as `git -c safe.directory=D:/AI/projects/incubating/games/new-game-godot ...`.
 - **Visual checks** need a real window (no `--headless`): `tests/visual/*_capture.gd`, commands in `CLAUDE.md`.

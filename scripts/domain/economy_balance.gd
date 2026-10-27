@@ -136,6 +136,22 @@ const MAX_TRAVEL_SHARE: float = 0.6
 # Each unit carried also takes a moment to load and stack, however short the trip.
 const HANDLING_DAYS_PER_UNIT: float = 0.01
 
+# --- Paths (docs/TOWN_BUILDING_MODEL.md, Paths) ---
+# Nobody builds paths: ground people walk often wears into a trail, then a path, and both make
+# that ground quicker to cross. Every trip a family makes over a tile adds 1 wear; wear fades by
+# PATH_WEAR_DECAY a day (grass grows back over about two months untrodden), so a tile settles at
+# about 60 times its daily trips. A tile becomes a trail at TRAIL_WEAR and a path at PATH_WEAR,
+# and falls back a level only below half of that, so a path does not flicker at the threshold.
+# A family walking to work and back (2 trips a day) wears a trail in about a month; a path needs
+# more than 2.5 trips a day, so it forms where routes share ground or goods are carried.
+const PATH_WEAR_DECAY: float = 1.0 / 60.0
+const TRAIL_WEAR: float = 40.0
+const PATH_WEAR: float = 150.0
+# Share of the ground's effort left on a trail and on a path (open ground 1.0 becomes 0.85 and
+# 0.65; woods and rock keep their extra cost in proportion). Built roads stay quickest.
+const TRAIL_EFFORT_FACTOR: float = 0.85
+const PATH_EFFORT_FACTOR: float = 0.65
+
 static func get_build_cost(building_type: String) -> Dictionary:
 	return (BUILD_COSTS.get(building_type, {}) as Dictionary).duplicate()
 

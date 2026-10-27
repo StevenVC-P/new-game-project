@@ -6,9 +6,9 @@ extends SceneTree
 #  2. A town grown by the stand-in player for a year and a half: houses, workplaces, walkers.
 #  3. Every building type, tier 1 and tier 0, side by side.
 #  4. The real game: a town founded through main.gd, grown, with a house selected.
-#  5. Building in the real game: sites at every stage, plots, a road being built, a site's card;
-#     then a town grown with families building their own homes on plots, and a workplace selected
-#     with its routes to the store and from home.
+#  5. Building in the real game: sites at every stage, plots, a site's card; then a town grown
+#     with families building their own homes on plots, the trails and paths its people wore, and
+#     a workplace selected with its routes to the store and from home.
 # Needs a real window and GPU, so run it without --headless:
 #   & (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/town_map_capture.gd -- <output_dir>
 
@@ -286,16 +286,15 @@ func capture_game_flow() -> void:
 	await process_frame
 	await capture_construction()
 
-func nearest_roadable(town: City, near: Vector2i) -> Vector2i:
-	for radius in range(0, 14):
-		for y in range(near.y - radius, near.y + radius + 1):
-			for x in range(near.x - radius, near.x + radius + 1):
-				if town.construction.is_roadable(Vector2i(x, y)):
-					return Vector2i(x, y)
-	return near
+static func count_path_levels(town: City) -> Array[int]:
+	var counts: Array[int] = [0, 0, 0]
+	for row: Array in town.local_map:
+		for tile: Dictionary in row:
+			counts[TownLogistics.get_path_level(tile)] += 1
+	return counts
 
 # Building in the real game: plan a start, let a few days pass, look at the sites; then grow a
-# town where families build their own homes on plots.
+# town where families build their own homes on plots, and look at the paths they wore.
 func capture_construction() -> void:
 	var main: Node2D = (load("res://scenes/main.tscn") as PackedScene).instantiate()
 	# Looks up places by name, so it plays on the hand-authored planet.
@@ -317,10 +316,6 @@ func capture_construction() -> void:
 	for _plot in range(3):
 		player.set_aside_plot(town, {})
 	var store: Vector2i = town.logistics.get_store_tiles()[0]
-	var route: Array[Vector2i] = town.construction.plan_road(nearest_roadable(town, store + Vector2i(3, 0)), nearest_roadable(town, store + Vector2i(16, 4)))
-	print("[CAPTURE] road planned: %d tiles" % route.size())
-	if not route.is_empty():
-		town.construction.request_road(route)
 	for _day in range(5):
 		town.tick()
 	print("[CAPTURE] after 5 days: %s" % [str(ConstructionDisplayHelper.get_sidebar_lines(town))])
@@ -337,9 +332,13 @@ func capture_construction() -> void:
 		main.clear_selected_household()
 	player.play(town, {"homes_on_plots": true}, 360)
 	print("[CAPTURE] grown with plots: %d buildings, %d households, %d homes built by families, sites: %s" % [town.buildings.size(), town.households.size(), town.construction.completed_by_households, str(ConstructionDisplayHelper.get_sidebar_lines(town))])
+	var levels: Array[int] = count_path_levels(town)
+	print("[CAPTURE] worn ground after a year: %d trail tiles, %d path tiles" % [levels[TownLogistics.PATH_TRAIL], levels[TownLogistics.PATH_WORN]])
 	for _frame in range(4):
 		await process_frame
 	await shot("build_grown")
+	main.town_map_view.focus_on(TownMapStyle.tile_rect(store).get_center(), 4.0)
+	await shot("build_paths_near")
 	var far: int = -1
 	for index in range(town.buildings.size()):
 		var building: Building = town.buildings[index]

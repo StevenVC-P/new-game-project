@@ -89,4 +89,7 @@ static func get_travel_lines(city: City, building: Building) -> Array[String]:
 	if building.assigned_household_id >= 0:
 		detail += ", walk %d -%d%%" % [int(round(float(travel["commute_effort"]))), int(round(float(travel["commute_share"]) * 100.0))]
 	lines.append("  " + detail)
+	var trodden: float = city.logistics.get_trodden_share(building)
+	if trodden > 0.0:
+		lines.append("  %d%% of the way on paths or roads" % int(round(trodden * 100.0)))
 	return lines

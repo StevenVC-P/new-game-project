@@ -533,6 +533,7 @@ func apply_labor(project: ConstructionProject, labor: float) -> void:
 		project.haul_progress = 0.0
 		city.remove_resource(material, 1)
 		project.materials_delivered[material] = int(project.materials_delivered.get(material, 0)) + 1
+		logistics().record_site_delivery(project.get_site_tile())
 	if project.has_all_materials():
 		project.work_done = minf(project.work_required, project.work_done + left)
 
