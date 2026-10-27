@@ -3,12 +3,12 @@ extends TownMapLayer
 
 # Natural features on the town map, painted like the regional map's (LandscapePainter) at four
 # times the scale: trees only on tree tiles, boulders only on rough ground and deposits, and up
-# close shrubs on open ground and flowers on farmland, never under a building. What the map
-# shows as woods is woodland the town can use.
+# close shrubs on open ground and flowers on farmland, never under a building or on a trodden
+# path. What the map shows as woods is woodland the town can use.
 #
 # Trees and boulders are recorded once per town map. Shrubs and flowers sit on their own
 # canvases, shown or hidden by level of detail in the rendering server (toggling `visible`
-# would re-record them), and recorded again only when buildings cover new ground.
+# would re-record them), and recorded again only when buildings cover new ground or paths wear.
 
 var tree_style: Dictionary = {}
 var shrub_canvas: Canvas = null
@@ -121,7 +121,7 @@ func _draw() -> void:
 # --- Ground details -------------------------------------------------------------------------
 
 func is_open_ground(tile: Dictionary) -> bool:
-	return tile["type"] == "ground" and not tile["has_trees"] and not tile.get("has_road", false) and not tile["occupied"]
+	return tile["type"] == "ground" and not tile["has_trees"] and not tile.get("has_road", false) and not tile["occupied"] and TownLogistics.get_path_level(tile) == TownLogistics.PATH_NONE
 
 func paint_shrubs(canvas: CanvasItem) -> void:
 	if view == null or view.city == null:

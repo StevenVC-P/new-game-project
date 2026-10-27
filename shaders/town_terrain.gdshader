@@ -2,8 +2,8 @@ shader_type canvas_item;
 
 // Ground of the town map: the regional landscape magnified (shaders/region_terrain.gdshader
 // paints the same land four times smaller). Meadow and farmland in the site's climate colors,
-// forest floor under the drawn trees, rock and scree, stone and ore outcrops, rutted tracks,
-// and water with banks and beaches. Inputs are small per-tile data textures, so camera moves
+// forest floor under the drawn trees, rock and scree, stone and ore outcrops, trails and paths
+// worn by the townsfolk, rutted tracks, and water with banks and beaches. Inputs are small per-tile data textures, so camera moves
 // only change uniforms.
 //
 // Feature edges follow the tile data: masks are smoothly interpolated, so a boundary between
@@ -16,7 +16,8 @@ shader_type canvas_item;
 uniform sampler2D masks_a : filter_linear;
 // R stone deposit, G iron deposit, B road, A sea.
 uniform sampler2D masks_b : filter_linear;
-// R lake, G water depth (distance from shore), B ground height (water low, rock high, blurred), A unused.
+// R lake, G water depth (distance from shore), B ground height (water low, rock high, blurred),
+// A trodden ground (0 none, 0.5 trail, 1 path).
 uniform sampler2D masks_c : filter_linear;
 uniform vec2 map_tiles = vec2(64.0, 44.0);
 uniform float tile_units = 12.0;
@@ -148,6 +149,19 @@ void fragment() {
 		float stain = fbm(p + vec2(19.0, 63.0), 1.2, 3);
 		vec3 iron_col = mix(vec3(0.58, 0.38, 0.25), vec3(0.32, 0.27, 0.24), smoothstep(0.5, 0.65, stain));
 		land = mix(land, iron_col, iron * 0.85);
+	}
+
+	// Trodden ground (TownLogistics): a trail is flattened, paler grass; a path is bare packed
+	// earth with a trampled verge. A path tile is 1.0 in the mask and a trail 0.5, so a line of
+	// trail tiles never reaches the bare-earth band.
+	float trodden = smooth_mask(masks_c, q).a;
+	if (trodden > 0.02) {
+		float flattened = smoothstep(0.14, 0.3, trodden);
+		float bare = smoothstep(0.36, 0.52, trodden + (fbm(p + vec2(57.0, 29.0), 0.5, 2) - 0.5) * 0.12);
+		vec3 trampled = land * vec3(1.06, 1.03, 0.84) + vec3(0.04, 0.03, 0.0);
+		land = mix(land, trampled, flattened * 0.55);
+		vec3 earth = vec3(0.57, 0.48, 0.34) * (0.9 + 0.16 * fine);
+		land = mix(land, earth, bare * 0.85);
 	}
 
 	// Tracks: packed earth with wheel ruts along their length.

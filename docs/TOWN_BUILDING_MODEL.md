@@ -6,17 +6,17 @@ First implementation 2026-10-26, from the owner's town-building brief. Settled b
 
 ## How To Run And Check It
 
-- **In the game:** in the town view, every building choice (1-0, Q-R, T storehouse) now plans a construction site rather than placing a finished building. P sets aside a residential plot; G lays a road (click both ends; Esc cancels). Click a site, plot, or building to see its card: a site shows its status, materials on site, work done, builders today, who asked for it and who pays, with "Build this first" and "Cancel". A workplace's card shows what travel costs it, and the map draws its routes to the nearest store (gold) and from its family's home (blue). The sidebar's Construction section lists the queue.
-- **Rules:** `tests/town_construction_validation.gd` (headless, synthetic town map): a request reserves land and pays nothing; the building appears only when built; sites wait for materials; more builders build faster; every site, tier 1 workplaces included, goes up from spare time even with every family at work; upgrades happen in place while the building keeps working; distance to a store and from home costs output; storehouses and roads cut it; an island cut off by water loses the most; cancelling returns materials; families claim plots and build homes (huts when wood is short), then upgrade huts; values steer plot choice and home type; towns without a town map still build.
-- **Real flow:** `tests/town_map_view_validation.gd`: a click plans a site and the house later stands on that tile; the road tool lays a road between two clicks with a preview; the plot tool sets land aside and a house placed on it uses the plot; clicking a site selects it.
+- **In the game:** in the town view, every building choice (1-0, Q-R, T storehouse) now plans a construction site rather than placing a finished building. P sets aside a residential plot. Nobody lays roads: trails and paths wear on their own where families walk (Paths, below). Click a site, plot, or building to see its card: a site shows its status, materials on site, work done, builders today, who asked for it and who pays, with "Build this first" and "Cancel". A workplace's card shows what travel costs it and how much of its way is on paths or roads, and the map draws its routes to the nearest store (gold) and from its family's home (blue). The sidebar's Construction section lists the queue.
+- **Rules:** `tests/town_construction_validation.gd` (headless, synthetic town map): a request reserves land and pays nothing; the building appears only when built; sites wait for materials; more builders build faster; every site, tier 1 workplaces included, goes up from spare time even with every family at work; upgrades happen in place while the building keeps working; distance to a store and from home costs output; storehouses, roads, and worn paths cut it; walking wears a trail in a month and a path where traffic is heavy; routes bend onto worn ground; abandoned paths fade, and building over one ends it; an island cut off by water loses the most; cancelling returns materials; families claim plots and build homes (huts when wood is short), then upgrade huts; values steer plot choice and home type; towns without a town map still build.
+- **Real flow:** `tests/town_map_view_validation.gd`: a click plans a site and the house later stands on that tile; the plot tool sets land aside and a house placed on it uses the plot; clicking a site selects it; a worked garden wears a trail and the view redraws the ground.
 - **Balance:** `tests/sim/opening_check.gd` and `tests/sim/map_luck_check.gd` now play through the construction pipeline (the stand-in player plans buildings and the town builds them). `tests/sim/town_building_check.gd` compares three policies on real town maps: houses placed by the player, homes built by families on plots, and a scattered layout. Write their output to a file and filter it; piping Godot's household log through a shell pipe stalls Godot on Windows.
-- **Screenshots:** `tests/visual/town_map_capture.gd` section 5: sites at every stage, plots, a road being built, a site's card, a town grown with families building on plots, and a workplace's routes.
+- **Screenshots:** `tests/visual/town_map_capture.gd` section 5: sites at every stage, plots, a site's card, a town grown with families building on plots, the trails and paths it wore (fitted and close), and a workplace's routes.
 
 ## The Pipeline
 
 One pipeline for everyone (`scripts/domain/town_construction.gd`, `TownConstruction`, one per `City`):
 
-1. **Request.** `request_building`, `request_upgrade`, `request_road`, and `designate_plot` validate against the town map (`BuildingPlacement`, materials not checked) and reserve the land. Nothing is paid up front. Each project (`ConstructionProject`) records `requested_by` (player, household, town), the requesting family, and `funded_by` (today always `town_stores`; household wealth, the player's own capital, and public funds are later sources).
+1. **Request.** `request_building`, `request_upgrade`, `request_road` (no player tool since paths replaced it, 2026-10-27; kept for a later paving step and for saves with a road still queued), and `designate_plot` validate against the town map (`BuildingPlacement`, materials not checked) and reserve the land. Nothing is paid up front. Each project (`ConstructionProject`) records `requested_by` (player, household, town), the requesting family, and `funded_by` (today always `town_stores`; household wealth, the player's own capital, and public funds are later sources).
 2. **Supply.** Builders carry the materials from the nearest store to the site (`TownLogistics`). Materials leave the stores only as each load arrives, so a site waits, with "waiting for 4 wood", while the stores are short, and the queue's order decides who gets scarce wood first.
 3. **Build.** With every material on site, builders work off the project's family-days.
 4. **Complete.** A new building becomes a real `Building` (a home's family moves in before anyone else is housed); an upgrade swaps the building's type in place; a road's tiles become road.
@@ -49,14 +49,32 @@ With six founding families a farm takes about two to three days, a house about t
 `scripts/domain/town_logistics.gd` (`TownLogistics`, one per `City`).
 
 - **Stores.** The founders' stockpile sits on open ground at the town's heart (placed the first time the town map is used); storehouses add more. All stores share one stock, `City.resources`. **Judgment call / limitation:** separate inventories per store, and carts between them, are later work; today a storehouse is a second door to the same stock.
-- **Routes.** Walking effort is found on the town map with `AStarGrid2D`, once per layout change: open ground 1 per tile, road 0.5, woods 1.5, yards and fields 2, rock 3, water impassable; diagonals cost 1.41 times as much.
-- **Aggregated carrying, not per-item agents.** A workplace's family carries its output to the nearest store and its inputs back (`EconomyBalance.PRODUCTION` now holds the production chain the city uses), and walks from home to work. A family covers 400 effort-tiles in a day (`DAY_EFFORT_TILES`) and carries 4 units a trip (`CARRY_LOAD`). The trips become a share of its working day, capped at 60%, and its output drops by that share. A workplace no store or home can reach loses the full 60%.
+- **Routes.** Walking effort is found on the town map with `AStarGrid2D`, once per layout change: open ground 1 per tile, road 0.5, woods 1.5, yards and fields 2, rock 3, water impassable; a trail takes 15% off the ground's effort and a path 35%; diagonals cost 1.41 times as much. Routes are the cheapest there are: the grid's weights are divided by the cheapest effort, so its distance estimate never overshoots (before paths, with roads at 0.5, A* could return a route that only looked direct).
+- **Aggregated carrying, not per-item agents.** A workplace's family carries its output to the nearest store and its inputs back (`EconomyBalance.PRODUCTION` now holds the production chain the city uses), and walks from home to work. A family covers 500 effort-tiles in a day (`DAY_EFFORT_TILES`) and carries 5 units a trip (`CARRY_LOAD`). The trips become a share of its working day, capped at 60%, and its output drops by that share. A workplace no store or home can reach loses the full 60%.
 - **Builders carry the same way:** each unit of material costs a moment to handle plus a round trip from the nearest store.
 - Walkers on the map stay cosmetic.
 
 What this means in play (measured in `tests/town_construction_validation.gd` on open ground): a farm 13 tiles from the stockpile, its family camped there, loses 10% of its day; one 26 tiles out loses 19%; a storehouse next to the far farm, or a road, cuts that by a quarter to a half.
 
-**Why this shape.** It accounts for distance, travel time, and carrying capacity at a cost of a few path queries per layout change, so it scales to many towns, and it maps directly onto the Grouped and Summary levels (`docs/SIMULATION_SCALE_MODEL.md`): a district's travel share is the same formula over district-to-store distances. No universally optimal layout falls out: farms must sit on farmland and camps by woods wherever the map puts them, so the player trades store placement, roads, and homes against the land.
+**Why this shape.** It accounts for distance, travel time, and carrying capacity at a cost of a few path queries per layout change, so it scales to many towns, and it maps directly onto the Grouped and Summary levels (`docs/SIMULATION_SCALE_MODEL.md`): a district's travel share is the same formula over district-to-store distances. No universally optimal layout falls out: farms must sit on farmland and camps by woods wherever the map puts them, so the player trades store placement and homes against the land, and a compact town also wears its paths sooner.
+
+## Paths
+
+Owner direction (2026-10-27): people move faster on paths and roads, but rather than the player building roads, paths develop over time where people walk, and routing prefers the quickest ways. Code: `TownLogistics` (Paths); numbers: `EconomyBalance` (Paths).
+
+- **Wear.** The trips the logistics model already charges for wear the ground they cross. Each working day a workplace's family walks from home and back (2 trips) and makes its carrying trips to the store; builders make a round trip for every 5 units they carry to a site. Each trip adds 1 wear to every tile on its route; wear fades by a sixtieth a day, so a tile settles near 60 times its daily trips. Water, roads, and built or reserved ground do not wear.
+- **Trails and paths.** Wear 40 makes a trail and 150 a path; a tile falls back a level only below half of that, so paths do not flicker. A trail takes 15% off the ground's effort, a path 35% (open ground 1 becomes 0.85 and 0.65; woods and rock keep their extra cost in proportion). A road (0.5) stays quickest.
+- **Routes follow them.** A level change is a layout change: routes are found again, bend onto the worn ground where it is quicker, and wear it further. Shared ground (the way into the stockpile, a lane past several farms) turns to path first; one family's walk to work alone stays a trail (2 trips a day settles at 120).
+- **In play** (`tests/town_construction_validation.gd`, open ground): a woodcutter 25 tiles from the stockpile, its family camped there, wears a trail within 30 days and a path by 150; its travel share falls from 19.5% to 13.2% (a road on the same route: 11.5%). A path nobody walks is a trail again after about six weeks and grass after about four months.
+- **On the map:** trails are flattened, paler grass, paths bare earth with a trampled verge; shrubs and flowers keep off them. A workplace's card says how much of its way is on paths or roads.
+- **Cost:** wear is added along routes already cached for the travel figures, once a day; levels change rarely, and only those days find routes again.
+
+**Judgment calls**, open to owner veto:
+
+- Only travel the model charges for wears paths. Builders' walks to their sites, and errands it does not model (fetching food, visiting), leave no trace.
+- The player's road tool is gone from the controls (key G, the build menu). Road projects stay in the pipeline for a later step that paves a well-worn path, and so saves with a road still queued finish it. Roads already on the land (the regional road crossing a town) are unchanged.
+- Trees stay on a path through woods: woodland is a resource, and clearing it is later work.
+- Paths are one tile wide whatever the traffic; a busy path does not widen into a lane.
 
 ## Plots And Family Homes
 
@@ -79,6 +97,7 @@ These are product-design changes this milestone was authorized to make (owner br
 - A storehouse is neither a home nor a workplace (`Building.is_store`): no family, no upkeep.
 - `BuildingPlacement.validate` takes `check_cost` (default true).
 - The labor pressure row counts families on a site as building, not idle.
+- Paths replace player-built roads (owner, 2026-10-27): worn ground cuts the travel share as roads did, and routes are now always the cheapest (see Routes).
 
 ## Measured Effect
 
@@ -101,6 +120,17 @@ The stand-in player (`tests/sim/stand_in_player.gd`) plans buildings and the tow
 - **Layout matters:** a scattered town loses 13% of its working day to travel against 8% for a compact one, and gets 14/20 towns off the ground against 17/20. Travel alone (map luck "before" already counts it) moved the continuous map from 42/42 to 40/42.
 - **Queue order matters:** spending all the wood on houses first puts them ahead of the woodcutter in the queue; builders and wood go to the houses, and 7 of 20 towns do not recover (they did when buildings were instant). "Build this first" on the woodcutter's card is the remedy; whether builders should favor workplaces on their own is an owner decision below.
 - **Family homes are slower but steadier:** a town that leaves homes to its families houses them by day 10 (day 9 when the player places houses) and grows a little more slowly.
+- **Paths (2026-10-27).** Same tools, `develop` before paths against this branch:
+
+  | Check | Before paths | With paths |
+  | --- | --- | --- |
+  | Opening check, every opening (no town map, so no travel) | | identical |
+  | Map luck, original / continuous maps | 46/48, 41/42 | 46/48, 41/42, same failing sites |
+  | Town building check, houses placed by the player | 17/20, 39 people, travel 8% | 18/20, 40 people, travel 8% |
+  | Town building check, homes left to families on plots | 18/20, 33 people, travel 8% | 18/20, 33 people, travel 8% |
+  | Town building check, scattered layout | 14/20, 27 people, travel 13% | 15/20, 33 people, travel 11% |
+
+  Paths help most where travel hurts most: a scattered town's routes cross open ground that wears, while a compact town's short routes run mostly through yards and fields, which do not wear (a stand-in town grown 18 months shows almost no paths; the plots town in the screenshots shows 14 trail and 11 path tiles after a year).
 - **What measuring changed:** three stalls were found and fixed during implementation (see the judgment calls above): spare time limited to tier 0 and a family's own home left spare houses unbuilt and stopped growth; a finished workplace stood empty because its family had been pulled onto another vacancy (the toolmaker, fatally); towns that left homes to families never had a spare home for marriages.
 
 ## Open Owner Decisions
@@ -108,8 +138,9 @@ The stand-in player (`tests/sim/stand_in_player.gd`) plans buildings and the tow
 1. **Helpers cannot be turned off.** Every family at work gives 20% of its day to sites with room in the crew, so a long queue costs output across the town. Keep, make it a town policy, or limit it to homes and tier 0 (which stalls towns, measured above)?
 2. **Should builders favor workplaces over homes,** or keep strict queue order (the player reorders with "Build this first")? Strict order is what punishes "all wood on houses first".
 3. **Upkeep grace counts from founding.** `MAINTENANCE_GRACE_DAYS` is a town-wide grace that starts at founding (the roadmap's wording, "new buildings need no tools for their first 60 days", reads per building). With construction, buildings start later, so the effective grace is shorter. Per-building grace would soften the tool cliff.
-4. **Travel numbers** (`DAY_EFFORT_TILES` 400, `CARRY_LOAD` 4, road 0.5) were set so a compact town loses about 8% and a sprawled one 15-25%; first-pass values for owner tuning.
+4. **Travel numbers** (`DAY_EFFORT_TILES` 500, `CARRY_LOAD` 5, road 0.5) were set so a compact town loses about 8% and a sprawled one 15-25%; first-pass values for owner tuning.
 5. **Families build homes only on plots the player set aside.** Should mature towns choose their own residential land?
+6. **Path numbers** (trail at wear 40, path at 150, fading over about two months, trail -15% and path -35% effort) are first-pass values: a busy route turns to path within two to five months. The judgment calls under Paths are open too, above all removing the road tool.
 
 ## Remaining Work And Limitations
 
@@ -120,6 +151,7 @@ In rough priority order:
 3. **Who pays.** `funded_by` is recorded but every project draws on the town's stores; household wealth (M7), the player's capital, and public funds come later.
 4. **Builder specialization.** Any free family builds; a builder's yard or builder responsibility, and the Grouped-scale crew model, are not built.
 5. **Demolition and moving.** Nothing can be torn down; roads cannot be removed.
-6. **Industry next to homes** has no cost yet (noise, smoke); with satisfaction (M4) it can.
-7. **Storage capacity** is unlimited.
-8. **Regional depiction** still draws the player's town by rule, not from its layout.
+6. **Paving.** A well-worn path cannot yet be made a road; the road project in the pipeline is ready for it once there is a reason (a cart, a paver yard's stone).
+7. **Industry next to homes** has no cost yet (noise, smoke); with satisfaction (M4) it can.
+8. **Storage capacity** is unlimited.
+9. **Regional depiction** still draws the player's town by rule, not from its layout.

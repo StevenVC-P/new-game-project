@@ -22,8 +22,10 @@ var hash_origin: Vector2i = Vector2i.ZERO
 # The town map array last built from: a new town map (another site) rebuilds everything.
 var built_map: Array = []
 var development_signature: int = 0
-# TownConstruction.roads_version the ground was last drawn with: finished roads redraw it.
+# TownConstruction.roads_version and TownLogistics.paths_version the ground was last drawn
+# with: finished roads and worn paths redraw it.
 var ground_roads_version: int = -1
+var ground_paths_version: int = -1
 var camp_spot_cache: Array[Vector2i] = []
 var camp_spot_signature: int = -1
 
@@ -59,8 +61,6 @@ var selected_house_index: int = -1
 var inspected_project_id: int = -1
 var inspected_plot_id: int = -1
 var linked_indices: Array[int] = []
-# The road the road tool would lay, while the player picks its second end.
-var road_preview: Array[Vector2i] = []
 var walker_time: float = 0.0
 var walker_cycle_seconds: float = 12.0
 
@@ -115,6 +115,7 @@ func set_city(town: City) -> void:
 		noise_offset = Vector2(posmod(hash_origin.x, 97), posmod(hash_origin.y, 89))
 	development_signature = 0
 	ground_roads_version = town.construction.roads_version if town != null else -1
+	ground_paths_version = town.logistics.paths_version if town != null else -1
 	camp_spot_signature = -1
 	for layer: TownMapLayer in layers:
 		layer.rebuild()
@@ -157,11 +158,16 @@ func construction_signature() -> Array:
 func refresh_development() -> void:
 	if city == null or map_size == Vector2i.ZERO:
 		return
-	if city.construction.roads_version != ground_roads_version:
+	var ground_changed: bool = city.construction.roads_version != ground_roads_version or city.logistics.paths_version != ground_paths_version
+	if ground_changed:
 		ground_roads_version = city.construction.roads_version
+		ground_paths_version = city.logistics.paths_version
 		ground_layer.rebuild()
 	var signature: int = compute_development_signature()
 	if signature == development_signature:
+		if ground_changed:
+			# Grass tufts and stones keep off trodden ground.
+			feature_layer.rebuild_details()
 		return
 	development_signature = signature
 	structure_layer.rebuild()

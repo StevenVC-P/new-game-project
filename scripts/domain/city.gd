@@ -917,6 +917,7 @@ func tick():
 			update_building_maintenance(building)
 		if building.can_produce():
 			apply_building_production(building)
+	logistics.advance_day()
 
 	resolve_soft_needs()
 	if resources["food_shortage"] == true:

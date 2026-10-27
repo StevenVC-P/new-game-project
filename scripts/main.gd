@@ -83,8 +83,6 @@ var household_debug_inspector: Control = null
 var trade_menu: TradeMenu = TradeMenu.new()
 var selected_building_type: String = BUILDING_HOUSE
 var is_placing_building: bool = true
-# First end of a road being laid with the road tool; (-1, -1) until the first click.
-var road_start_tile: Vector2i = Vector2i(-1, -1)
 var is_build_menu_open: bool = false
 var city_walker_time: float = 0.0
 var world_calendar: Calendar = Calendar.new()
@@ -238,7 +236,6 @@ func sync_town_map_view() -> void:
 	town_map_view.preview_type = selected_building_type if is_placing_building else ""
 	town_map_view.preview_size = get_building_size(selected_building_type)
 	town_map_view.preview_valid = is_placing_building and is_inside_city_map(city_hovered_tile.x, city_hovered_tile.y) and is_valid_building_placement(selected_city_index, selected_building_type, city_hovered_tile)
-	town_map_view.road_preview = get_road_preview(city)
 	town_map_view.inspected_index = city_building_overlay.inspected_building_index
 	town_map_view.inspected_project_id = city_building_overlay.inspected_project_id
 	town_map_view.inspected_plot_id = city_building_overlay.inspected_plot_id
@@ -1253,7 +1250,6 @@ func try_handle_building_click_at_tile(tile_pos: Vector2i, toggle_maintenance: b
 	var city: City = cities[selected_city_index]
 	if city_building_overlay.select_building_at_tile(city, tile_pos, toggle_maintenance) or city_building_overlay.select_site_at_tile(city, tile_pos):
 		is_placing_building = false
-		road_start_tile = Vector2i(-1, -1)
 		queue_redraw()
 		return true
 
@@ -1278,7 +1274,6 @@ func handle_clear_selection_key(key_event: InputEventKey) -> bool:
 
 	is_placing_building = false
 	is_build_menu_open = false
-	road_start_tile = Vector2i(-1, -1)
 	clear_selected_household()
 	queue_redraw()
 	return true
@@ -1335,8 +1330,6 @@ func handle_building_selection_key_event(key_event: InputEventKey) -> bool:
 		select_building_type(BUILDING_PAVER_YARD)
 	elif is_letter_key(keycode, physical_keycode, KEY_T):
 		select_building_type(BUILDING_STOREHOUSE)
-	elif is_letter_key(keycode, physical_keycode, KEY_G):
-		select_building_type(TownConstruction.ROAD)
 	elif is_letter_key(keycode, physical_keycode, KEY_P):
 		select_building_type(TownConstruction.PLOT)
 	else:
@@ -1348,7 +1341,6 @@ func handle_building_selection_key_event(key_event: InputEventKey) -> bool:
 func select_building_type(building_type: String):
 	selected_building_type = building_type
 	is_placing_building = true
-	road_start_tile = Vector2i(-1, -1)
 	clear_selected_household()
 
 func is_building_key(keycode: int, physical_keycode: int, unicode_value: int, number_key: int, expected_unicode: int) -> bool:
@@ -1363,8 +1355,8 @@ func is_letter_key(keycode: int, physical_keycode: int, letter_key: int) -> bool
 	return keycode == letter_key or physical_keycode == letter_key
 
 # Plans what the build tool holds at the hovered tile. Buildings become construction sites the
-# town's families build (TownConstruction); a plot sets land aside for a family home; the road
-# tool takes two clicks, one at each end, and plans the road between them.
+# town's families build (TownConstruction); a plot sets land aside for a family home. Nobody
+# builds paths: they wear where people walk (TownLogistics).
 func try_place_selected_building():
 	if selected_city_index < 0 or selected_city_index >= cities.size():
 		return
@@ -1372,10 +1364,6 @@ func try_place_selected_building():
 		return
 
 	var city: City = cities[selected_city_index]
-	if selected_building_type == TownConstruction.ROAD:
-		place_road_end(city)
-		queue_redraw()
-		return
 	if selected_building_type == TownConstruction.PLOT:
 		if city.construction.designate_plot(city_hovered_tile) < 0:
 			print("Cannot set aside a plot: ", get_building_placement_status(selected_city_index, selected_building_type, city_hovered_tile))
@@ -1388,25 +1376,6 @@ func try_place_selected_building():
 	if city.construction.request_building(selected_building_type, origin) == null:
 		print("Cannot place ", selected_building_type, ": ", get_building_placement_status(selected_city_index, selected_building_type, origin))
 	queue_redraw()
-
-func place_road_end(city: City) -> void:
-	if road_start_tile.x < 0:
-		if city.construction.is_roadable(city_hovered_tile) or (city.local_map[city_hovered_tile.y][city_hovered_tile.x] as Dictionary).get("has_road", false) == true:
-			road_start_tile = city_hovered_tile
-		return
-	var route: Array[Vector2i] = city.construction.plan_road(road_start_tile, city_hovered_tile)
-	if route.is_empty() or city.construction.request_road(route) == null:
-		print("Cannot lay a road there")
-	road_start_tile = Vector2i(-1, -1)
-
-# The road the tool would lay from its first click to the hovered tile.
-func get_road_preview(city: City) -> Array[Vector2i]:
-	var route: Array[Vector2i] = []
-	if not is_placing_building or selected_building_type != TownConstruction.ROAD or road_start_tile.x < 0:
-		return route
-	if not is_inside_city_map(city_hovered_tile.x, city_hovered_tile.y):
-		return route
-	return city.construction.plan_road(road_start_tile, city_hovered_tile)
 
 # Whether a click would put the chosen home on an open residential plot.
 func is_placing_home_on_plot(tile_pos: Vector2i) -> bool:
@@ -1489,8 +1458,6 @@ func get_building_placement_result(city_index: int, building_type: String, origi
 	return city.construction.validate(building_type, origin)
 
 func get_building_size(building_type: String) -> Vector2i:
-	if building_type == TownConstruction.ROAD:
-		return Vector2i.ONE
 	if building_type == TownConstruction.PLOT:
 		return TownConstruction.PLOT_SIZE
 	return building_placement.get_building_size(building_type)
@@ -1711,8 +1678,6 @@ func get_placement_status_message() -> String:
 		return "Placement off"
 
 	var message: String = "Move over the city map to place."
-	if selected_building_type == TownConstruction.ROAD and road_start_tile.x >= 0:
-		return "Valid placement: click where the road ends"
 
 	if selected_city_index >= 0 and selected_city_index < cities.size() and is_inside_city_map(city_hovered_tile.x, city_hovered_tile.y):
 		message = get_building_placement_status(selected_city_index, selected_building_type, city_hovered_tile)
@@ -1815,9 +1780,9 @@ func draw_city_sidebar(font: Font, font_size: int):
 	else:
 		y = draw_sidebar_label_value(font, font_size, "Building", "none", text_x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
 	# The key list is long; when a selection fills the panel it shrinks to one line.
-	var key_lines: Array[String] = ["1 house, 2 farm, 3 woodcutter", "4 toolmaker, 5 quarry, 6 stonecutter", "7 brickworks, 8 lime, 9 mortar", "0 mason, Q sculptor, W carver", "E tileworks, R paver yard", "T storehouse, P home plot, G road"]
+	var key_lines: Array[String] = ["1 house, 2 farm, 3 woodcutter", "4 toolmaker, 5 quarry, 6 stonecutter", "7 brickworks, 8 lime, 9 mortar", "0 mason, Q sculptor, W carver", "E tileworks, R paver yard", "T storehouse, P home plot"]
 	if y + (key_lines.size() + 4) * 15.0 > sidebar_rect.end.y:
-		key_lines = ["Keys 1-0, Q-R, T choose a building", "P home plot, G road (click both ends)"]
+		key_lines = ["Keys 1-0, Q-R, T choose a building", "P home plot"]
 	for key_line: String in key_lines:
 		y = draw_sidebar_line(font, font_size, key_line, text_x, y, VisualStyle.COLOR_MUTED)
 	y = draw_sidebar_line(font, font_size, "B: build menu, Right click/Esc: clear", text_x, y, VisualStyle.COLOR_MUTED)
@@ -1919,7 +1884,7 @@ func get_building_display_name(building_type: String) -> String:
 		return "Tileworks"
 	if building_type == BUILDING_PAVER_YARD:
 		return "Paver Yard"
-	if building_type == BUILDING_STOREHOUSE or building_type == TownConstruction.ROAD or building_type == TownConstruction.PLOT:
+	if building_type == BUILDING_STOREHOUSE or building_type == TownConstruction.PLOT:
 		return BuildMenuHelper.get_display_name(building_type)
 
 	return building_type
