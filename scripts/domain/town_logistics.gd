@@ -393,6 +393,23 @@ func ensure_grid() -> void:
 				if not closed_cells.has(owner):
 					closed_cells[owner] = []
 				(closed_cells[owner] as Array).append(Vector2i(x, y))
+	close_fence_lines()
+
+# A fence stands on a field's edge, so a fenced field closes its whole square: the lines and
+# corners round it as well as its inside (owner, 2026-10-27). Two fenced fields side by side
+# leave no way between them. Its own routes still open all of it (the gate).
+func close_fence_lines() -> void:
+	for building: Building in city.buildings:
+		if not building.fenced:
+			continue
+		var cells: Array = []
+		for y in range(building.tile.y * 2, (building.tile.y + building.size.y) * 2 + 1):
+			for x in range(building.tile.x * 2, (building.tile.x + building.size.x) * 2 + 1):
+				var cell: Vector2i = Vector2i(x, y)
+				if not is_inf(cell_effort[y * cell_size().x + x]):
+					grid.set_point_solid(cell, true)
+					cells.append(cell)
+		closed_cells[building.id] = cells
 
 # Footprints people do not walk through (owner, 2026-10-27): every building but an unfenced field
 # (a field can be crossed, at a cost to its harvest), every building site (a home rising on a
