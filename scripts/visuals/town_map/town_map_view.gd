@@ -24,7 +24,7 @@ var built_map: Array = []
 var development_signature: int = 0
 # TownConstruction.roads_version and TownLogistics.paths_version the ground was last drawn
 # with: finished roads and worn paths redraw it. TownWoodland.land_version the trees were last
-# drawn with: felled and regrown woods redraw the ground and the trees.
+# drawn with: felled and spread woods redraw the ground and the trees.
 var ground_roads_version: int = -1
 var ground_paths_version: int = -1
 var land_version: int = -1

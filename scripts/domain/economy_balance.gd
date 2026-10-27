@@ -159,17 +159,21 @@ const PATH_EFFORT_FACTOR: float = 0.65
 # A woodcutter's family fells the woods the player marked for clearing as the place it cuts its
 # wood (its output is unchanged): a wooded tile takes this many full working days.
 const CLEAR_DAYS_PER_TILE: float = 2.0
-# Felled land grows back from the woods around it: each day it gains its share of wooded
-# neighbours (out of 8) divided by REGROWTH_DAYS, and is woods again at 1. Ringed by woods that
-# is a year; on a straight edge (3 wooded neighbours) about three; with no woods beside it,
-# never, until the tiles between have grown back.
-const REGROWTH_DAYS: float = 360.0
-# Foot traffic fights it: wear (TownLogistics) of TRAMPLE_WEAR cancels the growth of a tile
-# ringed by woods, and more pushes it back. A trail (wear 40) always holds the land open; once
-# nobody walks it, its wear fades below this in three to five months and the woods come back.
-const TRAMPLE_WEAR: float = 10.0
-# Growth at which young trees show on the ground.
-const SAPLING_GROWTH: float = 0.5
+# Forest expansion (TownWoodland.spread_forest), once a year. Every open tile that can grow woods
+# and has woods on a side (not just a corner) may become woods. Woods within
+# FOREST_INFLUENCE_RADIUS steps (|dx| + |dy|) push it: each wooded tile adds
+# FOREST_INFLUENCE_DECAY ^ (steps - 1), so a side neighbour adds 1, a corner 0.5, three steps
+# 0.25. The year's chance for a total influence I is
+#   FOREST_SPREAD_MAX_CHANCE * (1 - (1 - FOREST_SPREAD_BASE_CHANCE / FOREST_SPREAD_MAX_CHANCE) ^ I),
+# which is the base chance beside a lone wooded tile (I = 1), about 2.6% on a long straight edge
+# (I = 3.75), 3.8% for a tile ringed by woods (I = 11), and never more than the max. A big forest
+# spreads faster in all only because it has more edge; woods further away add nothing.
+# Placeholders until tile size and the game's pace are calibrated: a town tile is a quarter of a
+# regional tile, and a year is 360 days (6 minutes at 1x).
+const FOREST_SPREAD_BASE_CHANCE: float = 0.01
+const FOREST_SPREAD_MAX_CHANCE: float = 0.04
+const FOREST_INFLUENCE_RADIUS: int = 3
+const FOREST_INFLUENCE_DECAY: float = 0.5
 
 static func get_build_cost(building_type: String) -> Dictionary:
 	return (BUILD_COSTS.get(building_type, {}) as Dictionary).duplicate()

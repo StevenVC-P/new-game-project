@@ -45,7 +45,7 @@ func test_town_round_trip_plays_on_identically() -> void:
 	var town_index: int = original.get_player_city_index()
 	var town: City = original.cities[town_index]
 	_check(not town.construction.projects.is_empty() or town.buildings.size() > 0, "the town should be building before the save")
-	_check(not town.woodland.marked.is_empty() or not town.woodland.regrowth.is_empty(), "woods should be marked or felled before the save")
+	_check(not town.woodland.marked.is_empty() or town.woodland.felled_count > 0, "woods should be marked or felled before the save")
 
 	var store: SaveStore = SaveStore.new(TEST_DIRECTORY)
 	_check(store.write("Round trip", GameState.describe(original, "Round trip"), GameState.capture(original)) == OK, "the game should save")

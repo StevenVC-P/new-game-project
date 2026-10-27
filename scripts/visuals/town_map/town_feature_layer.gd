@@ -2,15 +2,14 @@ class_name TownFeatureLayer
 extends TownMapLayer
 
 # Natural features on the town map, painted like the regional map's (LandscapePainter) at four
-# times the scale: trees only on tree tiles, saplings on felled land growing back, boulders only
-# on rough ground and deposits, and up
+# times the scale: trees only on tree tiles, boulders only on rough ground and deposits, and up
 # close shrubs on open ground and flowers on farmland, never under a building or on a trodden
 # path. What the map shows as woods is woodland the town can use.
 #
-# Trees and boulders are recorded once per town map and again when woods are felled or grow
-# back (TownMapView.refresh_development). Shrubs and flowers sit on their own
-# canvases, shown or hidden by level of detail in the rendering server (toggling `visible`
-# would re-record them), and recorded again only when buildings cover new ground or paths wear.
+# Trees and boulders are recorded once per town map and again when woods are felled or spread
+# (TownMapView.refresh_development). Shrubs and flowers sit on their own canvases, shown or
+# hidden by level of detail in the rendering server (toggling `visible` would re-record them),
+# and recorded again only when buildings cover new ground, paths wear, or woods change.
 
 var tree_style: Dictionary = {}
 var shrub_canvas: Canvas = null
@@ -96,12 +95,6 @@ func _draw() -> void:
 					elif hash01(h.x, h.y, 30 + k) < float(tree_style["conifer_share"]):
 						kind = 1.0
 					items.append(PackedFloat32Array([kind, position.x, position.y, lerpf(radius.x, radius.y, hash01(h.x, h.y, 40 + k)), hash01(h.x, h.y, 50 + k)]))
-			elif tile.get("saplings", false) == true:
-				# Felled land growing back (TownWoodland): young trees, a third the size.
-				for k in range(3):
-					var position: Vector2 = origin + Vector2(0.15 + hash01(h.x, h.y, 150 + k) * 0.7, 0.2 + hash01(h.x, h.y, 160 + k) * 0.65) * unit
-					var kind: float = 2.0 if tree_style["kind"] == "scrub" else (1.0 if hash01(h.x, h.y, 170 + k) < float(tree_style["conifer_share"]) else 0.0)
-					items.append(PackedFloat32Array([kind, position.x, position.y, radius.x * 0.38, hash01(h.x, h.y, 180 + k)]))
 			elif tile["type"] == "rough":
 				var resource: String = tile.get("resource", "none")
 				var kind: float = 4.0 if resource == "iron" else 3.0
@@ -129,7 +122,7 @@ func _draw() -> void:
 # --- Ground details -------------------------------------------------------------------------
 
 func is_open_ground(tile: Dictionary) -> bool:
-	return tile["type"] == "ground" and not tile["has_trees"] and not tile.get("has_road", false) and not tile["occupied"] and TownLogistics.get_path_level(tile) == TownLogistics.PATH_NONE and tile.get("saplings", false) != true
+	return tile["type"] == "ground" and not tile["has_trees"] and not tile.get("has_road", false) and not tile["occupied"] and TownLogistics.get_path_level(tile) == TownLogistics.PATH_NONE
 
 func paint_shrubs(canvas: CanvasItem) -> void:
 	if view == null or view.city == null:

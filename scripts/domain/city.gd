@@ -76,7 +76,7 @@ var site_profile: SettlementSiteProfile = SettlementSiteProfile.new()
 # How goods and people move around the town map, and everything being built (docs/TOWN_BUILDING_MODEL.md).
 var logistics: TownLogistics = null
 var construction: TownConstruction = null
-# Woods marked for clearing, and felled land growing back.
+# Woods marked for clearing, and woods spreading.
 var woodland: TownWoodland = null
 
 # `random_seed` makes each founding differ between games; 0 (the default, used by tests and
