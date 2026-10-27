@@ -155,7 +155,7 @@ const PATH_WEAR: float = 150.0
 const TRAIL_EFFORT_FACTOR: float = 0.85
 const PATH_EFFORT_FACTOR: float = 0.65
 # Ground in woods (every tile beside it wooded) wears at this share of the rate, and never past a
-# trail: wear never fells a tree.
+# trail: wear never fells a tree. The strips between buildings never pass a trail either.
 const FOREST_WEAR_FACTOR: float = 0.5
 
 # --- Fields (docs/TOWN_BUILDING_MODEL.md, Fields and fences) ---
