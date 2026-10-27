@@ -30,14 +30,16 @@ func _init(local_width: int = 64, local_height: int = 44, tree_radius: int = 5):
 	city_map_height = local_height
 	woodcutter_tree_radius = tree_radius
 
-func validate(city: City, local_map: Array, building_type: String, origin: Vector2i) -> Dictionary:
+# check_cost: whether the town must hold the cost now. Construction (TownConstruction) does not
+# check it: a planned site waits for its materials.
+func validate(city: City, local_map: Array, building_type: String, origin: Vector2i, check_cost: bool = true) -> Dictionary:
 	var rule_type: String = BuildingTiersScript.get_base_type(building_type)
 	var size: Vector2i = get_building_size(building_type)
 	var footprint: Array[Vector2i] = get_footprint_tiles(origin, size)
 	var has_fertile_tile: bool = false
 	var cost: Dictionary = get_building_cost(building_type)
 
-	if not city.can_afford_cost(cost):
+	if check_cost and not city.can_afford_cost(cost):
 		return make_result(false, "Insufficient resources: " + get_cost_text(cost), footprint)
 
 	for tile_pos: Vector2i in footprint:

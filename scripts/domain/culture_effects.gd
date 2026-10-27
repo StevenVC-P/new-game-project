@@ -50,7 +50,9 @@ const BUILDING_CALLINGS: Dictionary = {
 	"sculptor": ["muse", "stone"],
 	"carver": ["forge_bench", "muse"],
 	"tileworks": ["stone"],
-	"paver_yard": ["stone"]
+	"paver_yard": ["stone"],
+	# Building sites (TownConstruction): masons and carpenters.
+	"construction": ["stone", "forest"]
 }
 
 # Families whose only callings are material trades are poorly suited to unrelated material work.

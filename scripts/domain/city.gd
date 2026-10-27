@@ -73,6 +73,9 @@ var regional_value_counts: Dictionary = {}
 # Producing buildings by type, refreshed each tick; read by Communal Labor.
 var operating_building_counts: Dictionary = {}
 var site_profile: SettlementSiteProfile = SettlementSiteProfile.new()
+# How goods and people move around the town map, and everything being built (docs/TOWN_BUILDING_MODEL.md).
+var logistics: TownLogistics = null
+var construction: TownConstruction = null
 
 # `random_seed` makes each founding differ between games; 0 (the default, used by tests and
 # tools) keeps a town reproducible from its tile alone.
@@ -80,6 +83,8 @@ func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO, city_r
 	name = city_name
 	tile = city_tile
 	role = get_normalized_role(city_role)
+	logistics = TownLogistics.new(self)
+	construction = TownConstruction.new(self)
 	founding_seed = random_seed
 	var normalized_household_count: int = max(0, starter_household_count)
 	resources = make_starting_resources(normalized_household_count)
@@ -259,6 +264,7 @@ func advance_household_lifecycle_month(city_index: int = 0):
 	recalculate_household_succession_pressures(city_index)
 	advance_work_succession_vacancies(city_index)
 	HouseholdMigrationScript.advance_month(self, city_index)
+	FamilyDevelopment.advance_month(self)
 	update_shelter_counts()
 	update_worker_counts()
 
@@ -875,10 +881,15 @@ func log_household_lifecycle_event(city_index: int, household_id: int, event_nam
 		line += " " + detail
 	print(line)
 
+# Adds a finished building. A house built for a family (household) is theirs: they move in before
+# other families without a home are housed.
 func add_building(building: Building, household: Household = null):
 	building.id = buildings.size()
 	buildings.append(building)
+	logistics.mark_layout_changed()
 	if building.is_house():
+		if household != null:
+			household.move_to_house(building.id)
 		assign_households_to_housing()
 
 	update_shelter_counts()
@@ -893,6 +904,7 @@ func tick():
 	update_worker_counts()
 	consume_food()
 	refresh_operating_building_counts()
+	construction.advance_day()
 
 	for building: Building in buildings:
 		if building.is_house():
@@ -1238,37 +1250,10 @@ func apply_building_production(building: Building):
 		return
 
 	# Tier 0 buildings produce the same goods as their tier 1 counterpart, at a lower rate.
-	building_type = BuildingTiersScript.get_base_type(building_type)
-	if building_type == BUILDING_FARM:
-		resources["food"] = int(resources["food"]) + output_amount
-	elif building_type == BUILDING_WOODCUTTER:
-		resources["wood"] = int(resources["wood"]) + output_amount
-	elif building_type == BUILDING_TOOLMAKER:
-		var max_tool_output_from_wood: int = int(floor(float(int(resources["wood"])) / float(TOOLMAKER_WOOD_INPUT)))
-		if max_tool_output_from_wood > 0:
-			var tool_output: int = min(output_amount, max_tool_output_from_wood)
-			resources["wood"] = int(resources["wood"]) - tool_output * TOOLMAKER_WOOD_INPUT
-			resources["tools"] = int(resources["tools"]) + tool_output
-	elif building_type == BUILDING_QUARRY:
-		resources["stone_blocks"] = int(resources["stone_blocks"]) + output_amount
-	elif building_type == BUILDING_STONECUTTER:
-		apply_input_output_production("cut_stone", output_amount, {"stone_blocks": 1})
-	elif building_type == BUILDING_BRICKWORKS:
-		apply_input_output_production("bricks", output_amount, {"wood": 1})
-	elif building_type == BUILDING_LIME_KILN:
-		apply_input_output_production("lime", output_amount, {"stone_blocks": 1, "wood": 1})
-	elif building_type == BUILDING_MORTAR_YARD:
-		apply_input_output_production("mortar", output_amount, {"lime": 1, "stone_blocks": 1})
-	elif building_type == BUILDING_MASON_YARD:
-		apply_input_output_production("masonry", output_amount, {"cut_stone": 1, "mortar": 1})
-	elif building_type == BUILDING_SCULPTOR:
-		apply_input_output_production("statues", output_amount, {"cut_stone": 1, "tools": 1})
-	elif building_type == BUILDING_CARVER:
-		apply_input_output_production("carved_goods", output_amount, {"wood": 1, "tools": 1})
-	elif building_type == BUILDING_TILEWORKS:
-		apply_input_output_production("tiles", output_amount, {"bricks": 1, "wood": 1})
-	elif building_type == BUILDING_PAVER_YARD:
-		apply_input_output_production("paving_stones", output_amount, {"stone_blocks": 1})
+	var chain: Dictionary = EconomyBalanceScript.PRODUCTION.get(BuildingTiersScript.get_base_type(building_type), {})
+	if chain.is_empty():
+		return
+	apply_input_output_production(str(chain["output"]), output_amount, chain["inputs"])
 
 func apply_input_output_production(output_key: String, output_amount: int, input_costs: Dictionary):
 	var capped_output: int = output_amount
@@ -1327,9 +1312,15 @@ func get_base_building_output_amount(building_type: String) -> float:
 	return 0.0
 
 func apply_building_output_modifiers(base_output: float, tick_count: int, building: Building) -> int:
-	var family_output: float = base_output * get_family_labor_factor(get_household_by_id(building.assigned_household_id))
+	var family_output: float = base_output * get_family_labor_factor(get_household_by_id(building.assigned_household_id)) * get_work_time_factor(building)
 	var output_amount: int = apply_output_percent(family_output, building, get_worker_output_percent(building))
 	return apply_older_child_support_output_modifier(output_amount, tick_count, building)
+
+# Share of a family's day left for its holding after travel (hauling goods to and from the
+# nearest store, walking from home) and any spare time it gave a building site today.
+func get_work_time_factor(building: Building) -> float:
+	var spare: float = float(construction.spare_time_today.get(building.assigned_household_id, 0.0)) if building.assigned_household_id >= 0 else 0.0
+	return maxf(0.0, 1.0 - logistics.get_travel_share(building) - spare)
 
 # Balance outputs assume a two-adult family; a family with one working adult works at half.
 # Workplaces without a household (starter neutral workers) work at full rate.
@@ -1519,19 +1510,28 @@ func can_upgrade_building(building_index: int) -> bool:
 		return false
 	return can_afford_cost(get_upgrade_cost(building_index))
 
-# Upgrades a tier 0 building in place into its tier 1 counterpart. The family working or living
-# in it stays; the footprint and terrain rules are shared, so no new placement is needed.
+# Upgrades a tier 0 building in place into its tier 1 counterpart at once. The family working or
+# living in it stays; the footprint and terrain rules are shared, so no new placement is needed.
+# Play goes through TownConstruction.request_upgrade, which takes time, labor, and delivery.
 func upgrade_building(building_index: int) -> bool:
 	if not can_upgrade_building(building_index):
 		return false
-	var building: Building = buildings[building_index]
 	pay_cost(get_upgrade_cost(building_index))
-	building.type = BuildingTiersScript.get_upgrade_type(building.type)
+	complete_upgrade(building_index)
+	return true
+
+# Turns a tier 0 building into its tier 1 counterpart, already paid for (by upgrade_building, or
+# by a finished construction project).
+func complete_upgrade(building_index: int) -> void:
+	var building: Building = buildings[building_index]
+	var upgrade_type: String = BuildingTiersScript.get_upgrade_type(building.type)
+	if upgrade_type == "":
+		return
+	building.type = upgrade_type
 	building.maintenance_level = 100
 	building.maintenance_timer = 0
 	update_shelter_counts()
 	update_worker_counts()
-	return true
 
 func get_unhoused_households_by_size() -> Array[Household]:
 	var result: Array[Household] = []
