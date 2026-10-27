@@ -21,6 +21,7 @@ const COLOR_WORK: Color = Color(0.96, 0.80, 0.36)
 const COLOR_HAUL_ROUTE: Color = Color(0.96, 0.72, 0.30, 0.9)
 const COLOR_COMMUTE_ROUTE: Color = Color(0.70, 0.86, 0.98, 0.9)
 const COLOR_CLEARING: Color = Color(0.95, 0.56, 0.22)
+const COLOR_TILLING: Color = Color(0.62, 0.42, 0.22)
 
 # Routes shown for the selected workplace, kept until the selection or the layout changes.
 var route_key: Array = []
@@ -236,19 +237,23 @@ func draw_road_preview() -> void:
 		draw_rect(rect, RegionMapLayer.faded(TownMapStyle.COLOR_VALID, 0.35))
 		draw_rect(rect, TownMapStyle.COLOR_VALID, false, px(1.0))
 
-# Woods marked for clearing (a tint that fills as the woodcutters fell it), and the block the
-# clearing tool would mark.
+# Woods marked for clearing and land marked for tilling (a tint that fills as the work goes on),
+# and the block the clearing or tilling tool would mark.
 func draw_clearing(city: City) -> void:
 	for tile: Vector2i in city.woodland.marked.keys():
-		var rect: Rect2 = TownMapStyle.tile_rect(tile).grow(-px(1.0))
-		var felled: float = clampf(float(city.woodland.marked[tile]) / EconomyBalance.CLEAR_DAYS_PER_TILE, 0.0, 1.0)
-		draw_rect(rect, RegionMapLayer.faded(COLOR_CLEARING, 0.18 + 0.3 * felled))
-		draw_rect(rect, COLOR_CLEARING, false, px(1.0))
-	if view.clear_preview.size == Vector2i.ZERO:
+		draw_marked_tile(tile, float(city.woodland.marked[tile]) / EconomyBalance.CLEAR_DAYS_PER_TILE, COLOR_CLEARING)
+	for tile: Vector2i in city.farmland.marked.keys():
+		draw_marked_tile(tile, float(city.farmland.marked[tile]) / EconomyBalance.TILL_DAYS_PER_TILE, COLOR_TILLING)
+	if view.block_preview.size == Vector2i.ZERO:
 		return
-	var block: Rect2 = Rect2(TownMapStyle.tile_rect(view.clear_preview.position).position, Vector2(view.clear_preview.size) * TownMapStyle.TILE)
+	var block: Rect2 = Rect2(TownMapStyle.tile_rect(view.block_preview.position).position, Vector2(view.block_preview.size) * TownMapStyle.TILE)
 	draw_rect(block, RegionMapLayer.faded(TownMapStyle.COLOR_VALID, 0.12))
 	draw_rect(block, TownMapStyle.COLOR_VALID, false, px(2.0))
+
+func draw_marked_tile(tile: Vector2i, done: float, color: Color) -> void:
+	var rect: Rect2 = TownMapStyle.tile_rect(tile).grow(-px(1.0))
+	draw_rect(rect, RegionMapLayer.faded(color, 0.18 + 0.3 * clampf(done, 0.0, 1.0)))
+	draw_rect(rect, color, false, px(1.0))
 
 # The selected workplace's routes: its goods to the nearest store, its family from home.
 func draw_routes(city: City) -> void:
@@ -371,5 +376,5 @@ func paint_ghost(canvas: CanvasItem) -> void:
 	var rect: Rect2 = TownMapStyle.tile_rect(view.hovered_tile, view.preview_size)
 	if view.preview_type == TownConstruction.PLOT:
 		TownConstructionPainter.plot(canvas, rect, false)
-	elif view.preview_type != TownWoodland.CLEAR and view.preview_type != TownConstruction.ROAD:
+	elif view.preview_type != TownWoodland.CLEAR and view.preview_type != TownFarmland.TILL and view.preview_type != TownConstruction.ROAD:
 		TownBuildingPainter.draw(canvas, rect, BuildingVisuals.get_profile(view.preview_type), {"variant": 0.3, "lod": lod})

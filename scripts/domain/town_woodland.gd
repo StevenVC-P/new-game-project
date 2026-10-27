@@ -1,11 +1,13 @@
 class_name TownWoodland
 extends RefCounted
 
-# The woods of a town. The player marks woods for clearing; woodcutters fell them, a tile at a
-# time, as the place they cut their wood. Woods also spread on their own, slowly: once a year
-# every open tile beside them may become woods, more likely the more woods stand within a few
-# steps (spread_forest; numbers in EconomyBalance, Woodland). Felled land is open land like any
-# other, so a clearing nobody uses closes again over the years.
+# The woods of a town. The player marks woods for clearing; woodcutters (gatherer's camps too)
+# fell them, a tile at a time, as the place they cut their wood, and with nothing marked they
+# slowly cut the trees nearest them. Woods also spread on their own, slowly: each spring every
+# open tile beside them may be chosen to become woods, more likely the more woods stand within a
+# few steps (choose_spread; numbers in EconomyBalance, Woodland), and the chosen ones grow in one
+# by one through spring, summer, and autumn. Felled land is open land like any other, so a
+# clearing nobody uses closes again over the years.
 #
 # Woods take only land nothing else holds: not water or rock, nothing built or reserved (fields
 # are buildings), no road, and no trail or path (TownLogistics). A path in use holds its line
@@ -25,6 +27,10 @@ var city: City:
 		return _city_ref.get_ref() as City
 # Woods marked for clearing: tile -> working days spent felling it so far.
 var marked: Dictionary = {}
+# Unmarked trees a woodcutter is cutting: tile -> working days spent so far.
+var cutting: Dictionary = {}
+# This year's chosen spread: tile -> the day of the year it grows in.
+var scheduled: Dictionary = {}
 # Bumped whenever trees are felled or spread, so views redraw.
 var land_version: int = 0
 var felled_count: int = 0
@@ -38,6 +44,9 @@ var _frontier: Dictionary = {}
 var _frontier_ready: bool = false
 # (offset, influence) of every tile within the influence radius, nearest first.
 var _influence_offsets: Array = []
+# Each woodcutter's nearest unmarked trees, for the land_version they were found at.
+var _cut_targets: Dictionary = {}
+var _cut_targets_version: int = -1
 
 func _init(owner: City) -> void:
 	_city_ref = weakref(owner)
@@ -54,6 +63,11 @@ func is_inside(tile: Vector2i) -> bool:
 
 func is_wooded(tile: Vector2i) -> bool:
 	return is_inside(tile) and tile_data(tile)["has_trees"] == true
+
+# For the woods' pull: beyond the map's edge the woods at the edge are taken to go on.
+func is_wooded_or_beyond(tile: Vector2i) -> bool:
+	var size: Vector2i = city.logistics.map_size()
+	return tile_data(tile.clamp(Vector2i.ZERO, size - Vector2i.ONE))["has_trees"] == true
 
 # --- Marking -----------------------------------------------------------------------------------
 
@@ -97,50 +111,94 @@ func mark_block(from: Vector2i, to: Vector2i) -> int:
 func is_marked(tile: Vector2i) -> bool:
 	return marked.has(tile)
 
+# Working woodcutters of any tier: a gatherer's camp fells too, at its tier's pace.
 func get_woodcutters() -> Array[Building]:
 	var woodcutters: Array[Building] = []
 	for building: Building in city.buildings:
-		if building.type == Building.BUILDING_WOODCUTTER and building.can_produce():
+		if BuildingTiers.get_base_type(building.type) == Building.BUILDING_WOODCUTTER and building.can_produce():
 			woodcutters.append(building)
 	return woodcutters
 
 # --- Daily change ------------------------------------------------------------------------------
 
-# A day: woodcutters fell marked woods, and on the last day of each year the woods spread.
-# Trees felled or spread change routes, so they count as a layout change.
+# A day: woodcutters fell trees; on the first day of spring the year's spread is chosen, and
+# through spring, summer, and autumn the chosen tiles grow in on their days. Trees felled or
+# grown change routes, so they count as a layout change.
 func advance_day() -> void:
 	if not has_map():
 		return
-	var changed: bool = fell_marked_woods()
-	var day: int = city.construction.day
-	if day > 0 and day % Calendar.DAYS_PER_YEAR == 0:
-		var rng: RandomNumberGenerator = make_spread_rng(day / Calendar.DAYS_PER_YEAR)
-		if not spread_forest(func() -> float: return rng.randf()).is_empty():
-			changed = true
+	var changed: bool = fell_woods()
+	var today: int = city.get_day_of_year()
+	if today == 1:
+		choose_spring_spread()
+	if grow_scheduled(today):
+		changed = true
 	if changed:
 		land_version += 1
 		city.logistics.mark_layout_changed()
 
 # Each working woodcutter puts its day into the marked tile nearest it that it can reach, as
-# much of the day as travel and spare time leave (City.get_work_time_factor).
-func fell_marked_woods() -> bool:
-	if marked.is_empty() or city.should_skip_for_food_shortage():
+# much of the day as travel and spare time leave (City.get_work_time_factor); with nothing
+# marked it cuts the trees nearest it, slowly. A gatherer's camp works at its tier's pace.
+func fell_woods() -> bool:
+	if city.should_skip_for_food_shortage():
 		return false
 	var felled: bool = false
 	for building: Building in get_woodcutters():
-		var target: Vector2i = nearest_marked(building)
+		var work: float = city.get_work_time_factor(building)
+		if building.is_tier0():
+			work *= EconomyBalance.TIER0_OUTPUT_FRACTION
+		var target: Vector2i = nearest_marked(building) if not marked.is_empty() else Vector2i(-1, -1)
+		var progress: Dictionary = marked
+		if target.x < 0:
+			target = nearest_trees(building)
+			progress = cutting
+			work *= EconomyBalance.UNMARKED_FELLING_SHARE
 		if target.x < 0:
 			continue
-		marked[target] = float(marked[target]) + city.get_work_time_factor(building)
-		if float(marked[target]) >= EconomyBalance.CLEAR_DAYS_PER_TILE:
+		progress[target] = float(progress.get(target, 0.0)) + work
+		if float(progress[target]) >= EconomyBalance.CLEAR_DAYS_PER_TILE:
 			fell(target)
 			felled = true
 	return felled
 
-# Nearest by distance, ties broken by row then column; a tile no route reaches is passed over.
-func nearest_marked(building: Building) -> Vector2i:
+# The wooded tile nearest a woodcutter that a route reaches: ring by ring outward, nearest first
+# within a ring. Kept until the woods change.
+func nearest_trees(building: Building) -> Vector2i:
+	if _cut_targets_version != land_version:
+		_cut_targets_version = land_version
+		_cut_targets.clear()
+	if _cut_targets.has(building.id) and is_wooded(_cut_targets[building.id]):
+		return _cut_targets[building.id]
 	var origin: Vector2i = TownLogistics.center_tile(building.tile, building.size)
-	var tiles: Array = marked.keys()
+	var size: Vector2i = city.logistics.map_size()
+	var found: Vector2i = Vector2i(-1, -1)
+	for radius in range(0, maxi(size.x, size.y)):
+		var ring: Array[Vector2i] = []
+		for y in range(origin.y - radius, origin.y + radius + 1):
+			for x in range(origin.x - radius, origin.x + radius + 1):
+				if maxi(absi(x - origin.x), absi(y - origin.y)) == radius and is_wooded(Vector2i(x, y)):
+					ring.append(Vector2i(x, y))
+		ring.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+			var da: int = (a - origin).length_squared()
+			var db: int = (b - origin).length_squared()
+			return da < db or (da == db and is_before(a, b)))
+		for tile: Vector2i in ring:
+			if not is_inf(city.logistics.effort_between(origin, tile)):
+				found = tile
+				break
+		if found.x >= 0:
+			break
+	_cut_targets[building.id] = found
+	return found
+
+func nearest_marked(building: Building) -> Vector2i:
+	return nearest_reachable(building, marked.keys())
+
+# The tile of `tiles` nearest a building that a route reaches: nearest by distance, ties broken by
+# row then column. Also used for land marked to till (TownFarmland).
+func nearest_reachable(building: Building, tiles: Array) -> Vector2i:
+	var origin: Vector2i = TownLogistics.center_tile(building.tile, building.size)
 	tiles.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
 		var da: int = (a - origin).length_squared()
 		var db: int = (b - origin).length_squared()
@@ -156,6 +214,7 @@ static func is_before(a: Vector2i, b: Vector2i) -> bool:
 func fell(tile: Vector2i) -> void:
 	tile_data(tile)["has_trees"] = false
 	marked.erase(tile)
+	cutting.erase(tile)
 	felled_count += 1
 	update_frontier_around(tile)
 
@@ -168,23 +227,55 @@ func make_spread_rng(year: int) -> RandomNumberGenerator:
 	rng.seed = hash([city.founding_seed, int(city.tile.x), int(city.tile.y), year, "forest"])
 	return rng
 
-# One year of spreading. Every candidate is judged against the woods as they stood at the start
-# of the pass and draws one number from `draw` (uniform in [0, 1)); the winners become woods
-# only after all have drawn, so woods never spread twice in a year. Candidates draw in row
-# order. Returns the tiles that became woods.
+# The first day of spring: this year's spread is chosen from the woods as they stand, and each
+# chosen tile gets a day between spring and the end of autumn to grow in. So the year's new
+# woods appear one by one through the growing season, and none of them spreads further until
+# next spring.
+func choose_spring_spread() -> void:
+	spread_years += 1
+	var rng: RandomNumberGenerator = make_spread_rng(spread_years)
+	for tile: Vector2i in choose_spread(func() -> float: return rng.randf()):
+		scheduled[tile] = rng.randi_range(1, EconomyBalance.FOREST_GROWING_DAYS)
+
+# Chosen tiles whose day has come become woods, if nothing has taken the land meanwhile.
+# Returns whether any did.
+func grow_scheduled(today: int) -> bool:
+	var grown: bool = false
+	for tile: Vector2i in scheduled.keys():
+		if int(scheduled[tile]) > today:
+			continue
+		scheduled.erase(tile)
+		if can_forest(tile):
+			plant(tile)
+			grown = true
+	return grown
+
+# One year of spreading at once (tests and tools): chosen as in spring, all grown in now.
 func spread_forest(draw: Callable) -> Array[Vector2i]:
 	var grown: Array[Vector2i] = []
 	if not has_map():
 		return grown
 	spread_years += 1
+	grown = choose_spread(draw)
+	for tile: Vector2i in grown:
+		plant(tile)
+	return grown
+
+# Every candidate is judged against the woods as they stand and draws one number from `draw`
+# (uniform in [0, 1)), in row order; nothing changes until all have drawn. Returns the winners.
+func choose_spread(draw: Callable) -> Array[Vector2i]:
+	var chosen: Array[Vector2i] = []
+	if not has_map():
+		return chosen
 	for tile: Vector2i in get_spread_candidates():
 		if float(draw.call()) < get_spread_chance(tile):
-			grown.append(tile)
-	for tile: Vector2i in grown:
-		tile_data(tile)["has_trees"] = true
-		spread_count += 1
-		update_frontier_around(tile)
-	return grown
+			chosen.append(tile)
+	return chosen
+
+func plant(tile: Vector2i) -> void:
+	tile_data(tile)["has_trees"] = true
+	spread_count += 1
+	update_frontier_around(tile)
 
 # Open tiles beside woods (sharing a side) that woods can take, in row order.
 func get_spread_candidates() -> Array[Vector2i]:
@@ -207,7 +298,7 @@ func get_forest_influence(tile: Vector2i) -> float:
 	var influence: float = 0.0
 	for entry: Array in get_influence_offsets():
 		var offset: Vector2i = entry[0]
-		if is_wooded(tile + offset):
+		if is_wooded_or_beyond(tile + offset):
 			influence += float(entry[1])
 	return influence
 

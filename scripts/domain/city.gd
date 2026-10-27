@@ -78,6 +78,11 @@ var logistics: TownLogistics = null
 var construction: TownConstruction = null
 # Woods marked for clearing, and woods spreading.
 var woodland: TownWoodland = null
+# Land marked to till into farmland.
+var farmland: TownFarmland = null
+# Today's day of the year (1-360), set by the game before each day's tick; -1 where nothing sets
+# it (tests, balance tools), which count years from founding instead.
+var day_of_year: int = -1
 
 # `random_seed` makes each founding differ between games; 0 (the default, used by tests and
 # tools) keeps a town reproducible from its tile alone.
@@ -88,6 +93,7 @@ func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO, city_r
 	logistics = TownLogistics.new(self)
 	construction = TownConstruction.new(self)
 	woodland = TownWoodland.new(self)
+	farmland = TownFarmland.new(self)
 	founding_seed = random_seed
 	var normalized_household_count: int = max(0, starter_household_count)
 	resources = make_starting_resources(normalized_household_count)
@@ -901,6 +907,11 @@ func add_building(building: Building, household: Household = null):
 	update_worker_counts()
 	auto_assign_workers()
 
+func get_day_of_year() -> int:
+	if day_of_year > 0:
+		return day_of_year
+	return posmod(construction.day - 1, Calendar.DAYS_PER_YEAR) + 1
+
 func tick():
 	update_shelter_counts()
 	if int(resources["maintenance_grace_ticks"]) > 0:
@@ -922,6 +933,7 @@ func tick():
 			apply_building_production(building)
 	logistics.advance_day()
 	woodland.advance_day()
+	farmland.advance_day()
 
 	resolve_soft_needs()
 	if resources["food_shortage"] == true:

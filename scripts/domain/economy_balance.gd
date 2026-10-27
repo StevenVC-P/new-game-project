@@ -171,7 +171,14 @@ const FENCE_WORK_DAYS: float = 2.0
 # A woodcutter's family fells the woods the player marked for clearing as the place it cuts its
 # wood (its output is unchanged): a wooded tile takes this many full working days.
 const CLEAR_DAYS_PER_TILE: float = 2.0
-# Forest expansion (TownWoodland.spread_forest), once a year. Every open tile that can grow woods
+# With no woods marked, a woodcutter cuts the trees nearest it, slowly (owner, 2026-10-27): this
+# share of its day goes into felling, so a tile falls every 20 working days, about 16 a year.
+const UNMARKED_FELLING_SHARE: float = 0.1
+# Clearing only clears; land marked to till becomes farmland after this many full working days
+# of a field's family (TownFarmland), its harvest unchanged.
+const TILL_DAYS_PER_TILE: float = 3.0
+# Forest expansion (TownWoodland.spread_forest), once a year. Woods beyond the town map's edge
+# count too: the woods at the edge are taken to go on past it. Every open tile that can grow woods
 # and has woods on a side (not just a corner) may become woods. Woods within
 # FOREST_INFLUENCE_RADIUS steps (|dx| + |dy|) push it: each wooded tile adds
 # FOREST_INFLUENCE_DECAY ^ (steps - 1), so a side neighbour adds 1, a corner 0.5, three steps
@@ -186,6 +193,9 @@ const FOREST_SPREAD_BASE_CHANCE: float = 0.01
 const FOREST_SPREAD_MAX_CHANCE: float = 0.04
 const FOREST_INFLUENCE_RADIUS: int = 3
 const FOREST_INFLUENCE_DECAY: float = 0.5
+# The year's spread is chosen at the start of spring and grows in a tile at a time, each on its
+# own day between spring and the end of autumn (owner, 2026-10-27): the first three seasons.
+const FOREST_GROWING_DAYS: int = 270
 
 static func get_build_cost(building_type: String) -> Dictionary:
 	return (BUILD_COSTS.get(building_type, {}) as Dictionary).duplicate()

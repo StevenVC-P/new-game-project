@@ -28,6 +28,7 @@ var development_signature: int = 0
 var ground_roads_version: int = -1
 var ground_paths_version: int = -1
 var land_version: int = -1
+var tilled_version: int = -1
 var camp_spot_cache: Array[Vector2i] = []
 var camp_spot_signature: int = -1
 
@@ -63,8 +64,8 @@ var selected_house_index: int = -1
 var inspected_project_id: int = -1
 var inspected_plot_id: int = -1
 var linked_indices: Array[int] = []
-# The block of woods the clearing tool would mark, while the player picks its second corner.
-var clear_preview: Rect2i = Rect2i()
+# The block the clearing or tilling tool would mark, while the player picks its second corner.
+var block_preview: Rect2i = Rect2i()
 # The road the road tool would lay, while the player picks its second end.
 var road_preview: Array[Vector2i] = []
 var walker_time: float = 0.0
@@ -123,6 +124,7 @@ func set_city(town: City) -> void:
 	ground_roads_version = town.construction.roads_version if town != null else -1
 	ground_paths_version = town.logistics.paths_version if town != null else -1
 	land_version = town.woodland.land_version if town != null else -1
+	tilled_version = town.farmland.land_version if town != null else -1
 	camp_spot_signature = -1
 	for layer: TownMapLayer in layers:
 		layer.rebuild()
@@ -166,11 +168,12 @@ func refresh_development() -> void:
 	if city == null or map_size == Vector2i.ZERO:
 		return
 	var trees_changed: bool = city.woodland.land_version != land_version
-	var ground_changed: bool = trees_changed or city.construction.roads_version != ground_roads_version or city.logistics.paths_version != ground_paths_version
+	var ground_changed: bool = trees_changed or city.construction.roads_version != ground_roads_version or city.logistics.paths_version != ground_paths_version or city.farmland.land_version != tilled_version
 	if ground_changed:
 		ground_roads_version = city.construction.roads_version
 		ground_paths_version = city.logistics.paths_version
 		land_version = city.woodland.land_version
+		tilled_version = city.farmland.land_version
 		ground_layer.rebuild()
 	if trees_changed:
 		feature_layer.queue_redraw()
