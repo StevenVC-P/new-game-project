@@ -2,15 +2,17 @@
 
 Snapshot for whoever picks the project up next. Update it when a milestone closes; durable detail lives in the linked docs, not here.
 
-*Last updated: 2026-10-26, after the town building model.*
+*Last updated: 2026-10-26, after generated worlds.*
 
 ## Current Objective
 
-Town building is settled before it is locked in (`docs/TOWN_BUILDING_MODEL.md`): the player plans, families build over time, materials are carried from stores, layout costs or saves travel, and families build their own homes on residential plots. The owner approved it for `main`; the open decisions there remain for tuning, and the main track resumes: the first playable village (`docs/IMPLEMENTATION_ROADMAP.md`).
+Generated worlds (`feature/procedural-world`, from `develop`): every game now opens on a newly generated, continent-styled planet with a small polar ice cap (owner request, 2026-10-26). Merged into `develop`; `main` waits for the owner's look. Then the main track resumes.
+
+Before that: town building is settled before it is locked in (`docs/TOWN_BUILDING_MODEL.md`): the player plans, families build over time, materials are carried from stores, layout costs or saves travel, and families build their own homes on residential plots. The owner approved it for `main`; the open decisions there remain for tuning, and the main track resumes: the first playable village (`docs/IMPLEMENTATION_ROADMAP.md`).
 
 ## Status
 
-- **Working:** world atlas (`docs/WORLD_MAP.md`); continuous regional map (`docs/REGIONAL_MAP.md`); town map (`docs/TOWN_MAP.md`); town building: construction sites, builders, carried materials, travel costs, roads, storehouses, residential plots, families building homes (`docs/TOWN_BUILDING_MODEL.md`). All 23 headless test scripts pass; import validation is clean; `town_map_capture` (now with construction scenes) was reviewed by eye.
+- **Working:** generated worlds (`WorldGenerator`; design in `docs/WORLD_MAP.md`): 30 seeds build without warnings, openings on generated planets get off the ground about as often as on the authored one (38/42 and 40/42 on seeds 1 and 2, authored still 40/42 continuous and 46/48 original); world atlas (`docs/WORLD_MAP.md`); continuous regional map (`docs/REGIONAL_MAP.md`); town map (`docs/TOWN_MAP.md`); town building: construction sites, builders, carried materials, travel costs, roads, storehouses, residential plots, families building homes (`docs/TOWN_BUILDING_MODEL.md`). All 24 headless test scripts pass (with the new `world_generator_validation`); import validation is clean; generated planets were reviewed by eye (`world_map_capture` with `seed=`); `town_map_capture` (now with construction scenes) was reviewed by eye.
 - **Balance:** with construction, the sensible opening stays 20/20 and map luck matches building instantly (46/48, 40/42); an opening that queues every house before the woodcutter falls from 20/20 to 13/20 (queue order). Numbers in the model doc.
 - **Branches:** the town building work is on `feature/town-building-model` (from `develop`), merged into `develop`, and `develop` into `main` on the owner's approval (2026-10-26). `main` now carries the town map art and the town building model.
 - **Unchanged:** the original region generator (fingerprints in `tests/region_map_validation.gd`); economy numbers other than the new construction and travel ones.
@@ -25,10 +27,12 @@ Town building is settled before it is locked in (`docs/TOWN_BUILDING_MODEL.md`):
 - **The whole planet can be viewed; only frontier land can be settled (owner, 2026-10-26).** After founding, other regions are view-only too (one player settlement).
 - **Founding is allowed on any unclaimed or contested land (owner, 2026-10-26).** The founding neighbourhood (160x100 tiles) follows the camera until a town is founded, then stays put.
 - **Zooming hands off between the atlas and regional map (owner, 2026-10-26)** at matching scale: regional zoom 0.4 = atlas zoom 4.0.
-- The world is hand-authored; detail noise uses fixed seeds. Owner check still pending: whether "no randomization" was meant to exclude that noise too (`docs/WORLD_MAP.md`).
+- **Generated planets, continent styled, less polar ice (owner, 2026-10-26).** Replaces the earlier "no randomization" direction. A new seed each launch; the authored planet stays as the test and reference world (`docs/WORLD_MAP.md`).
 - Decoration never shows what the tile data does not hold, on the regional and town maps. Tests enforce it.
 
 ## Open Owner Decisions
+
+- **Generated worlds** (details in `docs/WORLD_MAP.md`): a new planet every launch with no way to pick one in the game yet (the seed shows in the atlas top bar; `-- --world-seed=N` replays it); is that the wanted default, or should the player choose or reroll? How much ice: generated land stops at about 72 N / 58 S, pack ice from 77 N / 72 S. Frontier tends to be tropical or dry, because kingdoms start on the most habitable land.
 
 0. **Town building** (details in `docs/TOWN_BUILDING_MODEL.md`, Open Owner Decisions): helpers' spare time cannot be turned off; strict queue order vs builders favoring workplaces; upkeep grace counted from founding rather than per building; first-pass travel numbers; families building only on player-set plots.
 
@@ -36,7 +40,7 @@ Town building is settled before it is locked in (`docs/TOWN_BUILDING_MODEL.md`):
 2. **Balance after the town terrain.** Farmland per town rose (median 364 fertile tiles, was 160); map-luck is 42/42 continuous, 46/48 original (was 47/48); most towns have no water. Accepted for now, not confirmed as intended.
 3. **Quarries on stone.** Deposits are on town maps now; the access rule decided on 2026-10-25 is still unbuilt. Next step when wanted.
 4. **Remove the unused world-window code?** `RegionGeography`, the world path of `RegionMapGenerator`, and `RegionShowcase.build` are used only by `tests/region_map_validation.gd`.
-5. **Founding on frozen land.** Polar frontier offers thousands of valid founding sites. Should ice refuse founding?
+5. **Founding on frozen land.** Polar frontier offers thousands of valid founding sites on the authored planet (generated planets have almost no polar land). Should ice refuse founding?
 
 ## Remaining Work (Map Leg, Deferred)
 
@@ -51,6 +55,8 @@ In rough priority order; details in each doc's "Remaining Work" section.
 
 ## Risks And Gotchas
 
+- **Generated worlds must stay deterministic per seed.** Draw only from the generator's own `rng`, iterate in a fixed order, and break sort ties by index; `tests/world_generator_validation.gd` builds a seed twice and compares. Tests that name places must set `main.use_authored_world` before adding `main` to the tree.
+- **Startup is now about 3.4 s** on the main thread (generation plus build; was 2.4 s). Building on a thread is the next step if it bothers the owner.
 - **Chunks must stay pointwise.** Every regional tile must depend only on its global position (and the world). Anything region-wide or order-dependent makes chunks disagree at their edges; `tests/regional_terrain_validation.gd` compares every shared tile.
 - **Town maps must stay deterministic.** Never draw from the game's `rng` in `LocalCityMapGenerator`; the founded town must equal the surveyed map (`tests/founding_city_validation.gd`), and changing the generator changes balance: re-run `tests/sim/map_luck_check.gd` and `tests/sim/town_map_probe.gd` (survey thresholds).
 - **Worker threads and exit:** call `RegionalTerrain.wait_for_tasks()` before quitting a script that streamed chunks, or Godot hangs on exit.
