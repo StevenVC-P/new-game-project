@@ -65,6 +65,8 @@ var inspected_plot_id: int = -1
 var linked_indices: Array[int] = []
 # The block of woods the clearing tool would mark, while the player picks its second corner.
 var clear_preview: Rect2i = Rect2i()
+# The road the road tool would lay, while the player picks its second end.
+var road_preview: Array[Vector2i] = []
 var walker_time: float = 0.0
 var walker_cycle_seconds: float = 12.0
 
@@ -146,7 +148,7 @@ static func camped_households(town: City) -> Array[String]:
 func compute_development_signature() -> int:
 	var parts: Array = [city.buildings.size()]
 	for building: Building in city.buildings:
-		parts.append([building.type, building.tile, upkeep_band(building) if building.needs_maintenance() else 10, building.assigned_workers > 0])
+		parts.append([building.type, building.tile, upkeep_band(building) if building.needs_maintenance() else 10, building.assigned_workers > 0, building.fenced])
 	parts.append(camped_households(city))
 	parts.append(construction_signature())
 	return hash(parts)

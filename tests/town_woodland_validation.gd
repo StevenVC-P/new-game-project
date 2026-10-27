@@ -49,7 +49,7 @@ func test_terrain_costs() -> void:
 	_check(is_equal_approx(TownLogistics.tile_effort(ground({"has_trees": true, "is_hill": true})), EconomyBalance.HILL_EFFORT * EconomyBalance.WOODS_EFFORT), "a wooded hillside costs both")
 	_check(is_equal_approx(TownLogistics.tile_effort(ground({"type": "rough"})), EconomyBalance.ROUGH_EFFORT), "rock costs most")
 	_check(is_inf(TownLogistics.tile_effort(ground({"type": "water"}))), "water cannot be crossed")
-	_check(TownLogistics.tile_effort(ground({"has_trees": true, "path_level": TownLogistics.PATH_WORN})) < EconomyBalance.WOODS_EFFORT, "a path through woods is quicker than the woods")
+	_check(TownLogistics.tile_effort(ground({"has_trees": true}), TownLogistics.PATH_WORN) < EconomyBalance.WOODS_EFFORT, "a path through woods is quicker than the woods")
 
 # A short wood five tiles deep across the straight line: going around is quicker.
 func test_routes_avoid_woods() -> void:
@@ -60,9 +60,9 @@ func test_routes_avoid_woods() -> void:
 	city.logistics.mark_layout_changed()
 	var route: Array[Vector2i] = city.logistics.find_route(Vector2i(28, 22), Vector2i(36, 22))
 	var through_woods: int = 0
-	for tile: Vector2i in route:
-		through_woods += 1 if city.local_map[tile.y][tile.x]["has_trees"] == true else 0
-	print("[WOOD] route past a small wood: %d tiles, %d of them wooded, effort %.1f" % [route.size(), through_woods, city.logistics.route_effort(route)])
+	for cell: Vector2i in route:
+		through_woods += 1 if city.logistics.is_cell_in_woods(cell) else 0
+	print("[WOOD] route past a small wood: %d cells, %d of them in the woods, effort %.1f" % [route.size(), through_woods, city.logistics.route_effort(route)])
 	_check(route.size() > 0 and through_woods == 0, "the route should go around the woods")
 
 func test_woodcutters_clear_marked_woods() -> void:
@@ -196,7 +196,7 @@ func test_boundary_blocking() -> void:
 	city.local_map[water.y][water.x]["type"] = "water"
 	city.local_map[field.y][field.x]["occupied"] = true
 	city.local_map[road.y][road.x]["has_road"] = true
-	city.local_map[trail.y][trail.x]["path_level"] = TownLogistics.PATH_TRAIL
+	city.logistics.set_tile_path_level(trail, TownLogistics.PATH_TRAIL)
 	city.local_map[rock.y][rock.x]["type"] = "rough"
 	city.local_map[farmland.y][farmland.x]["is_fertile"] = true
 	var grown: Array[Vector2i] = city.woodland.spread_forest(always(0.0))
@@ -205,7 +205,7 @@ func test_boundary_blocking() -> void:
 	_check(grown.has(farmland), "woods may take fertile land nobody farms")
 	_check(grown.size() == 3, "only the open tiles should become woods, got " + str(grown))
 	# A trail nobody walks fades, and then the woods may take it.
-	city.local_map[trail.y][trail.x]["path_level"] = TownLogistics.PATH_NONE
+	city.logistics.set_tile_path_level(trail, TownLogistics.PATH_NONE)
 	_check(city.woodland.spread_forest(always(0.0)).has(trail), "an abandoned path is open land again")
 
 func test_influence_cap() -> void:

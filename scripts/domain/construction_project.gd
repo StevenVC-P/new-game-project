@@ -1,7 +1,8 @@
 class_name ConstructionProject
 extends RefCounted
 
-# One thing being built in a town: a new building, an upgrade in place, or a stretch of road.
+# One thing being built in a town: a new building, an upgrade in place, a fence round a field,
+# or a stretch of road.
 # Projects are plain data owned by TownConstruction, which advances them each day. Whoever asked
 # for it (the player, a family, later the town's own government) uses the same pipeline, and the
 # project records who asked and who pays. Design: docs/TOWN_BUILDING_MODEL.md.
@@ -9,6 +10,7 @@ extends RefCounted
 const KIND_BUILDING: String = "building"
 const KIND_UPGRADE: String = "upgrade"
 const KIND_ROAD: String = "road"
+const KIND_FENCE: String = "fence"
 
 const REQUESTED_BY_PLAYER: String = "player"
 const REQUESTED_BY_HOUSEHOLD: String = "household"
@@ -30,7 +32,7 @@ var tile: Vector2i = Vector2i.ZERO
 var size: Vector2i = Vector2i.ONE
 # Road projects: every tile the road covers.
 var road_tiles: Array[Vector2i] = []
-# Upgrade projects: the building being upgraded, which keeps working until the upgrade is done.
+# Upgrade and fence projects: the building worked on, which keeps working until they are done.
 var target_building_id: int = -1
 var requested_by: String = REQUESTED_BY_PLAYER
 var requester_household_id: int = -1
@@ -54,8 +56,12 @@ var created_day: int = 0
 func is_tier0() -> bool:
 	return BuildingTiers.is_tier0(building_type)
 
+# Upgrades and fences work on a building that already stands: they reserve no land of their own.
+func is_on_standing_building() -> bool:
+	return kind == KIND_UPGRADE or kind == KIND_FENCE
+
 func is_home() -> bool:
-	return kind != KIND_ROAD and BuildingTiers.get_base_type(building_type) == Building.BUILDING_HOUSE
+	return kind != KIND_ROAD and kind != KIND_FENCE and BuildingTiers.get_base_type(building_type) == Building.BUILDING_HOUSE
 
 func get_remaining_materials() -> Dictionary:
 	var remaining: Dictionary = {}

@@ -1322,6 +1322,8 @@ func get_base_building_output_amount(building_type: String) -> float:
 
 func apply_building_output_modifiers(base_output: float, tick_count: int, building: Building) -> int:
 	var family_output: float = base_output * get_family_labor_factor(get_household_by_id(building.assigned_household_id)) * get_work_time_factor(building)
+	# A field people walk through loses some of its harvest underfoot.
+	family_output *= 1.0 - logistics.get_field_trample_loss(building)
 	var output_amount: int = apply_output_percent(family_output, building, get_worker_output_percent(building))
 	return apply_older_child_support_output_modifier(output_amount, tick_count, building)
 

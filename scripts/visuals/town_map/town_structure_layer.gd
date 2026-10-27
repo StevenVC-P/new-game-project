@@ -7,7 +7,7 @@ extends TownMapLayer
 # camped on open ground near the town's heart.
 #
 # What is being built shows too: the founders' stockpile, staked residential plots, building
-# sites (TownConstructionPainter), planned roads, and scaffolding around upgrades.
+# sites (TownConstructionPainter), planned roads, scaffolding around upgrades, and fences.
 #
 # Recorded again only when the development signature changes (TownMapView), never per frame:
 # a building's type and place, its upkeep in steps of ten, whether a family works it, how many
@@ -32,6 +32,12 @@ func _draw() -> void:
 		var upgrade: ConstructionProject = city.construction.get_upgrade_project(building.id)
 		if upgrade != null:
 			TownConstructionPainter.scaffold(self, rect, upgrade.get_progress())
+		if building.fenced:
+			TownConstructionPainter.fence(self, rect, 1.0)
+		else:
+			var fencing: ConstructionProject = city.construction.get_fence_project(building.id)
+			if fencing != null:
+				TownConstructionPainter.fence(self, rect, maxf(0.1, fencing.get_progress()))
 	draw_camp(city)
 
 # Flat things first: the stockpile, plots, sites, and planned roads lie under the buildings.

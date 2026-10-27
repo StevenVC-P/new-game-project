@@ -191,14 +191,15 @@ func get_spread_candidates() -> Array[Vector2i]:
 	ensure_frontier()
 	var candidates: Array[Vector2i] = []
 	for tile: Vector2i in _frontier.keys():
-		if can_forest(tile_data(tile)):
+		if can_forest(tile):
 			candidates.append(tile)
 	candidates.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return is_before(a, b))
 	return candidates
 
 # Land woods can take: open ground (meadow or unworked farmland) that nothing holds.
-static func can_forest(tile: Dictionary) -> bool:
-	return tile["type"] == "ground" and tile["has_trees"] != true and tile["occupied"] != true and tile.get("has_road", false) != true and TownLogistics.get_path_level(tile) == TownLogistics.PATH_NONE
+func can_forest(tile: Vector2i) -> bool:
+	var data: Dictionary = tile_data(tile)
+	return data["type"] == "ground" and data["has_trees"] != true and data["occupied"] != true and data.get("has_road", false) != true and city.logistics.get_tile_path_level(tile) == TownLogistics.PATH_NONE
 
 # The pull of nearby woods on a tile: each wooded tile within the radius adds the decay raised to
 # its distance in steps less one.

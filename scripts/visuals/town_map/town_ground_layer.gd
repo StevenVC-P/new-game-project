@@ -54,8 +54,6 @@ func rebuild() -> void:
 			masks_b[i * 4 + 2] = 255 if tile.get("has_road", false) == true else 0
 			masks_b[i * 4 + 3] = 255 if tile.get("water_kind", "") == "sea" else 0
 			masks_c[i * 4] = 255 if tile.get("water_kind", "") == "lake" else 0
-			# Trodden ground: a trail at half strength, a path at full.
-			masks_c[i * 4 + 3] = TownLogistics.get_path_level(tile) * 255 / TownLogistics.PATH_WORN
 			# Ground height for the light: water low, open land, hill land rising, rock standing proud.
 			height[i] = 0.0 if water else (0.85 if rough else (0.55 if tile.get("is_hill", false) == true else 0.3))
 	var depth: PackedFloat32Array = RegionTerrainLayer.distance_to_land(is_water, size)
@@ -63,11 +61,24 @@ func rebuild() -> void:
 	for i in range(count):
 		masks_c[i * 4 + 1] = int(clampf(depth[i] / DEPTH_TILES, 0.0, 1.0) * 255.0)
 		masks_c[i * 4 + 2] = int(clampf(height[i], 0.0, 1.0) * 255.0)
+		masks_c[i * 4 + 3] = 255
 
 	set_mask("masks_a", masks_a, size)
 	set_mask("masks_b", masks_b, size)
 	set_mask("masks_c", masks_c, size)
 	shader_material.set_shader_parameter("map_tiles", Vector2(size))
+	# Trodden ground at route-cell resolution (half a tile), so paths along the lines between
+	# tiles show where they run: a trail at half strength, a path at full.
+	var cells: Vector2i = size * 2 + Vector2i.ONE
+	var trodden: PackedByteArray = PackedByteArray()
+	trodden.resize(cells.x * cells.y * 4)
+	var logistics: TownLogistics = view.city.logistics
+	for cell: Vector2i in logistics.cell_levels.keys():
+		var j: int = (cell.y * cells.x + cell.x) * 4
+		trodden[j] = logistics.get_cell_path_level(cell) * 255 / TownLogistics.PATH_WORN
+		trodden[j + 3] = 255
+	set_mask("path_mask", trodden, cells)
+	shader_material.set_shader_parameter("path_cells", Vector2(cells))
 	var climate: Dictionary = view.climate
 	shader_material.set_shader_parameter("site_temperature", float(climate.get("temperature", 0.55)))
 	shader_material.set_shader_parameter("site_moisture", float(climate.get("moisture", 0.6)))

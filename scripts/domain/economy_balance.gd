@@ -154,6 +154,18 @@ const PATH_WEAR: float = 150.0
 # 0.65; woods and rock keep their extra cost in proportion). Built roads stay quickest.
 const TRAIL_EFFORT_FACTOR: float = 0.85
 const PATH_EFFORT_FACTOR: float = 0.65
+# Ground in woods (every tile beside it wooded) wears at this share of the rate, and never past a
+# trail: wear never fells a tree.
+const FOREST_WEAR_FACTOR: float = 0.5
+
+# --- Fields (docs/TOWN_BUILDING_MODEL.md, Fields and fences) ---
+# People who walk through a field (not along its edge) trample it: each daily trip across a field
+# costs it this share of its harvest, up to the max. A field's own family does not count.
+const FIELD_TRAMPLE_LOSS_PER_TRIP: float = 0.02
+const FIELD_TRAMPLE_MAX_LOSS: float = 0.4
+# A fence keeps everyone else out; it is built like anything else.
+const FENCE_WOOD: int = 4
+const FENCE_WORK_DAYS: float = 2.0
 
 # --- Woodland (docs/TOWN_BUILDING_MODEL.md, Woodland) ---
 # A woodcutter's family fells the woods the player marked for clearing as the place it cuts its

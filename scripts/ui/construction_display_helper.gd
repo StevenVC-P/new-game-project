@@ -95,4 +95,11 @@ static func get_travel_lines(city: City, building: Building) -> Array[String]:
 	var trodden: float = city.logistics.get_trodden_share(building)
 	if trodden > 0.0:
 		lines.append("  %d%% of the way on paths or roads" % int(round(trodden * 100.0)))
+	if TownLogistics.is_field(building):
+		if building.fenced:
+			lines.append("Fenced: nobody else walks through")
+		else:
+			var trips: float = float(city.logistics.trampled_trips.get(building.id, 0.0))
+			if trips > 0.0:
+				lines.append("Trampled: -%d%% harvest (%.1f trips a day through it)" % [int(round(city.logistics.get_field_trample_loss(building) * 100.0)), trips])
 	return lines
