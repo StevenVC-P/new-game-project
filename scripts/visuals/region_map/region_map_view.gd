@@ -46,7 +46,6 @@ const HANDOFF_OVERSHOOT: float = 8.0
 var tiles: Array = []
 var cities: Array[City] = []
 var roads: Array[Array] = []
-var geography: RegionGeography = null
 var geometry: RegionMapGeometry = RegionMapGeometry.new()
 var map_size: Vector2i = Vector2i.ZERO
 
@@ -207,22 +206,20 @@ func set_terrain(regional_terrain: RegionalTerrain) -> void:
 	board_layer.visible = false
 	terrain_layer.visible = false
 	feature_layer.visible = false
-	geography = null
 	apply_camera()
 
 # --- Data ---------------------------------------------------------------------------
 
-func set_region(region_tiles: Array, region_cities: Array[City], region_roads: Array[Array], region_geography: RegionGeography) -> void:
+func set_region(region_tiles: Array, region_cities: Array[City], region_roads: Array[Array]) -> void:
 	tiles = region_tiles
 	cities = region_cities
 	roads = region_roads
-	geography = region_geography
 	map_size = Vector2i((tiles[0] as Array).size(), tiles.size()) if not tiles.is_empty() else Vector2i.ZERO
 	hovered_tile = Vector2i(-1, -1)
 	hovered_city = -1
 	selected_city = -1
 	pending_tile = Vector2i(-1, -1)
-	geometry.build(tiles, cities, roads, geography)
+	geometry.build(tiles, cities, roads)
 	for layer: RegionMapLayer in layers:
 		layer.rebuild()
 	board_clip.queue_redraw()
@@ -254,7 +251,7 @@ func set_neighbourhood(window_tiles: Array, window_cities: Array[City], window_r
 	geometry.world_tiers.clear()
 	for settlement: WorldMapData.Settlement in terrain.world.settlements:
 		geometry.world_tiers[settlement.name] = settlement.tier
-	geometry.build(tiles, cities, roads, geography, neighbourhood_context_roads)
+	geometry.build(tiles, cities, roads, neighbourhood_context_roads)
 	for layer: RegionMapLayer in [field_layer, structure_layer, site_layer, overlay_layer, label_layer]:
 		layer.rebuild()
 	board_clip.queue_redraw()
@@ -300,7 +297,7 @@ func notify_changed(layer: String, region_cities: Array[City] = cities, region_r
 	cities = region_cities
 	roads = region_roads
 	var previous_clearings: PackedByteArray = geometry.clear_grid
-	geometry.build(tiles, cities, roads, geography, neighbourhood_context_roads)
+	geometry.build(tiles, cities, roads, neighbourhood_context_roads)
 	if is_continuous():
 		# The chunks draw the ground; trees there make way for new development.
 		if geometry.clear_grid != previous_clearings:
@@ -691,7 +688,7 @@ func legend_temperature() -> float:
 		var chunk: RegionalChunk = terrain.get_chunk_if_ready(terrain.chunk_of_tile(Vector2i(camera_global_tile().floor())))
 		if chunk != null:
 			return chunk.mean_temperature
-	return RegionMapStyle.region_temperature(geography)
+	return RegionMapStyle.BOUNDED_TEMPERATURE
 
 func draw_hud_button(canvas: CanvasItem, font: Font, text: String, x: float, y: float, active: bool, action: String) -> float:
 	var width: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + 16.0

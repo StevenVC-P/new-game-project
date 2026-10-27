@@ -110,9 +110,6 @@ var use_authored_world: bool = false
 var pending_save_state: Dictionary = {}
 # World region the current regional map was generated for; -1 before any region is entered.
 var entered_world_region_id: int = -1
-# What the world says about the entered region; steers the generator and the landscape's
-# palette. Null for regional maps made without the world (tests, the original valley).
-var region_geography: RegionGeography = null
 # The regional landscape draws on its own canvas layer under this node's panels. Without it
 # (scripts that never enter the scene tree) the original tile drawing is used.
 var region_map_layer: CanvasLayer = null
@@ -140,6 +137,8 @@ var pending_neighbourhood_center: Vector2i = Vector2i(-1, -1)
 var requested_neighbourhood_origin: Vector2i = Vector2i(-1, -1)
 # Region id per neighbourhood tile (row-major), for the founding rules' kingdom check.
 var neighbourhood_regions: PackedInt32Array = PackedInt32Array()
+# 1 per neighbourhood tile (row-major) where the ground is frozen; founding refuses it.
+var neighbourhood_frozen: PackedByteArray = PackedByteArray()
 
 func get_city_pressure_debug_city() -> City:
 	if selected_city_index >= 0 and selected_city_index < cities.size():
@@ -268,7 +267,7 @@ func refresh_founding_sites() -> void:
 		var town_tiles: PackedVector2Array = PackedVector2Array()
 		for city: City in cities:
 			town_tiles.append(city.tile)
-		region_founding_sites = scan_founding_sites(tiles, town_tiles, neighbourhood_regions, world_map_data, region_map_size)
+		region_founding_sites = scan_founding_sites(tiles, town_tiles, neighbourhood_regions, neighbourhood_frozen, world_map_data, region_map_size)
 		return
 	for y in range(region_map_size.y):
 		for x in range(region_map_size.x):
@@ -538,6 +537,7 @@ static func prepare_neighbourhood(terrain: RegionalTerrain, world: WorldMapData,
 	var origin: Vector2i = neighbourhood_origin_for(terrain, center)
 	var window_tiles: Array = terrain.extract_window(origin, NEIGHBOURHOOD_SIZE)
 	var regions: PackedInt32Array = terrain.region_ids_in_window(origin, NEIGHBOURHOOD_SIZE)
+	var frozen: PackedByteArray = terrain.frozen_in_window(origin, NEIGHBOURHOOD_SIZE)
 	var settlements: Array = []
 	var town_tiles: PackedVector2Array = PackedVector2Array()
 	for pair: Array in terrain.settlements_in_window(origin, NEIGHBOURHOOD_SIZE):
@@ -549,17 +549,21 @@ static func prepare_neighbourhood(terrain: RegionalTerrain, world: WorldMapData,
 		"origin": origin,
 		"tiles": window_tiles,
 		"regions": regions,
+		"frozen": frozen,
 		"settlements": settlements,
-		"sites": scan_founding_sites(window_tiles, town_tiles, regions, world, NEIGHBOURHOOD_SIZE),
+		"sites": scan_founding_sites(window_tiles, town_tiles, regions, frozen, world, NEIGHBOURHOOD_SIZE),
 		"region_id": world.region_id_at(terrain.tile_center_to_world(center)),
 	}
 
-# Tiles where a town may be founded: the founding rules, and no kingdom holds the land.
-static func scan_founding_sites(window_tiles: Array, town_tiles: PackedVector2Array, regions: PackedInt32Array, world: WorldMapData, size: Vector2i) -> Array[Vector2i]:
+# Tiles where a town may be founded: the founding rules, the ground is not frozen, and no
+# kingdom holds the land.
+static func scan_founding_sites(window_tiles: Array, town_tiles: PackedVector2Array, regions: PackedInt32Array, frozen: PackedByteArray, world: WorldMapData, size: Vector2i) -> Array[Vector2i]:
 	var sites: Array[Vector2i] = []
 	for y in range(size.y):
 		for x in range(size.x):
 			if not FoundingSiteHelper.is_valid_founding_site(window_tiles, town_tiles, Vector2i(x, y), MIN_CITY_DISTANCE):
+				continue
+			if frozen.size() == size.x * size.y and frozen[y * size.x + x] != 0:
 				continue
 			var region: WorldMapData.Region = world.get_region(regions[y * size.x + x]) if regions.size() == size.x * size.y else null
 			if region == null or region.owner_kingdom_id == -1:
@@ -574,6 +578,7 @@ func apply_neighbourhood(data: Dictionary) -> void:
 	region_map_size = NEIGHBOURHOOD_SIZE
 	tiles = data["tiles"]
 	neighbourhood_regions = data["regions"]
+	neighbourhood_frozen = data["frozen"]
 	var neighbourhood_cities: Array[City] = []
 	for entry: Array in data["settlements"]:
 		var town: City = City.new(entry[0], Vector2(entry[1] as Vector2i), City.ROLE_NEUTRAL)
@@ -582,7 +587,6 @@ func apply_neighbourhood(data: Dictionary) -> void:
 		neighbourhood_cities.append(town)
 	cities = neighbourhood_cities
 	roads = []
-	region_geography = null
 	clear_pending_founding_tile()
 	trade_routes.clear()
 	trade_menu.close()
@@ -619,6 +623,12 @@ func follow_camera_with_neighbourhood() -> void:
 		return
 	requested_neighbourhood_origin = origin
 	request_neighbourhood(center)
+
+# Frozen ground refuses founding; only the continuous map knows the climate.
+func is_frozen_tile(tile_pos: Vector2i) -> bool:
+	if not is_inside_map(tile_pos.x, tile_pos.y) or neighbourhood_frozen.size() != region_map_size.x * region_map_size.y:
+		return false
+	return neighbourhood_frozen[tile_pos.y * region_map_size.x + tile_pos.x] != 0
 
 # Free settlers may not found towns on land a kingdom holds; null where none does.
 func get_kingdom_holding_tile(tile_pos: Vector2i) -> WorldMapData.Kingdom:
@@ -907,9 +917,7 @@ func generate_spur_roads(generator: RegionMapGenerator) -> Array[Array]:
 	return spurs
 
 func make_region_map_generator() -> RegionMapGenerator:
-	var generator: RegionMapGenerator = RegionMapGenerator.new(rng, region_map_size.x, region_map_size.y, MIN_CITY_DISTANCE, RIVER_NEAR_RANGE, CITY_RESOURCE_RANGE)
-	generator.geography = region_geography
-	return generator
+	return RegionMapGenerator.new(rng, region_map_size.x, region_map_size.y, MIN_CITY_DISTANCE, RIVER_NEAR_RANGE, CITY_RESOURCE_RANGE)
 
 # A site's town map: the regional land around it, magnified (LocalCityMapGenerator).
 func make_town_map(tile_pos: Vector2i, profile: SettlementSiteProfile) -> Array:
@@ -926,8 +934,6 @@ func analyze_site(tile_pos: Vector2i) -> SettlementSiteProfile:
 func get_site_climate(tile_pos: Vector2i) -> Dictionary:
 	if is_continuous_region_map():
 		return regional_terrain.climate_at(local_to_global_tile(tile_pos))
-	if region_geography != null:
-		return {"temperature": region_geography.mean_temperature, "moisture": region_geography.mean_moisture, "family": region_geography.climate_family, "tree_temperature": region_geography.mean_temperature}
 	return LocalCityMapGenerator.DEFAULT_CLIMATE.duplicate()
 
 func analyze_city_site_profiles():
@@ -981,11 +987,13 @@ func get_region_tile_at_position(mouse_pos: Vector2) -> Vector2i:
 func is_valid_founding_tile(tile_pos: Vector2i) -> bool:
 	if not FoundingSiteHelper.is_valid_founding_tile(tiles, cities, tile_pos, MIN_CITY_DISTANCE):
 		return false
-	return get_kingdom_holding_tile(tile_pos) == null
+	return not is_frozen_tile(tile_pos) and get_kingdom_holding_tile(tile_pos) == null
 
 func get_founding_tile_invalid_reason(tile_pos: Vector2i) -> String:
 	var reason: String = FoundingSiteHelper.get_founding_tile_invalid_reason(tiles, cities, tile_pos, MIN_CITY_DISTANCE)
 	if reason == FoundingSiteHelper.VALID_FOUNDING_SITE:
+		if is_frozen_tile(tile_pos):
+			return FoundingSiteHelper.REASON_FROZEN
 		var kingdom: WorldMapData.Kingdom = get_kingdom_holding_tile(tile_pos)
 		if kingdom != null:
 			return FoundingSiteHelper.kingdom_land_reason(kingdom.name)

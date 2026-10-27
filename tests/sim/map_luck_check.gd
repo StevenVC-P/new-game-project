@@ -73,7 +73,7 @@ func _play_continuous_map(world: WorldMapData) -> Array[Dictionary]:
 	var terrain: RegionalTerrain = RegionalTerrain.new(world)
 	var frontier: Array[WorldMapData.Region] = []
 	for region: WorldMapData.Region in world.regions:
-		if region.owner_kingdom_id == -1:
+		if region.owner_kingdom_id == -1 and not world.is_frozen_region(region):
 			frontier.append(region)
 	# Spread the picks across climates: sort by climate, then take evenly spaced regions.
 	frontier.sort_custom(func(a: WorldMapData.Region, b: WorldMapData.Region) -> bool: return a.climate + a.name < b.climate + b.name)
@@ -85,16 +85,12 @@ func _play_continuous_map(world: WorldMapData) -> Array[Dictionary]:
 		var origin: Vector2i = Vector2i(terrain.wrap_tile_x(focus.x - size.x / 2), clampi(focus.y - size.y / 2, 0, terrain.size_tiles.y - size.y))
 		var tiles: Array = terrain.extract_window(origin, size)
 		var cities: Array[City] = []
+		var town_tiles: PackedVector2Array = PackedVector2Array()
 		for pair: Array in terrain.settlements_in_window(origin, size):
 			cities.append(City.new((pair[0] as WorldMapData.Settlement).name, Vector2((pair[1] as Vector2i) - origin), City.ROLE_NEUTRAL))
-		var valid_sites: Array[Vector2i] = []
-		for y in range(size.y):
-			for x in range(size.x):
-				if not FoundingSiteHelper.is_valid_founding_tile(tiles, cities, Vector2i(x, y), MainScript.MIN_CITY_DISTANCE):
-					continue
-				var held_by: int = world.get_region(terrain.region_id_at_tile(Vector2i(terrain.wrap_tile_x(origin.x + x), origin.y + y))).owner_kingdom_id
-				if held_by == -1:
-					valid_sites.append(Vector2i(x, y))
+			town_tiles.append(Vector2((pair[1] as Vector2i) - origin))
+		# The game's own rules: the tile rules, no frozen ground, no kingdom land.
+		var valid_sites: Array[Vector2i] = MainScript.scan_founding_sites(tiles, town_tiles, terrain.region_ids_in_window(origin, size), terrain.frozen_in_window(origin, size), world, size)
 		_report("%s (%s): %d valid founding sites in the neighbourhood" % [region.name, region.climate, valid_sites.size()])
 		if valid_sites.is_empty():
 			continue

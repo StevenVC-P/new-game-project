@@ -70,7 +70,7 @@ func rebuild() -> void:
 	var climate: Dictionary = view.climate
 	shader_material.set_shader_parameter("site_temperature", float(climate.get("temperature", 0.55)))
 	shader_material.set_shader_parameter("site_moisture", float(climate.get("moisture", 0.6)))
-	var floor_color: Color = RegionMapStyle.forest_floor_color(float(climate.get("tree_temperature", 0.55)), str(climate.get("family", RegionGeography.CLIMATE_TEMPERATE)))
+	var floor_color: Color = RegionMapStyle.forest_floor_color(float(climate.get("tree_temperature", 0.55)), str(climate.get("family", RegionalTerrain.CLIMATE_TEMPERATE)))
 	shader_material.set_shader_parameter("forest_floor", Vector3(floor_color.r, floor_color.g, floor_color.b))
 	shader_material.set_shader_parameter("noise_offset", view.noise_offset)
 	queue_redraw()

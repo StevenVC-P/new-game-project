@@ -6,6 +6,7 @@ extends RegionLabelLayer
 # own towns in the neighbourhood are named by the view's RegionLabelLayer.
 
 const REGION_FONT_SIZE: int = 17
+const WATER_FONT_SIZE: int = 14
 # Below this zoom the map reads as a landscape of regions, so they are named.
 const REGION_LABEL_ZOOM: float = 0.9
 
@@ -40,7 +41,7 @@ func _draw() -> void:
 
 	if zoom < REGION_LABEL_ZOOM:
 		var fade: float = 1.0 - smoothstep(REGION_LABEL_ZOOM * 0.8, REGION_LABEL_ZOOM, zoom)
-		var color: Color = faded(RegionMapStyle.COLOR_LABEL_EDGE, fade)
+		var color: Color = faded(RegionMapStyle.COLOR_LABEL_REGION, fade)
 		for region: WorldMapData.Region in terrain.world.regions:
 			var center: Vector2 = terrain.world_to_tile(region.centroid) * tile_size
 			center.x += roundf((visible.get_center().x - center.x) / planet) * planet

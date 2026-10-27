@@ -143,9 +143,9 @@ func classify(local_map: Array, climate: Dictionary) -> String:
 			counts["trees"] += 1 if tile["has_trees"] else 0
 			counts["deposit"] += 1 if tile["resource"] != "none" else 0
 			counts["fertile"] += 1 if tile["is_fertile"] else 0
-	if climate["family"] == RegionGeography.CLIMATE_COLD:
+	if climate["family"] == RegionalTerrain.CLIMATE_COLD:
 		return "cold"
-	if climate["family"] == RegionGeography.CLIMATE_ARID:
+	if climate["family"] == RegionalTerrain.CLIMATE_ARID:
 		return "arid"
 	if counts["sea"] > 250:
 		return "coast"
