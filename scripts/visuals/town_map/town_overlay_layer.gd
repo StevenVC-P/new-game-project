@@ -5,10 +5,11 @@ extends TownMapLayer
 # (a ghost of it on a green or red footprint), hover and selection, the selected family's home
 # and work, who works each workplace (a badge in the family's color, or a red vacancy badge),
 # upkeep (a slim plate under each workplace), each house's family (a pennant in its color),
-# families walking between home and work and builders walking to their sites, how far each site
-# has come (a plate: materials, then work), the road being laid, woods marked for clearing, and
-# for the selected workplace the routes its goods and family travel (to the nearest store, from
-# home).
+# families walking their routes between home and work, carriers taking goods to the store, and
+# builders carrying materials to their sites, all along the routes that wear the paths; how far
+# each site has come (a plate: materials, then work), the road being laid, woods marked for
+# clearing, and for the selected workplace the routes its goods and family travel (to the
+# nearest store, from home).
 #
 # Badges and plates keep their size on screen so they stay readable when zoomed out; walkers
 # and pennants are part of the scene and scale with it.
@@ -24,6 +25,9 @@ const COLOR_CLEARING: Color = Color(0.95, 0.56, 0.22)
 # Routes shown for the selected workplace, kept until the selection or the layout changes.
 var route_key: Array = []
 var routes: Array = []
+# Walkers' paths in map units, by [kind, id], and the routes version they were made from.
+var walker_paths: Dictionary = {}
+var walker_paths_version: int = -1
 
 var ghost: TownFeatureLayer.Canvas = null
 
@@ -75,15 +79,92 @@ func draw_pennant(city: City, house: Building, index: int) -> void:
 	draw_colored_polygon(PackedVector2Array([top, top + Vector2(4.6, 1.3), top + Vector2(0.0, 2.8)]), color)
 
 func draw_walkers(city: City) -> void:
+	refresh_walker_paths(city)
 	for index in range(city.buildings.size()):
 		var workplace: Building = city.buildings[index]
 		if not workplace.is_production_building() or workplace.assigned_workers <= 0 or workplace.assigned_household_id < 0:
 			continue
-		var home: Vector2 = household_home(city, workplace.assigned_household_id, city.get_assigned_house_building_id(workplace))
-		var work: Vector2 = TownMapStyle.tile_rect(workplace.tile, workplace.size).get_center()
 		var color: Color = TownMapStyle.preference_color(city.get_household_preference_for_worker_modifier(workplace))
+		var key: int = workplace.assigned_household_id * 10 + index
+		# The family walks its route from home and back; one of it carries goods to the store and
+		# back along the store route, half a day out of step.
+		var commute: Dictionary = walker_path(city, "commute", workplace)
 		for walker_index in range(workplace.assigned_workers):
-			draw_walker(walker_position(home, work, walker_index, workplace.assigned_household_id * 10 + index), color)
+			draw_walker(position_on(commute, out_and_back(0.0), walker_index, key), color)
+		if TownLogistics.get_daily_units(city, workplace) > 0.0:
+			var haul: Dictionary = walker_path(city, "haul", workplace)
+			var phase: float = out_and_back(0.5)
+			draw_walker(position_on(haul, phase, 0, key + 5), color)
+			if phase_outbound(0.5):
+				draw_load(position_on(haul, phase, 0, key + 5))
+
+# Where along its route a walker is: out for the first half of the cycle, back for the second.
+func out_and_back(offset: float) -> float:
+	var cycle: float = fposmod(view.walker_time / maxf(view.walker_cycle_seconds, 0.01) + offset, 1.0)
+	return cycle * 2.0 if cycle < 0.5 else 1.0 - (cycle - 0.5) * 2.0
+
+func phase_outbound(offset: float) -> bool:
+	return fposmod(view.walker_time / maxf(view.walker_cycle_seconds, 0.01) + offset, 1.0) < 0.5
+
+# Routes in map units, kept until routes change. Walkers follow the routes the town's travel is
+# reckoned on (TownLogistics), so what the player sees walked is what wears the paths.
+func refresh_walker_paths(city: City) -> void:
+	if walker_paths_version != city.logistics.routes_version:
+		walker_paths_version = city.logistics.routes_version
+		walker_paths.clear()
+
+func walker_path(city: City, kind: String, building: Building) -> Dictionary:
+	var key: Array = [kind, building.id, building.assigned_household_id]
+	if walker_paths.has(key):
+		return walker_paths[key]
+	# Commutes run from home to work, store routes from work to the store.
+	var route: Array = city.logistics.get_commute(building)["route"] if kind == "commute" else city.logistics.get_store_route(building)["route"]
+	var path: Dictionary = make_path(route)
+	if path["points"].size() < 2:
+		# No town map or no route: a straight walk from home (or the camp) to work.
+		var work: Vector2 = TownMapStyle.tile_rect(building.tile, building.size).get_center()
+		var start: Vector2 = household_home(city, building.assigned_household_id, city.get_assigned_house_building_id(building)) if kind == "commute" else work
+		path = make_path_from_points(PackedVector2Array([start, work]))
+	walker_paths[key] = path
+	return path
+
+func make_path(route: Array) -> Dictionary:
+	var points: PackedVector2Array = PackedVector2Array()
+	for cell: Vector2i in route:
+		points.append(TownLogistics.cell_position(cell) * TownMapStyle.TILE)
+	return make_path_from_points(points)
+
+# A polyline with each point's distance from the start, for walking along it.
+func make_path_from_points(points: PackedVector2Array) -> Dictionary:
+	var lengths: PackedFloat32Array = PackedFloat32Array()
+	var total: float = 0.0
+	for i in range(points.size()):
+		if i > 0:
+			total += points[i].distance_to(points[i - 1])
+		lengths.append(total)
+	return {"points": points, "lengths": lengths, "total": total}
+
+# A point a share of the way along a path, walkers side by side across it.
+func position_on(path: Dictionary, share: float, walker_index: int, key: int) -> Vector2:
+	var points: PackedVector2Array = path["points"]
+	if points.is_empty():
+		return Vector2.ZERO
+	var lengths: PackedFloat32Array = path["lengths"]
+	var distance: float = clampf(share, 0.0, 1.0) * float(path["total"])
+	var i: int = 1
+	while i < points.size() - 1 and lengths[i] < distance:
+		i += 1
+	if points.size() == 1:
+		return points[0]
+	var span: float = maxf(lengths[i] - lengths[i - 1], 0.0001)
+	var position: Vector2 = points[i - 1].lerp(points[i], clampf((distance - lengths[i - 1]) / span, 0.0, 1.0))
+	var direction: Vector2 = points[i] - points[i - 1]
+	if direction.length() > 0.01:
+		var side: Vector2 = Vector2(-direction.normalized().y, direction.normalized().x)
+		var lane: float = (float(walker_index) - 0.5) * 1.6
+		var bob: float = sin(view.walker_time * 5.0 + float(key + walker_index)) * 0.3
+		position += side * (lane + bob)
+	return position
 
 # Home is the family's house, or its tent at the camp.
 func household_home(city: City, household_id: int, house_index: int) -> Vector2:
@@ -95,35 +176,44 @@ func household_home(city: City, household_id: int, house_index: int) -> Vector2:
 		return Vector2(view.map_size) * TownMapStyle.TILE * 0.5
 	return (Vector2(spots[posmod(household_id, spots.size())]) + Vector2(0.5, 0.5)) * TownMapStyle.TILE
 
-# Out to work for the first half of the cycle, home for the second, walking side by side.
-func walker_position(home: Vector2, work: Vector2, walker_index: int, key: int) -> Vector2:
-	var cycle: float = view.walker_time / maxf(view.walker_cycle_seconds, 0.01)
-	var travel: float = cycle * 2.0 if cycle < 0.5 else 1.0 - (cycle - 0.5) * 2.0
-	var position: Vector2 = home.lerp(work, travel)
-	var direction: Vector2 = work - home
-	if direction.length() > 0.1:
-		var side: Vector2 = Vector2(-direction.normalized().y, direction.normalized().x)
-		var lane: float = (float(walker_index) - 0.5) * 2.6
-		var bob: float = sin(view.walker_time * 5.0 + float(key + walker_index)) * 0.4
-		position += side * (lane + bob)
-	return position
-
 # A small figure seen from above: shadow, tunic in the family's color, head.
 func draw_walker(position: Vector2, tunic: Color) -> void:
 	RegionMapLayer.draw_blob(self, position + Vector2(0.9, 1.1), Vector2(1.5, 1.0), RegionMapStyle.COLOR_SHADOW, 8)
 	RegionMapLayer.draw_blob(self, position, Vector2(1.3, 1.5), tunic, 8)
 	draw_circle(position + Vector2(0.0, -1.3), 0.85, TownMapStyle.COLOR_SKIN)
 
-# Builders walk between home and the site they work today.
+# A load on a carrier's back: a sack of goods.
+func draw_load(position: Vector2) -> void:
+	RegionMapLayer.draw_blob(self, position + Vector2(1.1, 0.2), Vector2(0.9, 1.0), TownConstructionPainter.SACK, 8)
+
+# Builders carry materials from the store along the site's delivery route while a site waits
+# for them, then work on the site.
 func draw_builders(city: City) -> void:
 	for project: ConstructionProject in city.construction.projects:
 		var site: Vector2 = TownMapStyle.tile_rect(project.get_site_tile()).get_center()
+		var supplying: bool = project.get_stage() == ConstructionProject.STAGE_SUPPLYING and city.logistics.has_map()
+		var delivery: Dictionary = {}
+		if supplying:
+			var key: Array = ["site", project.id]
+			if not walker_paths.has(key):
+				var route: Array = city.logistics.get_site_store_route(project.get_site_tile())["route"]
+				walker_paths[key] = make_path(route)
+			delivery = walker_paths[key]
 		for i in range(project.crew_household_ids.size()):
 			var household: Household = city.get_household_by_id(project.crew_household_ids[i])
 			if household == null:
 				continue
 			var color: Color = TownMapStyle.preference_color(household.preference)
-			draw_walker(walker_position(household_home(city, household.id, household.residence_building_id), site, i, project.id * 7 + household.id), color)
+			if supplying and (delivery["points"] as PackedVector2Array).size() >= 2:
+				# Routes run from the site to the store: loaded on the way back.
+				var offset: float = float(i) * 0.3
+				var position: Vector2 = position_on(delivery, out_and_back(offset), i, project.id * 7 + household.id)
+				draw_walker(position, color)
+				if not phase_outbound(offset):
+					draw_load(position)
+			else:
+				var jitter: Vector2 = Vector2(sin(view.walker_time * 2.0 + float(i) * 2.1), cos(view.walker_time * 1.7 + float(i))) * TownMapStyle.TILE * 0.3
+				draw_walker(site + jitter + Vector2((float(i) - 1.0) * TownMapStyle.TILE * 0.4, 0.0), color)
 
 # --- Building sites ------------------------------------------------------------------------------
 
