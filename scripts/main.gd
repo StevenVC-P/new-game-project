@@ -1,5 +1,12 @@
 extends Node2D
 
+# The game menu (save, load, quit) is the app's (scripts/app.gd); this asks for it.
+signal menu_requested
+# Once a season, for the app's autosave.
+signal autosave_due
+# A saved game given in pending_save_state could not be restored.
+signal load_failed(message: String)
+
 const TILE_SIZE: int = 12
 const MAP_WIDTH: int = 80
 const MAP_HEIGHT: int = 50
@@ -98,6 +105,9 @@ var world_map_data: WorldMapData = null
 # use_authored_world for the hand-authored planet.
 var world_seed: int = -1
 var use_authored_world: bool = false
+# A saved game (GameState.capture) to restore once the world is built; set before _ready,
+# together with world_seed and use_authored_world from the save.
+var pending_save_state: Dictionary = {}
 # World region the current regional map was generated for; -1 before any region is entered.
 var entered_world_region_id: int = -1
 # What the world says about the entered region; steers the generator and the landscape's
@@ -150,6 +160,11 @@ func _ready():
 	_ensure_town_map_view()
 	# The game opens on the world atlas; the regional map is generated when a region is entered.
 	open_world_map()
+	if not pending_save_state.is_empty():
+		var error: String = GameState.restore(self, pending_save_state)
+		pending_save_state = {}
+		if error != "":
+			load_failed.emit.call_deferred(error)
 
 func _ensure_region_map_view() -> void:
 	if region_map_view != null:
@@ -326,6 +341,7 @@ func _ensure_world_map_view() -> void:
 	world_map_view.region_entry_requested.connect(on_world_region_entry_requested)
 	world_map_view.zoom_in_past_max.connect(on_world_zoom_in_past_max)
 	world_map_view.return_requested.connect(close_world_map)
+	world_map_view.menu_requested.connect(menu_requested.emit)
 	# Ready the regional terrain in the background, so zooming into the world never waits for it.
 	terrain_being_built = null
 	var world: WorldMapData = world_map_data
@@ -1089,6 +1105,8 @@ func try_handle_top_bar_click(mouse_pos: Vector2) -> bool:
 			try_return_to_region(mouse_pos)
 		elif action == "open_world_map":
 			open_world_map()
+		elif action == "open_menu":
+			menu_requested.emit()
 		else:
 			apply_time_control_action(action)
 		return true
@@ -1422,6 +1440,7 @@ func on_calendar_season_changed(calendar: Calendar):
 			city.advance_household_birth_rolls_season(calendar, city_index)
 
 	print("Season changed: ", calendar.get_current_season(), " - Year ", calendar.current_year)
+	autosave_due.emit()
 
 func apply_trade_routes():
 	for route: TradeRoute in trade_routes:
@@ -1640,6 +1659,7 @@ func draw_top_bar():
 	x = draw_top_bar_button(font, font_size, "1x", x, y, 42.0, {"action": "speed_1x"}, get_time_control_color("1x"))
 	x = draw_top_bar_button(font, font_size, "3x", x, y, 42.0, {"action": "speed_3x"}, get_time_control_color("3x"))
 	draw_top_bar_button(font, font_size, "10x", x, y, 48.0, {"action": "speed_10x"}, get_time_control_color("10x"))
+	draw_top_bar_button(font, font_size, "Menu", get_viewport_rect().size.x - 78.0, y, 66.0, {"action": "open_menu"}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
 
 func get_top_bar_title() -> String:
 	if current_view == VIEW_CITY:

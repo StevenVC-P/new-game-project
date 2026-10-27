@@ -48,6 +48,12 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # Household simulation benchmark (filter output for [BENCH]; takes several minutes)
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/benchmarks/household_sim_benchmark.gd
 
+# Saved games: a town saved, loaded, and played on stays identical to the original; menus; the save store
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/save_game_validation.gd
+
+# Start and in-game menu screenshots (needs a window; uses its own save folder)
+& (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/menu_capture.gd -- <output_dir>
+
 # World map: data checks, and the hand-off into the regional/founding flow
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/world_map_validation.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/world_map_flow_validation.gd
@@ -86,6 +92,7 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 
 ## Architecture
 
+- `scripts/app.gd` (`scenes/app.tscn`, the project's main scene) - start menu, in-game menu, saving and loading; it runs `scenes/main.tscn` as the game. Tests create `main.gd` directly. Saves: `scripts/persistence/` (`GameState` decides what is saved; domain fields are saved automatically, but new object-valued fields, caches, and new `main.gd` state need a line there). Design: `docs/SAVED_GAMES.md`.
 - `scripts/main.gd` - large central scene script: map input, drawing, UI, day ticking, trade. High-risk; avoid adding new simulation logic here. A click that switches views must call `get_viewport().set_input_as_handled()`, or the newly shown view receives the same click.
 - `scripts/domain/` - simulation model: `city.gd` (resources, households, buildings, growth, lifecycle orchestration), `household.gd` (family structure, lifecycle, labor), `building.gd`.
 - `scripts/simulation/` - `calendar.gd` and `simulation_clock.gd` (1 day = 1 real second at 1x).
