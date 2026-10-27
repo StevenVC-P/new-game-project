@@ -16,8 +16,8 @@ extends RefCounted
 #
 # Town tiles: "type" (ground, water, rough), "has_trees", "is_fertile", "occupied", and
 # "water_kind" (river, lake, sea, or ""), "resource" (none, stone, iron), "has_road", "is_hill"
-# (sloping land on the regional map's hills). Play adds "path_level" (TownLogistics) and
-# "saplings" (TownWoodland), and fells and regrows trees.
+# (sloping land on the regional map's hills). Play adds "path_level" (TownLogistics), and fells
+# and spreads trees (TownWoodland).
 
 const TOWN_TILES_PER_REGIONAL_TILE: int = 4
 # Bounded regional maps carry no climate; they read as the temperate valley they always were.

@@ -8,7 +8,7 @@ extends SceneTree
 #  4. The real game: a town founded through main.gd, grown, with a house selected.
 #  5. Building in the real game: sites at every stage, plots, a site's card, woods marked for
 #     clearing; then a town grown with families building their own homes on plots, the trails
-#     and paths its people wore, the woods its woodcutter cleared and, two years on, growing
+#     and paths its people wore, the woods its woodcutter cleared and, years on, spreading
 #     back; and a workplace selected with its routes to the store and from home.
 # Needs a real window and GPU, so run it without --headless:
 #   & (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/town_map_capture.gd -- <output_dir>
@@ -298,13 +298,6 @@ static func nearest_wooded(town: City, near: Vector2i) -> Vector2i:
 				best_distance = distance
 	return best
 
-static func count_saplings(town: City) -> int:
-	var count: int = 0
-	for row: Array in town.local_map:
-		for tile: Dictionary in row:
-			count += 1 if tile.get("saplings", false) == true else 0
-	return count
-
 static func count_path_levels(town: City) -> Array[int]:
 	var counts: Array[int] = [0, 0, 0]
 	for row: Array in town.local_map:
@@ -363,7 +356,7 @@ func capture_construction() -> void:
 	main.town_map_view.focus_on(TownMapStyle.tile_rect(woods).get_center(), 3.0)
 	await shot("build_woods_marked")
 	player.play(town, {"homes_on_plots": true}, 360)
-	print("[CAPTURE] woods felled in a year: %d, still marked %d, saplings %d" % [town.woodland.felled_count, town.woodland.marked.size(), count_saplings(town)])
+	print("[CAPTURE] woods felled in a year: %d, still marked %d, spread %d" % [town.woodland.felled_count, town.woodland.marked.size(), town.woodland.spread_count])
 	print("[CAPTURE] grown with plots: %d buildings, %d households, %d homes built by families, sites: %s" % [town.buildings.size(), town.households.size(), town.construction.completed_by_households, str(ConstructionDisplayHelper.get_sidebar_lines(town))])
 	var levels: Array[int] = count_path_levels(town)
 	print("[CAPTURE] worn ground after a year: %d trail tiles, %d path tiles" % [levels[TownLogistics.PATH_TRAIL], levels[TownLogistics.PATH_WORN]])
@@ -374,13 +367,20 @@ func capture_construction() -> void:
 	await shot("build_paths_near")
 	main.town_map_view.focus_on(TownMapStyle.tile_rect(woods).get_center(), 3.0)
 	await shot("build_woods_cleared")
-	# Left alone for two more years: saplings, then woods, creep back in from the edge.
+	# Two more years of the town, then twenty more years of the woods alone (no families: only
+	# the yearly spread), to see the edges creep.
 	for _day in range(720):
 		town.tick()
-	print("[CAPTURE] two years later: %d regrown, saplings %d" % [town.woodland.regrown_count, count_saplings(town)])
+	print("[CAPTURE] two years later: woods spread to %d tiles" % town.woodland.spread_count)
+	await shot("build_woods_two_years")
+	for year in range(20):
+		var rng: RandomNumberGenerator = town.woodland.make_spread_rng(100 + year)
+		town.woodland.spread_forest(func() -> float: return rng.randf())
+	town.woodland.land_version += 1
+	print("[CAPTURE] twenty more years of spreading: woods spread to %d tiles" % town.woodland.spread_count)
 	for _frame in range(4):
 		await process_frame
-	await shot("build_woods_regrowing")
+	await shot("build_woods_twenty_years")
 	var far: int = -1
 	for index in range(town.buildings.size()):
 		var building: Building = town.buildings[index]

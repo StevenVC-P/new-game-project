@@ -6,7 +6,9 @@ Snapshot for whoever picks the project up next. Update it when a milestone close
 
 ## Current Objective
 
-New focus: the gameplay loop inside towns. Second step, terrain and woodland (`feature/woodland-clearing`, from `develop`, owner request 2026-10-27): woods, hills, and rock slow travel and routes skirt them; the player marks woods (C) for woodcutters to clear; felled land grows back from the woods' edge over years unless paths in use hold it (`docs/TOWN_BUILDING_MODEL.md`, Terrain and Woodland).
+New focus: the gameplay loop inside towns. Third step, forest expansion (`feature/forest-expansion`, from `develop`, owner specification 2026-10-27): once a year woods spread onto open land beside them, by influence of woods within 3 steps, capped; it replaces the first growing-back model (`docs/TOWN_BUILDING_MODEL.md`, Woodland).
+
+Second step, terrain and woodland (`feature/woodland-clearing`, from `develop`, owner request 2026-10-27): woods, hills, and rock slow travel and routes skirt them; the player marks woods (C) for woodcutters to clear (`docs/TOWN_BUILDING_MODEL.md`, Terrain and Woodland).
 
 First step, paths (`feature/desire-paths`, from `develop`, owner request 2026-10-27): people move faster on paths and roads, but instead of the player building roads, trails and paths wear where families walk, and routes prefer the quickest ways (`docs/TOWN_BUILDING_MODEL.md`, Paths). The player's road tool is gone from the controls.
 
@@ -28,7 +30,7 @@ Before that: town building is settled before it is locked in (`docs/TOWN_BUILDIN
 
 ## Decisions Made (Don't Re-litigate Without The Owner)
 
-- **Woods can be cleared and grow back; paths in use hold the land (owner, 2026-10-27).** Travel is slowed by terrain and routes generally avoid woods and uneven ground. Numbers and judgment calls are open (`docs/TOWN_BUILDING_MODEL.md`, Woodland).
+- **Woods can be cleared and spread back; paths in use hold the land (owner, 2026-10-27).** Travel is slowed by terrain and routes generally avoid woods and uneven ground. Woods spread by the owner's forest expansion specification onto any open land nothing holds. Numbers (placeholders until calibrated) and judgment calls are open (`docs/TOWN_BUILDING_MODEL.md`, Woodland).
 - **Paths develop from walking; the player does not build roads (owner, 2026-10-27).** Routing prefers the quickest ways. Numbers and the judgment calls made implementing it are open (`docs/TOWN_BUILDING_MODEL.md`, Paths).
 
 - **Saved games (owner, 2026-10-27).** Named slots plus one autosave; a start menu (Continue, New world, Load game); autosave each in-game season and on quit.
@@ -80,7 +82,7 @@ In rough priority order; details in each doc's "Remaining Work" section.
 - **Headless tests:** the root window is 64x64; tests that click set `root.size` first. Streaming takes several seconds; wait on wall-clock time.
 - **New `class_name` scripts** are unknown until an import pass: run `scripts/validate_project.ps1` before running tests or captures.
 - **Balance tools print a long household log.** Write their output to a file and filter it (`> log`); piping it through a shell pipe on Windows stalls Godot at a few percent CPU.
-- **Town maps change in play.** Felled and regrown woods, saplings, and path levels are written onto `City.local_map`; anything that draws or caches from the town map must watch `TownWoodland.land_version` and `TownLogistics.paths_version` (the town view does). Town maps are saved whole, so this survives saving.
+- **Town maps change in play.** Felled and spread woods and path levels are written onto `City.local_map`; anything that draws or caches from the town map must watch `TownWoodland.land_version` and `TownLogistics.paths_version` (the town view does). Town maps are saved whole, so this survives saving.
 - **Path levels change routes.** A tile's `path_level` changing is a layout change (`TownLogistics.advance_day`); anything that caches routes must key on `layout_version`. Wear is saved with the town (`TownLogistics.wear`), levels on the town map's tiles.
 - **Buildings are never placed finished in play.** Everything goes through `TownConstruction`; `City.add_building` is the completion step (tests may still call it directly). City's helpers (`logistics`, `construction`) hold the city weakly, or towns leak.
 - **Git:** this repo's `.git` belongs to another Windows account; run git as `git -c safe.directory=D:/AI/projects/incubating/games/new-game-godot ...`.
