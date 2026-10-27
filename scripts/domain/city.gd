@@ -880,12 +880,15 @@ func log_household_lifecycle_event(city_index: int, household_id: int, event_nam
 		line += " " + detail
 	print(line)
 
-# Adds a finished building. A house built for a family (household) is theirs: they move in before
-# other families without a home are housed.
+# Adds a finished building. One built for a family (household) is theirs: they move into a house
+# before other families without a home are housed, and take on a workplace before it is offered
+# to anyone else.
 func add_building(building: Building, household: Household = null):
 	building.id = buildings.size()
 	buildings.append(building)
 	logistics.mark_layout_changed()
+	if building.is_production_building() and household != null:
+		building.assign_household(household, Building.ASSIGNMENT_AUTO)
 	if building.is_house():
 		if household != null:
 			household.move_to_house(building.id)
@@ -1598,6 +1601,9 @@ func find_auto_assignment_household(building: Building) -> Household:
 	for household: Household in get_available_households():
 		var available_workers: int = household.get_available_workers()
 		if available_workers <= 0:
+			continue
+		# A family building a workplace of its own is not free for other vacancies.
+		if construction.is_promised_to_workplace(household.id):
 			continue
 
 		var score: int = get_auto_assignment_score(household, building)

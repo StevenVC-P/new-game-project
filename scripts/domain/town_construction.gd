@@ -98,6 +98,8 @@ func request_building(building_type: String, origin: Vector2i, requested_by: Str
 	project.tile = origin
 	project.size = get_size(building_type)
 	project.claimant_household_id = claimant_household_id
+	if claimant_household_id < 0 and not project.is_home():
+		project.claimant_household_id = find_family_for_workplace(project)
 	project.materials_needed = EconomyBalance.get_build_cost(building_type)
 	project.work_required = EconomyBalance.get_build_work_days(building_type)
 	var plot: Variant = get_open_plot_at(origin) if project.is_home() else null
@@ -299,16 +301,41 @@ func get_home_project_for(household_id: int) -> ConstructionProject:
 			return project
 	return null
 
-# Every new home is meant for a family: one the player planned goes to the first family still in
-# a tent or out in the open, else to a family in a hut (for a proper house). That family can give
-# its spare time to it while working a holding.
-func assign_home_claimants() -> void:
+# Everything new is built for a family. A home the player planned goes to the first family still
+# in a tent or out in the open, else to a family in a hut (for a proper house); that family works
+# on it first, in spare time if it holds a job. A new workplace goes to the free family best suited
+# to it, which builds it as its own, is not taken for other vacancies meanwhile, and works it when
+# it is done: a farm is a family's farmstead (docs/IMPLEMENTATION_ROADMAP.md, One Holding Per Family).
+func assign_claimants() -> void:
 	for project: ConstructionProject in projects:
-		if not project.is_home() or project.kind != ConstructionProject.KIND_BUILDING:
+		if project.kind != ConstructionProject.KIND_BUILDING:
 			continue
-		if project.claimant_household_id >= 0 and city.get_household_by_id(project.claimant_household_id) != null:
+		var claimant: Household = city.get_household_by_id(project.claimant_household_id)
+		if project.is_home():
+			if claimant == null:
+				project.claimant_household_id = find_family_needing_home(project)
+		elif claimant == null or claimant.assigned_workers > 0:
+			project.claimant_household_id = find_family_for_workplace(project)
+
+# The household id a workplace site is being built for (it will work it), or -1.
+func is_promised_to_workplace(household_id: int) -> bool:
+	for project: ConstructionProject in projects:
+		if project.claimant_household_id == household_id and project.kind == ConstructionProject.KIND_BUILDING and not project.is_home():
+			return true
+	return false
+
+func find_family_for_workplace(project: ConstructionProject) -> int:
+	var best: Household = null
+	var best_score: int = -9999
+	var probe: Building = Building.new(-1, project.building_type, project.tile, project.size)
+	for household: Household in city.households:
+		if household.labor_capacity <= 0 or household.assigned_workers > 0 or is_promised_to_workplace(household.id):
 			continue
-		project.claimant_household_id = find_family_needing_home(project)
+		var score: int = city.get_auto_assignment_score(household, probe)
+		if best == null or score > best_score:
+			best = household
+			best_score = score
+	return best.id if best != null else -1
 
 func find_family_needing_home(project: ConstructionProject) -> int:
 	var in_hut: int = -1
@@ -375,7 +402,7 @@ func advance_day() -> void:
 	if projects.is_empty():
 		return
 	logistics().ensure_ready()
-	assign_home_claimants()
+	assign_claimants()
 	for project: ConstructionProject in projects:
 		project.crew_household_ids.clear()
 		project.blocked_reason = ""
@@ -528,7 +555,9 @@ func complete(project: ConstructionProject) -> void:
 				plots.erase(plot)
 			var building: Building = Building.new(-1, project.building_type, project.tile, project.size)
 			var claimant: Household = city.get_household_by_id(project.claimant_household_id)
-			if claimant != null and not wants_to_move_in(claimant, building):
+			if claimant != null and building.is_house() and not wants_to_move_in(claimant, building):
+				claimant = null
+			if claimant != null and building.is_production_building() and claimant.assigned_workers > 0:
 				claimant = null
 			city.add_building(building, claimant)
 	if project.requested_by == ConstructionProject.REQUESTED_BY_HOUSEHOLD:

@@ -20,7 +20,7 @@ static func get_funder_text(project: ConstructionProject) -> String:
 
 static func get_project_title(city: City, project: ConstructionProject) -> String:
 	var title: String = TownConstruction.get_display_name(project)
-	if project.claimant_household_id >= 0 and project.is_home():
+	if project.claimant_household_id >= 0 and project.kind == ConstructionProject.KIND_BUILDING:
 		title += " for " + city.get_household_label(project.claimant_household_id)
 	return title
 

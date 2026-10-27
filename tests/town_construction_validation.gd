@@ -16,6 +16,7 @@ func run_all() -> void:
 	test_request_reserves_land_and_takes_time()
 	test_site_waits_for_materials()
 	test_more_builders_build_faster()
+	test_workplaces_are_built_for_a_family()
 	test_tier0_never_stalls()
 	test_upgrade_in_place_keeps_working()
 	test_travel_costs_output()
@@ -129,6 +130,19 @@ func test_tier0_never_stalls() -> void:
 	_check(run_until_built(city, house, 240) > 0, "a family builds its own house in spare time")
 	_check(run_until_built(city, workshop, 240) > 0, "even a tier 1 workplace goes up in spare time: nothing stalls for want of hands")
 	_check(city.buildings.size() == EconomyBalance.FOUNDING_FAMILIES + 3, "everything planned should stand")
+
+func test_workplaces_are_built_for_a_family() -> void:
+	var city: City = make_city()
+	for index in range(EconomyBalance.FOUNDING_FAMILIES - 1):
+		city.add_building(Building.new(-1, "forager_garden", Vector2i(2 + index * 3, 2), Vector2i(3, 3)))
+	var free: Household = city.get_available_households()[0]
+	var workshop: ConstructionProject = city.construction.request_building("toolmaker", Vector2i(30, 14))
+	_check(workshop.claimant_household_id == free.id, "a new workplace is built for the free family that will work it")
+	city.add_building(Building.new(-1, "gatherer_camp", Vector2i(52, 20), Vector2i(2, 2)))
+	_check(city.buildings[-1].assigned_workers == 0, "a family building its own workplace is not taken for another vacancy")
+	_check(run_until_built(city, workshop, 120) > 0, "the workplace should get built")
+	var toolmaker: Building = city.buildings[city.buildings.size() - 1]
+	_check(toolmaker.type == "toolmaker" and toolmaker.assigned_household_id == free.id, "the family that built it works it")
 
 func test_upgrade_in_place_keeps_working() -> void:
 	var city: City = make_city()
