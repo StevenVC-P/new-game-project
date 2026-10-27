@@ -148,6 +148,8 @@ func fell_woods() -> bool:
 		var work: float = city.get_work_time_factor(building)
 		if building.is_tier0():
 			work *= EconomyBalance.TIER0_OUTPUT_FRACTION
+		if city.get_season_index() == 3:
+			work *= EconomyBalance.WINTER_FELLING_FACTOR
 		var target: Vector2i = nearest_marked(building) if not marked.is_empty() else Vector2i(-1, -1)
 		var progress: Dictionary = marked
 		if target.x < 0:

@@ -16,7 +16,9 @@ extends RefCounted
 # Families that found a new town. With one holding per family, this is also the number of
 # jobs a new town can fill (two farms, wood, and tools use four).
 const FOUNDING_FAMILIES: int = 6
-const STARTING_FOOD: int = 60
+# The founders' stores carry them through their first lean spring (about 25 days of food for
+# the founding families; was 60, about 5 days, before the farming year had seasons).
+const STARTING_FOOD: int = 300
 const STARTING_WOOD: int = 45
 const STARTING_TOOLS: int = 14
 
@@ -25,6 +27,15 @@ const STARTING_TOOLS: int = 14
 # per-worker values: a family's total output is unchanged). A family with one working adult
 # produces half; older children add the periodic family-support bonus on top.
 const FARM_FOOD_PER_DAY: float = 4.0
+# The farming year (docs/FIRST_STAGE_LOOP.md, decision 1): a field's daily food by season,
+# spring, summer, autumn, winter, as a share of FARM_FOOD_PER_DAY. It averages 1, so a year's
+# harvest is unchanged, but most of it comes in summer and autumn and winter lives on stores.
+# Tried and measured (docs/FIRST_STAGE_LOOP.md, Milestone Log): 0.4/1.0/2.2/0.4 starved towns
+# founded in spring (map luck 32/48); 0.7/1.0/1.6/0.7 with founding stores of 300 still lost 3 of 20
+# sensible openings; 0.8/1.0/1.4/0.8 keeps the year's shape and the towns.
+const FARM_SEASON_YIELD: Array[float] = [0.8, 1.0, 1.4, 0.8]
+# Felling is winter work: woodcutters fell twice as fast in winter, marked woods or not.
+const WINTER_FELLING_FACTOR: float = 2.0
 const WOODCUTTER_WOOD_PER_DAY: float = 6.0
 const TOOLMAKER_TOOLS_PER_DAY: float = 1.0
 # Wood the toolmaker consumes for each tool it makes.
@@ -61,8 +72,10 @@ const ROUGH_HOUSING_GRACE_MONTHS: int = 6
 const PEOPLE_FED_PER_FOOD: int = 2
 
 # --- Upkeep: every interval a workplace consumes tools, or loses condition without them ---
-# New buildings need no tools for this long. 60 days gives about 3 minutes at 1x to get a
-# toolmaker running (owner decision 2026-10-20; measured in docs/IMPLEMENTATION_ROADMAP.md).
+# Each new or newly upgraded workplace needs no tools for this long. 60 days gives about 3
+# minutes at 1x to get a toolmaker running (owner decision 2026-10-20). Counted per building
+# since 2026-10-27 (docs/FIRST_STAGE_LOOP.md, decision 2): a town-wide grace from founding left
+# workplaces built later with little or none, and towns fell off the tool cliff at random.
 const MAINTENANCE_GRACE_DAYS: int = 60
 const MAINTENANCE_TOOL_COST: int = 1
 const MAINTENANCE_INTERVAL_DAYS: Dictionary = {

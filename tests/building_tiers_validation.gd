@@ -51,7 +51,6 @@ func test_tier0_produces_a_third_of_tier1() -> void:
 func test_tier0_needs_no_tool_upkeep() -> void:
 	var city = _city()
 	city.resources["tools"] = 0
-	city.resources["maintenance_grace_ticks"] = 0
 	var camp: Building = _workplace(city, "gatherer_camp", _household(city, 1, ["forest"]))
 	for day in range(200):
 		city.tick()
@@ -61,7 +60,6 @@ func test_town_with_no_wood_or_tools_can_restart() -> void:
 	var city = _city()
 	city.resources["wood"] = 0
 	city.resources["tools"] = 0
-	city.resources["maintenance_grace_ticks"] = 0
 	_workplace(city, "gatherer_camp", _household(city, 1, ["forest"]))
 	_workplace(city, "tool_mender", _household(city, 2, ["forge_bench"]))
 	for day in range(60):
@@ -125,7 +123,6 @@ func _output_over(building_type: String, resource: String, days: int) -> int:
 	var city = _city()
 	var family: Household = _household(city, 1, ["hearth"])
 	var building: Building = _workplace(city, building_type, family)
-	city.resources["maintenance_grace_ticks"] = days + 1
 	var before: int = int(city.resources[resource])
 	for day in range(days):
 		city.resources["production_tick_count"] = day

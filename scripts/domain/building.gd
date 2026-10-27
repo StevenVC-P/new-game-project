@@ -40,6 +40,8 @@ var succession_source_household_id: int = -1
 # it is not a succession vacancy (for example a player hold, which is never auto-filled).
 var succession_vacancy_months: int = -1
 var maintenance_timer: int = 0
+# Days a new or newly upgraded workplace runs before it needs tools (EconomyBalance).
+var upkeep_grace_days: int = EconomyBalanceScript.MAINTENANCE_GRACE_DAYS
 var maintenance_level: int = 100
 var receives_maintenance: bool = true
 # Fractional output carried between days when values modify output; starts at 0.5 so it rounds.
