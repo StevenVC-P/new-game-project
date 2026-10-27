@@ -19,8 +19,9 @@ extends RefCounted
 #
 # The trips wear the cells they cross. Wear builds up where people walk and fades where they
 # stop; enough of it makes a trail, then a path, which are quicker to walk, so routes bend toward
-# them and wear them further (desire paths). Walking through someone's field tramples its crops;
-# a fenced field is walked around.
+# them and wear them further (desire paths). Nobody walks through a building, a building site, or
+# the stockpile, only along the strips between them; walking through someone's field tramples its
+# crops, and a fenced field is walked around.
 # Design: docs/TOWN_BUILDING_MODEL.md. A town without a town map (balance tools) has no travel.
 
 const STOCKPILE_SIZE: Vector2i = Vector2i(2, 2)
@@ -63,7 +64,8 @@ var cell_inside: PackedInt32Array = PackedInt32Array()
 var tile_base: PackedFloat32Array = PackedFloat32Array()
 var tile_margin: PackedFloat32Array = PackedFloat32Array()
 var tile_open: PackedByteArray = PackedByteArray()
-var fenced_cells: Dictionary = {}
+# Cells closed to every route that does not start or end in their footprint, by footprint owner.
+var closed_cells: Dictionary = {}
 # Travel figures for the current routes: building id -> store route, [building id, household
 # id] -> walk to work. Cleared when routes change.
 var cache_version: int = -1
@@ -355,8 +357,8 @@ func compute_cell(cx: int, cy: int) -> void:
 
 # Grid weights are efforts divided by the cheapest effort (a road), so no cell weighs less than a
 # step: the grid's distance estimate then never overshoots, and A* finds the cheapest route
-# rather than one that merely looks direct. Fenced fields are closed (solid); find_route opens
-# the one a route starts or ends in.
+# rather than one that merely looks direct. Buildings, sites, the stockpile, and fenced fields are
+# closed (solid); find_route opens the ones a route starts or ends in.
 func ensure_grid() -> void:
 	if grid_version == layout_version and grid != null:
 		return
@@ -373,11 +375,8 @@ func ensure_grid() -> void:
 	grid.update()
 	cell_effort.resize(size.x * size.y)
 	cell_inside.resize(size.x * size.y)
-	fenced_cells.clear()
-	var fenced: Dictionary = {}
-	for building: Building in city.buildings:
-		if building.fenced:
-			fenced[building.id] = true
+	closed_cells.clear()
+	var closed: Dictionary = get_closed_owners()
 	var cheapest: float = cheapest_effort()
 	for y in range(size.y):
 		for x in range(size.x):
@@ -388,12 +387,30 @@ func ensure_grid() -> void:
 				grid.set_point_solid(Vector2i(x, y), true)
 				continue
 			grid.set_point_weight_scale(Vector2i(x, y), effort / cheapest)
-			if fenced.has(cell_inside[index]):
+			if closed.has(cell_inside[index]):
 				var owner: int = cell_inside[index]
 				grid.set_point_solid(Vector2i(x, y), true)
-				if not fenced_cells.has(owner):
-					fenced_cells[owner] = []
-				(fenced_cells[owner] as Array).append(Vector2i(x, y))
+				if not closed_cells.has(owner):
+					closed_cells[owner] = []
+				(closed_cells[owner] as Array).append(Vector2i(x, y))
+
+# Footprints people do not walk through (owner, 2026-10-27): every building but an unfenced field
+# (a field can be crossed, at a cost to its harvest), every building site (a home rising on a
+# plot too), and the stockpile. Open plots stay open.
+func get_closed_owners() -> Dictionary:
+	var closed: Dictionary = {}
+	for building: Building in city.buildings:
+		if building.fenced or not is_field(building):
+			closed[building.id] = true
+	for project: ConstructionProject in city.construction.projects:
+		if project.kind == ConstructionProject.KIND_BUILDING and project.plot_id < 0:
+			closed[OWNER_PROJECT + project.id] = true
+	for plot: Dictionary in city.construction.plots:
+		if int(plot["project_id"]) >= 0:
+			closed[OWNER_PLOT + int(plot["id"])] = true
+	if stockpile_tile.x >= 0:
+		closed[OWNER_STOCKPILE] = true
+	return closed
 
 # A path level changed: the cell's weight follows, without rebuilding the grid.
 func refresh_cell(cell: Vector2i) -> void:
@@ -411,8 +428,8 @@ func get_cell_effort(cell: Vector2i) -> float:
 # --- Routes ------------------------------------------------------------------------------------
 
 # The cells of the easiest route between two tiles' middles, both included; empty when none
-# exists. A fenced field the route starts or ends in is open to it: its own family, and builders
-# working on it, go in by the gate.
+# exists. A closed footprint (a building, a site, a fenced field) the route starts or ends in is
+# open to it: the family goes in at its own door or gate, and builders onto their own site.
 func find_route(from: Vector2i, to: Vector2i) -> Array[Vector2i]:
 	var route: Array[Vector2i] = []
 	if not has_map():
@@ -425,16 +442,16 @@ func find_route(from: Vector2i, to: Vector2i) -> Array[Vector2i]:
 	var opened: Array = []
 	for tile: Vector2i in [from, to]:
 		var owner: int = owner_of(tile)
-		if fenced_cells.has(owner) and not opened.has(owner):
+		if closed_cells.has(owner) and not opened.has(owner):
 			opened.append(owner)
 	for owner: int in opened:
-		for cell: Vector2i in fenced_cells[owner]:
+		for cell: Vector2i in closed_cells[owner]:
 			grid.set_point_solid(cell, false)
 	if not grid.is_point_solid(start) and not grid.is_point_solid(goal):
 		for cell: Vector2i in grid.get_id_path(start, goal):
 			route.append(cell)
 	for owner: int in opened:
-		for cell: Vector2i in fenced_cells[owner]:
+		for cell: Vector2i in closed_cells[owner]:
 			grid.set_point_solid(cell, true)
 	return route
 

@@ -33,6 +33,7 @@ Before that: town building is settled before it is locked in (`docs/TOWN_BUILDIN
 ## Decisions Made (Don't Re-litigate Without The Owner)
 
 - **Woods can be cleared and spread back; paths in use hold the land (owner, 2026-10-27).** Travel is slowed by terrain and routes generally avoid woods and uneven ground. Woods spread by the owner's forest expansion specification onto any open land nothing holds. Numbers (placeholders until calibrated) and judgment calls are open (`docs/TOWN_BUILDING_MODEL.md`, Woodland).
+- **Nobody walks through buildings, sites, or the stockpile (owner, 2026-10-27).** Only their own routes go in; unfenced fields stay crossable.
 - **Routes run on the lines between tiles; fields can be trampled and fenced; the road tool stays (owner, 2026-10-27).** A road influences where people walk but does not decide it.
 - **Paths develop from walking (owner, 2026-10-27).** Routing prefers the quickest ways. Numbers and the judgment calls made implementing it are open (`docs/TOWN_BUILDING_MODEL.md`, Paths).
 

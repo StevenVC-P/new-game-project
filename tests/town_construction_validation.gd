@@ -29,6 +29,7 @@ func run_all() -> void:
 	test_routes_slip_between_fields()
 	test_crossing_a_field_tramples_it()
 	test_fences_keep_people_out()
+	test_nobody_walks_through_buildings()
 	test_paths_form_between_yards()
 	test_paths_in_woods_stay_trails()
 	test_cancel_returns_materials()
@@ -366,6 +367,29 @@ func test_fences_keep_people_out() -> void:
 	var middle: Vector2i = TownLogistics.center_tile(field.tile, field.size)
 	_check(not city.logistics.find_route(middle, Vector2i(30, 30)).is_empty(), "its own family still gets in and out by the gate")
 	_check(city.logistics.get_travel(field)["reachable"] == true, "and still carries its harvest to the store")
+
+# Buildings, sites, and the stockpile are walked around (along the strips between them); a
+# building's own family still goes in at its door.
+func test_nobody_walks_through_buildings() -> void:
+	var city: City = make_city()
+	city.logistics.ensure_ready()
+	city.add_building(Building.new(-1, "house", Vector2i(30, 10), Vector2i(2, 2)))
+	var house: Building = city.buildings[0]
+	var site: ConstructionProject = city.construction.request_building("house", Vector2i(40, 10))
+	var owners: Array[int] = [house.id, TownLogistics.OWNER_PROJECT + site.id, TownLogistics.OWNER_STOCKPILE]
+	var crossings: Array = [[Vector2i(29, 11), Vector2i(32, 10)], [Vector2i(39, 11), Vector2i(42, 10)]]
+	var store: Vector2i = city.logistics.stockpile_tile
+	crossings.append([store + Vector2i(-1, 0), store + Vector2i(2, 1)])
+	for crossing: Array in crossings:
+		var route: Array[Vector2i] = city.logistics.find_route(crossing[0], crossing[1])
+		var inside: Array[Vector2i] = []
+		for cell: Vector2i in route:
+			if owners.has(city.logistics.cell_inside_owner(cell)):
+				inside.append(cell)
+		_check(not route.is_empty() and inside.is_empty(), "a route from %s to %s should go round, not through: %s" % [str(crossing[0]), str(crossing[1]), str(inside)])
+	var door: Array[Vector2i] = city.logistics.find_route(TownLogistics.center_tile(house.tile, house.size), Vector2i(30, 20))
+	_check(not door.is_empty(), "a family still leaves its own house")
+	_check(not city.logistics.find_route(Vector2i(30, 20), store).is_empty(), "goods still reach the stockpile")
 
 # The strips between yards are open ground, so a compact town wears paths between its houses.
 func test_paths_form_between_yards() -> void:

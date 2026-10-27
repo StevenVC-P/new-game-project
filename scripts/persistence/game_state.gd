@@ -15,7 +15,7 @@ extends RefCounted
 const FORMAT: int = 1
 
 # Travel caches are rebuilt from the layout on first use.
-const LOGISTICS_SKIP: Array[String] = ["grid", "grid_version", "cell_effort", "cell_inside", "tile_owner", "tile_base", "tile_margin", "tile_open", "fenced_cells", "cache_version", "store_cache", "commute_cache", "site_cache"]
+const LOGISTICS_SKIP: Array[String] = ["grid", "grid_version", "cell_effort", "cell_inside", "tile_owner", "tile_base", "tile_margin", "tile_open", "closed_cells", "cache_version", "store_cache", "commute_cache", "site_cache"]
 # Fixed tables, not state.
 const CALENDAR_SKIP: Array[String] = ["month_names", "season_names"]
 const CLOCK_SKIP: Array[String] = ["speed_options"]
