@@ -23,6 +23,8 @@ func run() -> void:
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	DisplayServer.window_set_size(WINDOW_SIZE)
 	var main: Node2D = (load("res://scenes/main.tscn") as PackedScene).instantiate()
+	# Looks up places by name, so it plays on the hand-authored planet.
+	main.use_authored_world = true
 	root.add_child(main)
 	await settle(main)
 

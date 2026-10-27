@@ -189,9 +189,10 @@ void fragment() {
 	lining_line *= (1.0 - smoothstep(0.03, 0.1, depth)) * (1.0 - smoothstep(0.12, 0.3, lining_width)) * step(0.004, depth);
 	water_col = mix(water_col, water_col * 0.82, lining_line * 0.5);
 
-	// Pack ice toward the poles.
+	// Pack ice only close to the poles: the map stretches high latitudes, so a wide ice
+	// band reads as a far larger cap than it is.
 	float ice_noise = fbm(wp + vec2(17.0, 431.0), 60.0, 4);
-	float ice = smoothstep(75.0, 83.0, latitude) + 1.0 - smoothstep(-75.0, -64.0, latitude);
+	float ice = smoothstep(77.0, 84.0, latitude) + 1.0 - smoothstep(-80.0, -72.0, latitude);
 	ice = smoothstep(0.45, 0.6, ice + (ice_noise - 0.5) * 0.6);
 	water_col = mix(water_col, vec3(0.84, 0.89, 0.92), ice * 0.9);
 

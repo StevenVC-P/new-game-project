@@ -29,7 +29,7 @@ float vnoise(vec2 p, float period) {
 
 float temperature(float latitude, float land_elevation) {
 	// Same formula as WorldFieldBuilder.temperature().
-	float southern_cold = smoothstep(55.0, 72.0, -latitude) * 0.25;
+	float southern_cold = smoothstep(60.0, 80.0, -latitude) * 0.12;
 	return clamp(1.0 - pow(abs(latitude) / 90.0, 1.45) * 1.02 - land_elevation * 0.4 - southern_cold, 0.0, 1.0);
 }
 

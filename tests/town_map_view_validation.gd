@@ -18,6 +18,8 @@ func run_all() -> void:
 	# Headless runs report a 64x64 window; give the panels their normal layout.
 	root.size = Vector2i(1600, 900)
 	var main: Node2D = MainScript.new()
+	# Looks up places by name, so it plays on the hand-authored planet.
+	main.use_authored_world = true
 	root.add_child(main)
 	await _settle()
 	await _found_town(main)
