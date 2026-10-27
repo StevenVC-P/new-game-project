@@ -380,6 +380,9 @@ func test_paths_form_between_yards() -> void:
 	for cell: Vector2i in city.logistics.cell_levels.keys():
 		between += 1 if cell.x == 64 and cell.y >= 60 and cell.y <= 64 else 0
 	_check(between >= 3, "a path should wear along the line between two yards, got %d cells" % between)
+	var strip: Vector2i = Vector2i(64, 62)
+	_check(city.logistics.is_cell_between_buildings(strip) and city.logistics.get_cell_path_level(strip) == TownLogistics.PATH_TRAIL, "the strip between two yards is walked but stays a trail")
+	_check(not city.logistics.is_cell_between_buildings(Vector2i(64, 58)), "a line between a yard and open land is open land")
 
 # Woods wear slowly, never past a trail, and keep their trees.
 func test_paths_in_woods_stay_trails() -> void:

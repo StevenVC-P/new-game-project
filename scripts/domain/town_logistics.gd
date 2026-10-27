@@ -255,6 +255,20 @@ func is_cell_in_woods(cell: Vector2i) -> bool:
 			return false
 	return true
 
+# A line or corner with built land on every side: a strip between buildings. People walk it,
+# but it stays a trail (owner, 2026-10-27); a line between a building and open land is open land.
+func is_cell_between_buildings(cell: Vector2i) -> bool:
+	if is_tile_cell(cell):
+		return false
+	ensure_grid()
+	var tiles: Array[Vector2i] = cell_tiles(cell)
+	if tiles.size() < 2:
+		return false
+	for tile: Vector2i in tiles:
+		if owner_of(tile) == OWNER_NONE:
+			return false
+	return true
+
 # Kept per tile so a full rebuild reads each tile once: who occupies it.
 func build_tile_owners() -> void:
 	var size: Vector2i = map_size()
@@ -630,7 +644,7 @@ func update_path_levels() -> Array[Vector2i]:
 		var amount: float = float(cell_wear[cell]) if is_cell_wearable(cell) else 0.0
 		var current: int = get_cell_path_level(cell)
 		var level: int = get_path_level_for(amount, current)
-		if is_cell_in_woods(cell):
+		if is_cell_in_woods(cell) or is_cell_between_buildings(cell):
 			level = mini(level, PATH_TRAIL)
 		if level != current:
 			set_cell_path_level(cell, level)
