@@ -6,6 +6,8 @@ Snapshot for whoever picks the project up next. Update it when a milestone close
 
 ## Current Objective
 
+**Current objective: `docs/FIRST_STAGE_LOOP.md`**, approved by the owner on 2026-10-27 with amendments: six milestones from the balance foundation to village completion, worked without per-feature approval within that vision; milestone summaries, measurements, and screenshots after each, owner playtests after milestones 2 and 6. Starting milestone 1 (balance foundation). Homes now stand on a single tile (owner, 2026-10-27).
+
 New focus: the gameplay loop inside towns. Sixth step (`feature/yard-fences-and-errands`, 2026-10-27): fences for any building with an open yard, and families' errands (store, water, firewood, kin) wearing paths. Next: homes 1x1 (owner, 2026-10-27), then the first-stage loop the owner approved in outline: site-driven opportunities and hazards, a seasonal rhythm, family ambitions (M4), defense (M5), the first neighbour (M6), and a chronicle (M8). Owner red lines stand; formulas may be changed to fix balance.
 
 Fifth step, owner answers on woods (`feature/woodcutters-and-seasons`, from `develop`, 2026-10-27): woodcutters of any tier, and with nothing marked they slowly cut the nearest trees; land is tilled into farmland as a second step (F); woods past the map's edge count toward spreading; the year's spread is chosen in spring and grows in one tile at a time through autumn.
