@@ -8,9 +8,9 @@ Snapshot for whoever picks the project up next. Update it when a milestone close
 
 Owner answers on three open decisions (2026-10-27), on `chore/remove-world-window-and-frozen-founding` from `develop`: the unused world-window code is removed; frozen ground refuses founding; balance waits for the next design pass.
 
-Saved games (`feature/saved-games`, from `develop`, owner request 2026-10-27): a start menu, an in-game menu, named saves, and an autosave each season and on quit (`docs/SAVED_GAMES.md`). Merged into `develop`; `main` waits for the owner's look.
+Saved games (`feature/saved-games`, from `develop`, owner request 2026-10-27): a start menu, an in-game menu, named saves, and an autosave each season and on quit (`docs/SAVED_GAMES.md`). Merged into `develop` and, on the owner's approval, into `main` (2026-10-27).
 
-Before that, generated worlds (`feature/procedural-world`, from `develop`): every game now opens on a newly generated, continent-styled planet with a small polar ice cap (owner request, 2026-10-26). Merged into `develop`; `main` waits for the owner's look. Then the main track resumes.
+Before that, generated worlds (`feature/procedural-world`, from `develop`): every game now opens on a newly generated, continent-styled planet with a small polar ice cap (owner request, 2026-10-26). Merged into `develop` and, on the owner's approval, into `main` (2026-10-27). Then the main track resumes.
 
 Before that: town building is settled before it is locked in (`docs/TOWN_BUILDING_MODEL.md`): the player plans, families build over time, materials are carried from stores, layout costs or saves travel, and families build their own homes on residential plots. The owner approved it for `main`; the open decisions there remain for tuning, and the main track resumes: the first playable village (`docs/IMPLEMENTATION_ROADMAP.md`).
 
@@ -18,7 +18,7 @@ Before that: town building is settled before it is locked in (`docs/TOWN_BUILDIN
 
 - **Working:** saved games and the start/in-game menus (`docs/SAVED_GAMES.md`): a town saved, loaded, and played 120 more days stays identical to the original; generated worlds (`WorldGenerator`; design in `docs/WORLD_MAP.md`): 30 seeds build without warnings, openings on generated planets get off the ground about as often as on the authored one (38/42 and 40/42 on seeds 1 and 2, authored now 41/42 continuous, since frozen regions are no longer picked, and 46/48 original); world atlas (`docs/WORLD_MAP.md`); continuous regional map (`docs/REGIONAL_MAP.md`); town map (`docs/TOWN_MAP.md`); town building: construction sites, builders, carried materials, travel costs, roads, storehouses, residential plots, families building homes (`docs/TOWN_BUILDING_MODEL.md`). All 25 headless test scripts pass (with `world_generator_validation` and `save_game_validation`); import validation is clean; generated planets were reviewed by eye (`world_map_capture` with `seed=`); `town_map_capture` (now with construction scenes) was reviewed by eye.
 - **Balance:** with construction, the sensible opening stays 20/20 and map luck matches building instantly (46/48, 40/42); an opening that queues every house before the woodcutter falls from 20/20 to 13/20 (queue order). Numbers in the model doc.
-- **Branches:** the town building work is on `feature/town-building-model` (from `develop`), merged into `develop`, and `develop` into `main` on the owner's approval (2026-10-26). `main` now carries the town map art and the town building model.
+- **Branches:** generated worlds, saved games, and the world-window cleanup with frozen-ground founding are on `develop`; the owner approved them and `develop` was merged into `main` on 2026-10-27. Both are pushed.
 - **Unchanged:** the original region generator (fingerprints in `tests/region_map_validation.gd`); economy numbers other than the new construction and travel ones.
 
 ## Decisions Made (Don't Re-litigate Without The Owner)
