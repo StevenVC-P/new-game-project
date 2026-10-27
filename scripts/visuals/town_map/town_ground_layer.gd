@@ -56,8 +56,8 @@ func rebuild() -> void:
 			masks_c[i * 4] = 255 if tile.get("water_kind", "") == "lake" else 0
 			# Trodden ground: a trail at half strength, a path at full.
 			masks_c[i * 4 + 3] = TownLogistics.get_path_level(tile) * 255 / TownLogistics.PATH_WORN
-			# Ground height for the light: water low, open land, rock standing proud.
-			height[i] = 0.0 if water else (0.85 if rough else 0.3)
+			# Ground height for the light: water low, open land, hill land rising, rock standing proud.
+			height[i] = 0.0 if water else (0.85 if rough else (0.55 if tile.get("is_hill", false) == true else 0.3))
 	var depth: PackedFloat32Array = RegionTerrainLayer.distance_to_land(is_water, size)
 	height = RegionTerrainLayer.blur3(RegionTerrainLayer.blur3(height, size), size)
 	for i in range(count):

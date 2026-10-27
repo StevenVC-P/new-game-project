@@ -6,8 +6,8 @@ extends TownMapLayer
 # and work, who works each workplace (a badge in the family's color, or a red vacancy badge),
 # upkeep (a slim plate under each workplace), each house's family (a pennant in its color),
 # families walking between home and work and builders walking to their sites, how far each site
-# has come (a plate: materials, then work), and for the selected workplace
-# the routes its goods and family travel (to the nearest store, from home).
+# has come (a plate: materials, then work), woods marked for clearing, and for the selected
+# workplace the routes its goods and family travel (to the nearest store, from home).
 #
 # Badges and plates keep their size on screen so they stay readable when zoomed out; walkers
 # and pennants are part of the scene and scale with it.
@@ -18,6 +18,7 @@ const COLOR_SUPPLY: Color = Color(0.72, 0.52, 0.30)
 const COLOR_WORK: Color = Color(0.96, 0.80, 0.36)
 const COLOR_HAUL_ROUTE: Color = Color(0.96, 0.72, 0.30, 0.9)
 const COLOR_COMMUTE_ROUTE: Color = Color(0.70, 0.86, 0.98, 0.9)
+const COLOR_CLEARING: Color = Color(0.95, 0.56, 0.22)
 
 # Routes shown for the selected workplace, kept until the selection or the layout changes.
 var route_key: Array = []
@@ -55,6 +56,7 @@ func _draw() -> void:
 	draw_routes(city)
 	draw_selection(city)
 	draw_site_selection(city)
+	draw_clearing(city)
 	draw_placement()
 
 # --- Families --------------------------------------------------------------------------------
@@ -135,6 +137,20 @@ func draw_site_plates(city: City) -> void:
 			draw_rect(Rect2(plate.position + Vector2(plate.size.x * 0.3, 0.0), Vector2(plate.size.x * 0.7 * project.get_progress(), plate.size.y)), COLOR_WORK)
 		if project.blocked_reason != "":
 			draw_circle(Vector2(plate.end.x + px(5.0), plate.get_center().y), px(3.0), TownMapStyle.COLOR_VACANT)
+
+# Woods marked for clearing (a tint that fills as the woodcutters fell it), and the block the
+# clearing tool would mark.
+func draw_clearing(city: City) -> void:
+	for tile: Vector2i in city.woodland.marked.keys():
+		var rect: Rect2 = TownMapStyle.tile_rect(tile).grow(-px(1.0))
+		var felled: float = clampf(float(city.woodland.marked[tile]) / EconomyBalance.CLEAR_DAYS_PER_TILE, 0.0, 1.0)
+		draw_rect(rect, RegionMapLayer.faded(COLOR_CLEARING, 0.18 + 0.3 * felled))
+		draw_rect(rect, COLOR_CLEARING, false, px(1.0))
+	if view.clear_preview.size == Vector2i.ZERO:
+		return
+	var block: Rect2 = Rect2(TownMapStyle.tile_rect(view.clear_preview.position).position, Vector2(view.clear_preview.size) * TownMapStyle.TILE)
+	draw_rect(block, RegionMapLayer.faded(TownMapStyle.COLOR_VALID, 0.12))
+	draw_rect(block, TownMapStyle.COLOR_VALID, false, px(2.0))
 
 # The selected workplace's routes: its goods to the nearest store, its family from home.
 func draw_routes(city: City) -> void:
@@ -256,5 +272,5 @@ func paint_ghost(canvas: CanvasItem) -> void:
 	var rect: Rect2 = TownMapStyle.tile_rect(view.hovered_tile, view.preview_size)
 	if view.preview_type == TownConstruction.PLOT:
 		TownConstructionPainter.plot(canvas, rect, false)
-	else:
+	elif view.preview_type != TownWoodland.CLEAR:
 		TownBuildingPainter.draw(canvas, rect, BuildingVisuals.get_profile(view.preview_type), {"variant": 0.3, "lod": lod})

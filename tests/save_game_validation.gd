@@ -45,6 +45,7 @@ func test_town_round_trip_plays_on_identically() -> void:
 	var town_index: int = original.get_player_city_index()
 	var town: City = original.cities[town_index]
 	_check(not town.construction.projects.is_empty() or town.buildings.size() > 0, "the town should be building before the save")
+	_check(not town.woodland.marked.is_empty() or not town.woodland.regrowth.is_empty(), "woods should be marked or felled before the save")
 
 	var store: SaveStore = SaveStore.new(TEST_DIRECTORY)
 	_check(store.write("Round trip", GameState.describe(original, "Round trip"), GameState.capture(original)) == OK, "the game should save")
@@ -195,6 +196,22 @@ func plan_buildings(main: Node2D) -> void:
 		main.select_building_type(building_type)
 		main.city_hovered_tile = valid_spot(main, building_type)
 		main.try_place_selected_building()
+	# Woods marked for clearing, so the woodcutter fells some before the save and some after.
+	var woods: Vector2i = nearest_wooded(main)
+	main.select_building_type(TownWoodland.CLEAR)
+	for corner: Vector2i in [woods, woods + Vector2i(3, 3)]:
+		main.city_hovered_tile = corner
+		main.try_place_selected_building()
+
+func nearest_wooded(main: Node2D) -> Vector2i:
+	var town: City = main.cities[main.selected_city_index]
+	var center: Vector2i = Vector2i(MainScript.CITY_MAP_WIDTH, MainScript.CITY_MAP_HEIGHT) / 2
+	for radius in range(0, 32):
+		for y in range(maxi(0, center.y - radius), mini(MainScript.CITY_MAP_HEIGHT, center.y + radius + 1)):
+			for x in range(maxi(0, center.x - radius), mini(MainScript.CITY_MAP_WIDTH, center.x + radius + 1)):
+				if town.local_map[y][x]["has_trees"] == true:
+					return Vector2i(x, y)
+	return center
 
 func valid_spot(main: Node2D, building_type: String) -> Vector2i:
 	var center: Vector2i = Vector2i(MainScript.CITY_MAP_WIDTH, MainScript.CITY_MAP_HEIGHT) / 2

@@ -76,6 +76,8 @@ var site_profile: SettlementSiteProfile = SettlementSiteProfile.new()
 # How goods and people move around the town map, and everything being built (docs/TOWN_BUILDING_MODEL.md).
 var logistics: TownLogistics = null
 var construction: TownConstruction = null
+# Woods marked for clearing, and felled land growing back.
+var woodland: TownWoodland = null
 
 # `random_seed` makes each founding differ between games; 0 (the default, used by tests and
 # tools) keeps a town reproducible from its tile alone.
@@ -85,6 +87,7 @@ func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO, city_r
 	role = get_normalized_role(city_role)
 	logistics = TownLogistics.new(self)
 	construction = TownConstruction.new(self)
+	woodland = TownWoodland.new(self)
 	founding_seed = random_seed
 	var normalized_household_count: int = max(0, starter_household_count)
 	resources = make_starting_resources(normalized_household_count)
@@ -918,6 +921,7 @@ func tick():
 		if building.can_produce():
 			apply_building_production(building)
 	logistics.advance_day()
+	woodland.advance_day()
 
 	resolve_soft_needs()
 	if resources["food_shortage"] == true:

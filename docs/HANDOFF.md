@@ -6,7 +6,9 @@ Snapshot for whoever picks the project up next. Update it when a milestone close
 
 ## Current Objective
 
-New focus: the gameplay loop inside towns. First step, paths (`feature/desire-paths`, from `develop`, owner request 2026-10-27): people move faster on paths and roads, but instead of the player building roads, trails and paths wear where families walk, and routes prefer the quickest ways (`docs/TOWN_BUILDING_MODEL.md`, Paths). The player's road tool is gone from the controls.
+New focus: the gameplay loop inside towns. Second step, terrain and woodland (`feature/woodland-clearing`, from `develop`, owner request 2026-10-27): woods, hills, and rock slow travel and routes skirt them; the player marks woods (C) for woodcutters to clear; felled land grows back from the woods' edge over years unless paths in use hold it (`docs/TOWN_BUILDING_MODEL.md`, Terrain and Woodland).
+
+First step, paths (`feature/desire-paths`, from `develop`, owner request 2026-10-27): people move faster on paths and roads, but instead of the player building roads, trails and paths wear where families walk, and routes prefer the quickest ways (`docs/TOWN_BUILDING_MODEL.md`, Paths). The player's road tool is gone from the controls.
 
 Before that, owner answers on three open decisions (2026-10-27), on `chore/remove-world-window-and-frozen-founding` from `develop`: the unused world-window code is removed; frozen ground refuses founding; balance waits for the next design pass.
 
@@ -26,6 +28,7 @@ Before that: town building is settled before it is locked in (`docs/TOWN_BUILDIN
 
 ## Decisions Made (Don't Re-litigate Without The Owner)
 
+- **Woods can be cleared and grow back; paths in use hold the land (owner, 2026-10-27).** Travel is slowed by terrain and routes generally avoid woods and uneven ground. Numbers and judgment calls are open (`docs/TOWN_BUILDING_MODEL.md`, Woodland).
 - **Paths develop from walking; the player does not build roads (owner, 2026-10-27).** Routing prefers the quickest ways. Numbers and the judgment calls made implementing it are open (`docs/TOWN_BUILDING_MODEL.md`, Paths).
 
 - **Saved games (owner, 2026-10-27).** Named slots plus one autosave; a start menu (Continue, New world, Load game); autosave each in-game season and on quit.
@@ -45,7 +48,7 @@ Before that: town building is settled before it is locked in (`docs/TOWN_BUILDIN
 
 - **Generated worlds** (details in `docs/WORLD_MAP.md`): a new planet every launch with no way to pick one in the game yet (the seed shows in the atlas top bar; `-- --world-seed=N` replays it); is that the wanted default, or should the player choose or reroll? How much ice: generated land stops at about 72 N / 58 S, pack ice from 77 N / 72 S. Frontier tends to be tropical or dry, because kingdoms start on the most habitable land.
 
-0. **Town building** (details in `docs/TOWN_BUILDING_MODEL.md`, Open Owner Decisions): helpers' spare time cannot be turned off; strict queue order vs builders favoring workplaces; upkeep grace counted from founding rather than per building; first-pass travel numbers; families building only on player-set plots; first-pass path numbers, and whether the road tool should come back later as paving a worn path.
+0. **Town building** (details in `docs/TOWN_BUILDING_MODEL.md`, Open Owner Decisions): helpers' spare time cannot be turned off; strict queue order vs builders favoring workplaces; upkeep grace counted from founding rather than per building; first-pass travel numbers; families building only on player-set plots; first-pass path numbers, and whether the road tool should come back later as paving a worn path; terrain and woodland numbers, whether clearings become farmland, and whether a woodcutter needs woods in reach.
 
 1. **Upkeep plates only when they need attention?** The town view shows a workplace's upkeep plate only below full or when upkeep is off ("no plate" = fully maintained). The old view always showed a bar. Easy to reverse.
 2. **Balance after the town terrain.** Farmland per town rose (median 364 fertile tiles, was 160); map-luck is 41/42 continuous (frozen regions are no longer picked, 2026-10-27), 46/48 original (was 47/48); most towns have no water. The owner will revisit it with the next design work (2026-10-27); don't tune it before then.
@@ -77,6 +80,7 @@ In rough priority order; details in each doc's "Remaining Work" section.
 - **Headless tests:** the root window is 64x64; tests that click set `root.size` first. Streaming takes several seconds; wait on wall-clock time.
 - **New `class_name` scripts** are unknown until an import pass: run `scripts/validate_project.ps1` before running tests or captures.
 - **Balance tools print a long household log.** Write their output to a file and filter it (`> log`); piping it through a shell pipe on Windows stalls Godot at a few percent CPU.
+- **Town maps change in play.** Felled and regrown woods, saplings, and path levels are written onto `City.local_map`; anything that draws or caches from the town map must watch `TownWoodland.land_version` and `TownLogistics.paths_version` (the town view does). Town maps are saved whole, so this survives saving.
 - **Path levels change routes.** A tile's `path_level` changing is a layout change (`TownLogistics.advance_day`); anything that caches routes must key on `layout_version`. Wear is saved with the town (`TownLogistics.wear`), levels on the town map's tiles.
 - **Buildings are never placed finished in play.** Everything goes through `TownConstruction`; `City.add_building` is the completion step (tests may still call it directly). City's helpers (`logistics`, `construction`) hold the city weakly, or towns leak.
 - **Git:** this repo's `.git` belongs to another Windows account; run git as `git -c safe.directory=D:/AI/projects/incubating/games/new-game-godot ...`.

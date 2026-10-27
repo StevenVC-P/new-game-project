@@ -123,14 +123,17 @@ const SPARE_TIME_SHARE: float = 0.2
 
 # --- Logistics (docs/TOWN_BUILDING_MODEL.md) ---
 # Goods move between workplaces and stores on foot. Distances are in effort-tiles: a tile of open
-# ground is 1, a road tile ROAD_EFFORT, woods, yards, and rock cost more, and water cannot be
-# crossed. A family covers DAY_EFFORT_TILES in a working day and carries CARRY_LOAD units a trip.
+# ground is 1, a road tile ROAD_EFFORT, yards and fields BUILT_EFFORT, and water cannot be
+# crossed. Other ground is its terrain times its cover: rock (ROUGH_EFFORT) or sloping hill land
+# (HILL_EFFORT), times WOODS_EFFORT under trees, so a wooded hillside costs 2.8. A family covers
+# DAY_EFFORT_TILES in a working day and carries CARRY_LOAD units a trip.
 const DAY_EFFORT_TILES: float = 500.0
 const CARRY_LOAD: float = 5.0
 const ROAD_EFFORT: float = 0.5
-const WOODS_EFFORT: float = 1.5
 const BUILT_EFFORT: float = 2.0
 const ROUGH_EFFORT: float = 3.0
+const HILL_EFFORT: float = 1.4
+const WOODS_EFFORT: float = 2.0
 # Travel (hauling plus walking to work) never takes more than this share of a family's day.
 const MAX_TRAVEL_SHARE: float = 0.6
 # Each unit carried also takes a moment to load and stack, however short the trip.
@@ -151,6 +154,22 @@ const PATH_WEAR: float = 150.0
 # 0.65; woods and rock keep their extra cost in proportion). Built roads stay quickest.
 const TRAIL_EFFORT_FACTOR: float = 0.85
 const PATH_EFFORT_FACTOR: float = 0.65
+
+# --- Woodland (docs/TOWN_BUILDING_MODEL.md, Woodland) ---
+# A woodcutter's family fells the woods the player marked for clearing as the place it cuts its
+# wood (its output is unchanged): a wooded tile takes this many full working days.
+const CLEAR_DAYS_PER_TILE: float = 2.0
+# Felled land grows back from the woods around it: each day it gains its share of wooded
+# neighbours (out of 8) divided by REGROWTH_DAYS, and is woods again at 1. Ringed by woods that
+# is a year; on a straight edge (3 wooded neighbours) about three; with no woods beside it,
+# never, until the tiles between have grown back.
+const REGROWTH_DAYS: float = 360.0
+# Foot traffic fights it: wear (TownLogistics) of TRAMPLE_WEAR cancels the growth of a tile
+# ringed by woods, and more pushes it back. A trail (wear 40) always holds the land open; once
+# nobody walks it, its wear fades below this in three to five months and the woods come back.
+const TRAMPLE_WEAR: float = 10.0
+# Growth at which young trees show on the ground.
+const SAPLING_GROWTH: float = 0.5
 
 static func get_build_cost(building_type: String) -> Dictionary:
 	return (BUILD_COSTS.get(building_type, {}) as Dictionary).duplicate()
