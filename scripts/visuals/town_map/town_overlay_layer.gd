@@ -6,8 +6,9 @@ extends TownMapLayer
 # and work, who works each workplace (a badge in the family's color, or a red vacancy badge),
 # upkeep (a slim plate under each workplace), each house's family (a pennant in its color),
 # families walking between home and work and builders walking to their sites, how far each site
-# has come (a plate: materials, then work), woods marked for clearing, and for the selected
-# workplace the routes its goods and family travel (to the nearest store, from home).
+# has come (a plate: materials, then work), the road being laid, woods marked for clearing, and
+# for the selected workplace the routes its goods and family travel (to the nearest store, from
+# home).
 #
 # Badges and plates keep their size on screen so they stay readable when zoomed out; walkers
 # and pennants are part of the scene and scale with it.
@@ -56,6 +57,7 @@ func _draw() -> void:
 	draw_routes(city)
 	draw_selection(city)
 	draw_site_selection(city)
+	draw_road_preview()
 	draw_clearing(city)
 	draw_placement()
 
@@ -138,6 +140,12 @@ func draw_site_plates(city: City) -> void:
 		if project.blocked_reason != "":
 			draw_circle(Vector2(plate.end.x + px(5.0), plate.get_center().y), px(3.0), TownMapStyle.COLOR_VACANT)
 
+func draw_road_preview() -> void:
+	for tile: Vector2i in view.road_preview:
+		var rect: Rect2 = TownMapStyle.tile_rect(tile).grow(-px(1.0))
+		draw_rect(rect, RegionMapLayer.faded(TownMapStyle.COLOR_VALID, 0.35))
+		draw_rect(rect, TownMapStyle.COLOR_VALID, false, px(1.0))
+
 # Woods marked for clearing (a tint that fills as the woodcutters fell it), and the block the
 # clearing tool would mark.
 func draw_clearing(city: City) -> void:
@@ -158,7 +166,7 @@ func draw_routes(city: City) -> void:
 	if index < 0 or index >= city.buildings.size() or not city.buildings[index].is_production_building():
 		return
 	var building: Building = city.buildings[index]
-	var key: Array = [index, city.logistics.layout_version, building.assigned_household_id]
+	var key: Array = [index, city.logistics.routes_version, building.assigned_household_id]
 	if key != route_key:
 		route_key = key
 		var work: Vector2i = TownLogistics.center_tile(building.tile, building.size)
@@ -175,8 +183,9 @@ func draw_route(route: Array, color: Color) -> void:
 	if route.size() < 2:
 		return
 	var points: PackedVector2Array = PackedVector2Array()
-	for tile: Vector2i in route:
-		points.append(TownMapStyle.tile_rect(tile).get_center())
+	# Routes run through tile middles and along the lines between tiles (TownLogistics cells).
+	for cell: Vector2i in route:
+		points.append(TownLogistics.cell_position(cell) * TownMapStyle.TILE)
 	draw_polyline(points, Color(0.05, 0.05, 0.05, 0.55), px(4.0), true)
 	draw_polyline(points, color, px(2.0), true)
 	draw_circle(points[points.size() - 1], px(3.5), color)
@@ -272,5 +281,5 @@ func paint_ghost(canvas: CanvasItem) -> void:
 	var rect: Rect2 = TownMapStyle.tile_rect(view.hovered_tile, view.preview_size)
 	if view.preview_type == TownConstruction.PLOT:
 		TownConstructionPainter.plot(canvas, rect, false)
-	elif view.preview_type != TownWoodland.CLEAR:
+	elif view.preview_type != TownWoodland.CLEAR and view.preview_type != TownConstruction.ROAD:
 		TownBuildingPainter.draw(canvas, rect, BuildingVisuals.get_profile(view.preview_type), {"variant": 0.3, "lod": lod})

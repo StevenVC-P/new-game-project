@@ -149,6 +149,8 @@ func apply_action(option_data: Dictionary, city: City):
 		city.toggle_building_maintenance(inspected_building_index)
 	elif action == "upgrade":
 		city.construction.request_upgrade(inspected_building_index)
+	elif action == "fence":
+		city.construction.request_fence(inspected_building_index)
 
 func draw(canvas: CanvasItem, font: Font, font_size: int, city: City):
 	action_options.clear()
@@ -220,6 +222,8 @@ func draw(canvas: CanvasItem, font: Font, font_size: int, city: City):
 	else:
 		y = draw_overlay_available_worker_options(canvas, font, font_size, text_x, y, overlay_size.x, city, building)
 
+	if TownLogistics.is_field(building):
+		y = draw_fence_option(canvas, font, font_size, text_x, y, overlay_size.x, city, building)
 	if building.is_tier0():
 		y = draw_upgrade_option(canvas, font, font_size, text_x, y, overlay_size.x, city, building)
 	else:
@@ -238,6 +242,23 @@ func draw_upgrade_option(canvas: CanvasItem, font: Font, font_size: int, x: floa
 	var label: String = "Upgrade to " + capitalize_building_name(upgrade_type) + " (" + get_cost_summary(cost) + ")"
 	var color: Color = VisualStyle.COLOR_UI_BUTTON_CONFIRM if city.construction.can_supply(cost) else VisualStyle.COLOR_UI_BUTTON_DISABLED
 	return draw_overlay_action_option(canvas, font, font_size, label, x, y, overlay_width, {"action": "upgrade"}, color)
+
+# A fence round a field is a construction project too; once it stands, nobody else walks through.
+func draw_fence_option(canvas: CanvasItem, font: Font, font_size: int, x: float, y: float, overlay_width: float, city: City, building: Building) -> float:
+	if building.fenced:
+		return y
+	var project: ConstructionProject = city.construction.get_fence_project(building.id)
+	if project != null:
+		y = draw_overlay_line(canvas, font, font_size, "Fencing: " + city.construction.get_status_text(project), x, y, overlay_width)
+		return draw_overlay_action_option(canvas, font, font_size, "Cancel fence", x, y, overlay_width, {"action": "cancel_project", "project_id": project.id}, VisualStyle.COLOR_UI_BUTTON_DANGER)
+	var cost: Dictionary = {"wood": EconomyBalance.FENCE_WOOD}
+	var color: Color = VisualStyle.COLOR_UI_BUTTON_CONFIRM if city.construction.can_supply(cost) else VisualStyle.COLOR_UI_BUTTON_DISABLED
+	return draw_overlay_action_option(canvas, font, font_size, "Fence the field (" + get_cost_summary(cost) + ")", x, y, overlay_width, {"action": "fence"}, color)
+
+static func count_fence_rows(city: City, building: Building) -> Vector2i:
+	if not TownLogistics.is_field(building) or building.fenced:
+		return Vector2i.ZERO
+	return Vector2i(1 if city.construction.get_fence_project(building.id) != null else 0, 1)
 
 # --- Building sites and plots ------------------------------------------------------------------
 
@@ -342,6 +363,9 @@ func get_building_overlay_size(city: City, building: Building) -> Vector2:
 		option_count += 1
 	if building.is_tier0() and city.construction.get_upgrade_project(building.id) != null:
 		line_count += 1
+	var fence_rows: Vector2i = count_fence_rows(city, building)
+	line_count += fence_rows.x
+	option_count += fence_rows.y
 
 	var height: float = 18.0 + float(line_count) * 18.0 + float(option_count) * 22.0
 	return Vector2(width, height)

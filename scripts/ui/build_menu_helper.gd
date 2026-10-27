@@ -7,6 +7,7 @@ static func get_building_catalog() -> Array[Dictionary]:
 		{"id": "gatherer_camp", "display_name": "Gatherer's Camp", "category": "Hand Work (Tier 0)"},
 		{"id": "tool_mender", "display_name": "Tool Mender", "category": "Hand Work (Tier 0)"},
 		{"id": "plot", "display_name": "Residential Plot", "category": "Town Planning"},
+		{"id": "road", "display_name": "Road", "category": "Town Planning"},
 		{"id": "storehouse", "display_name": "Storehouse", "category": "Town Planning"},
 		{"id": "clear_woods", "display_name": "Clear Woods", "category": "Town Planning"},
 		{

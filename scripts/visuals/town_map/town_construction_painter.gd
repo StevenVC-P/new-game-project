@@ -3,8 +3,8 @@ extends RefCounted
 
 # What is being built, and what the town keeps its goods in, as miniatures in the town map's
 # style (TownBuildingPainter): staked plots, building sites that fill with stacked materials and
-# then rise as timber frames, scaffolding around an upgrade, the founders' stockpile, and the
-# storehouse.
+# then rise as timber frames, scaffolding around an upgrade, fences round fields, the founders'
+# stockpile, and the storehouse.
 
 const STAKE: Color = Color(0.78, 0.66, 0.44)
 const STRING_LINE: Color = Color(0.94, 0.90, 0.78, 0.8)
@@ -87,6 +87,36 @@ static func scaffold(c: CanvasItem, r: Rect2, progress: float) -> void:
 			c.draw_circle(point, 0.45, timber.darkened(0.25))
 	c.draw_line(Vector2(area.position.x, area.position.y + area.size.y * 0.15), Vector2(area.end.x, area.position.y + area.size.y * 0.15), timber, 0.35)
 	c.draw_line(Vector2(area.position.x, area.end.y - area.size.y * 0.2), Vector2(area.end.x, area.end.y - area.size.y * 0.2), timber, 0.35)
+
+# A post-and-rail fence round a field, with a gap on its south side for the family's gate.
+# progress below 1 draws the posts set so far and no rails.
+static func fence(c: CanvasItem, r: Rect2, progress: float) -> void:
+	var area: Rect2 = r.grow(-0.5)
+	var corners: Array[Vector2] = [area.position, Vector2(area.end.x, area.position.y), area.end, Vector2(area.position.x, area.end.y)]
+	var timber: Color = TownMapStyle.COLOR_TIMBER_DARK
+	var gate: float = area.size.x * 0.12
+	var posts_per_side: int = maxi(2, int(area.size.x / 4.0))
+	var total: int = posts_per_side * 4
+	var standing: int = total if progress >= 1.0 else int(progress * float(total))
+	var drawn: int = 0
+	for side in range(4):
+		var a: Vector2 = corners[side]
+		var b: Vector2 = corners[(side + 1) % 4]
+		if progress >= 1.0:
+			if side == 2:
+				# South side, drawn east to west: rails on both sides of the gate.
+				var middle: Vector2 = (a + b) * 0.5
+				c.draw_line(a, middle + Vector2(gate, 0.0), timber, 0.35)
+				c.draw_line(middle - Vector2(gate, 0.0), b, timber, 0.35)
+			else:
+				c.draw_line(a, b, timber, 0.35)
+		for i in range(posts_per_side):
+			if drawn >= standing:
+				return
+			var point: Vector2 = a.lerp(b, float(i) / float(posts_per_side))
+			c.draw_circle(point + Vector2(0.3, 0.35), 0.42, TownBuildingPainter.SHADOW)
+			c.draw_circle(point, 0.38, STAKE.darkened(0.2))
+			drawn += 1
 
 # The founders' stockpile: sacks, crates, and a log stack under the open sky.
 static func stockpile(c: CanvasItem, r: Rect2, lod: int) -> void:

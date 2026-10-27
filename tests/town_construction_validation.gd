@@ -25,6 +25,12 @@ func run_all() -> void:
 	test_paths_wear_where_families_walk()
 	test_routes_prefer_worn_ground()
 	test_paths_fade_and_give_way()
+	test_open_ground_costs_hold()
+	test_routes_slip_between_fields()
+	test_crossing_a_field_tramples_it()
+	test_fences_keep_people_out()
+	test_paths_form_between_yards()
+	test_paths_in_woods_stay_trails()
 	test_cancel_returns_materials()
 	test_families_build_on_plots()
 	test_parents_build_for_new_families()
@@ -209,7 +215,7 @@ func test_roads() -> void:
 	_check(after < before * 0.8, "a road to the stores should cut travel")
 
 static func path_level_at(city: City, tile: Vector2i) -> int:
-	return TownLogistics.get_path_level(city.local_map[tile.y][tile.x])
+	return city.logistics.get_tile_path_level(tile)
 
 func test_paths_wear_where_families_walk() -> void:
 	var city: City = make_city()
@@ -220,9 +226,9 @@ func test_paths_wear_where_families_walk() -> void:
 	var route: Array = city.logistics.get_store_route(camp)["route"]
 	var middle: Vector2i = route[route.size() / 2]
 	run_days(city, 30)
-	var level_30: int = path_level_at(city, middle)
+	var level_30: int = city.logistics.get_cell_path_level(middle)
 	run_days(city, 120)
-	var level_150: int = path_level_at(city, middle)
+	var level_150: int = city.logistics.get_cell_path_level(middle)
 	var after: float = city.logistics.get_travel_share(camp)
 	print("[TOWN] woodcutter's route after 30 days: level %d, after 150: level %d; travel share %.3f -> %.3f, %.0f%% of the way trodden" % [level_30, level_150, before, after, city.logistics.get_trodden_share(camp) * 100.0])
 	_check(level_30 >= TownLogistics.PATH_TRAIL, "a month of walking to work should wear a trail")
@@ -230,7 +236,7 @@ func test_paths_wear_where_families_walk() -> void:
 	_check(after < before * 0.8, "a worn path should cut the family's travel (%.3f vs %.3f)" % [after, before])
 	_check(city.logistics.paths_version > 0, "views are told when paths change")
 	var untrodden: Vector2i = Vector2i(30, 38)
-	_check(path_level_at(city, untrodden) == TownLogistics.PATH_NONE and not city.logistics.wear.has(untrodden), "ground nobody walks stays untouched")
+	_check(path_level_at(city, untrodden) == TownLogistics.PATH_NONE and not city.logistics.cell_wear.has(TownLogistics.tile_cell(untrodden)), "ground nobody walks stays untouched")
 
 	# Builders carrying materials to a site wear their way too.
 	var building_town: City = make_city()
@@ -238,7 +244,7 @@ func test_paths_wear_where_families_walk() -> void:
 	var site: ConstructionProject = building_town.construction.request_building("toolmaker", Vector2i(30, 30))
 	run_days(building_town, 3)
 	var site_route: Array = building_town.logistics.get_site_store_route(site.get_site_tile())["route"]
-	_check(building_town.logistics.wear.has(site_route[site_route.size() / 2]), "carrying materials to a site should wear the ground between")
+	_check(building_town.logistics.cell_wear.has(site_route[site_route.size() / 2]), "carrying materials to a site should wear the ground between")
 
 # A path that is longer in tiles but quicker to walk wins over the straight line.
 func test_routes_prefer_worn_ground() -> void:
@@ -246,43 +252,147 @@ func test_routes_prefer_worn_ground() -> void:
 	var from: Vector2i = Vector2i(20, 24)
 	var to: Vector2i = Vector2i(40, 24)
 	var straight: float = city.logistics.effort_between(from, to)
+	# A worn path along row 20: the tiles' middles and the lines between them.
 	for x in range(19, 42):
-		city.local_map[20][x]["path_level"] = TownLogistics.PATH_WORN
+		city.logistics.set_cell_path_level(TownLogistics.tile_cell(Vector2i(x, 20)), TownLogistics.PATH_WORN)
+		city.logistics.set_cell_path_level(TownLogistics.tile_cell(Vector2i(x, 20)) + Vector2i(1, 0), TownLogistics.PATH_WORN)
 	city.logistics.mark_layout_changed()
 	var route: Array[Vector2i] = city.logistics.find_route(from, to)
 	var effort: float = city.logistics.effort_between(from, to)
 	print("[TOWN] 20 tiles straight across open ground: effort %.1f; by a path 4 tiles to the side: %.1f" % [straight, effort])
-	_check(route.has(Vector2i(30, 20)), "the route should bend onto the path when it is quicker")
+	_check(route.has(TownLogistics.tile_cell(Vector2i(30, 20))), "the route should bend onto the path when it is quicker")
 	_check(effort < straight, "the path should be the quicker way")
 
 func test_paths_fade_and_give_way() -> void:
 	var city: City = make_city()
 	var logistics: TownLogistics = city.logistics
 	var tile: Vector2i = Vector2i(30, 24)
-	logistics.wear[tile] = EconomyBalance.PATH_WEAR
+	logistics.cell_wear[TownLogistics.tile_cell(tile)] = EconomyBalance.PATH_WEAR
 	logistics.advance_day()
 	_check(path_level_at(city, tile) == TownLogistics.PATH_WORN, "enough wear makes a path")
-	var version: int = logistics.layout_version
+	var version: int = logistics.paths_version
 	for _day in range(10):
 		logistics.advance_day()
-	_check(path_level_at(city, tile) == TownLogistics.PATH_WORN and logistics.layout_version == version, "a path does not vanish as soon as its wear dips under the threshold")
+	_check(path_level_at(city, tile) == TownLogistics.PATH_WORN and logistics.paths_version == version, "a path does not vanish as soon as its wear dips under the threshold")
 	var days_to_trail: int = days_until_level(logistics, city, tile, TownLogistics.PATH_TRAIL, 200)
 	var days_to_none: int = days_until_level(logistics, city, tile, TownLogistics.PATH_NONE, 300)
 	print("[TOWN] an abandoned path is a trail after %d more days and grass after %d more" % [days_to_trail, days_to_none])
 	_check(days_to_trail > 0 and days_to_none > 0, "a path nobody walks should fade to a trail and then to grass")
 	# What wear is left keeps fading (walked again, it would come back sooner) until it is gone.
 	for _day in range(300):
-		if not logistics.wear.has(tile):
+		if not logistics.cell_wear.has(TownLogistics.tile_cell(tile)):
 			break
 		logistics.advance_day()
-	_check(not logistics.wear.has(tile), "faded ground is forgotten in time")
+	_check(not logistics.cell_wear.has(TownLogistics.tile_cell(tile)), "faded ground is forgotten in time")
 
 	# Building over a path ends it at once.
-	logistics.wear[tile] = EconomyBalance.PATH_WEAR
+	logistics.cell_wear[TownLogistics.tile_cell(tile)] = EconomyBalance.PATH_WEAR
 	logistics.advance_day()
 	city.local_map[tile.y][tile.x]["occupied"] = true
 	logistics.advance_day()
-	_check(path_level_at(city, tile) == TownLogistics.PATH_NONE and not logistics.wear.has(tile), "ground built over or reserved is no longer a path")
+	_check(path_level_at(city, tile) == TownLogistics.PATH_NONE and not logistics.cell_wear.has(TownLogistics.tile_cell(tile)), "ground built over or reserved is no longer a path")
+
+# Routes run through tile middles and along the lines between tiles; open ground still costs a
+# tile's worth a tile, straight or diagonal.
+func test_open_ground_costs_hold() -> void:
+	var city: City = make_city()
+	_check(is_equal_approx(city.logistics.effort_between(Vector2i(10, 20), Vector2i(20, 20)), 10.0), "ten tiles straight across open ground cost 10")
+	_check(absf(city.logistics.effort_between(Vector2i(10, 20), Vector2i(15, 25)) - 5.0 * TownLogistics.DIAGONAL_STEP) < 0.01, "five tiles diagonally cost 5 x 1.41")
+	var started: int = Time.get_ticks_usec()
+	city.logistics.mark_layout_changed()
+	city.logistics.ensure_grid()
+	var rebuild_ms: float = float(Time.get_ticks_usec() - started) / 1000.0
+	started = Time.get_ticks_usec()
+	city.logistics.find_route(Vector2i(2, 2), Vector2i(60, 40))
+	print("[TOWN] route grid %s cells: rebuilt in %.1f ms, a route across the map in %.2f ms" % [str(city.logistics.cell_size()), rebuild_ms, float(Time.get_ticks_usec() - started) / 1000.0])
+
+# Two fields side by side: people walk along the line between them rather than through either.
+static func add_field(city: City, origin: Vector2i) -> Building:
+	city.add_building(Building.new(-1, "farm", origin, Vector2i(3, 3)))
+	return city.buildings[-1]
+
+func test_routes_slip_between_fields() -> void:
+	var city: City = make_city()
+	var west: Building = add_field(city, Vector2i(20, 12))
+	var east: Building = add_field(city, Vector2i(23, 12))
+	var route: Array[Vector2i] = city.logistics.find_route(Vector2i(22, 10), Vector2i(23, 16))
+	var inside: Array[Vector2i] = []
+	var on_the_line: int = 0
+	for cell: Vector2i in route:
+		var owner: int = city.logistics.cell_inside_owner(cell)
+		if owner == west.id or owner == east.id:
+			inside.append(cell)
+		on_the_line += 1 if cell.x == 46 and cell.y >= 24 and cell.y <= 30 else 0
+	print("[TOWN] between two fields: %d of %d route cells on the line between them, %s inside a field" % [on_the_line, route.size(), str(inside)])
+	_check(on_the_line >= 5 and inside.is_empty(), "the route should follow the line between the fields without entering either: " + str(route))
+
+func test_crossing_a_field_tramples_it() -> void:
+	var city: City = make_city()
+	var field: Building = add_field(city, Vector2i(20, 20))
+	var logistics: TownLogistics = city.logistics
+	logistics.ensure_grid()
+	# Straight through the field's middle row, from open ground to open ground.
+	var through: Array = []
+	for x in range(39, 50):
+		through.append(Vector2i(x, 43))
+	logistics.add_traffic(through, 3.0)
+	# Its own family walking out of it does not count.
+	logistics.add_traffic(logistics.find_route(TownLogistics.center_tile(field.tile, field.size), Vector2i(30, 30)), 4.0)
+	logistics.advance_day()
+	var expected: float = 3.0 * EconomyBalance.FIELD_TRAMPLE_LOSS_PER_TRIP
+	_check(is_equal_approx(float(logistics.trampled_trips.get(field.id, 0.0)), 3.0), "trips through a field are counted, its own family's are not: " + str(logistics.trampled_trips))
+	_check(is_equal_approx(logistics.get_field_trample_loss(field), expected), "each daily trip costs its share of the harvest")
+	logistics.trampled_trips[field.id] = 100.0
+	_check(is_equal_approx(logistics.get_field_trample_loss(field), EconomyBalance.FIELD_TRAMPLE_MAX_LOSS), "trampling costs at most the max share")
+	var trampled: int = city.get_current_building_output_amount(field)
+	logistics.trampled_trips.clear()
+	var whole: int = city.get_current_building_output_amount(field)
+	print("[TOWN] a field's harvest: %d a day untrodden, %d trampled at the max" % [whole, trampled])
+	_check(trampled < whole, "a trampled field yields less")
+
+func test_fences_keep_people_out() -> void:
+	var city: City = make_city()
+	city.resources["wood"] = 50
+	var field: Building = add_field(city, Vector2i(20, 20))
+	var project: ConstructionProject = city.construction.request_fence(field.id)
+	_check(project != null and city.construction.request_fence(field.id) == null, "a field can be fenced, once")
+	_check(city.construction.request_fence(-1) == null, "only fields can be fenced")
+	_check(run_until_built(city, project, 60) > 0 and field.fenced, "the fence should get built")
+	var route: Array[Vector2i] = city.logistics.find_route(Vector2i(19, 21), Vector2i(23, 21))
+	var inside: int = 0
+	for cell: Vector2i in route:
+		inside += 1 if city.logistics.cell_inside_owner(cell) == field.id else 0
+	_check(not route.is_empty() and inside == 0, "a fenced field is walked around")
+	var middle: Vector2i = TownLogistics.center_tile(field.tile, field.size)
+	_check(not city.logistics.find_route(middle, Vector2i(30, 30)).is_empty(), "its own family still gets in and out by the gate")
+	_check(city.logistics.get_travel(field)["reachable"] == true, "and still carries its harvest to the store")
+
+# The strips between yards are open ground, so a compact town wears paths between its houses.
+func test_paths_form_between_yards() -> void:
+	var city: City = make_city()
+	city.add_building(Building.new(-1, "house", Vector2i(30, 30), Vector2i(2, 2)))
+	city.add_building(Building.new(-1, "house", Vector2i(32, 30), Vector2i(2, 2)))
+	var route: Array[Vector2i] = city.logistics.find_route(Vector2i(31, 28), Vector2i(32, 34))
+	for _day in range(30):
+		city.logistics.add_traffic(route, 4.0)
+		city.logistics.advance_day()
+	var between: int = 0
+	for cell: Vector2i in city.logistics.cell_levels.keys():
+		between += 1 if cell.x == 64 and cell.y >= 60 and cell.y <= 64 else 0
+	_check(between >= 3, "a path should wear along the line between two yards, got %d cells" % between)
+
+# Woods wear slowly, never past a trail, and keep their trees.
+func test_paths_in_woods_stay_trails() -> void:
+	var city: City = make_city()
+	var route: Array[Vector2i] = city.logistics.find_route(Vector2i(57, 5), Vector2i(62, 5))
+	city.logistics.add_traffic(route, 10.0)
+	var woods_cell: Vector2i = TownLogistics.tile_cell(Vector2i(59, 5))
+	_check(is_equal_approx(float(city.logistics.cell_wear.get(woods_cell, 0.0)), 10.0 * EconomyBalance.FOREST_WEAR_FACTOR), "woods wear at a reduced rate")
+	for _day in range(200):
+		city.logistics.add_traffic(route, 10.0)
+		city.logistics.advance_day()
+	_check(city.logistics.get_cell_path_level(woods_cell) == TownLogistics.PATH_TRAIL, "a busy way through woods stays a trail")
+	_check(city.local_map[5][59]["has_trees"] == true, "wear never fells a tree")
 
 static func days_until_level(logistics: TownLogistics, city: City, tile: Vector2i, level: int, max_days: int) -> int:
 	for day in range(1, max_days + 1):

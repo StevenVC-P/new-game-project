@@ -16,10 +16,13 @@ shader_type canvas_item;
 uniform sampler2D masks_a : filter_linear;
 // R stone deposit, G iron deposit, B road, A sea.
 uniform sampler2D masks_b : filter_linear;
-// R lake, G water depth (distance from shore), B ground height (water low, rock high, blurred),
-// A trodden ground (0 none, 0.5 trail, 1 path).
+// R lake, G water depth (distance from shore), B ground height (water low, rock high, blurred), A unused.
 uniform sampler2D masks_c : filter_linear;
+// R trodden ground (0 none, 0.5 trail, 1 path) per route cell: tile middles, the lines between
+// tiles, and corners, at half-tile spacing (TownLogistics), so (2W+1) x (2H+1) texels.
+uniform sampler2D path_mask : filter_linear;
 uniform vec2 map_tiles = vec2(64.0, 44.0);
+uniform vec2 path_cells = vec2(129.0, 89.0);
 uniform float tile_units = 12.0;
 uniform float zoom = 1.5;
 // The site's climate (LocalCityMapGenerator / RegionalTerrain.climate_at).
@@ -40,7 +43,7 @@ void vertex() {
 }
 
 // Cubic B-spline filtering from four bilinear taps (p in tiles), as on the regional map.
-vec4 smooth_mask(sampler2D tex, vec2 p) {
+vec4 smooth_mask_sized(sampler2D tex, vec2 p, vec2 size) {
 	vec2 st = p - 0.5;
 	vec2 i = floor(st);
 	vec2 f = st - i;
@@ -52,10 +55,14 @@ vec4 smooth_mask(sampler2D tex, vec2 p) {
 	vec2 w3 = (1.0 / 6.0) * f3;
 	vec2 g0 = w0 + w1;
 	vec2 g1 = w2 + w3;
-	vec2 h0 = (i - 1.0 + w1 / g0 + 0.5) / map_tiles;
-	vec2 h1 = (i + 1.0 + w3 / g1 + 0.5) / map_tiles;
+	vec2 h0 = (i - 1.0 + w1 / g0 + 0.5) / size;
+	vec2 h1 = (i + 1.0 + w3 / g1 + 0.5) / size;
 	return g0.y * (g0.x * texture(tex, h0) + g1.x * texture(tex, vec2(h1.x, h0.y)))
 		+ g1.y * (g0.x * texture(tex, vec2(h0.x, h1.y)) + g1.x * texture(tex, h1));
+}
+
+vec4 smooth_mask(sampler2D tex, vec2 p) {
+	return smooth_mask_sized(tex, p, map_tiles);
 }
 
 // Fractal noise in tile units; octaves smaller than a few screen pixels fade to their mean so
@@ -151,13 +158,14 @@ void fragment() {
 		land = mix(land, iron_col, iron * 0.85);
 	}
 
-	// Trodden ground (TownLogistics): a trail is flattened, paler grass; a path is bare packed
-	// earth with a trampled verge. A path tile is 1.0 in the mask and a trail 0.5, so a line of
-	// trail tiles never reaches the bare-earth band.
-	float trodden = smooth_mask(masks_c, q).a;
+	// Trodden ground (TownLogistics): a trail is a thin line of flattened, paler grass; a path is
+	// bare packed earth up to about a tile wide with a trampled verge. Route cells are half a tile
+	// apart, so the mask is sampled at twice the tile resolution (cell k sits at k / 2 tiles). A
+	// path cell is 1.0 and a trail 0.5, so a trail never reaches the bare-earth band.
+	float trodden = smooth_mask_sized(path_mask, q * 2.0 + 0.5, path_cells).r;
 	if (trodden > 0.02) {
-		float flattened = smoothstep(0.14, 0.3, trodden);
-		float bare = smoothstep(0.36, 0.52, trodden + (fbm(p + vec2(57.0, 29.0), 0.5, 2) - 0.5) * 0.12);
+		float flattened = smoothstep(0.15, 0.24, trodden);
+		float bare = smoothstep(0.3, 0.42, trodden + (fbm(p + vec2(57.0, 29.0), 0.5, 2) - 0.5) * 0.1);
 		vec3 trampled = land * vec3(1.06, 1.03, 0.84) + vec3(0.04, 0.03, 0.0);
 		land = mix(land, trampled, flattened * 0.55);
 		vec3 earth = vec3(0.57, 0.48, 0.34) * (0.9 + 0.16 * fine);
