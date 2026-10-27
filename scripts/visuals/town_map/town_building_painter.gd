@@ -53,6 +53,8 @@ static func draw(c: CanvasItem, rect: Rect2, profile: Dictionary, state: Diction
 			draw_tileworks(c, rect, state, roof, wall)
 		"paver_yard":
 			draw_paver_yard(c, rect, state, roof, wall)
+		"storehouse":
+			TownConstructionPainter.draw_storehouse(c, rect, state, roof, wall)
 		_:
 			draw_house(c, rect, state, roof, wall)
 
