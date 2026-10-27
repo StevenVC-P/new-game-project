@@ -6,9 +6,10 @@ First implementation 2026-10-26, from the owner's town-building brief. Settled b
 
 ## How To Run And Check It
 
-- **In the game:** in the town view, every building choice (1-0, Q-R, T storehouse) now plans a construction site rather than placing a finished building. P sets aside a residential plot. Nobody lays roads: trails and paths wear on their own where families walk (Paths, below). Click a site, plot, or building to see its card: a site shows its status, materials on site, work done, builders today, who asked for it and who pays, with "Build this first" and "Cancel". A workplace's card shows what travel costs it and how much of its way is on paths or roads, and the map draws its routes to the nearest store (gold) and from its family's home (blue). The sidebar's Construction section lists the queue.
+- **In the game:** in the town view, every building choice (1-0, Q-R, T storehouse) now plans a construction site rather than placing a finished building. P sets aside a residential plot; C marks woods for the woodcutters to clear (click both corners). Nobody lays roads: trails and paths wear on their own where families walk (Paths, below). Click a site, plot, or building to see its card: a site shows its status, materials on site, work done, builders today, who asked for it and who pays, with "Build this first" and "Cancel". A workplace's card shows what travel costs it and how much of its way is on paths or roads, and the map draws its routes to the nearest store (gold) and from its family's home (blue). The sidebar's Construction section lists the queue.
 - **Rules:** `tests/town_construction_validation.gd` (headless, synthetic town map): a request reserves land and pays nothing; the building appears only when built; sites wait for materials; more builders build faster; every site, tier 1 workplaces included, goes up from spare time even with every family at work; upgrades happen in place while the building keeps working; distance to a store and from home costs output; storehouses, roads, and worn paths cut it; walking wears a trail in a month and a path where traffic is heavy; routes bend onto worn ground; abandoned paths fade, and building over one ends it; an island cut off by water loses the most; cancelling returns materials; families claim plots and build homes (huts when wood is short), then upgrade huts; values steer plot choice and home type; towns without a town map still build.
-- **Real flow:** `tests/town_map_view_validation.gd`: a click plans a site and the house later stands on that tile; the plot tool sets land aside and a house placed on it uses the plot; clicking a site selects it; a worked garden wears a trail and the view redraws the ground.
+- **Terrain and woodland:** `tests/town_woodland_validation.gd` (headless, synthetic town map): what each ground costs; routes go around a small wood; a woodcutter clears marked woods nearest first and keeps producing; marking again unmarks; a gatherer's camp does not fell; a clearing grows back from its edge over years; a trail in use holds felled land open and the woods take it back once abandoned; built land never regrows.
+- **Real flow:** `tests/town_map_view_validation.gd`: a click plans a site and the house later stands on that tile; the plot tool sets land aside and a house placed on it uses the plot; the clearing tool marks woods between two clicks with a preview; clicking a site selects it; a worked garden wears a trail and the view redraws the ground.
 - **Balance:** `tests/sim/opening_check.gd` and `tests/sim/map_luck_check.gd` now play through the construction pipeline (the stand-in player plans buildings and the town builds them). `tests/sim/town_building_check.gd` compares three policies on real town maps: houses placed by the player, homes built by families on plots, and a scattered layout. Write their output to a file and filter it; piping Godot's household log through a shell pipe stalls Godot on Windows.
 - **Screenshots:** `tests/visual/town_map_capture.gd` section 5: sites at every stage, plots, a site's card, a town grown with families building on plots, the trails and paths it wore (fitted and close), and a workplace's routes.
 
@@ -49,7 +50,22 @@ With six founding families a farm takes about two to three days, a house about t
 `scripts/domain/town_logistics.gd` (`TownLogistics`, one per `City`).
 
 - **Stores.** The founders' stockpile sits on open ground at the town's heart (placed the first time the town map is used); storehouses add more. All stores share one stock, `City.resources`. **Judgment call / limitation:** separate inventories per store, and carts between them, are later work; today a storehouse is a second door to the same stock.
-- **Routes.** Walking effort is found on the town map with `AStarGrid2D`, once per layout change: open ground 1 per tile, road 0.5, woods 1.5, yards and fields 2, rock 3, water impassable; a trail takes 15% off the ground's effort and a path 35%; diagonals cost 1.41 times as much. Routes are the cheapest there are: the grid's weights are divided by the cheapest effort, so its distance estimate never overshoots (before paths, with roads at 0.5, A* could return a route that only looked direct).
+- **Routes.** Walking effort is found on the town map with `AStarGrid2D`, once per layout change, over the terrain (below); diagonals cost 1.41 times as much. Routes are the cheapest there are: the grid's weights are divided by the cheapest effort, so its distance estimate never overshoots (before paths, with roads at 0.5, A* could return a route that only looked direct).
+- **Terrain** (owner, 2026-10-27: travel is slowed by the ground it crosses, and routes generally avoid woods and uneven ground). A tile's effort is its terrain times its cover, then its wear:
+
+  | Ground | Effort |
+  | --- | --- |
+  | Road | 0.5 |
+  | Open ground | 1 |
+  | Hill land (`is_hill`, sloping ground on the regional map's hills) | 1.4 |
+  | Woods | 2 (was 1.5) |
+  | Wooded hillside | 2.8 |
+  | Yards and fields (anything built or reserved) | 2 |
+  | Rock | 3 |
+  | Water | impassable |
+  | Trail / path | 85% / 65% of the ground under it |
+
+  A route around a small wood five tiles deep is cheaper than the straight line through it, so routes skirt woods unless the way around is long. **Judgment calls:** slope has no direction (uphill costs the same as down: the grid weighs tiles, not steps), and hill land is lit as rising ground on the town map so the player can see why routes avoid it.
 - **Aggregated carrying, not per-item agents.** A workplace's family carries its output to the nearest store and its inputs back (`EconomyBalance.PRODUCTION` now holds the production chain the city uses), and walks from home to work. A family covers 500 effort-tiles in a day (`DAY_EFFORT_TILES`) and carries 5 units a trip (`CARRY_LOAD`). The trips become a share of its working day, capped at 60%, and its output drops by that share. A workplace no store or home can reach loses the full 60%.
 - **Builders carry the same way:** each unit of material costs a moment to handle plus a round trip from the nearest store.
 - Walkers on the map stay cosmetic.
@@ -73,8 +89,25 @@ Owner direction (2026-10-27): people move faster on paths and roads, but rather 
 
 - Only travel the model charges for wears paths. Builders' walks to their sites, and errands it does not model (fetching food, visiting), leave no trace.
 - The player's road tool is gone from the controls (key G, the build menu). Road projects stay in the pipeline for a later step that paves a well-worn path, and so saves with a road still queued finish it. Roads already on the land (the regional road crossing a town) are unchanged.
-- Trees stay on a path through woods: woodland is a resource, and clearing it is later work.
+- Trees stay on a path through woods: wear does not fell them; only woodcutters clearing marked woods do (Woodland).
 - Paths are one tile wide whatever the traffic; a busy path does not widen into a lane.
+
+## Woodland
+
+Owner direction (2026-10-27): the woodcutter can be given woods to clear; trees try to grow back around the edges over a long time; well-worn paths stop them, so two things fight over the land: paths in use win, unused paths give way. Code: `TownWoodland` (`city.woodland`); numbers: `EconomyBalance` (Woodland).
+
+- **Marking.** C (or Clear Woods in the build menu), then two clicks at opposite corners, marks every wooded tile in the block (at most 16 a side) for clearing. Marking a block that is all marked already takes the marks off. Marked tiles are tinted orange, deeper as felling goes on; the sidebar counts them and says when no woodcutter is at work.
+- **Felling.** Each working woodcutter (tier 1; a gatherer's camp gathers but does not fell) puts its day into the marked tile nearest it that a route reaches, as much of the day as travel and spare time leave. A tile takes 2 working days: one woodcutter clears a 3x5 block in about six weeks. Felling is where it cuts its wood, so its output is unchanged. A felled tile is open ground: buildable, and quicker to cross.
+- **Growing back.** Felled land that nothing stands on gains growth from the woods around it: its share of wooded neighbours, out of 8, over a year. Ringed by woods it is woods again in a year, on a straight edge in about three, and a tile with no woods beside it waits for the tiles between to grow back first, so clearings close from the edge inward. Saplings show from halfway.
+- **The fight.** Wear (Paths) pushes growth back: wear 10 cancels the growth of a tile ringed by woods, and a trail (wear 40 and up) always holds the land open. When nobody walks it, its wear fades and the woods win. Built or reserved land (a plot, a field) never grows back.
+- **In play** (`tests/town_woodland_validation.gd`): a 3x3 clearing inside woods shows saplings on its corner by day 289, is woods there by day 576 and in its middle by day 1052; a trail at the woods' edge held open for two and a half years is woods again 740 days after it was abandoned.
+
+**Judgment calls**, open to owner veto:
+
+- Only felled land grows back. Meadows that were never wooded stay open, so the woods the regional map shows are the most a town has; otherwise every woods' edge would creep over the town's open land.
+- Felled land is building land, not farmland: wooded tiles were never arable. Making a clearing arable is a balance decision (more room for farms).
+- A woodcutter's output does not depend on woods in reach: one that has cleared all the woods around it still cuts wood. Its placement still needs woods within 5 tiles.
+- Felling costs the woodcutter nothing extra and leaves no extra wood; the walk to the felling site is not travel it pays for, and does not wear a path.
 
 ## Plots And Family Homes
 
@@ -131,6 +164,7 @@ The stand-in player (`tests/sim/stand_in_player.gd`) plans buildings and the tow
   | Town building check, scattered layout | 14/20, 27 people, travel 13% | 15/20, 33 people, travel 11% |
 
   Paths help most where travel hurts most: a scattered town's routes cross open ground that wears, while a compact town's short routes run mostly through yards and fields, which do not wear (a stand-in town grown 18 months shows almost no paths; the plots town in the screenshots shows 14 trail and 11 path tiles after a year).
+- **Terrain and woodland (2026-10-27)**, against paths alone: the opening check is identical; map luck stays 46/48 and 41/42 with the same failing sites; the town building check is unchanged for houses placed by the player (18/20) and homes on plots (18/20), and the scattered layout falls back from 15/20 to 14/20 (33 to 30 people; its routes pay more for woods). The stand-in player never marks woods, so these measure the terrain costs only. `tests/sim/town_map_probe.gd`: what town maps hold is unchanged (hill land is a new marker, not new land); generation median 38 ms.
 - **What measuring changed:** three stalls were found and fixed during implementation (see the judgment calls above): spare time limited to tier 0 and a family's own home left spare houses unbuilt and stopped growth; a finished workplace stood empty because its family had been pulled onto another vacancy (the toolmaker, fatally); towns that left homes to families never had a spare home for marriages.
 
 ## Open Owner Decisions
@@ -141,6 +175,7 @@ The stand-in player (`tests/sim/stand_in_player.gd`) plans buildings and the tow
 4. **Travel numbers** (`DAY_EFFORT_TILES` 500, `CARRY_LOAD` 5, road 0.5) were set so a compact town loses about 8% and a sprawled one 15-25%; first-pass values for owner tuning.
 5. **Families build homes only on plots the player set aside.** Should mature towns choose their own residential land?
 6. **Path numbers** (trail at wear 40, path at 150, fading over about two months, trail -15% and path -35% effort) are first-pass values: a busy route turns to path within two to five months. The judgment calls under Paths are open too, above all removing the road tool.
+7. **Terrain and woodland numbers** (woods 2, hills 1.4; 2 working days to fell a tile; a year to regrow ringed by woods, three on an edge; wear 10 to hold growth back) are first-pass values, and the judgment calls under Woodland are open, above all whether clearings become farmland and whether a woodcutter needs woods in reach to produce.
 
 ## Remaining Work And Limitations
 

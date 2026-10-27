@@ -40,6 +40,9 @@ static func get_sidebar_lines(city: City) -> Array[String]:
 		lines.append("+%d more planned" % (construction.projects.size() - SIDEBAR_PROJECT_LINES))
 	if construction.families_without_plot > 0:
 		lines.append("%d famil%s want a home plot (P)" % [construction.families_without_plot, "y" if construction.families_without_plot == 1 else "ies"])
+	var marked: int = city.woodland.marked.size()
+	if marked > 0:
+		lines.append("Woods to clear: %d tile%s%s" % [marked, "" if marked == 1 else "s", "" if not city.woodland.get_woodcutters().is_empty() else " (needs a working woodcutter)"])
 	return lines
 
 static func get_project_lines(city: City, project: ConstructionProject) -> Array[String]:

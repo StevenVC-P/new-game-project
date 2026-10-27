@@ -8,9 +8,9 @@ extends RefCounted
 # from the nearest store to a site the same way (TownConstruction).
 #
 # Travel is aggregated, not simulated per item: routes are found once per town layout on the
-# town map (AStarGrid2D, weighted by ground: roads fast, woods and rock slow, water impassable),
-# and each workplace's daily trips become a share of its family's working day. All stores share
-# one stock, City.resources; separate inventories per store are later work.
+# town map (AStarGrid2D, weighted by ground: roads fast, woods, hills, and rock slow, water
+# impassable), and each workplace's daily trips become a share of its family's working day. All
+# stores share one stock, City.resources; separate inventories per store are later work.
 #
 # Those same trips wear the ground they cross. Wear builds up where people walk and fades where
 # they stop; enough of it makes a trail, then a path, which are quicker to walk, so routes bend
@@ -110,11 +110,14 @@ static func tile_effort(tile: Dictionary) -> float:
 		return EconomyBalance.ROAD_EFFORT
 	if tile["occupied"] == true:
 		return EconomyBalance.BUILT_EFFORT
+	# Terrain, then cover.
 	var effort: float = 1.0
 	if tile["type"] == "rough":
 		effort = EconomyBalance.ROUGH_EFFORT
-	elif tile["has_trees"] == true:
-		effort = EconomyBalance.WOODS_EFFORT
+	elif tile.get("is_hill", false) == true:
+		effort = EconomyBalance.HILL_EFFORT
+	if tile["has_trees"] == true:
+		effort *= EconomyBalance.WOODS_EFFORT
 	match get_path_level(tile):
 		PATH_TRAIL:
 			effort *= EconomyBalance.TRAIL_EFFORT_FACTOR

@@ -2,7 +2,8 @@ extends SceneTree
 
 # The town view in the real game (main.gd + TownMapView): it opens fitted beside the sidebar;
 # screen and tile coordinates agree at every zoom; a click on the map plans the chosen building
-# on the tile under the cursor, and the town builds it there; the plot tool sets land aside; a
+# on the tile under the cursor, and the town builds it there; the plot tool sets land aside; the
+# clearing tool marks woods between two clicks; a
 # click on a site selects it; a drag pans instead of placing; the wheel zooms; a click on the
 # sidebar never reaches the map; paths worn by the townsfolk show on the ground; and decoration
 # stands only where the town map allows it.
@@ -122,6 +123,22 @@ func test_planning_tools(main: Node2D, view: TownMapView) -> void:
 	await _settle()
 	_check(city.construction.projects[-1].plot_id == int(city.construction.plots[-1]["id"]), "a house placed on a plot is built on that plot")
 
+	# The clearing tool marks the woods between two clicks, with a preview between them.
+	var woods: Vector2i = _nearest_wooded(city)
+	var far_corner: Vector2i = (woods + Vector2i(2, 2)).min(view.map_size - Vector2i.ONE)
+	main.select_building_type(TownWoodland.CLEAR)
+	_click(view.tile_rect_to_screen(woods).get_center())
+	await _settle()
+	_check(city.woodland.marked.is_empty(), "the first click only marks where the block starts")
+	main.update_city_hovered_tile(view.tile_rect_to_screen(far_corner).get_center())
+	main.sync_town_map_view()
+	_check(view.clear_preview.has_point(woods) and view.clear_preview.has_point(far_corner), "the block to be marked should show while the player picks its corner")
+	_click(view.tile_rect_to_screen(far_corner).get_center())
+	await _settle()
+	_check(city.woodland.is_marked(woods), "the second click should mark the woods in the block for clearing")
+	_check(view.clear_preview.size == Vector2i.ZERO, "the preview goes once the block is marked")
+	main.select_building_type(MainScript.BUILDING_HOUSE)
+
 	main.is_placing_building = false
 	_click(view.tile_rect_to_screen(plot_tile).get_center())
 	await _settle()
@@ -205,6 +222,16 @@ func test_decoration_follows_the_map(main: Node2D, view: TownMapView) -> void:
 	for building: Building in city.buildings:
 		var tile: Dictionary = city.local_map[building.tile.y][building.tile.x]
 		_check(not features.is_open_ground(tile), "no ground details under a building")
+
+func _nearest_wooded(city: City) -> Vector2i:
+	var size: Vector2i = city.logistics.map_size()
+	var center: Vector2 = Vector2(size) * 0.5
+	var best: Vector2i = Vector2i(-1, -1)
+	for y in range(size.y):
+		for x in range(size.x):
+			if city.local_map[y][x]["has_trees"] == true and (best.x < 0 or Vector2(x, y).distance_squared_to(center) < Vector2(best).distance_squared_to(center)):
+				best = Vector2i(x, y)
+	return best
 
 func _valid_spot(main: Node2D, building_type: String) -> Vector2i:
 	var center: Vector2i = Vector2i(MainScript.CITY_MAP_WIDTH, MainScript.CITY_MAP_HEIGHT) / 2

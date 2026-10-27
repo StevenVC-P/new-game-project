@@ -83,6 +83,8 @@ var household_debug_inspector: Control = null
 var trade_menu: TradeMenu = TradeMenu.new()
 var selected_building_type: String = BUILDING_HOUSE
 var is_placing_building: bool = true
+# First corner of a block of woods being marked for clearing; (-1, -1) until the first click.
+var clear_start_tile: Vector2i = Vector2i(-1, -1)
 var is_build_menu_open: bool = false
 var city_walker_time: float = 0.0
 var world_calendar: Calendar = Calendar.new()
@@ -236,6 +238,7 @@ func sync_town_map_view() -> void:
 	town_map_view.preview_type = selected_building_type if is_placing_building else ""
 	town_map_view.preview_size = get_building_size(selected_building_type)
 	town_map_view.preview_valid = is_placing_building and is_inside_city_map(city_hovered_tile.x, city_hovered_tile.y) and is_valid_building_placement(selected_city_index, selected_building_type, city_hovered_tile)
+	town_map_view.clear_preview = get_clear_preview(city)
 	town_map_view.inspected_index = city_building_overlay.inspected_building_index
 	town_map_view.inspected_project_id = city_building_overlay.inspected_project_id
 	town_map_view.inspected_plot_id = city_building_overlay.inspected_plot_id
@@ -1250,6 +1253,7 @@ func try_handle_building_click_at_tile(tile_pos: Vector2i, toggle_maintenance: b
 	var city: City = cities[selected_city_index]
 	if city_building_overlay.select_building_at_tile(city, tile_pos, toggle_maintenance) or city_building_overlay.select_site_at_tile(city, tile_pos):
 		is_placing_building = false
+		clear_start_tile = Vector2i(-1, -1)
 		queue_redraw()
 		return true
 
@@ -1274,6 +1278,7 @@ func handle_clear_selection_key(key_event: InputEventKey) -> bool:
 
 	is_placing_building = false
 	is_build_menu_open = false
+	clear_start_tile = Vector2i(-1, -1)
 	clear_selected_household()
 	queue_redraw()
 	return true
@@ -1332,6 +1337,8 @@ func handle_building_selection_key_event(key_event: InputEventKey) -> bool:
 		select_building_type(BUILDING_STOREHOUSE)
 	elif is_letter_key(keycode, physical_keycode, KEY_P):
 		select_building_type(TownConstruction.PLOT)
+	elif is_letter_key(keycode, physical_keycode, KEY_C):
+		select_building_type(TownWoodland.CLEAR)
 	else:
 		return false
 
@@ -1341,6 +1348,7 @@ func handle_building_selection_key_event(key_event: InputEventKey) -> bool:
 func select_building_type(building_type: String):
 	selected_building_type = building_type
 	is_placing_building = true
+	clear_start_tile = Vector2i(-1, -1)
 	clear_selected_household()
 
 func is_building_key(keycode: int, physical_keycode: int, unicode_value: int, number_key: int, expected_unicode: int) -> bool:
@@ -1355,8 +1363,9 @@ func is_letter_key(keycode: int, physical_keycode: int, letter_key: int) -> bool
 	return keycode == letter_key or physical_keycode == letter_key
 
 # Plans what the build tool holds at the hovered tile. Buildings become construction sites the
-# town's families build (TownConstruction); a plot sets land aside for a family home. Nobody
-# builds paths: they wear where people walk (TownLogistics).
+# town's families build (TownConstruction); a plot sets land aside for a family home; the
+# clearing tool takes two clicks, at opposite corners, and marks the woods between for the
+# woodcutters (TownWoodland). Nobody builds paths: they wear where people walk (TownLogistics).
 func try_place_selected_building():
 	if selected_city_index < 0 or selected_city_index >= cities.size():
 		return
@@ -1364,6 +1373,10 @@ func try_place_selected_building():
 		return
 
 	var city: City = cities[selected_city_index]
+	if selected_building_type == TownWoodland.CLEAR:
+		place_clear_corner(city)
+		queue_redraw()
+		return
 	if selected_building_type == TownConstruction.PLOT:
 		if city.construction.designate_plot(city_hovered_tile) < 0:
 			print("Cannot set aside a plot: ", get_building_placement_status(selected_city_index, selected_building_type, city_hovered_tile))
@@ -1376,6 +1389,22 @@ func try_place_selected_building():
 	if city.construction.request_building(selected_building_type, origin) == null:
 		print("Cannot place ", selected_building_type, ": ", get_building_placement_status(selected_city_index, selected_building_type, origin))
 	queue_redraw()
+
+func place_clear_corner(city: City) -> void:
+	if clear_start_tile.x < 0:
+		clear_start_tile = city_hovered_tile
+		return
+	if city.woodland.mark_block(clear_start_tile, city_hovered_tile) == 0:
+		print("No woods to clear there")
+	clear_start_tile = Vector2i(-1, -1)
+
+# The block the clearing tool would mark from its first click to the hovered tile.
+func get_clear_preview(city: City) -> Rect2i:
+	if not is_placing_building or selected_building_type != TownWoodland.CLEAR or clear_start_tile.x < 0:
+		return Rect2i()
+	if not is_inside_city_map(city_hovered_tile.x, city_hovered_tile.y):
+		return Rect2i()
+	return city.woodland.block_rect(clear_start_tile, city_hovered_tile)
 
 # Whether a click would put the chosen home on an open residential plot.
 func is_placing_home_on_plot(tile_pos: Vector2i) -> bool:
@@ -1455,9 +1484,23 @@ func get_building_placement_status(city_index: int, building_type: String, origi
 # Whether the build tool may plan here. Materials are not needed yet: a site waits for them.
 func get_building_placement_result(city_index: int, building_type: String, origin: Vector2i) -> Dictionary:
 	var city: City = cities[city_index]
+	if building_type == TownWoodland.CLEAR:
+		return get_clearing_result(city, origin)
 	return city.construction.validate(building_type, origin)
 
+# The clearing tool may start anywhere; its block must hold woods.
+func get_clearing_result(city: City, origin: Vector2i) -> Dictionary:
+	var footprint: Array[Vector2i] = [origin]
+	if clear_start_tile.x < 0:
+		return building_placement.make_result(true, "Valid placement: click one corner of the woods to clear", footprint)
+	var woods: int = city.woodland.get_wooded_in_block(clear_start_tile, origin).size()
+	if woods == 0:
+		return building_placement.make_result(false, "No woods in that block", footprint)
+	return building_placement.make_result(true, "Valid placement: click the opposite corner (%d wooded tiles; all marked: unmark)" % woods, footprint)
+
 func get_building_size(building_type: String) -> Vector2i:
+	if building_type == TownWoodland.CLEAR:
+		return Vector2i.ONE
 	if building_type == TownConstruction.PLOT:
 		return TownConstruction.PLOT_SIZE
 	return building_placement.get_building_size(building_type)
@@ -1780,9 +1823,9 @@ func draw_city_sidebar(font: Font, font_size: int):
 	else:
 		y = draw_sidebar_label_value(font, font_size, "Building", "none", text_x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
 	# The key list is long; when a selection fills the panel it shrinks to one line.
-	var key_lines: Array[String] = ["1 house, 2 farm, 3 woodcutter", "4 toolmaker, 5 quarry, 6 stonecutter", "7 brickworks, 8 lime, 9 mortar", "0 mason, Q sculptor, W carver", "E tileworks, R paver yard", "T storehouse, P home plot"]
+	var key_lines: Array[String] = ["1 house, 2 farm, 3 woodcutter", "4 toolmaker, 5 quarry, 6 stonecutter", "7 brickworks, 8 lime, 9 mortar", "0 mason, Q sculptor, W carver", "E tileworks, R paver yard", "T storehouse, P home plot", "C clear woods (click both corners)"]
 	if y + (key_lines.size() + 4) * 15.0 > sidebar_rect.end.y:
-		key_lines = ["Keys 1-0, Q-R, T choose a building", "P home plot"]
+		key_lines = ["Keys 1-0, Q-R, T choose a building", "P home plot, C clear woods"]
 	for key_line: String in key_lines:
 		y = draw_sidebar_line(font, font_size, key_line, text_x, y, VisualStyle.COLOR_MUTED)
 	y = draw_sidebar_line(font, font_size, "B: build menu, Right click/Esc: clear", text_x, y, VisualStyle.COLOR_MUTED)
@@ -1884,7 +1927,7 @@ func get_building_display_name(building_type: String) -> String:
 		return "Tileworks"
 	if building_type == BUILDING_PAVER_YARD:
 		return "Paver Yard"
-	if building_type == BUILDING_STOREHOUSE or building_type == TownConstruction.PLOT:
+	if building_type == BUILDING_STOREHOUSE or building_type == TownConstruction.PLOT or building_type == TownWoodland.CLEAR:
 		return BuildMenuHelper.get_display_name(building_type)
 
 	return building_type

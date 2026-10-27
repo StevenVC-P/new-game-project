@@ -8,6 +8,7 @@ static func get_building_catalog() -> Array[Dictionary]:
 		{"id": "tool_mender", "display_name": "Tool Mender", "category": "Hand Work (Tier 0)"},
 		{"id": "plot", "display_name": "Residential Plot", "category": "Town Planning"},
 		{"id": "storehouse", "display_name": "Storehouse", "category": "Town Planning"},
+		{"id": "clear_woods", "display_name": "Clear Woods", "category": "Town Planning"},
 		{
 			"id": "house",
 			"display_name": "House",
