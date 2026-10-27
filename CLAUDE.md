@@ -13,6 +13,7 @@ A household-rooted civilization sandbox: founding families on a frontier grow in
 Design decisions are owner-confirmed and authoritative. Check them before changing gameplay:
 
 - `docs/GAME_VISION.md` - objectives, pace, experience; wins over any other doc on conflict
+- `docs/FIRST_STAGE_LOOP.md` - the owner-approved plan for a town's first stage (2026-10-27): the principle, planning that pays off, geography, the way to trade, six milestones, and the terms for working with less owner input
 - `docs/IMPLEMENTATION_ROADMAP.md` - milestones to the first playable village, with the formula changes each milestone is authorized to make
 - System models: `docs/ECONOMY_MODEL.md`, `docs/SIMULATION_SCALE_MODEL.md`, `docs/HOUSES_AND_LINEAGE_MODEL.md`, `docs/CULTURE_AND_VALUES_MODEL.md`, `docs/WARFARE_AND_CONFLICT_MODEL.md`, `docs/SETTLEMENT_GROWTH_SCALE_MODEL.md`
 - `docs/household_simulation_philosophy.md` and `docs/PROJECT_OWNER_QUESTIONS.md` - the household-first rules
