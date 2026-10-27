@@ -101,6 +101,8 @@ class GeoLabel:
 	var angle: float = 0.0
 
 var world_size: Vector2 = Vector2(7200.0, 3600.0)
+# The seed a generated world was built from (WorldGenerator); -1 for the authored world.
+var world_seed: int = -1
 
 # Geography fields at terrain resolution, one texel per cell:
 # R elevation (0 = sea level, land up to 1, sea down to -1), G moisture, B forest, A mountain relief.
@@ -187,6 +189,11 @@ func lake_at(world_pos: Vector2, reach: float = 1.0) -> Lake:
 		if (offset / lake.radius).length() <= reach:
 			return lake
 	return null
+
+# The region's heart is frozen ground, which the founding rules refuse (RegionalChunk.is_frozen).
+func is_frozen_region(region: Region) -> bool:
+	var land_elevation: float = maxf(elevation_at(region.centroid), 0.0)
+	return WorldFieldBuilder.temperature(latitude_at(region.centroid.y), land_elevation) <= RegionalChunkGenerator.FROZEN_TEMPERATURE
 
 # Region under a world position, or -1 over water.
 func region_id_at(world_pos: Vector2) -> int:

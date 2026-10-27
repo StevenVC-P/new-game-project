@@ -23,6 +23,8 @@ const REDRAW_ZOOM_DRIFT: float = 1.15
 var recorded_zoom: float = -1.0
 var recorded_area: Rect2 = Rect2()
 signal return_requested
+# The top bar's Menu button: save, load, quit (scripts/app.gd).
+signal menu_requested
 
 const ZOOM_STEP: float = 1.25
 const ZOOM_SMOOTHING: float = 14.0
@@ -350,6 +352,8 @@ func apply_hud_action(action: String) -> void:
 			request_region_entry(selected_region_id)
 		"return":
 			return_requested.emit()
+		"open_menu":
+			menu_requested.emit()
 	panel.queue_redraw()
 
 # --- Hover and selection ---------------------------------------------------
@@ -424,6 +428,8 @@ func get_region_entry_status(region: WorldMapData.Region) -> Dictionary:
 	if other_regions_locked and home_region_id >= 0:
 		var home: WorldMapData.Region = data.get_region(home_region_id)
 		return {"allowed": true, "button": "View region", "reason": "Your settlement is in " + home.name + ". Settling a second region is not possible yet.", "can_settle": false}
+	if data.is_frozen_region(region):
+		return {"allowed": true, "button": "View region", "reason": "Frozen land: too cold for free settlers to found a town.", "can_settle": false}
 	var reason: String = "Open frontier. Enter to survey founding sites."
 	if region.is_contested():
 		reason = "Contested frontier: claimed by kingdoms but held by none. Enter to survey founding sites."

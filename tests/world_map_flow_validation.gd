@@ -1,7 +1,7 @@
 extends SceneTree
 
 # The world map's hand-off into the continuous regional map and the founding flow in main.gd:
-# entering regions, kingdom land as view-only, the founding neighbourhood following the
+# entering regions, kingdom land and frozen land as view-only, the founding neighbourhood following the
 # camera, zooming between the two maps at the same place and scale, and founding.
 
 const MainScript = preload("res://scripts/main.gd")
@@ -15,12 +15,15 @@ func run_all() -> void:
 	# Headless runs report a 64x64 window; give the panels their normal layout.
 	root.size = Vector2i(1600, 900)
 	var main: Node2D = MainScript.new()
+	# Looks up places by name, so it plays on the hand-authored planet.
+	main.use_authored_world = true
 	root.add_child(main)
 	await _settle()
 
 	test_game_opens_on_world_map(main)
 	test_calendar_waits_until_a_region_is_entered(main)
 	test_kingdom_land_is_view_only(main)
+	test_frozen_land_refuses_founding(main)
 	var frontier: WorldMapData.Region = test_entering_frontier_shows_its_land(main)
 	test_same_region_gives_same_map(main, frontier)
 	test_neighbourhood_follows_the_camera(main, frontier)
@@ -67,6 +70,29 @@ func test_kingdom_land_is_view_only(main: Node2D) -> void:
 				refused += 1
 	_check(checked > 0 and refused == checked, "no town may be founded on land a kingdom holds (%d of %d refused)" % [refused, checked])
 	main.open_world_map()
+
+# The southern ice shelf is frontier, but its ground is frozen: no town may be founded there.
+func test_frozen_land_refuses_founding(main: Node2D) -> void:
+	var shelf: WorldMapData.Region = main.world_map_data.find_region_by_name("White Shelf West")
+	var status: Dictionary = main.world_map_view.get_region_entry_status(shelf)
+	_check(bool(status["allowed"]) and not bool(status["can_settle"]), "frozen land should be viewable but not settleable")
+	_enter(main, shelf)
+	_check(main.current_view == MainScript.VIEW_REGION, "viewing frozen land should open the regional map")
+	_check(main.region_founding_sites.is_empty(), "frozen land should offer no founding sites (has %d)" % main.region_founding_sites.size())
+	var checked: int = 0
+	var refused: int = 0
+	for y in range(main.region_map_size.y):
+		for x in range(main.region_map_size.x):
+			var tile: Vector2i = Vector2i(x, y)
+			if not FoundingSiteHelper.is_valid_founding_tile(main.tiles, main.cities, tile, main.MIN_CITY_DISTANCE):
+				continue
+			checked += 1
+			if not main.is_valid_founding_tile(tile) and main.get_founding_tile_invalid_reason(tile) == FoundingSiteHelper.REASON_FROZEN:
+				refused += 1
+	_check(checked > 1000 and refused == checked, "open frozen ground should be refused as frozen (%d of %d)" % [refused, checked])
+	main.open_world_map()
+	var temperate: WorldMapData.Region = main.world_map_data.find_region_by_name("Meander Plains")
+	_check(not main.world_map_data.is_frozen_region(temperate), "temperate frontier should not read as frozen")
 
 func test_entering_frontier_shows_its_land(main: Node2D) -> WorldMapData.Region:
 	var frontier: WorldMapData.Region = main.world_map_data.find_region_by_name("Meander Plains")

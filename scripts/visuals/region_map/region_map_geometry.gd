@@ -25,9 +25,6 @@ const QUARRY_SEARCH_TILES: int = 7
 class RoadShape:
 	var points: PackedVector2Array = PackedVector2Array()
 	var road_class: int = ROAD_PATH
-	# Where the road leads beyond the map edge, "" for roads between towns.
-	var toward: String = ""
-	var edge_point: Vector2 = Vector2.ZERO
 	# Drawn elsewhere (a world road the chunks draw); still lines streets and clears trees.
 	var is_context: bool = false
 
@@ -70,7 +67,6 @@ class QuarryShape:
 
 var tiles: Array = []
 var cities: Array[City] = []
-var geography: RegionGeography = null
 var map_size: Vector2i = Vector2i.ZERO
 # Tile of tiles[0][0]. Shapes are in map units of this tile space: tile t covers
 # t * TILE .. (t + 1) * TILE. Zero for a bounded region; a global tile on the continuous map.
@@ -87,10 +83,9 @@ var clear_grid: PackedByteArray = PackedByteArray()
 
 # context_roads: world roads drawn by the continuous map's chunks; settlements line their
 # streets along them and trees keep clear of them, but this geometry does not draw them.
-func build(region_tiles: Array, region_cities: Array[City], road_paths: Array[Array], region_geography: RegionGeography, context_roads: Array[RoadShape] = []) -> void:
+func build(region_tiles: Array, region_cities: Array[City], road_paths: Array[Array], context_roads: Array[RoadShape] = []) -> void:
 	begin(region_tiles, Vector2i.ZERO)
 	cities = region_cities
-	geography = region_geography
 	if map_size == Vector2i.ZERO:
 		return
 	build_roads(road_paths)
@@ -199,12 +194,7 @@ func build_roads(road_paths: Array[Array]) -> void:
 				points.append(outside)
 			else:
 				points.insert(0, outside)
-			road.edge_point = outside
 			road.road_class = ROAD_PATH
-			var exit: RegionGeography.RoadExit = nearest_world_exit(edge_tile)
-			if exit != null:
-				road.road_class = ROAD_MAJOR if exit.road_class == WorldMapData.ROAD_MAJOR else ROAD_ROAD
-				road.toward = exit.toward
 		road.points = chaikin(points, 3)
 		roads.append(road)
 	# Wider roads draw last so they cover the paths that share their roadbed.
@@ -234,18 +224,6 @@ func edge_outward(tile: Vector2) -> Vector2:
 	if tile.y <= 0:
 		return Vector2.UP
 	return Vector2.DOWN
-
-func nearest_world_exit(edge_tile: Vector2) -> RegionGeography.RoadExit:
-	if geography == null:
-		return null
-	var best: RegionGeography.RoadExit = null
-	var best_distance: float = 12.0
-	for exit: RegionGeography.RoadExit in geography.road_exits:
-		var distance: float = Vector2(exit.tile).distance_to(edge_tile)
-		if distance < best_distance:
-			best_distance = distance
-			best = exit
-	return best
 
 # A bridge spans each stretch of road that lies over river tiles (the data's fords).
 func build_bridges() -> void:
@@ -307,10 +285,6 @@ func settlement_tier(city: City) -> int:
 		tier = RegionMapStyle.TIER_TOWN
 	elif population >= 40:
 		tier = RegionMapStyle.TIER_VILLAGE
-	if geography != null:
-		for site: RegionGeography.SettlementSite in geography.settlements:
-			if site.name == city.name:
-				tier = maxi(tier, mini(site.tier, RegionMapStyle.TIER_LARGE_TOWN))
 	if world_tiers.has(city.name):
 		tier = maxi(tier, mini(int(world_tiers[city.name]), RegionMapStyle.TIER_LARGE_TOWN))
 	return tier

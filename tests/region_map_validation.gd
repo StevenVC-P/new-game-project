@@ -1,8 +1,9 @@
 extends SceneTree
 
-# The regional map: world-driven generation, the original generator left unchanged, and a
-# presentation that never shows what the tile data does not hold. Rendering itself is
-# checked visually with tests/visual/region_map_capture.gd.
+# The regional map: the original generator left unchanged, a presentation that never shows
+# what the tile data does not hold, and founding on the continuous map. The continuous
+# terrain itself is checked by tests/regional_terrain_validation.gd; rendering visually with
+# tests/visual/region_map_capture.gd.
 
 const MainScript = preload("res://scripts/main.gd")
 const MAP_SIZE: Vector2i = Vector2i(80, 50)
@@ -18,8 +19,8 @@ const LEGACY_FINGERPRINTS: Array[String] = [
 	"0b4b8b2c96de9eb6b659ebe5f23d2cfe", "da4be9a03b276693d0bbe75c6077b9bd", "88ec4a2eff85456b9e0b0e16d4ac2901",
 	"3da19613e723e5aa367b0e4732f5e26f", "82063ee9fadbc59019719e291d6b36e6",
 ]
-# Every frontier region must leave the player plenty of choice.
-const MIN_FOUNDING_SITES: int = 300
+# Original-generator map for the presentation checks.
+const VIEW_SEED: int = 3
 
 var failure_count: int = 0
 
@@ -28,12 +29,8 @@ func _init() -> void:
 
 func run_all() -> void:
 	test_legacy_generation_is_unchanged()
-	var world: WorldMapData = FixedWorldDefinition.build()
-	test_frontier_regions_are_playable(world)
-	test_regions_follow_world_geography(world)
-	test_world_generation_is_deterministic(world)
-	test_presentation_follows_tile_data(world)
-	test_camera_maps_screen_to_tiles(world)
+	test_presentation_follows_tile_data()
+	test_camera_maps_screen_to_tiles()
 	await test_clicking_the_landscape_picks_that_tile()
 
 	if failure_count > 0:
@@ -62,77 +59,23 @@ func test_legacy_generation_is_unchanged() -> void:
 			parts.append(str(road))
 		_check("".join(parts).md5_text() == LEGACY_FINGERPRINTS[seed_value - 1], "maps made without the world should be unchanged (seed %d)" % seed_value)
 
-func generate(world: WorldMapData, region: WorldMapData.Region) -> Dictionary:
+# A bounded region as the original generator makes it, with a grown player town beside the
+# neutral one, so settlements, fields, roads, and a quarry are all on the board.
+func make_view() -> RegionMapView:
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
-	rng.seed = region.regional_map_seed
+	rng.seed = VIEW_SEED
 	var generator: RegionMapGenerator = RegionMapGenerator.new(rng, MAP_SIZE.x, MAP_SIZE.y, 24, 5, 7)
-	generator.geography = RegionGeography.from_world(world, region.id, MAP_SIZE)
 	var result: Dictionary = generator.generate_region()
-	result["roads"] = generator.generate_roads_for_cities(result["cities"] as Array[City])
-	result["geography"] = generator.geography
-	return result
-
-func count_tiles(tiles: Array, matches: Callable) -> int:
-	var count: int = 0
-	for row: Array in tiles:
-		for tile: Dictionary in row:
-			if matches.call(tile):
-				count += 1
-	return count
-
-func test_frontier_regions_are_playable(world: WorldMapData) -> void:
-	for region: WorldMapData.Region in world.regions:
-		if region.owner_kingdom_id != -1:
-			continue
-		var result: Dictionary = generate(world, region)
-		var tiles: Array = result["tiles"]
-		var cities: Array[City] = result["cities"] as Array[City]
-		_check(cities.size() == 1 and cities[0].is_neutral_city(), "a frontier region should have one regional town: " + region.name)
-		var sites: int = 0
-		for y in range(MAP_SIZE.y):
-			for x in range(MAP_SIZE.x):
-				if FoundingSiteHelper.is_valid_founding_tile(tiles, cities, Vector2i(x, y), 24):
-					sites += 1
-		_check(sites >= MIN_FOUNDING_SITES, "%s should offer at least %d founding sites (has %d)" % [region.name, MIN_FOUNDING_SITES, sites])
-
-func test_regions_follow_world_geography(world: WorldMapData) -> void:
-	var valley: Dictionary = generate(world, world.find_region_by_name("Meander Plains"))
-	_check(count_tiles(valley["tiles"], func(t: Dictionary) -> bool: return t["type"] == "river") >= 100, "the Great Meander should run through Meander Plains")
-	_check((valley["cities"] as Array[City])[0].name == "Callow Ford", "the world's village should be the regional town")
-	var leads_to_port: bool = false
-	for exit: RegionGeography.RoadExit in (valley["geography"] as RegionGeography).road_exits:
-		leads_to_port = leads_to_port or exit.toward == "Port Brannoch"
-	_check(leads_to_port, "the road to Port Brannoch should leave the map")
-
-	var lake: Dictionary = generate(world, world.find_region_by_name("Lake Callow"))
-	_check(count_tiles(lake["tiles"], func(t: Dictionary) -> bool: return t["type"] == "lake") >= 200, "Lake Callow should hold its lake")
-
-	var coast: Dictionary = generate(world, world.find_region_by_name("Tessaly"))
-	_check(count_tiles(coast["tiles"], func(t: Dictionary) -> bool: return t["type"] == "sea") >= 200, "a coastal region should border the sea")
-
-	var heights: Dictionary = generate(world, world.find_region_by_name("Crownspine Heights"))
-	_check(count_tiles(heights["tiles"], func(t: Dictionary) -> bool: return t["type"] == "mountain") >= 600, "a mountain region should be mountainous")
-
-	var desert: Dictionary = generate(world, world.find_region_by_name("Siwan Oases"))
-	_check((desert["geography"] as RegionGeography).climate_family == RegionGeography.CLIMATE_ARID, "a desert region should read as arid")
-	_check(count_tiles(desert["tiles"], func(t: Dictionary) -> bool: return t["has_forest"] == true) < 400, "a desert should have little woodland")
-
-	var jungle: Dictionary = generate(world, world.find_region_by_name("Western Gulf"))
-	_check(count_tiles(jungle["tiles"], func(t: Dictionary) -> bool: return t["has_forest"] == true) > 1200, "a jungle region should be heavily wooded")
-
-func test_world_generation_is_deterministic(world: WorldMapData) -> void:
-	var region: WorldMapData.Region = world.find_region_by_name("Thornspine North")
-	var first: Dictionary = generate(world, region)
-	var second: Dictionary = generate(world, region)
-	_check(str(first["tiles"]).md5_text() == str(second["tiles"]).md5_text(), "a region should give the same map every time")
-	_check(str(first["roads"]) == str(second["roads"]), "a region should give the same roads every time")
-
-func make_view(world: WorldMapData) -> RegionMapView:
-	var region: Dictionary = RegionShowcase.build(world, "Meander Plains", true)
+	var tiles: Array = result["tiles"]
+	var cities: Array[City] = result["cities"] as Array[City]
+	var site: Vector2i = RegionShowcase.best_founding_site(tiles, cities)
+	if site.x >= 0:
+		cities.append(RegionShowcase.make_grown_town(site))
+	var roads: Array[Array] = generator.generate_roads_for_cities(cities)
 	var view: RegionMapView = RegionMapView.new()
 	root.add_child(view)
 	view.set_screen_rect(Rect2(Vector2(0.0, 42.0), Vector2(1300.0, 858.0)))
-	view.set_region(region["tiles"], region["cities"], region["roads"], region["geography"])
+	view.set_region(tiles, cities, roads)
 	return view
 
 func tile_under(view: RegionMapView, map_position: Vector2) -> Dictionary:
@@ -142,8 +85,8 @@ func tile_under(view: RegionMapView, map_position: Vector2) -> Dictionary:
 
 # Decoration must not misrepresent the data: trees only on forest, peaks on mountains,
 # boulders on deposits, houses on open land, fields on fertile land, bridges over rivers.
-func test_presentation_follows_tile_data(world: WorldMapData) -> void:
-	var view: RegionMapView = make_view(world)
+func test_presentation_follows_tile_data() -> void:
+	var view: RegionMapView = make_view()
 	var trees: int = 0
 	for items: Array in view.feature_layer.strip_items:
 		for item: PackedFloat32Array in items:
@@ -176,13 +119,13 @@ func test_presentation_follows_tile_data(world: WorldMapData) -> void:
 		for step in range(-4, 5):
 			over_river = over_river or tile_under(view, bridge.center + axis * bridge.length * step / 10.0)["type"] == "river"
 		_check(over_river, "bridges should span a river")
-	_check(not view.geometry.bridges.is_empty(), "the road over the Great Meander should have a bridge")
+	_check(not view.geometry.bridges.is_empty(), "the road across the river should have a bridge")
 	for quarry: RegionMapGeometry.QuarryShape in view.geometry.quarries:
 		_check(tile_under(view, quarry.center)["resource"] == "stone", "a quarry should be cut into a stone deposit")
 	view.free()
 
-func test_camera_maps_screen_to_tiles(world: WorldMapData) -> void:
-	var view: RegionMapView = make_view(world)
+func test_camera_maps_screen_to_tiles() -> void:
+	var view: RegionMapView = make_view()
 	for zoom: float in [view.min_zoom(), 2.0, RegionMapStyle.MAX_ZOOM]:
 		view.focus_on(Vector2(40.5, 25.5) * RegionMapStyle.TILE, zoom)
 		for tile: Vector2i in [Vector2i(40, 25), Vector2i(38, 24), Vector2i(42, 27)]:
@@ -197,6 +140,8 @@ func test_clicking_the_landscape_picks_that_tile() -> void:
 	# Headless runs report a 64x64 window, which the inspector panel would cover entirely.
 	root.size = Vector2i(1600, 900)
 	var main: Node2D = MainScript.new()
+	# Looks up places by name, so it plays on the hand-authored planet.
+	main.use_authored_world = true
 	root.add_child(main)
 	main.world_map_view.request_region_entry(main.world_map_data.find_region_by_name("Meander Plains").id)
 	main.wait_for_neighbourhood_job()

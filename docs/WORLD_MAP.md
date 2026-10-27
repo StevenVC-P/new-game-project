@@ -1,12 +1,12 @@
 # World Map
 
-The world atlas: one fixed, hand-authored planet shown as a painterly physical atlas, sitting above the regional map in the hierarchy **World -> Region -> Settlement**. Built 2026-10-25 on `feature/world-map`. It is a foundation for later political, economic, and cultural simulation; none of that simulation exists yet.
+The world atlas: the planet shown as a painterly physical atlas, sitting above the regional map in the hierarchy **World -> Region -> Settlement**. Built 2026-10-25 on `feature/world-map` around one hand-authored planet; since 2026-10-26 every game is played on a newly generated planet (`feature/procedural-world`), and the authored planet remains as the reference and test world. It is a foundation for later political, economic, and cultural simulation; none of that simulation exists yet.
 
 ## Seeing It
 
-- **In the game:** the game now opens on the world atlas. Click a region to inspect it; **Enter region** (or double-click, or Enter) opens the regional map there, and zooming in past the atlas's closest view lands on the regional map at the same place and scale. The regional map's top bar has a **World** button back to the atlas, and zooming out past its widest view returns too.
-- **Isolated:** run `scenes/world_map_demo.tscn` (F6 in the editor).
-- **Screenshots:** `tests/visual/world_map_capture.gd` renders nine views (planet, continents, close zoom, a selected region, the wrap seam) to PNG files. It needs a window, so run it without `--headless` (command in `CLAUDE.md`).
+- **In the game:** the game opens on the world atlas of a newly generated planet. The top bar shows its seed; `--world-seed=N` after `--` on the command line replays it. Click a region to inspect it; **Enter region** (or double-click, or Enter) opens the regional map there, and zooming in past the atlas's closest view lands on the regional map at the same place and scale. The regional map's top bar has a **World** button back to the atlas, and zooming out past its widest view returns too.
+- **Isolated:** run `scenes/world_map_demo.tscn` (F6 in the editor); it shows the authored planet.
+- **Screenshots:** `tests/visual/world_map_capture.gd` renders nine views of the authored planet (planet, continents, close zoom, a selected region, the wrap seam) to PNG files, or with `seed=N` a generated planet's continents, a capital, a frontier region, and the seam. It needs a window, so run it without `--headless` (command in `CLAUDE.md`).
 
 Controls: drag (left, right, or middle) to pan; mouse wheel, `+`/`-`, or trackpad pinch to zoom toward the cursor; WASD/arrows pan; Home resets; Escape or right-click clears the selection; B, R, T, L toggle borders, roads, towns, and labels.
 
@@ -16,8 +16,9 @@ Data, its construction, and its presentation are separate so generated or simula
 
 | Stage | File | Role |
 | --- | --- | --- |
-| Authored world | `scripts/world/fixed_world_definition.gd` | Everything hand-placed, in degrees: landmass outlines, lakes, mountain ranges, plateaus, climate and forest zones, rivers, kingdoms, region seeds, settlements, roads, map labels. |
-| Builder | `scripts/world/world_field_builder.gd` | Turns a definition into `WorldMapData`: terrain fields, region partition, settlement placement, road geometry, region summaries. Deterministic. |
+| Generated world | `scripts/world/world_generator.gd`, `world_name_generator.gd` | A definition of the same shape from a seed: continents, ranges, climate, lakes, rivers, kingdoms, regions, settlements, roads, labels, and names. What the game plays on. |
+| Authored world | `scripts/world/fixed_world_definition.gd` | Everything hand-placed, in degrees: landmass outlines, lakes, mountain ranges, plateaus, climate and forest zones, rivers, kingdoms, region seeds, settlements, roads, map labels. The reference planet for tests and demos. |
+| Builder | `scripts/world/world_field_builder.gd` | Turns a definition into `WorldMapData`: terrain fields, region partition, settlement placement, road geometry, region summaries. Deterministic. Runs in two halves (`begin_world`, `finish_world`) so the generator can read the built land in between. |
 | Model | `scripts/world/world_map_data.gd` | The world as data (kingdoms, regions, settlements, roads, rivers, fields) plus lookups (`region_id_at`, wrapping). Emits `changed(layer)`. |
 | Renderer | `scripts/visuals/world_map/` | `WorldMapView` (camera, input, selection) and one node per layer: terrain shader, rivers, settlement footprints, roads, settlement icons, labels. `WorldMapStyle` holds colors and zoom rules. |
 | Terrain shader | `shaders/world_terrain.gdshader` | Biomes, relief shading, water, coast, cultivated land, and political borders, all from data textures. |
@@ -27,7 +28,17 @@ A future system changes the world by editing `WorldMapData` and calling `notify_
 
 ## Decisions And Why
 
-- **No procedural generation, but fixed detail noise.** The layout (every coastline, range, river, kingdom, settlement, and road) is authored. Coastlines, climate band edges, ridge texture, and region border wiggle use noise with a constant seed, so the same world is built on every run and every machine. Hand-drawing detail at that scale is impractical, and without it coasts read as blobs and borders as boxes. *Owner check:* if "no randomization" was meant to exclude this too, the alternative is denser authored outlines.
+- **A generated planet each game, continent styled (owner, 2026-10-26).** The owner asked for more random generation while keeping continents. `WorldGenerator` plans what the authored world spells out by hand and leaves the drawing to the same builder, so the atlas, regional map, and town map work unchanged. How it plans:
+  - *Continents* are chains of overlapping, stretched, wobbly lobes along a wandering spine, grown outward lobe by lobe until about 27-32% of the planet is land, with at least 7 degrees of sea between continents (the builder's coastline warp moves coasts up to about 6 degrees, so narrower gaps let continents merge). Archipelagos and lone islands come after. The date line is moved into the emptiest ocean, because roads are pathfound without wrapping.
+  - *Ranges, highlands, lakes, and climate* are placed on the planned continents. Ranges cast rain shadows by latitude (easterlies in the tropics and polar zones, westerlies between 30 and 60 degrees); a subtropical interior gets at most one great desert; wet belts get rain and forest.
+  - *Rivers* are drained over the built elevation with a priority flood from the sea, so every river reaches the sea (through lakes and out of hollows). The largest basins become rivers; major rivers get tributaries.
+  - *Regions* are seeded by dart throwing (about one per 420 land cells; islands with room get their own), nudged toward rivers and coasts, and grown with the builder's own region growth. The builder takes that partition over instead of growing it again.
+  - *Kingdoms* (5-8) start at the most habitable regions, kept four regions apart, and grow to a size (one large, the rest small to middling); the rest is frontier. Some border regions between kingdoms become contested, and kingdoms claim some frontier on their borders. Each kingdom has a culture whose sounds name its towns, regions, and rivers (`WorldNameGenerator`, which never repeats a name and blocks a short list of words a player would read as a joke or a slur).
+  - *Settlements and roads:* a town at every kingdom region's seed (the capital's tier follows the kingdom's size, and in some large kingdoms a port outgrows the capital), villages on rivers and coasts, and a village in about half the frontier regions. Major routes join each kingdom's cities, towns and villages tie in to the nearest town, and neighbouring kingdoms share one road.
+  - The same seed always builds the same planet. `tests/world_generator_validation.gd` checks the design rules (no build warnings, several continents, little polar land, capitals inside their kingdoms, unclaimed and contested frontier) on several seeds; 30 seeds passed on 2026-10-26.
+- **The authored planet stays.** Tests that look up places by name (Meander Plains, Highmoor) and the balance tools use it, and it remains the visual reference. `main.gd` plays on it when `use_authored_world` is set.
+- **Detail noise uses fixed seeds.** Coastlines, climate band edges, ridge texture, and region border wiggle use noise; in a generated world its seed comes from the world seed. Hand-drawing detail at that scale is impractical, and without it coasts read as blobs and borders as boxes.
+- **Less polar ice (owner, 2026-10-26).** Generated land stays below about 72 degrees north and 58 degrees south, so no land shelf spans a pole. The far south's extra chill is smaller and closer to the pole (it had turned everything past 60 degrees south to ice), and pack ice starts at 77 degrees north and 72 degrees south (was 75 and 64). The authored White Shelf is now tundra at its edge with ice toward the pole.
 - **One shader quad instead of tiles or nodes.** Terrain is a 1024x512 field (elevation, moisture, forest, relief) drawn by one shader; panning never touches the CPU. Relief comes from hillshading the elevation plus fixed ridged noise, so ranges read as mountain ranges rather than icons, and forests read as broad textured areas.
 - **Borders without fills.** Kingdoms show a thin border line and a soft ribbon of their color just inside it; land keeps its natural colors. The shader smooths the 512x256 region grid into curved borders, and regions are spread into the sea so borders never trace coastlines.
 - **Borders follow geography.** Regions grow outward from authored seed points; crossing mountains, high ground, and rivers is expensive, so borders settle on ranges and rivers.
@@ -61,7 +72,7 @@ The rules live in `WorldMapStyle`, shared by drawing and label collision.
 ## Remaining Work And Limitations
 
 - **Regional maps follow the world** (done since): the regional map is one continuous, true-scale map of the planet; see `docs/REGIONAL_MAP.md`.
-- **Startup cost.** Building the world takes about 2.4 s on the main thread when the game starts, and the regional terrain's setup about 1 s more when the regional map is first needed. Caching the built fields or building on a thread are the options if it becomes a problem.
+- **Startup cost.** Generating and building the world takes about 3.4 s on the main thread when the game starts (the authored world 2.4 s; the generator's own share is about 1 s), and the regional terrain's setup about 1 s more when the regional map is first needed. Caching the built fields or building on a thread are the options if it becomes a problem.
 - **Only one player settlement is supported,** so after founding other regions are view-only.
 - **Capacity.** The political texture carries at most 254 regions and 64 kingdoms.
 - **Not built (per the brief):** trade, wealth, culture, migration, or resource map modes; sea lanes; culture-specific architecture; world simulation of any kind.
@@ -71,4 +82,6 @@ The rules live in `WorldMapStyle`, shared by drawing and label collision.
 
 ## Changing The World
 
-Edit `scripts/world/fixed_world_definition.gd`, then run `tests/world_map_validation.gd`. It fails on any build warning (a road that cannot be routed over land, a settlement at sea, a capital outside its kingdom, a river that does not reach the sea) and checks the design rules (unclaimed and contested frontier exist, a small capital and an outgrown capital exist, the build is deterministic).
+For generated worlds, change `scripts/world/world_generator.gd` and run `tests/world_generator_validation.gd` (pass more seeds after `--` for a wider sweep), then look at a few seeds with `tests/visual/world_map_capture.gd -- <dir> seed=N` and play openings on one with `tests/sim/map_luck_check.gd -- --world-seed=N` (on 2026-10-26: 38/42 and 40/42 towns off the ground on seeds 1 and 2, against 40/42 on the authored planet, which the polar change left at 40/42 and 46/48).
+
+For the authored world, edit `scripts/world/fixed_world_definition.gd`, then run `tests/world_map_validation.gd`. It fails on any build warning (a road that cannot be routed over land, a settlement at sea, a capital outside its kingdom, a river that does not reach the sea) and checks the design rules (unclaimed and contested frontier exist, a small capital and an outgrown capital exist, the build is deterministic).

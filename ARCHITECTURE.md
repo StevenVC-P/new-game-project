@@ -48,7 +48,6 @@ This is a starting inventory for safe agent-assisted development. It describes w
 - `scripts/visuals/world_map/`: World atlas view (camera, input, selection) and its drawing layers; `shaders/world_terrain.gdshader` draws terrain and borders.
 - `scripts/ui/world_map_panel.gd`: World atlas HUD.
 - `scripts/world/regional_terrain.gd`, `regional_chunk_generator.gd`, `regional_chunk.gd`: The whole planet at regional scale, generated in chunks from the world on worker threads.
-- `scripts/world/region_geography.gd`: The earlier per-region window of the world; unused by the game since the continuous map, kept for `tests/region_map_validation.gd`.
 - `scripts/visuals/region_map/`: Regional map view (camera, chunk streaming, layers) drawing the planet as a miniature landscape; `shaders/region_terrain.gdshader` draws the ground. `shaders/natural_palette.gdshaderinc` holds the colors both map shaders share.
 
 ## World Map

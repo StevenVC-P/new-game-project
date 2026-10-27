@@ -68,7 +68,7 @@ const COLOR_QUARRY: Color = Color(0.80, 0.78, 0.72)
 const COLOR_LABEL: Color = Color(0.16, 0.13, 0.09)
 const COLOR_LABEL_HALO: Color = Color(0.97, 0.94, 0.84, 0.88)
 const COLOR_LABEL_WATER: Color = Color(0.13, 0.30, 0.44)
-const COLOR_LABEL_EDGE: Color = Color(0.25, 0.20, 0.14)
+const COLOR_LABEL_REGION: Color = Color(0.25, 0.20, 0.14)
 
 const COLOR_HOVER: Color = Color(1.0, 1.0, 1.0, 0.85)
 const COLOR_SITE_VALID: Color = Color(0.36, 0.86, 0.42)
@@ -112,14 +112,9 @@ static func lod_level(zoom: float) -> int:
 		return 1
 	return 0
 
-static func region_temperature(geography: RegionGeography) -> float:
-	return geography.mean_temperature if geography != null else 0.55
-
-static func region_moisture(geography: RegionGeography) -> float:
-	return geography.mean_moisture if geography != null else 0.6
-
-static func climate_family(geography: RegionGeography) -> String:
-	return geography.climate_family if geography != null else RegionGeography.CLIMATE_TEMPERATE
+# Climate of a bounded region (the original valley maps), which has no world behind it.
+const BOUNDED_TEMPERATURE: float = 0.55
+const BOUNDED_MOISTURE: float = 0.6
 
 # Mirrors forest_color() in shaders/natural_palette.gdshaderinc.
 static func forest_color(t: float) -> Color:
@@ -129,15 +124,12 @@ static func forest_color(t: float) -> Color:
 	var color: Color = boreal.lerp(temperate, smoothstep(0.34, 0.55, t))
 	return color.lerp(jungle, smoothstep(0.7, 0.86, t))
 
-# Tree kinds by climate: broadleaf woods, conifer forest, dry scrub, or tall jungle.
-static func tree_style(geography: RegionGeography) -> Dictionary:
-	return tree_style_for(region_temperature(geography), climate_family(geography))
-
 # Ground under the drawn trees, for the terrain shader's forest floor.
 static func forest_floor_color(t: float, family: String) -> Color:
 	var tree_dark: Color = tree_style_for(t, family)["dark"]
-	return tree_dark.lerp(Color(0.5, 0.48, 0.32), 0.25) if family == RegionGeography.CLIMATE_ARID else tree_dark.darkened(0.08)
+	return tree_dark.lerp(Color(0.5, 0.48, 0.32), 0.25) if family == RegionalTerrain.CLIMATE_ARID else tree_dark.darkened(0.08)
 
+# Tree kinds by climate: broadleaf woods, conifer forest, dry scrub, or tall jungle.
 static func tree_style_for(t: float, family: String) -> Dictionary:
 	var base: Color = forest_color(t)
 	var style: Dictionary = {
@@ -149,17 +141,17 @@ static func tree_style_for(t: float, family: String) -> Dictionary:
 		"light": base.lightened(0.30),
 	}
 	match family:
-		RegionGeography.CLIMATE_COLD:
+		RegionalTerrain.CLIMATE_COLD:
 			style["conifer_share"] = 0.85
 			style["radius"] = Vector2(2.1, 2.9)
-		RegionGeography.CLIMATE_ARID:
+		RegionalTerrain.CLIMATE_ARID:
 			style["kind"] = "scrub"
 			style["conifer_share"] = 0.0
 			style["radius"] = Vector2(1.7, 2.5)
 			style["base"] = Color(0.44, 0.48, 0.26)
 			style["dark"] = Color(0.30, 0.33, 0.18)
 			style["light"] = Color(0.60, 0.62, 0.36)
-		RegionGeography.CLIMATE_TROPICAL:
+		RegionalTerrain.CLIMATE_TROPICAL:
 			style["conifer_share"] = 0.0
 			style["radius"] = Vector2(3.0, 4.3)
 			style["light"] = base.lightened(0.38)

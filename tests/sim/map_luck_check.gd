@@ -4,6 +4,7 @@ extends SceneTree
 # founds towns at valid sites, generates their town maps exactly as the game does, and plays two
 # years with the stand-in player placing every building on the real map.
 # Run: <godot> --headless --path . --script res://tests/sim/map_luck_check.gd   (filter for [MAP])
+# Add "-- --world-seed=N" to play only the continuous map of a generated world (WorldGenerator).
 #
 # Reports how many farms and gatherer's camps each site's map can hold before play, and which
 # kinds of sites (by site profile tag) struggle.
@@ -28,11 +29,17 @@ func _init() -> void:
 	call_deferred("run_all")
 
 func run_all() -> void:
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--world-seed="):
+			var world_seed: int = int(arg.trim_prefix("--world-seed="))
+			_summarize(_play_continuous_map(WorldGenerator.build(world_seed)), "continuous regional map of generated world %d, %d frontier regions" % [world_seed, CONTINUOUS_REGIONS])
+			quit()
+			return
 	var results: Array[Dictionary] = []
 	for world in range(WORLDS):
 		results.append_array(_play_world(1000 + world))
 	_summarize(results, "original regional maps, %d worlds" % WORLDS)
-	_summarize(_play_continuous_map(), "continuous regional map, %d frontier regions" % CONTINUOUS_REGIONS)
+	_summarize(_play_continuous_map(FixedWorldDefinition.build()), "continuous regional map, %d frontier regions" % CONTINUOUS_REGIONS)
 	quit()
 
 func _summarize(results: Array[Dictionary], label: String) -> void:
@@ -62,12 +69,11 @@ func _summarize(results: Array[Dictionary], label: String) -> void:
 			_report("  failed %s site %s [%s]: farms room %d, camps room %d, people %d; %s" % [
 				str(result["world"]), str(result["site"]), ", ".join(result["tags"]), result["farm_capacity"], result["camp_capacity"], result["population"], ", ".join(result["reasons"])])
 
-func _play_continuous_map() -> Array[Dictionary]:
-	var world: WorldMapData = FixedWorldDefinition.build()
+func _play_continuous_map(world: WorldMapData) -> Array[Dictionary]:
 	var terrain: RegionalTerrain = RegionalTerrain.new(world)
 	var frontier: Array[WorldMapData.Region] = []
 	for region: WorldMapData.Region in world.regions:
-		if region.owner_kingdom_id == -1:
+		if region.owner_kingdom_id == -1 and not world.is_frozen_region(region):
 			frontier.append(region)
 	# Spread the picks across climates: sort by climate, then take evenly spaced regions.
 	frontier.sort_custom(func(a: WorldMapData.Region, b: WorldMapData.Region) -> bool: return a.climate + a.name < b.climate + b.name)
@@ -79,16 +85,12 @@ func _play_continuous_map() -> Array[Dictionary]:
 		var origin: Vector2i = Vector2i(terrain.wrap_tile_x(focus.x - size.x / 2), clampi(focus.y - size.y / 2, 0, terrain.size_tiles.y - size.y))
 		var tiles: Array = terrain.extract_window(origin, size)
 		var cities: Array[City] = []
+		var town_tiles: PackedVector2Array = PackedVector2Array()
 		for pair: Array in terrain.settlements_in_window(origin, size):
 			cities.append(City.new((pair[0] as WorldMapData.Settlement).name, Vector2((pair[1] as Vector2i) - origin), City.ROLE_NEUTRAL))
-		var valid_sites: Array[Vector2i] = []
-		for y in range(size.y):
-			for x in range(size.x):
-				if not FoundingSiteHelper.is_valid_founding_tile(tiles, cities, Vector2i(x, y), MainScript.MIN_CITY_DISTANCE):
-					continue
-				var held_by: int = world.get_region(terrain.region_id_at_tile(Vector2i(terrain.wrap_tile_x(origin.x + x), origin.y + y))).owner_kingdom_id
-				if held_by == -1:
-					valid_sites.append(Vector2i(x, y))
+			town_tiles.append(Vector2((pair[1] as Vector2i) - origin))
+		# The game's own rules: the tile rules, no frozen ground, no kingdom land.
+		var valid_sites: Array[Vector2i] = MainScript.scan_founding_sites(tiles, town_tiles, terrain.region_ids_in_window(origin, size), terrain.frozen_in_window(origin, size), world, size)
 		_report("%s (%s): %d valid founding sites in the neighbourhood" % [region.name, region.climate, valid_sites.size()])
 		if valid_sites.is_empty():
 			continue

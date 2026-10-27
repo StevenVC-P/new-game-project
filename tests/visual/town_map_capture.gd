@@ -143,9 +143,9 @@ func classify(local_map: Array, climate: Dictionary) -> String:
 			counts["trees"] += 1 if tile["has_trees"] else 0
 			counts["deposit"] += 1 if tile["resource"] != "none" else 0
 			counts["fertile"] += 1 if tile["is_fertile"] else 0
-	if climate["family"] == RegionGeography.CLIMATE_COLD:
+	if climate["family"] == RegionalTerrain.CLIMATE_COLD:
 		return "cold"
-	if climate["family"] == RegionGeography.CLIMATE_ARID:
+	if climate["family"] == RegionalTerrain.CLIMATE_ARID:
 		return "arid"
 	if counts["sea"] > 250:
 		return "coast"
@@ -248,6 +248,8 @@ func measure(label: String) -> void:
 # town view with its sidebar and a house selected.
 func capture_game_flow() -> void:
 	var main: Node2D = (load("res://scenes/main.tscn") as PackedScene).instantiate()
+	# Looks up places by name, so it plays on the hand-authored planet.
+	main.use_authored_world = true
 	root.add_child(main)
 	for _frame in range(10):
 		await process_frame
@@ -296,6 +298,8 @@ func nearest_roadable(town: City, near: Vector2i) -> Vector2i:
 # town where families build their own homes on plots.
 func capture_construction() -> void:
 	var main: Node2D = (load("res://scenes/main.tscn") as PackedScene).instantiate()
+	# Looks up places by name, so it plays on the hand-authored planet.
+	main.use_authored_world = true
 	root.add_child(main)
 	for _frame in range(10):
 		await process_frame

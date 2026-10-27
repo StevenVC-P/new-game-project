@@ -45,11 +45,12 @@ The HUD names the region under the camera and its status (unclaimed, contested, 
 - **True scale, one continuous map (owner decision 2026-10-26).** The regional map is the atlas magnified about 2.5 times beyond its closest view, at the old tile scale, so town spacing, catchment, and town maps keep their meaning. It replaces the earlier "representative window" of each region, which showed about a fifth of a region and could not join its neighbours.
 - **The zoom hands off at matching scale.** Regional zoom 0.4 is exactly atlas zoom 4.0 (10 map units per world unit), so the hand-off keeps the point under the cursor in place in both directions.
 - **The whole planet is viewable; only frontier land is settleable.** Kingdom land and, after founding, other regions are view-only; founding there is refused with the kingdom's name (`FoundingSiteHelper.kingdom_land_reason`).
+- **Frozen ground refuses founding (owner decision 2026-10-27, "for now").** A tile whose own temperature is at or below `RegionalChunkGenerator.FROZEN_TEMPERATURE` (0.08) is frozen (`RegionalChunk.is_frozen`): the palette paints it as snow and the generator grows no farmland or woods on it. On the authored planet this closes the southern ice shelf (the four White Shelf regions, which offered about 15,600 sites each) and a few snowy tiles in Skarnheim; cold tundra such as Svalgrim (land at 0.10-0.15) stays open. The atlas shows a region whose heart is frozen as "View region".
 - **The maps agree.** Coasts use the atlas's B-spline elevation; borders use the atlas shader's smooth vote over political cells, on both the GPU (regional shader) and the CPU (founding legality), so a border lies on the same curve everywhere.
 - **Local rules, not region-wide amounts.** The earlier world-driven generator ranked a whole region's tiles to hit exact shares of woods and high ground. Pointwise rules compare noise ranks against the world's local averages instead, so shares vary around the target. The map-luck probe measures the effect (below).
 - **Decoration never misrepresents the data.** Trees grow only on forest tiles, peaks only on mountains, boulders only on deposits, fields only on fertile land, buildings never on water, mountains, forest, or deposits, and bridges sit where roads cross rivers. A mountain on a world road becomes a hill: roads keep their passes.
 - **Coordinates stay local to their chunk or settlement.** Global map units reach 72,000; single-precision vertices that far out are too coarse for house polygons, so shapes are built relative to their chunk or settlement window and the node is placed there.
-- **The original generator is untouched.** Without the world, `RegionMapGenerator` still makes byte-identical maps (20 recorded fingerprints in `tests/region_map_validation.gd`), and the bounded view mode still draws them.
+- **The original generator is untouched.** `RegionMapGenerator` still makes byte-identical valley maps (20 recorded fingerprints in `tests/region_map_validation.gd`), and the bounded view mode still draws them. Its earlier world-driven path and `RegionGeography` were removed on the owner's go-ahead (2026-10-27); the game uses only its routed-road helpers, for a founded town's spur road.
 - **One palette with the world map.** Ground and canopy colors come from `shaders/natural_palette.gdshaderinc`, which the world shader also uses.
 
 ## Performance
@@ -75,9 +76,7 @@ The map-luck probe (`tests/sim/map_luck_check.gd`) founds 3 towns in each of 14 
 
 ## Remaining Work And Limitations
 
-- **The old world-driven path is unused.** `RegionGeography` and the world path of `RegionMapGenerator` (and `RegionShowcase.build`) remain only for `tests/region_map_validation.gd`; removing them is pending the owner's go-ahead.
 - **Settlements are depicted, not simulated.** World settlements are drawn from their world tier; the player's town from its buildings. Houses are placed by rule around roads, not from the town map's layout. Since the town map became the regional land magnified 4x (`docs/TOWN_MAP.md`), a town tile has a real place on this map, so its buildings could be drawn where they stand.
 - **Neutral towns are rebuilt when the neighbourhood moves before founding**, which costs a short pause (a few hundred milliseconds when new chunks are needed). Only towns in the neighbourhood can trade.
-- **Founding on ice is allowed.** Polar frontier offers thousands of valid sites; whether frozen land should refuse founding is a design question.
 - **Streams end in hollows.** A stream traced downhill can stop in a local low with no outlet; no pond is drawn there.
 - **Integrated GPUs are untested.**

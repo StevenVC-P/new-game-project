@@ -11,6 +11,8 @@ const REASON_RESOURCE: String = "Cannot found on resource deposit"
 const REASON_OCCUPIED: String = "Tile already occupied"
 const REASON_TOO_CLOSE_NEUTRAL: String = "Too close to neutral town"
 const REASON_TOO_CLOSE_TOWN: String = "Too close to existing town"
+# Checked by the owner of the continuous regional map, which knows the climate.
+const REASON_FROZEN: String = "Frozen ground: too cold to settle"
 
 # Free settlers may not found towns on land a kingdom holds (checked by the owner of the
 # continuous regional map, which knows the political map).
