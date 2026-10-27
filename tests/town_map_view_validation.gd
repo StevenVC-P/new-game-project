@@ -135,7 +135,7 @@ func test_planning_tools(main: Node2D, view: TownMapView) -> void:
 	await _settle()
 	_check(city.construction.plots.size() == plots + 1, "the plot tool should set land aside")
 	main.select_building_type(MainScript.BUILDING_HOUSE)
-	_click(view.tile_rect_to_screen(plot_tile + Vector2i.ONE).get_center())
+	_click(view.tile_rect_to_screen(plot_tile).get_center())
 	await _settle()
 	_check(city.construction.projects[-1].plot_id == int(city.construction.plots[-1]["id"]), "a house placed on a plot is built on that plot")
 

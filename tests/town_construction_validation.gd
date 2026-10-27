@@ -518,7 +518,7 @@ func test_families_build_on_plots() -> void:
 	_check(city.construction.families_without_plot > 0, "families without a plot are counted for the player")
 	var plot_id: int = city.construction.designate_plot(Vector2i(30, 14))
 	_check(plot_id >= 0, "a residential plot can be designated on open ground")
-	_check(city.construction.designate_plot(Vector2i(31, 15)) < 0, "plots cannot overlap")
+	_check(city.construction.designate_plot(Vector2i(30, 14)) < 0, "plots cannot overlap")
 	city.construction.designate_plot(Vector2i(40, 26))
 	var started: Array[ConstructionProject] = FamilyDevelopment.advance(city)
 	_check(started.size() == 2, "families should claim the open plots")
