@@ -99,6 +99,9 @@ func has_trees_near_building(local_map: Array, origin: Vector2i, size: Vector2i,
 
 func get_building_size(building_type: String) -> Vector2i:
 	building_type = BuildingTiersScript.get_base_type(building_type)
+	# Homes stand on a single tile (owner, 2026-10-27), huts too.
+	if building_type == BUILDING_HOUSE:
+		return Vector2i.ONE
 	if building_type == BUILDING_FARM:
 		return Vector2i(3, 3)
 	if building_type == BUILDING_TOOLMAKER:

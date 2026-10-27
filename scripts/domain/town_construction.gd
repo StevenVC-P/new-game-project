@@ -24,7 +24,8 @@ extends RefCounted
 const ROAD: String = "road"
 const PLOT: String = "plot"
 const FENCE: String = "fence"
-const PLOT_SIZE: Vector2i = Vector2i(2, 2)
+# A plot holds one home, which stands on a single tile.
+const PLOT_SIZE: Vector2i = Vector2i(1, 1)
 # Construction work draws on these callings (masons and carpenters); see CultureEffects.
 const CONSTRUCTION_WORK: String = "construction"
 
