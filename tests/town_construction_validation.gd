@@ -368,6 +368,18 @@ func test_fences_keep_people_out() -> void:
 	_check(not city.logistics.find_route(middle, Vector2i(30, 30)).is_empty(), "its own family still gets in and out by the gate")
 	_check(city.logistics.get_travel(field)["reachable"] == true, "and still carries its harvest to the store")
 
+	# A fence stands on the field's edge: two fenced fields side by side leave no way between.
+	var neighbour: Building = add_field(city, Vector2i(23, 20))
+	neighbour.fenced = true
+	city.logistics.mark_layout_changed()
+	var squares: Rect2i = Rect2i(Vector2i(40, 40), Vector2i(13, 7))
+	var between: Array[Vector2i] = []
+	for cell: Vector2i in city.logistics.find_route(Vector2i(22, 18), Vector2i(23, 24)):
+		if squares.has_point(cell):
+			between.append(cell)
+	_check(between.is_empty(), "nobody passes through or between two fenced fields: " + str(between))
+	_check(not city.logistics.find_route(TownLogistics.center_tile(neighbour.tile, neighbour.size), Vector2i(30, 30)).is_empty(), "each field's own family still leaves by its gate")
+
 # Buildings, sites, and the stockpile are walked around (along the strips between them); a
 # building's own family still goes in at its door.
 func test_nobody_walks_through_buildings() -> void:
