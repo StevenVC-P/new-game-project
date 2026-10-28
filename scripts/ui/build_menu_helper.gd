@@ -23,6 +23,7 @@ static func get_building_catalog() -> Array[Dictionary]:
 		},
 		{"id": "fisher", "display_name": "Fisher's Hut", "category": "Food"},
 		{"id": "hunter", "display_name": "Hunter's Lodge", "category": "Food"},
+		{"id": "herder", "display_name": "Herder's Fold", "category": "Clothing"},
 		{"id": "watch_post", "display_name": "Watch Post", "category": "Defense"},
 		{
 			"id": "woodcutter",

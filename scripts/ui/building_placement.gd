@@ -122,7 +122,7 @@ func get_building_size(building_type: String) -> Vector2i:
 	# watch post.
 	if building_type == BUILDING_HOUSE or building_type == Building.BUILDING_FISHER or building_type == Building.BUILDING_WATCH_POST:
 		return Vector2i.ONE
-	if building_type == BUILDING_FARM:
+	if building_type == BUILDING_FARM or building_type == Building.BUILDING_HERDER:
 		return Vector2i(3, 3)
 	if building_type == BUILDING_TOOLMAKER:
 		return Vector2i(3, 3)

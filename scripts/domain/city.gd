@@ -87,6 +87,8 @@ var land: TownLand = null
 var trade: TownTrade = null
 # Bandits on the roads, the watch, and the militia.
 var defense: TownDefense = null
+# The settlement's stage (camp, hamlet, village) and chronicle.
+var settlement: SettlementStage = null
 # Today's day of the year (1-360), set by the game before each day's tick; -1 where nothing sets
 # it (tests, balance tools), which count years from founding instead.
 var day_of_year: int = -1
@@ -105,6 +107,7 @@ func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO, city_r
 	land = TownLand.new(self)
 	trade = TownTrade.new(self)
 	defense = TownDefense.new(self)
+	settlement = SettlementStage.new(self)
 	founding_seed = random_seed
 	var normalized_household_count: int = max(0, starter_household_count)
 	resources = make_starting_resources(normalized_household_count)
@@ -154,6 +157,7 @@ func make_starting_resources(starter_household_count: int = STARTING_HOUSEHOLD_C
 		"tiles": 0,
 		"paving_stones": 0,
 		"clothing": 0,
+		"wool": 0,
 		"house_shelter_capacity": 0,
 		"temporary_shelter_capacity": starting_population,
 		"housing_capacity": starting_population,
@@ -952,6 +956,7 @@ func tick():
 	farmland.advance_day()
 	trade.advance_day()
 	defense.advance_day()
+	settlement.advance_day()
 
 	resolve_soft_needs()
 	if resources["food_shortage"] == true:
@@ -1347,6 +1352,8 @@ func get_base_building_output_amount(building_type: String) -> float:
 		return EconomyBalanceScript.FISHER_FOOD_PER_DAY
 	if building_type == Building.BUILDING_HUNTER:
 		return EconomyBalanceScript.HUNTER_FOOD_PER_DAY
+	if building_type == Building.BUILDING_HERDER:
+		return EconomyBalanceScript.HERDER_WOOL_PER_DAY
 	if building_type == BUILDING_TOOLMAKER:
 		return EconomyBalanceScript.TOOLMAKER_TOOLS_PER_DAY
 	if building_type in [BUILDING_QUARRY, BUILDING_STONECUTTER, BUILDING_BRICKWORKS, BUILDING_LIME_KILN, BUILDING_MORTAR_YARD, BUILDING_MASON_YARD, BUILDING_SCULPTOR, BUILDING_CARVER, BUILDING_TILEWORKS, BUILDING_PAVER_YARD]:
@@ -1815,12 +1822,15 @@ func get_clothing_need_pressure() -> Dictionary:
 
 	return make_need_pressure(GoodsNeedBucketHelperScript.BUCKET_CLOTHING, status, severity, demand, available, shortage_amount, true)
 
+# A garment lasts a person CLOTHING_DAYS_PER_PERSON, so the town needs one a day for every that
+# many people (at least one while anyone lives here).
 func get_clothing_need_demand() -> int:
-	var demand: int = 0
+	var people: int = 0
 	for household: Household in households:
-		demand += max(0, household.total_population)
-
-	return demand
+		people += max(0, household.total_population)
+	if people <= 0:
+		return 0
+	return maxi(1, ceili(float(people) / EconomyBalanceScript.CLOTHING_DAYS_PER_PERSON))
 
 func get_inactive_need_pressure(bucket_id: String) -> Dictionary:
 	return make_need_pressure(bucket_id, "pressure_only", "neutral", 0, get_available_need_bucket_amount(bucket_id), 0, false)

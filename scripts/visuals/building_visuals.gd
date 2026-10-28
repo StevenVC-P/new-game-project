@@ -38,6 +38,7 @@ const PROFILES: Dictionary = {
 	"fisher": {"drawing": "fisher", "roof": ROOF_THATCH, "wall": WALL_TIMBER},
 	"hunter": {"drawing": "lodge", "roof": ROOF_TIMBER, "wall": WALL_TIMBER},
 	"watch_post": {"drawing": "watch_post", "roof": ROOF_TIMBER, "wall": WALL_TIMBER},
+	"herder": {"drawing": "fold", "roof": ROOF_THATCH, "wall": WALL_TIMBER},
 }
 
 const TIER0_DRAWINGS: Dictionary = {

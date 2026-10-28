@@ -61,6 +61,8 @@ static func draw(c: CanvasItem, rect: Rect2, profile: Dictionary, state: Diction
 			draw_lodge(c, rect, state, roof, wall)
 		"watch_post":
 			draw_watch_post(c, rect, state, roof, wall)
+		"fold":
+			draw_fold(c, rect, state, roof, wall)
 		_:
 			draw_house(c, rect, state, roof, wall)
 
@@ -284,6 +286,22 @@ static func draw_fisher(c: CanvasItem, r: Rect2, state: Dictionary, roof: Color,
 	blob(c, boat + Vector2(0.4, 0.5), Vector2(0.9, 2.0), SHADOW, 8)
 	blob(c, boat, Vector2(0.8, 1.9), TownMapStyle.COLOR_TIMBER, 8)
 	blob(c, boat, Vector2(0.45, 1.4), TownMapStyle.COLOR_TIMBER_DARK, 8)
+
+# A herder's fold: a pen of hurdles with the flock, and a small shed for the shearing.
+static func draw_fold(c: CanvasItem, r: Rect2, state: Dictionary, roof: Color, wall: Color) -> void:
+	yard(c, r, state)
+	var pen: Rect2 = Rect2(at(r, 0.12, 0.38), r.size * Vector2(0.76, 0.5))
+	c.draw_rect(pen, TownMapStyle.COLOR_TIMBER_DARK, false, 0.4)
+	gabled(c, at(r, 0.3, 0.2), r.size * Vector2(0.34, 0.24), roof, wall, state)
+	var sheep: Array[Vector2] = [Vector2(0.25, 0.55), Vector2(0.45, 0.7), Vector2(0.62, 0.52), Vector2(0.75, 0.75), Vector2(0.38, 0.8), Vector2(0.58, 0.82)]
+	var shown: int = sheep.size() if not state.get("idle", false) else 2
+	# Sized to the fold, so the flock reads at every zoom.
+	var body: Vector2 = Vector2(r.size.x * 0.055, r.size.x * 0.04)
+	for i in range(shown):
+		var at_point: Vector2 = at(r, sheep[i].x, sheep[i].y)
+		blob(c, at_point + body * 0.35, body, SHADOW, 8)
+		blob(c, at_point, body, Color(0.93, 0.91, 0.85), 8)
+		blob(c, at_point + Vector2(body.x * 0.85, -body.y * 0.15), body * 0.38, Color(0.25, 0.22, 0.2), 6)
 
 # A watch post: a timber tower on four posts with a banner, and a fire for the watch.
 static func draw_watch_post(c: CanvasItem, r: Rect2, state: Dictionary, roof: Color, wall: Color) -> void:

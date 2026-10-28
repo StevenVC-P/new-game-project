@@ -129,9 +129,13 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 		"trader_visits": city.trade.visits,
 		"trades": city.trade.trades_made,
 		"raids": city.defense.raids,
+		"hamlet_day": city.settlement.stage_days[SettlementStage.HAMLET],
+		"village_day": city.settlement.stage_days[SettlementStage.VILLAGE],
 		"raids_driven_off": city.defense.raids_driven_off,
 		"calling_wishes": city.households.filter(func(h: Household) -> bool: return h.ambition == FamilyAmbitions.CALLING).size()
 	}
+
+const HERDER_FROM_HOUSEHOLDS: int = 8
 
 func choose_build(city, scenario: Dictionary, day: int) -> String:
 	var counts: Dictionary = count_kinds(city)
@@ -153,6 +157,9 @@ func choose_build(city, scenario: Dictionary, day: int) -> String:
 		wants.append("woodcutter")
 	if houses < city.households.size() + 2:
 		wants.append("house")
+	# Once the town has grown past its founders, a fold for the clothing need (wool).
+	if idle_labor and int(counts.get(Building.BUILDING_HERDER, 0)) == 0 and city.households.size() >= HERDER_FROM_HOUSEHOLDS and not city.local_map.is_empty():
+		wants.append(Building.BUILDING_HERDER)
 	for want: String in wants:
 		if allowed(want, scenario, day, counts):
 			return want

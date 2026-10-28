@@ -64,7 +64,13 @@ func summarize(policy_name: String, results: Array[Dictionary]) -> void:
 	var trades: float = 0.0
 	var raids: float = 0.0
 	var driven_off: float = 0.0
+	var villages: Array[int] = []
+	var hamlets: Array[int] = []
 	for result: Dictionary in results:
+		if int(result["village_day"]) >= 0:
+			villages.append(int(result["village_day"]))
+		if int(result["hamlet_day"]) >= 0:
+			hamlets.append(int(result["hamlet_day"]))
 		raids += float(result["raids"])
 		driven_off += float(result["raids_driven_off"])
 		buildings += float(result["buildings"])
@@ -76,6 +82,9 @@ func summarize(policy_name: String, results: Array[Dictionary]) -> void:
 	_report("%-9s %2d/%d off the ground | people %.0f | households %.1f | travel %.0f%% of the working day | food in store %.0f | fences %.1f | storehouses %.1f | content families %.1f | waiting on a calling %.1f" % [
 		policy_name, made_it, results.size(), float(totals["population"]) / n, float(totals["households"]) / n,
 		float(totals["travel_share"]) / n * 100.0, float(totals["food"]) / n, float(totals["fences"]) / n, float(totals["storehouses"]) / n, float(totals["content"]) / n, float(totals["calling_wishes"]) / n])
+	villages.sort()
+	hamlets.sort()
+	_report("%-9s hamlet %d/%d (median day %d) | village %d/%d (median day %d, year %.1f)" % [policy_name, hamlets.size(), results.size(), hamlets[hamlets.size() / 2] if not hamlets.is_empty() else -1, villages.size(), results.size(), villages[villages.size() / 2] if not villages.is_empty() else -1, (float(villages[villages.size() / 2]) / float(Calendar.DAYS_PER_YEAR)) if not villages.is_empty() else -1.0])
 	_report("%-9s buildings %.1f | linked to traders %d/%d | trader visits %.1f | trades %.1f | raids %.1f (driven off %.1f) | problems: %s" % [policy_name, buildings / n, linked, results.size(), visits / n, trades / n, raids / n, driven_off / n, str(reasons)])
 
 func _report(line: String) -> void:
