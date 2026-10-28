@@ -55,7 +55,9 @@ const PRODUCTION: Dictionary = {
 	"sculptor": {"output": "statues", "inputs": {"cut_stone": 1, "tools": 1}},
 	"carver": {"output": "carved_goods", "inputs": {"wood": 1, "tools": 1}},
 	"tileworks": {"output": "tiles", "inputs": {"bricks": 1, "wood": 1}},
-	"paver_yard": {"output": "paving_stones", "inputs": {"stone_blocks": 1}}
+	"paver_yard": {"output": "paving_stones", "inputs": {"stone_blocks": 1}},
+	"fisher": {"output": "food", "inputs": {}},
+	"hunter": {"output": "food", "inputs": {}}
 }
 # Working adults in the family the output values above assume.
 const FULL_FAMILY_WORKING_ADULTS: float = 2.0
@@ -105,7 +107,9 @@ const BUILD_COSTS: Dictionary = {
 	"carver": {"wood": 8, "tools": 1},
 	"tileworks": {"wood": 8, "tools": 1},
 	"paver_yard": {"wood": 8, "tools": 1},
-	"storehouse": {"wood": 8, "tools": 0}
+	"storehouse": {"wood": 8, "tools": 0},
+	"fisher": {"wood": 4, "tools": 0},
+	"hunter": {"wood": 5, "tools": 1}
 }
 
 # --- Construction (docs/TOWN_BUILDING_MODEL.md) ---
@@ -121,7 +125,9 @@ const BUILD_WORK_DAYS: Dictionary = {
 	"farm": 6.0,
 	"woodcutter": 6.0,
 	"toolmaker": 10.0,
-	"storehouse": 8.0
+	"storehouse": 8.0,
+	"fisher": 4.0,
+	"hunter": 5.0
 }
 const BUILD_WORK_DEFAULT_DAYS: float = 12.0
 # An upgrade in place reuses the site, so it takes this share of building the tier 1 type new.
@@ -170,6 +176,29 @@ const PATH_EFFORT_FACTOR: float = 0.65
 # Ground in woods (every tile beside it wooded) wears at this share of the rate, and never past a
 # trail: wear never fells a tree. The strips between buildings never pass a trail either.
 const FOREST_WEAR_FACTOR: float = 0.5
+
+# --- Land (docs/FIRST_STAGE_LOOP.md, Geography Shapes The Town; TownLand) ---
+# Food from the land rather than fields. A fisher's hut on a bank catches FISHER_FOOD_PER_DAY when
+# FISHER_FULL_WATER_TILES of water lie within FISHER_REACH of it, all year; a hunter's lodge brings
+# in HUNTER_FOOD_PER_DAY when HUNTER_FULL_WOODS_TILES of woods lie within HUNTER_REACH, more in
+# autumn and winter, and less as the woods around it are felled. Less water or woods, less food,
+# down to LAND_YIELD_FLOOR. A farm (FARM_FOOD_PER_DAY on average) yields more but needs farmland and
+# follows the farming year.
+const FISHER_FOOD_PER_DAY: float = 4.0
+const FISHER_REACH: int = 3
+const FISHER_FULL_WATER_TILES: int = 12
+const HUNTER_FOOD_PER_DAY: float = 3.5
+const HUNTER_REACH: int = 6
+const HUNTER_FULL_WOODS_TILES: int = 40
+const HUNT_SEASON_YIELD: Array[float] = [0.9, 0.8, 1.2, 1.1]
+const LAND_YIELD_FLOOR: float = 0.25
+# Hazards. Some springs (HIGH_WATER_CHANCE) bring high water: a field beside a river or lake yields
+# HIGH_WATER_FIELD_YIELD of its spring harvest. In winter, an unfenced hunter's lodge or gatherer's
+# camp within WOLF_WOODS_DISTANCE of woods works warily: WOLF_WINTER_YIELD of its output.
+const HIGH_WATER_CHANCE: float = 0.33
+const HIGH_WATER_FIELD_YIELD: float = 0.4
+const WOLF_WINTER_YIELD: float = 0.75
+const WOLF_WOODS_DISTANCE: int = 2
 
 # --- Errands (docs/TOWN_BUILDING_MODEL.md, Errands) ---
 # Round trips a day each family makes from home besides work (TownErrands): to the store for

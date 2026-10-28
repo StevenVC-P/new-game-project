@@ -191,17 +191,20 @@ static func get_attractiveness(city) -> int:
 	score += CultureEffectsScript.get_community_attraction(profiles)
 	return clampi(score, 0, MAX_ARRIVAL_CHANCE)
 
-# Expected daily food from worked farms, including value modifiers and upkeep.
+# Expected daily food from every worked workplace that makes food (farms, fishers, hunters),
+# including value modifiers, upkeep, travel, and what the land within reach allows; seasons
+# average out over a year and are left out.
 static func estimate_daily_food_production(city) -> float:
 	var total: float = 0.0
 	for building: Building in city.buildings:
-		if BuildingTiersScript.get_base_type(building.type) != Building.BUILDING_FARM or not building.can_produce():
+		var chain: Dictionary = EconomyBalanceScript.PRODUCTION.get(BuildingTiersScript.get_base_type(building.type), {})
+		if str(chain.get("output", "")) != "food" or not building.can_produce():
 			continue
 		var percent: int = 0
 		var household: Household = city.get_household_by_id(building.assigned_household_id)
 		if household != null and household.has_values():
 			percent = CultureEffectsScript.get_work_output_percent(household.values, building.type)
-		total += float(city.get_base_building_output_amount(building.type)) * city.get_family_labor_factor(household) * float(100 + percent) / 100.0 * get_maintenance_output_factor(building.maintenance_level) * (1.0 - city.logistics.get_travel_share(building))
+		total += float(city.get_base_building_output_amount(building.type)) * city.get_family_labor_factor(household) * float(100 + percent) / 100.0 * get_maintenance_output_factor(building.maintenance_level) * (1.0 - city.logistics.get_travel_share(building)) * city.land.get_reach_factor(building)
 	return total
 
 static func get_maintenance_output_factor(maintenance_level: int) -> float:

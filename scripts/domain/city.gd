@@ -81,6 +81,8 @@ var woodland: TownWoodland = null
 var farmland: TownFarmland = null
 # Families' own trips from home: the store, water, firewood, kin.
 var errands: TownErrands = null
+# What the land and season give each workplace, and the season's hazards.
+var land: TownLand = null
 # Today's day of the year (1-360), set by the game before each day's tick; -1 where nothing sets
 # it (tests, balance tools), which count years from founding instead.
 var day_of_year: int = -1
@@ -96,6 +98,7 @@ func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO, city_r
 	woodland = TownWoodland.new(self)
 	farmland = TownFarmland.new(self)
 	errands = TownErrands.new(self)
+	land = TownLand.new(self)
 	founding_seed = random_seed
 	var normalized_household_count: int = max(0, starter_household_count)
 	resources = make_starting_resources(normalized_household_count)
@@ -926,6 +929,7 @@ func tick():
 	construction.advance_day()
 	if construction.day % FamilyDevelopment.INTERVAL_DAYS == 0:
 		FamilyDevelopment.advance(self)
+	land.advance_day()
 
 	for building: Building in buildings:
 		if building.is_house():
@@ -1331,6 +1335,10 @@ func get_base_building_output_amount(building_type: String) -> float:
 		return EconomyBalanceScript.FARM_FOOD_PER_DAY
 	if building_type == BUILDING_WOODCUTTER:
 		return EconomyBalanceScript.WOODCUTTER_WOOD_PER_DAY
+	if building_type == Building.BUILDING_FISHER:
+		return EconomyBalanceScript.FISHER_FOOD_PER_DAY
+	if building_type == Building.BUILDING_HUNTER:
+		return EconomyBalanceScript.HUNTER_FOOD_PER_DAY
 	if building_type == BUILDING_TOOLMAKER:
 		return EconomyBalanceScript.TOOLMAKER_TOOLS_PER_DAY
 	if building_type in [BUILDING_QUARRY, BUILDING_STONECUTTER, BUILDING_BRICKWORKS, BUILDING_LIME_KILN, BUILDING_MORTAR_YARD, BUILDING_MASON_YARD, BUILDING_SCULPTOR, BUILDING_CARVER, BUILDING_TILEWORKS, BUILDING_PAVER_YARD]:
@@ -1340,10 +1348,10 @@ func get_base_building_output_amount(building_type: String) -> float:
 
 func apply_building_output_modifiers(base_output: float, tick_count: int, building: Building) -> int:
 	var family_output: float = base_output * get_family_labor_factor(get_household_by_id(building.assigned_household_id)) * get_work_time_factor(building)
-	# A field people walk through loses some of its harvest underfoot, and fields yield by season.
+	# A field people walk through loses some of its harvest underfoot; the land and season decide
+	# the rest (TownLand).
 	family_output *= 1.0 - logistics.get_field_trample_loss(building)
-	if TownLogistics.is_field(building):
-		family_output *= EconomyBalanceScript.FARM_SEASON_YIELD[get_season_index()]
+	family_output *= land.get_output_factor(building)
 	var output_amount: int = apply_output_percent(family_output, building, get_worker_output_percent(building))
 	return apply_older_child_support_output_modifier(output_amount, tick_count, building)
 
@@ -1411,7 +1419,7 @@ func apply_older_child_support_output_modifier(output_amount: int, tick_count: i
 
 func get_preferred_worker_for_building(building_type: String) -> String:
 	building_type = BuildingTiersScript.get_base_type(building_type)
-	if building_type == BUILDING_FARM:
+	if building_type == BUILDING_FARM or building_type == Building.BUILDING_FISHER or building_type == Building.BUILDING_HUNTER:
 		return WORK_PREF_AGRARIAN
 	if building_type == BUILDING_WOODCUTTER or building_type == BUILDING_TOOLMAKER:
 		return WORK_PREF_INDUSTRIAL

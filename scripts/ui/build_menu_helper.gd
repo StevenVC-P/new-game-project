@@ -21,6 +21,8 @@ static func get_building_catalog() -> Array[Dictionary]:
 			"display_name": "Farm",
 			"category": "Food"
 		},
+		{"id": "fisher", "display_name": "Fisher's Hut", "category": "Food"},
+		{"id": "hunter", "display_name": "Hunter's Lodge", "category": "Food"},
 		{
 			"id": "woodcutter",
 			"display_name": "Woodcutter",

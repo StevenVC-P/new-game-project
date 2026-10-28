@@ -40,6 +40,8 @@ const CLOSE_KNIT_FORMATION_DELAY_MONTHS: int = 12
 const BUILDING_CALLINGS: Dictionary = {
 	"farm": ["soil"],
 	"woodcutter": ["forest"],
+	"fisher": ["water"],
+	"hunter": ["forest", "shield"],
 	"toolmaker": ["forge_bench"],
 	"quarry": ["stone", "deep_earth"],
 	"stonecutter": ["stone"],
