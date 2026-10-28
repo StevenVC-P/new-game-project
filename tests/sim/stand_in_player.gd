@@ -45,6 +45,7 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 	var uses_map: bool = not city.local_map.is_empty()
 	if scenario.get("families_develop", false):
 		city.influence.enabled = true
+		city.influence.reserved_builders = int(scenario.get("reserved_builders", 0))
 	if scenario.get("hand_method", false):
 		city.set_hand_method_fallback(true)
 	for entry: String in scenario.get("prebuild", []):

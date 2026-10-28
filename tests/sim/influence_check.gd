@@ -33,18 +33,32 @@ const POLICIES: Array = [
 	{"name": "guided, scattered", "planned": true, "hand_method": true, "families_develop": true, "homes_on_plots": true, "guided": true, "scattered": true},
 ]
 
+# `-- --bottleneck`: why do towns families develop grow more slowly? Separates homes only on plots
+# from every family taking up work at once (no one left free to build).
+const BOTTLENECK_POLICIES: Array = [
+	{"name": "direct", "planned": true, "hand_method": true},
+	{"name": "direct, plots", "planned": true, "hand_method": true, "homes_on_plots": true},
+	{"name": "families", "planned": true, "hand_method": true, "families_develop": true, "homes_on_plots": true},
+	{"name": "families, houses", "planned": true, "hand_method": true, "families_develop": true},
+	{"name": "families, builder", "planned": true, "hand_method": true, "families_develop": true, "homes_on_plots": true, "reserved_builders": 1},
+	{"name": "families, both", "planned": true, "hand_method": true, "families_develop": true, "reserved_builders": 1},
+]
+
 func _init() -> void:
 	call_deferred("run")
 
 func run() -> void:
 	var years: int = 5
+	var policies: Array = POLICIES
 	for argument: String in OS.get_cmdline_user_args():
 		if argument.begins_with("--years="):
 			years = int(argument.trim_prefix("--years="))
+		elif argument == "--bottleneck":
+			policies = BOTTLENECK_POLICIES
 	var days: int = years * Calendar.DAYS_PER_YEAR
 	var sites: Array = TownBuildingCheck.collect_sites()
 	_report("%d towns on real town maps, %d days (%d years)" % [sites.size(), days, years])
-	for policy: Dictionary in POLICIES:
+	for policy: Dictionary in policies:
 		var scenario: Dictionary = policy.duplicate()
 		scenario.merge(THREE_INDUSTRIES)
 		var results: Array[Dictionary] = []

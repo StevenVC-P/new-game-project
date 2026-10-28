@@ -42,6 +42,9 @@ var workplaces_opened: int = 0
 var improvements_started: int = 0
 # Weekly decisions where a family wanted an improvement but the stores rule or reserves held it back.
 var held_back_by_stores: int = 0
+# Experiment (influence check, growth bottleneck): this many families without a holding stay free
+# to build while any site is planned, instead of taking up work. 0: families take up work at once.
+var reserved_builders: int = 0
 
 func _init(owner: City) -> void:
 	_city_ref = weakref(owner)

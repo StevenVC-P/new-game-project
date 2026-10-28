@@ -115,6 +115,18 @@ What it shows:
 - **Contented families are much more common** (6-8 against 1.2): families working work they chose fulfil their calling ambitions.
 - **Towns grow more slowly:** 70-76 people against 105 after five years, and Village at about year 2 instead of 1.1, nearer the year-3 target. The likely causes are untested: homes only on plots (the town building check measured plots alone at about 15% fewer people) and no family left free to build, since every family takes up work at once. Worth isolating before tuning.
 - **The guided stand-in did worse than leaving families alone** (70 against 76 people). Keeping the stores for priorities held back about 34 improvements per town against 5. A cruder player than a person, but a sign that a restrictive stores rule has a real cost, which is what makes it a decision.
+- **Why the towns grow more slowly** (`influence_check.gd -- --bottleneck`, same sites, five years; owner directive 2026-10-28: test before changing formulas):
+
+  | Policy | Off the ground | People | Hamlet (median day) | Village (median) | Content families |
+  | --- | --- | --- | --- | --- | --- |
+  | direct | 18/20 | 105 | 35 | year 1.1 | 1.2 |
+  | direct, homes on plots | 19/20 | 79 | 39 | year 1.8 | 1.8 |
+  | families (homes on plots) | 19/20 | 76 | 51 | year 1.9 | 7.8 |
+  | families, houses placed by the player | 17/20 | 90 | 48 | year 1.7 | 2.9 |
+  | families, one family kept free to build | 18/20 | 75 | 38 | year 1.9 | 7.7 |
+  | families, both | 18/20 | 94 | 36 | year 1.7 | 2.5 |
+
+  **Homes only on plots explain most of the gap:** the directed town loses 26 people from plots alone (105 to 79), and with plots on both sides family-driven development costs only 3 more (79 to 76). **Builders explain the slow first housing,** not the size: keeping one family free to build brings Hamlet from day 51 to 38 and changes population by nothing. The remaining gap with houses placed (90-94 against 105) is likely the hand-work start. **Not explained yet:** content families fall from about 8 to under 3 when the player places houses instead of plots; worth understanding before the plot rule changes. Families building on plots is a `FamilyDevelopment` rule from before the prototype (the stand-in sets plots aside only a couple ahead of need), so the fix belongs to how plots are supplied, not to growth formulas. `TownInfluence.reserved_builders` is an experiment setting, off by default.
 - **The hand method fallback changed nothing measurable** in direct play (identical figures): with the per-building grace, upkeep rarely runs out. It mostly matters for families' own projects.
 
 ## Judgment Calls (Open To Veto)

@@ -57,6 +57,9 @@ static func advance(city: City) -> Array[ConstructionProject]:
 		var holding: Building = get_holding(city, household)
 		if holding == null:
 			if household.assigned_workers <= 0 and not city.construction.is_promised_to_workplace(household.id):
+				if stays_free_to_build(city):
+					note(city, household, "Stays free to build while the town's sites wait")
+					continue
 				project = take_up_work(city, household)
 		elif holding.is_tier0() and get_activity(holding.type) != "":
 			project = consider_improving(city, household, holding)
@@ -65,6 +68,17 @@ static func advance(city: City) -> Array[ConstructionProject]:
 	return started
 
 # --- Taking up work -----------------------------------------------------------------------------
+
+# The growth-bottleneck experiment (TownInfluence.reserved_builders): while sites are planned, the
+# last few families without work stay free to build.
+static func stays_free_to_build(city: City) -> bool:
+	if city.influence.reserved_builders <= 0 or city.construction.projects.is_empty():
+		return false
+	var free: int = 0
+	for other: Household in city.households:
+		if other.labor_capacity > 0 and other.assigned_workers <= 0 and not city.construction.is_promised_to_workplace(other.id):
+			free += 1
+	return free <= city.influence.reserved_builders
 
 static func take_up_work(city: City, household: Household) -> ConstructionProject:
 	var choices: Array[Dictionary] = []
