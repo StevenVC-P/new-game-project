@@ -190,6 +190,40 @@ Later opportunities (clay and bricks, woods planted on open land, ore) follow mi
 - **Judgment and finding.** A rich, linked town draws about a raid a year: rich stores tempt bands, as the land table says. Defending keeps stores and contentment but costs a family's work for the watch and the militia's days away, so a defended town ends with a few fewer people. That is a real choice, which the loop wants; it will lean toward defense once contentment and trust (a failure to defend, `docs/WARFARE_AND_CONFLICT_MODEL.md`) weigh more. The stand-in builds its watch post only once tempting or raided, and calls the militia whenever a band outnumbers its guard.
 - **Seen by eye:** the warning, guard, and call-up in the sidebar (`game_bandits`), and the watch post in the building catalog.
 
+### Milestone 6: village completion (2026-10-28)
+
+- **Stage and chronicle** (`SettlementStage`, `city.settlement`; saved). The sidebar opens with a Settlement section: the stage (Founding Camp, Hamlet, Village, as drafted in `docs/SETTLEMENT_GROWTH_SCALE_MODEL.md`), what stands between a hamlet and a village ([x] winter, [ ] households 7/10, [ ] a family formed, [ ] a stable season), and the latest chronicle entries ("Year 1, autumn: The first harvest surplus"). Titles never drop back; a shrunken village shows as "A declining village". The chronicle records firsts once: every family housed, the first harvest surplus, the first winter, the first family formed here, the first trade, bandits driven off, a raid, a family leaving, and each stage. It is kept short on the sidebar because the panel is full; the whole chronicle is available (`get_chronicle_lines`) for a later screen.
+- **Clothing and wool.** The clothing need asked one garment per person a day; it now asks one a day for every 90 people (a garment lasts a person 90 days), at least one (`EconomyBalance.CLOTHING_DAYS_PER_PERSON`). A **herder's fold** (H, 3x3, 6 wood) grazes open land within 3 tiles (hill pasture counts double: 86% on open land, 100% on hills) and makes up to 1 wool a day; wool is spun and worn at home, so it meets the clothing need. Wolves threaten an unfenced fold at the woods' edge in winter, as the land table says. Traders now offer wool, so a town without pasture can clothe itself by trade. The stand-in builds a fold once the town has 8 households.
+- **Measured.** All test scripts pass. Two older tests assumed the old clothing rule and that wool would never clothe anyone; they now test the new rule (their arithmetic kept by giving test households 360 people).
+
+  | Check | Milestone 5 | Milestone 6 |
+  | --- | --- | --- |
+  | Map luck, original / continuous | 48/48, 41/42 | 48/48, 41/42 |
+  | Opening: sensible / owner's first / four farms / idle 60 days | 19, 20, 20, 20 of 20 (49, 52, 59, 54 people) | 19, 20, 20, 20 (49, 52, 59, 54) |
+  | Planning, five years: careless / compact / planned | 11/20 (61), 19/20 (114), 18/20 (109) | 11/20 (62), 19/20 (119), 18/20 (112) |
+  | Hamlet (median) / Village (median) | | day 35 / year 1.1 to 1.4 by plan; 11-19 of 20 towns reach Village |
+
+  Five-year towns gain a few people, likely from the clothing need now being met by wool (newcomers are drawn by met needs).
+- **Pacing: Village comes at about year 1.3, not year 3. Owner decision.** Every family is housed by about day 35 (Hamlet), and the village conditions are met soon after the first winter: ten households come from the six founders' children marrying (in town or outside, the M3-era judgment call) as much as from newcomers, and the binding condition is surviving the first winter. A pacing variant with a smaller, slower regional pool (2 families, refilling every 9 months) left the village day unchanged and cut five-year population by a third (compact 119 to 75), so it was reverted. Reaching Village by about year 3 needs one of: stricter village conditions (owner-decided 2026-10-19), fewer founding families (6 today; the growth model assumed 4), or slower family formation (the outside-marriage judgment call). All three revisit owner decisions, so none was made here.
+
+## Playtest Brief (after milestone 6)
+
+What to try, and what to judge, in the owner's playtest:
+
+- **Planning:** lay out a compact town; watch paths wear, fence a trampled field, till land, clear woods. Does the layout feel like it matters?
+- **The land:** found by water or woods and try a fisher's hut (Y) or hunter's lodge (U); found on hills and try a herder's fold (H). Do different sites feel different?
+- **Families:** the house card's "Wants:" line and the sidebar's wishes. Do families' wishes and contentment read clearly, and does answering them feel worth it?
+- **Trade:** a town with a road (or build one out with G); click lots in the Trader section in summer and autumn. Is barter readable? Are prices in grain clear?
+- **Bandits:** a rich, linked town in year 2+; the warning, a watch post (O), the militia (M). Is a raid a fair hardship?
+- **The stage:** the Settlement section and chronicle. Does Village come too early (see pacing above)?
+
+Open decisions for the owner:
+
+1. **Pacing** (above): accept Village at about year 1-2, or slow it by conditions, founders, or family formation.
+2. **The sidebar is full:** sections now run past the bottom of the panel at common window sizes. A tabbed or scrolling panel would be a UI pass of its own.
+3. **What contentment is worth:** today it only steadies families and draws newcomers, so answering wishes and defending cost about as much as they return. Should content families also work better or have more children, or wait for values?
+4. **Clothing scale:** one garment per 90 people a day was a judgment call to make the need answerable; the household goods need still asks a unit per household a day and has no early answer.
+
 ## Approved Decisions
 
 All approved by the owner on 2026-10-27, with the amendments above.

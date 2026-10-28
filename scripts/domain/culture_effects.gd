@@ -43,6 +43,7 @@ const BUILDING_CALLINGS: Dictionary = {
 	"fisher": ["water"],
 	"hunter": ["forest", "shield"],
 	"watch_post": ["shield"],
+	"herder": ["loom", "soil"],
 	"toolmaker": ["forge_bench"],
 	"quarry": ["stone", "deep_earth"],
 	"stonecutter": ["stone"],

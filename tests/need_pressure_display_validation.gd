@@ -4,6 +4,10 @@ const CityScript = preload("res://scripts/domain/city.gd")
 const CityPressureHintHelperScript = preload("res://scripts/ui/city_pressure_hint_helper.gd")
 const GoodsNeedBucketHelperScript = preload("res://scripts/domain/goods_need_bucket_helper.gd")
 
+# A garment lasts a person EconomyBalance.CLOTHING_DAYS_PER_PERSON (90) days: three households
+# of this many people need 12 garments a day.
+const CLOTHING_TEST_PEOPLE: int = 360
+
 var failure_count: int = 0
 
 func _init() -> void:
@@ -95,7 +99,7 @@ func test_household_goods_pressure_met() -> void:
 func test_clothing_bucket_mapping() -> void:
 	_check(GoodsNeedBucketHelperScript.BUCKET_CLOTHING == "clothing", "clothing bucket should be declared")
 	_check(GoodsNeedBucketHelperScript.get_need_buckets_for_good("clothing").has(GoodsNeedBucketHelperScript.BUCKET_CLOTHING), "clothing good should satisfy clothing bucket")
-	_check(not GoodsNeedBucketHelperScript.get_need_buckets_for_good("wool").has(GoodsNeedBucketHelperScript.BUCKET_CLOTHING), "wool should not satisfy clothing bucket in scaffold v0")
+	_check(GoodsNeedBucketHelperScript.get_need_buckets_for_good("wool").has(GoodsNeedBucketHelperScript.BUCKET_CLOTHING), "wool, spun and worn at home, meets the clothing need (milestone 6)")
 	_check(GoodsNeedBucketHelperScript.get_current_goods_for_need_bucket(GoodsNeedBucketHelperScript.BUCKET_CLOTHING).has("clothing"), "current clothing bucket goods should include clothing")
 
 func test_clothing_stockpile_scaffold() -> void:
@@ -105,7 +109,7 @@ func test_clothing_stockpile_scaffold() -> void:
 	_check(int(city.resources["clothing"]) == 0, "clothing stockpile should start at zero")
 
 func test_clothing_pressure_unmet() -> void:
-	var city = _make_city_with_population(3, 4)
+	var city = _make_city_with_population(3, CLOTHING_TEST_PEOPLE)
 	var clothing_need: Dictionary = city.get_clothing_need_pressure()
 
 	_check(str(clothing_need["status"]) == "unmet", "clothing should be unmet when clothing is recognized but stockpile is zero")
@@ -115,7 +119,7 @@ func test_clothing_pressure_unmet() -> void:
 	_check(bool(clothing_need["active"]) == true, "clothing should be active as display pressure")
 
 func test_clothing_pressure_low() -> void:
-	var city = _make_city_with_population(3, 4)
+	var city = _make_city_with_population(3, CLOTHING_TEST_PEOPLE)
 	city.resources["clothing"] = 5
 	var clothing_need: Dictionary = city.get_clothing_need_pressure()
 
@@ -124,7 +128,7 @@ func test_clothing_pressure_low() -> void:
 	_check(int(clothing_need["demand"]) == 12, "low clothing should report demand")
 
 func test_clothing_pressure_met() -> void:
-	var city = _make_city_with_population(3, 4)
+	var city = _make_city_with_population(3, CLOTHING_TEST_PEOPLE)
 	city.resources["clothing"] = 12
 	var clothing_need: Dictionary = city.get_clothing_need_pressure()
 
@@ -134,7 +138,7 @@ func test_clothing_pressure_met() -> void:
 	_check(int(clothing_need["demand"]) == 12, "met clothing should report demand")
 
 func test_clothing_pressure_read_does_not_consume_resources() -> void:
-	var city = _make_city_with_population(3, 4)
+	var city = _make_city_with_population(3, CLOTHING_TEST_PEOPLE)
 	var food_before: int = int(city.resources["food"])
 	var household_goods_before: int = int(city.resources["carved_goods"])
 	var clothing_before: int = int(city.resources["clothing"])

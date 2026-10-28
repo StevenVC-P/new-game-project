@@ -57,7 +57,8 @@ const PRODUCTION: Dictionary = {
 	"tileworks": {"output": "tiles", "inputs": {"bricks": 1, "wood": 1}},
 	"paver_yard": {"output": "paving_stones", "inputs": {"stone_blocks": 1}},
 	"fisher": {"output": "food", "inputs": {}},
-	"hunter": {"output": "food", "inputs": {}}
+	"hunter": {"output": "food", "inputs": {}},
+	"herder": {"output": "wool", "inputs": {}}
 }
 # Working adults in the family the output values above assume.
 const FULL_FAMILY_WORKING_ADULTS: float = 2.0
@@ -110,7 +111,8 @@ const BUILD_COSTS: Dictionary = {
 	"storehouse": {"wood": 8, "tools": 0},
 	"fisher": {"wood": 4, "tools": 0},
 	"hunter": {"wood": 5, "tools": 1},
-	"watch_post": {"wood": 6, "tools": 1}
+	"watch_post": {"wood": 6, "tools": 1},
+	"herder": {"wood": 6, "tools": 0}
 }
 
 # --- Construction (docs/TOWN_BUILDING_MODEL.md) ---
@@ -129,7 +131,8 @@ const BUILD_WORK_DAYS: Dictionary = {
 	"storehouse": 8.0,
 	"fisher": 4.0,
 	"hunter": 5.0,
-	"watch_post": 5.0
+	"watch_post": 5.0,
+	"herder": 5.0
 }
 const BUILD_WORK_DEFAULT_DAYS: float = 12.0
 # An upgrade in place reuses the site, so it takes this share of building the tier 1 type new.
@@ -201,6 +204,17 @@ const HIGH_WATER_CHANCE: float = 0.33
 const HIGH_WATER_FIELD_YIELD: float = 0.4
 const WOLF_WINTER_YIELD: float = 0.75
 const WOLF_WOODS_DISTANCE: int = 2
+# A herder's fold grazes its flock on open land within HERDER_REACH: HERDER_WOOL_PER_DAY when
+# HERDER_FULL_PASTURE_TILES of pasture lie in reach (hill tiles count double: the hill pasture of
+# the land table). Wolves threaten an unfenced fold at the woods' edge in winter, as they do a lodge.
+const HERDER_WOOL_PER_DAY: float = 1.0
+const HERDER_REACH: int = 3
+const HERDER_FULL_PASTURE_TILES: int = 90
+
+# --- Clothing (docs/FIRST_STAGE_LOOP.md, milestone 6) ---
+# A garment lasts CLOTHING_DAYS_PER_PERSON, so a town needs one for every that many people a day
+# (at least one). Wool is spun and worn at home: it meets the clothing need as it is.
+const CLOTHING_DAYS_PER_PERSON: float = 90.0
 
 # --- Ambitions (docs/FIRST_STAGE_LOOP.md, milestone 3; FamilyAmbitions) ---
 # A fulfilled ambition adds FULFILLED_CONTENTMENT to a family's contentment (at most
@@ -228,6 +242,7 @@ const CONTENT_ATTRACTION_MAX: int = 15
 # town's link (plus up to TRADER_INTERVAL_JITTER_DAYS) and stay TRADER_STAY_DAYS.
 const VALUE_IN_GRAIN: Dictionary = {
 	"food": 1.0,
+	"wool": 3.0,
 	"wood": 1.5,
 	"tools": 10.0,
 	"stone_blocks": 3.0,
@@ -236,9 +251,7 @@ const VALUE_IN_GRAIN: Dictionary = {
 	"carved_goods": 8.0,
 }
 const TRADER_WANTS: Array[String] = ["food", "wood", "tools", "stone_blocks", "bricks", "carved_goods"]
-# Clothing waits for milestone 6: the clothing need asks a unit per person a day, which no
-# trader's lot could answer.
-const TRADER_OFFERS: Array[String] = ["food", "wood", "tools", "stone_blocks"]
+const TRADER_OFFERS: Array[String] = ["food", "wood", "tools", "stone_blocks", "wool"]
 const TRADER_WANT_KINDS: int = 3
 const TRADER_OFFER_KINDS: int = 2
 const TRADER_GRAIN_PER_GOOD: float = 80.0

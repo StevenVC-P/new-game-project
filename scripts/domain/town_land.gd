@@ -79,6 +79,8 @@ func get_output_factor(building: Building) -> float:
 		factor *= get_reach_factor(building)
 	elif base == Building.BUILDING_HUNTER:
 		factor *= get_reach_factor(building) * EconomyBalance.HUNT_SEASON_YIELD[season]
+	elif base == Building.BUILDING_HERDER:
+		factor *= get_reach_factor(building)
 	if season == SEASON_WINTER and is_wolf_exposed(building):
 		factor *= EconomyBalance.WOLF_WINTER_YIELD
 	return factor
@@ -87,11 +89,12 @@ func get_output_factor(building: Building) -> float:
 func is_waterlogged(building: Building) -> bool:
 	return high_water_this_year and has_map() and TownLogistics.is_field(building) and count_near(building.tile, building.size, 1, "flowing_water") > 0
 
-# An unfenced hunter's lodge or gatherer's camp with woods within a few tiles.
+# An unfenced hunter's lodge, herder's fold, or gatherer's camp with woods within a few tiles.
 func is_wolf_exposed(building: Building) -> bool:
 	if not has_map() or building.fenced:
 		return false
-	var exposed: bool = BuildingTiers.get_base_type(building.type) == Building.BUILDING_HUNTER or building.type == "gatherer_camp"
+	var base: String = BuildingTiers.get_base_type(building.type)
+	var exposed: bool = base == Building.BUILDING_HUNTER or base == Building.BUILDING_HERDER or building.type == "gatherer_camp"
 	return exposed and count_near(building.tile, building.size, EconomyBalance.WOLF_WOODS_DISTANCE, "woods") > 0
 
 # The share of a full catch (fisher: water in reach) or bag (hunter: woods in reach) a workplace
@@ -116,11 +119,15 @@ func get_reach_factor_at(building_type: String, origin: Vector2i, size: Vector2i
 	elif base == Building.BUILDING_HUNTER:
 		found = count_near(origin, size, EconomyBalance.HUNTER_REACH, "woods")
 		full = EconomyBalance.HUNTER_FULL_WOODS_TILES
+	elif base == Building.BUILDING_HERDER:
+		found = count_near(origin, size, EconomyBalance.HERDER_REACH, "pasture")
+		full = EconomyBalance.HERDER_FULL_PASTURE_TILES
 	else:
 		return 1.0
 	return clampf(float(found) / float(full), EconomyBalance.LAND_YIELD_FLOOR, 1.0)
 
-# Tiles of a kind ("water", "flowing_water", "woods") within `reach` tiles of a footprint.
+# Tiles of a kind ("water", "flowing_water", "woods", "pasture") within `reach` tiles of a
+# footprint (pasture counts hill tiles double).
 func count_near(origin: Vector2i, size: Vector2i, reach: int, kind: String) -> int:
 	var map_size: Vector2i = city.logistics.map_size()
 	var count: int = 0
@@ -134,6 +141,10 @@ func count_near(origin: Vector2i, size: Vector2i, reach: int, kind: String) -> i
 					count += 1 if tile["type"] == "water" and tile.get("water_kind", "") != "sea" else 0
 				"woods":
 					count += 1 if tile["has_trees"] == true else 0
+				"pasture":
+					# Open ground nothing stands on; hill pasture counts double.
+					if tile["type"] == "ground" and not tile["has_trees"] and tile["occupied"] != true:
+						count += 2 if tile.get("is_hill", false) == true else 1
 	return count
 
 # What the town's people should know this season: a line or two for the sidebar.

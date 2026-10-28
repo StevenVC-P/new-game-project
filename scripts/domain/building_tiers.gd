@@ -21,7 +21,8 @@ const DISPLAY_NAMES: Dictionary = {
 	"tool_mender": "Tool Mender",
 	"fisher": "Fisher's Hut",
 	"hunter": "Hunter's Lodge",
-	"watch_post": "Watch Post"
+	"watch_post": "Watch Post",
+	"herder": "Herder's Fold"
 }
 
 static func is_tier0(building_type: String) -> bool:

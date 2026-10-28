@@ -1364,6 +1364,8 @@ func handle_building_selection_key_event(key_event: InputEventKey) -> bool:
 		select_building_type(Building.BUILDING_HUNTER)
 	elif is_letter_key(keycode, physical_keycode, KEY_O):
 		select_building_type(Building.BUILDING_WATCH_POST)
+	elif is_letter_key(keycode, physical_keycode, KEY_H):
+		select_building_type(Building.BUILDING_HERDER)
 	elif is_letter_key(keycode, physical_keycode, KEY_M):
 		if selected_city_index >= 0 and selected_city_index < cities.size():
 			cities[selected_city_index].defense.call_militia()
@@ -1838,6 +1840,11 @@ func draw_city_sidebar(font: Font, font_size: int):
 	elif placement_status != "Move over the city map to place." and placement_status != "Placement off":
 		placement_color = VisualStyle.COLOR_WARNING
 
+	y = draw_sidebar_section_title(font, "Settlement", text_x, y)
+	for settlement_line: String in city.settlement.get_display_lines():
+		y = draw_sidebar_line(font, font_size, settlement_line, text_x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
+	y += 4.0
+
 	y = draw_sidebar_section_title(font, "City Health", text_x, y)
 	y = draw_pressure_row(font, font_size, "Food", pressure_summary["food"] as Dictionary, text_x, y)
 	y = draw_pressure_row(font, font_size, "Shelter", pressure_summary["shelter"] as Dictionary, text_x, y)
@@ -1902,7 +1909,7 @@ func draw_city_sidebar(font: Font, font_size: int):
 	else:
 		y = draw_sidebar_label_value(font, font_size, "Building", "none", text_x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
 	# The key list is long; when a selection fills the panel it shrinks to one line.
-	var key_lines: Array[String] = ["1 house, 2 farm, 3 woodcutter", "4 toolmaker, 5 quarry, 6 stonecutter", "7 brickworks, 8 lime, 9 mortar", "0 mason, Q sculptor, W carver", "E tileworks, R paver yard", "Y fisher's hut, U hunter's lodge", "O watch post, M call the militia", "T storehouse, P home plot, G road", "C clear woods, F till land (click both corners)"]
+	var key_lines: Array[String] = ["1 house, 2 farm, 3 woodcutter", "4 toolmaker, 5 quarry, 6 stonecutter", "7 brickworks, 8 lime, 9 mortar", "0 mason, Q sculptor, W carver", "E tileworks, R paver yard", "Y fisher's hut, U hunter's lodge", "O watch post, M call the militia", "H herder's fold (wool for clothing)", "T storehouse, P home plot, G road", "C clear woods, F till land (click both corners)"]
 	if y + (key_lines.size() + 4) * 15.0 > sidebar_rect.end.y:
 		key_lines = ["Keys 1-0, Q-R, T choose a building", "P plot, G road, C clear, F till"]
 	for key_line: String in key_lines:

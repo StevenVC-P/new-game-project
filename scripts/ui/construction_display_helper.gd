@@ -107,6 +107,8 @@ static func get_travel_lines(city: City, building: Building) -> Array[String]:
 		lines.append("Catch: %d%% of a full one (water in reach)" % int(round(city.land.get_reach_factor(building) * 100.0)))
 	elif base == Building.BUILDING_HUNTER:
 		lines.append("Game: %d%% of a full bag (woods in reach)" % int(round(city.land.get_reach_factor(building) * 100.0)))
+	elif base == Building.BUILDING_HERDER:
+		lines.append("Grazing: %d%% of a full flock (open land in reach)" % int(round(city.land.get_reach_factor(building) * 100.0)))
 	if city.land.is_wolf_exposed(building):
 		lines.append("Wolves in winter: -%d%% (fence the yard)" % int(round((1.0 - EconomyBalance.WOLF_WINTER_YIELD) * 100.0)))
 	if city.land.is_waterlogged(building):

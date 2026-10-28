@@ -118,6 +118,7 @@ static func capture_city(city: City) -> Dictionary:
 		"land": SaveCodec.capture(city.land),
 		"trade": SaveCodec.capture(city.trade),
 		"defense": SaveCodec.capture(city.defense),
+		"settlement": SaveCodec.capture(city.settlement),
 	}
 
 static func restore_city(data: Dictionary) -> City:
@@ -147,6 +148,7 @@ static func restore_city(data: Dictionary) -> City:
 	SaveCodec.restore(city.land, data.get("land", {}))
 	SaveCodec.restore(city.trade, data.get("trade", {}))
 	SaveCodec.restore(city.defense, data.get("defense", {}))
+	SaveCodec.restore(city.settlement, data.get("settlement", {}))
 	var projects: Array[ConstructionProject] = []
 	for project_data: Dictionary in data["projects"]:
 		var project: ConstructionProject = ConstructionProject.new()
