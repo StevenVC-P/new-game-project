@@ -142,7 +142,9 @@ func make_path(route: Array) -> Dictionary:
 		points.append(TownLogistics.cell_position(cell) * TownMapStyle.TILE)
 	return make_path_from_points(points)
 
-# A polyline with each point's distance from the start, for walking along it.
+# A polyline with each point's distance from the start, for walking along it, and a sideways
+# direction at each point: at a bend, between the two segments' sideways directions, so a walker
+# keeping to its lane eases round the bend instead of hopping across it.
 func make_path_from_points(points: PackedVector2Array) -> Dictionary:
 	var lengths: PackedFloat32Array = PackedFloat32Array()
 	var total: float = 0.0
@@ -150,7 +152,21 @@ func make_path_from_points(points: PackedVector2Array) -> Dictionary:
 		if i > 0:
 			total += points[i].distance_to(points[i - 1])
 		lengths.append(total)
-	return {"points": points, "lengths": lengths, "total": total}
+	var sides: PackedVector2Array = PackedVector2Array()
+	for i in range(points.size()):
+		var side: Vector2 = Vector2.ZERO
+		if i > 0:
+			side += segment_side(points[i - 1], points[i])
+		if i < points.size() - 1:
+			side += segment_side(points[i], points[i + 1])
+		sides.append(side.normalized() if side.length() > 0.01 else Vector2.ZERO)
+	return {"points": points, "lengths": lengths, "total": total, "sides": sides}
+
+static func segment_side(from: Vector2, to: Vector2) -> Vector2:
+	var direction: Vector2 = to - from
+	if direction.length() <= 0.01:
+		return Vector2.ZERO
+	return Vector2(-direction.normalized().y, direction.normalized().x)
 
 # A point a share of the way along a path, walkers side by side across it.
 func position_on(path: Dictionary, share: float, walker_index: int, key: int) -> Vector2:
@@ -165,14 +181,13 @@ func position_on(path: Dictionary, share: float, walker_index: int, key: int) ->
 	if points.size() == 1:
 		return points[0]
 	var span: float = maxf(lengths[i] - lengths[i - 1], 0.0001)
-	var position: Vector2 = points[i - 1].lerp(points[i], clampf((distance - lengths[i - 1]) / span, 0.0, 1.0))
-	var direction: Vector2 = points[i] - points[i - 1]
-	if direction.length() > 0.01:
-		var side: Vector2 = Vector2(-direction.normalized().y, direction.normalized().x)
-		var lane: float = (float(walker_index) - 0.5) * 1.6
-		var bob: float = sin(view.walker_time * 5.0 + float(key + walker_index)) * 0.3
-		position += side * (lane + bob)
-	return position
+	var along: float = clampf((distance - lengths[i - 1]) / span, 0.0, 1.0)
+	var position: Vector2 = points[i - 1].lerp(points[i], along)
+	var sides: PackedVector2Array = path.get("sides", PackedVector2Array())
+	var side: Vector2 = sides[i - 1].lerp(sides[i], along) if sides.size() == points.size() else segment_side(points[i - 1], points[i])
+	var lane: float = (float(walker_index) - 0.5) * 1.6
+	var bob: float = sin(view.walker_time * 5.0 + float(key + walker_index)) * 0.3
+	return position + side * (lane + bob)
 
 # Home is the family's house, or its tent at the camp.
 func household_home(city: City, household_id: int, house_index: int) -> Vector2:
