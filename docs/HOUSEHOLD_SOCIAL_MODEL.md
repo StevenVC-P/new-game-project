@@ -164,12 +164,83 @@ What extends cleanly, and what conflicts:
 
 ## Prototype (Directive Section 16)
 
-PROTOTYPE_PLACEHOLDER
+Branch `feature/household-social-prototype`, 2026-10-28. Off unless a town enables it (`TownSocial.enabled`; in the game, **I** turns on both this and the influence prototype for the town in view, or start with `-- --influence`).
+
+| Piece | Where |
+| --- | --- |
+| Personality, value strengths, conduct values, inheritance | `HouseholdCharacter` |
+| Ties, memories, interpretation, value change | `HouseholdMemory` |
+| Desire for helping, sharing, pressing and settling claims | `SocialDecisions` |
+| Weekly and monthly passes, norms, trust, standing, recognition, grants, incentive, neighbour grid | `TownSocial` (`city.social`) |
+| Improvement weighing risk of acting against risk of waiting | `FamilyInitiative.get_improve_desire` |
+| Trampling by household; shortage hardship moved by sharing; voluntary spare time | `TownLogistics`, `HouseholdMigration`, `TownConstruction` |
+| Roster (L), the house card's Family section, sidebar norm appeals, help reward, honour | `HouseholdRosterHelper`, `CityBuildingOverlay`, `main.gd` |
+
+### The directive's ten demonstrations
+
+All ten pass in `tests/household_social_validation.gd`, each checking both the behavior and the reason the household gives:
+
+1. A very cautious family improves its garden while food is short, "because waiting is the greater risk", and keeps to hand work when the town is fed.
+2. An industrious, self-governing family declines to help build the storehouse ("it holds that families should choose their own work"); an industrious family that values working together helps.
+3. A charitable, attuned family close to the edge itself does not share ("it lacks reserves of its own"); the hungry family, seeing that, concludes "they could not spare it" rather than blaming it. With a margin, the same family shares.
+4. A family that has helped most accepts first claim on the stores, then sees a family that has given nothing favoured twice: its trust falls and it remembers accepting help while another got more.
+5. Rivals become friends after four weeks of one helping the other build, and the tie says why.
+6. A forceful crosser refuses amends: a grievance stands, its standing falls where the community asked that claims be respected, the pressure for agreed rules rises, the owner will not help it build, and a second refusal hardens into a feud.
+7. Where helping neighbours is the custom, a family with only a mild leaning helps, though it costs part of its own day.
+8. A caring family that values working together stops helping when it is itself close to having to leave, and says so; its conviction is unchanged.
+9. A family helped twice helps its neighbour back because it owes them, while its values have not changed yet.
+10. The same public honour: the egalitarian family reads favouritism, the ambitious hierarchical one reads "honour goes to those who seek it", and they end with different trust.
+
+### Controlled comparison
+
+`tests/sim/social_check.gd`: 12 real town sites, 3 years, six founding families developing their own work (three industries), the same seeds, and the same lost harvest at the start of the first winter. Only the player's approach differs.
+
+| Approach | Off the ground | People | Helped a family in need | Shared when asked | Friends / rivals a household | Mean disposition | Trust | Standing spread | Value changes | Help norm |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| none | 11/12 | 30 | 17% | 20% | 0.16 / 0 | +0.67 | 0.00 | 0.8 | 1.2 | habit in 2 towns |
+| encourage | 11/12 | 30 | 43% | 32% | 0.42 / 0 | +1.01 | 0.00 | 1.3 | 2.8 | habit in 5, custom in 1 |
+| incentives | 11/12 | 30 | 42% | 23% | 0.46 / 0 | +1.12 | 0.00 | 1.6 | 2.8 | habit in 4, custom in 1 |
+| restricted | 6/12 | 15 | 13% | 19% | 0.13 / 0 | +0.55 | -0.12 | 0.5 | 2.3 | habit in 2 |
+| unfair | 11/12 | 30 | 18% | 20% | 0.18 / 0.56 | -1.27 | -1.10 | 2.8 | 12.0 | habit in 2 |
+
+Course by year (help norm acceptance; trust): none 0.21, 0.22, 0.25 and 0; encourage 0.44, 0.47, 0.50 and 0; unfair 0.21, 0.25, 0.28 with trust -0.67, -1.20, -1.10.
+
+**What it shows.**
+
+- **Different player decisions make materially and socially different settlements from the same start.** Asking families to help neighbours, or rewarding help, more than doubles how often a family in need gets help (17% to 42-43%), roughly triples friendships, and turns the norm into a habit in five towns and a custom in one, without changing survival or size. The appeal works through receptive families, not by decree: about half the needy weeks still go unhelped.
+- **Unfair honours leave the town materially the same and socially worse:** rivalries appear (0.56 a household against none), relationships turn negative, trust in the leadership falls to about -1, standing spreads widest, and values move ten times as often as with no intervention (households drawing egalitarian or hierarchical lessons from what they saw).
+- **Restricting the stores to food for three years is ruinous here:** half the towns fail and they end half the size, because wood and tool work cannot be improved. That is partly the stand-in's choice (food only, never relaxed) on top of a lost harvest; it shows the policy has real teeth, not that restriction is always wrong.
+- **Encouragement and incentives look alike in outcome** but differ in mechanism: incentives buy more help-weeks (22 against 16), mostly from ambitious families, and slightly fewer shares.
+- **Weak spots.** Disputes almost never happen on these compact layouts (trampling is rare once routes follow field margins), so the claims norm never forms; it is tested only by the unit cases. Trust barely moves except under unfairness: the prototype has few positive sources of trust (kept promises only). Sharing requests are few (3-4 a town) because only a hard winter drives families toward leaving.
+
+### Performance
+
+The weekly pass costs about 0.16 ms a household in these towns (1.3 ms for 8). The scale probe (homes spread over one town map, each family on a holding, a home being built for every tenth): 50 households 6 ms, 100 16 ms, 200 44 ms, 400 136 ms a week, 119 to 340 µs a household. Growth comes from crowding more families onto one map, not from pairs: candidates are ties, kin, and a ring-searched neighbour grid that stops at 6. Two fixes found by profiling: households were looked up by scanning the whole list, and every candidate re-summed the town's population for its food days. Next steps if needed: spread the pass over the week's days, and the grouped representation for cities.
+
+### Against the intended experience (directive D)
+
+Watching one household, the card answers: what it wanted ("Lately", "Work"), why (the reasons), what circumstances weighed (security, food, its neighbours' example), what the player did (appeals and rewards appear among its reasons, as "the community asks families to ..."), why it accepted or refused (the strongest reasons for or against), what resulted (ties, standing, trust), and how it changed it (memories with the lesson drawn, value changes with the experience behind them). The roster gives the town at a glance. What still needs the owner's playtest: whether these words make the families feel like characters, and whether choosing between appeals, rewards, and honours feels like leading.
 
 ## Judgment Calls
 
-JUDGMENT_PLACEHOLDER
+Made during implementation, open to veto. Numbers are first guesses, in the scripts named.
+
+- **Branch.** `feature/household-social-prototype` is cut from `feature/family-influence-prototype`, not `develop`: this slice extends that unmerged prototype (families developing their own work), which still awaits review. Both merge together, or not at all.
+- **Spare time is a choice.** With the model on, a working family gives its spare fifth of a day only to its own project or the one it chose to help that week (`TownConstruction.get_spare_time_project`). Before, every family helped the first site in the queue. The town building model once found towns stall without automatic helpers; families' own homes and full-time builders are unaffected, and the comparison below did not show stalls, but it is the main balance risk.
+- **Sharing moves hardship, not food.** Stores are communal, so a family's "ration" is its share of the shortage's hardship: a donor takes one point of it, the family helped is spared one (`Household.shortage_hardship_adjust`). A donor gives at most once a month, and only if doing so leaves it clear of considering departure itself.
+- **The field claim is the only claim.** Disputes arise from trampling, now attributed to the walking household (`TownLogistics.trampled_by`). Amends mean the crossing family fences the field with its labor (or owes the field's family a favour when no wood can be spared). A dispute rests 90 days before the same pair can quarrel again; a second unsettled one is a feud.
+- **The help norm is judged per family in need,** not per family that could help: each week, a family building its first home or close to leaving either got some neighbour's help or none. Counting every non-helping family as a violation drove acceptance to nothing within weeks, because one helper is enough.
+- **Material incentive = first claim on the stores** for 120 days after helping or sharing: the household's own projects pass the priorities rule (never the reserve) and go to the front of the building queue. When that happens, the promise is kept and the household's trust rises a little.
+- **Fairness of honours and grants** is judged by contribution (weeks of help given and rations shared) against the town's middle and the observer's own, and repeated favour of the same household (more than two honours and grants) is favouritism whatever it has done. Resentment needs egalitarian conviction, ambition, or being clearly overlooked; hierarchical and deferential households accept it.
+- **Restricted stores cost trust** at most once a month per household, and only for households that are not secure.
+- **Value evidence:** ordinary experiences 1, major ones 2; 3 moves a value a level; a year between moves of one value. A lesson for a conduct value whose opposite the household holds weakens the opposite instead (forgiveness and vindication).
+- **Character drawing:** axes mostly balanced (40% zero, 20% each ±1, 10% each ±2); a held migrated value sets its axis to ±1 or ±2; each conduct value 45%; 3-5 strong convictions, 1-2 defining. New households: averaged temperament with a 15% chance of a step either way; parent strengths kept, 15% one weaker, 10% one stronger.
+- **Unchanged on purpose:** industrious and leisurely still give their ±10% output (`CultureEffects`); see Open Questions.
+- **A town with half a year of food in store is secure** for the purpose of weighing improvements, whatever its fields grow meanwhile (`FamilyInitiative.SECURE_FOOD_DAYS`).
 
 ## Open Questions For The Owner
 
-OPEN_PLACEHOLDER
+1. **Temperament and output.** Industrious and leisurely are now temperament, which the directive says must not be a production bonus, yet as catalog values they still give ±10% output. Remove the output effect (every balance run moves), or keep it as the effect of the underlying value?
+2. **Automatic helpers.** Should spare-time helping stay purely voluntary when the model is on, or should a family still give spare time to its own kin's homes without deciding to?
+3. **What contribution means.** Fairness is judged by help and food given. Should good work at a family's own holding (production) count as contribution too?
+4. **Where the player's appeals come from.** In the fiction, who asks families to help their neighbours: a gathering, respected elders, the founders? It decides what trust in leadership is trust *in* before any institution exists.
