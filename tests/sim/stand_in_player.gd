@@ -48,6 +48,22 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 		city.influence.reserved_builders = int(scenario.get("reserved_builders", 0))
 	if scenario.get("hand_method", false):
 		city.set_hand_method_fallback(true)
+	# Household social prototype (docs/HOUSEHOLD_SOCIAL_MODEL.md): "social" turns it on; "promote"
+	# asks for both norms; "incentive" gives helpers and sharers first claim on the stores;
+	# "restricted" keeps the stores for the community's priorities (food only); "unfair" honours and
+	# favours the household that has contributed least, every few months; "hard_winter" empties
+	# most of the stores as the first winter begins (a lost harvest), so the town meets a shortage.
+	if scenario.get("social", false):
+		city.social.set_enabled(true)
+		city.social.incentive = scenario.get("incentive", false)
+		if scenario.get("promote", false):
+			city.social.set_promoted(TownSocial.NORM_HELP, true)
+			city.social.set_promoted(TownSocial.NORM_CLAIMS, true)
+			player_actions += 2
+		if scenario.get("restricted", false):
+			city.influence.store_rule = TownInfluence.RULE_PRIORITIES
+			city.influence.set_encouraged(TownInfluence.ACTIVITY_FOOD, true)
+			player_actions += 2
 	for entry: String in scenario.get("prebuild", []):
 		if entry.ends_with("*"):
 			while try_build(city, entry.trim_suffix("*"), scenario, 0):
@@ -91,6 +107,12 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 			defend(city, day)
 		if scenario.get("guided", false) and day % GUIDE_INTERVAL_DAYS == 0:
 			guide(city)
+		if scenario.get("hard_winter", false) and day == HARD_WINTER_DAY:
+			city.resources["food"] = mini(int(city.resources["food"]), int(city.resources["food_consumption_rate"]) * HARD_WINTER_FOOD_DAYS)
+		if scenario.get("unfair", false) and day >= UNFAIR_FIRST_DAY and (day - UNFAIR_FIRST_DAY) % UNFAIR_INTERVAL_DAYS == 0:
+			favour_least_deserving(city)
+		if scenario.get("social", false) and day % 360 == 359:
+			social_years.append(snapshot_social(city))
 		if day % POLICY_INTERVAL_DAYS == 0 and day >= int(scenario.get("idle_until", 0)):
 			if not scenario.get("families_develop", false):
 				upgrade_one(city, scenario, day)
@@ -157,6 +179,72 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 		"working_by_hand": city.buildings.filter(func(b: Building) -> bool: return b.is_working_by_hand()).size(),
 		"workplace_spread": workplace_spread(city),
 		"founder_improvements": founder_improvements(city),
+		"social": snapshot_social(city) if scenario.get("social", false) else {},
+		"social_years": social_years,
+	}
+
+const HARD_WINTER_DAY: int = 270
+const HARD_WINTER_FOOD_DAYS: int = 8
+const UNFAIR_FIRST_DAY: int = 90
+const UNFAIR_INTERVAL_DAYS: int = 120
+
+# The social state of a town at a moment, for the social check.
+var social_years: Array = []
+
+# The household that has given the community least (ties: the newest) is honoured and given first
+# claim on the stores: a deliberately unfair distribution.
+func favour_least_deserving(city) -> void:
+	var chosen: Household = null
+	for household: Household in city.households:
+		if chosen == null or household.help_given < chosen.help_given or (household.help_given == chosen.help_given and household.id > chosen.id):
+			chosen = household
+	if chosen != null:
+		city.social.recognize(chosen)
+		city.social.grant(chosen)
+		player_actions += 2
+
+static func snapshot_social(city) -> Dictionary:
+	var social: TownSocial = city.social
+	var dispositions: Array[int] = []
+	var kinds: Dictionary = {}
+	var trust: float = 0.0
+	var standing: Array[int] = []
+	for household: Household in city.households:
+		trust += household.trust
+		standing.append(household.standing)
+		for tie: Dictionary in household.ties:
+			if bool(tie.get("kin", false)):
+				continue
+			dispositions.append(int(tie["disposition"]))
+			kinds[tie["kind"]] = int(kinds.get(tie["kind"], 0)) + 1
+	standing.sort()
+	var n: float = maxf(1.0, city.households.size())
+	var mean_disposition: float = 0.0
+	for d: int in dispositions:
+		mean_disposition += d
+	return {
+		"help_rate": float(social.help_followed) / maxf(1.0, social.help_opportunities),
+		"help_opportunities": social.help_opportunities,
+		"help_weeks": social.help_weeks,
+		"share_rate": float(social.shares) / maxf(1.0, social.share_requests),
+		"share_requests": social.share_requests,
+		"disputes_raised": social.disputes_raised,
+		"disputes_settled": social.disputes_settled,
+		"disputes_let_pass": social.disputes_let_pass,
+		"dispute_pressure": social.dispute_pressure,
+		"ties": dispositions.size() / n,
+		"mean_disposition": mean_disposition / maxf(1.0, dispositions.size()),
+		"friends": int(kinds.get("friend", 0)) / n,
+		"rivals": (int(kinds.get("rival", 0)) + int(kinds.get("feud", 0))) / n,
+		"trust": trust / n,
+		"standing_spread": float(standing.back() - standing.front()) if not standing.is_empty() else 0.0,
+		"help_acceptance": float(social.norms[TownSocial.NORM_HELP]["acceptance"]),
+		"help_status": social.norms[TownSocial.NORM_HELP]["status"],
+		"claims_acceptance": float(social.norms[TownSocial.NORM_CLAIMS]["acceptance"]),
+		"claims_status": social.norms[TownSocial.NORM_CLAIMS]["status"],
+		"value_changes": social.value_changes,
+		"week_usec": float(social.week_usec_total) / maxf(1.0, social.weeks_run),
+		"households": city.households.size(),
 	}
 
 # Founding families by temperament, with the day each first decided to improve its work (-1 never):

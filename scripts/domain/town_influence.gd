@@ -77,11 +77,14 @@ func get_protected_reserve() -> Dictionary:
 # Why the stores will not fund a family's project, or "" when they will. Under the priorities rule
 # a project is funded when any of the activities it serves is encouraged: an improvement serves
 # better work and its own trade.
-func get_funding_block(cost: Dictionary, activities: Array[String]) -> String:
+# A household with first claim (an incentive it earned, or a grant; TownSocial) passes the rule,
+# never the reserve.
+func get_funding_block(cost: Dictionary, activities: Array[String], household: Household = null) -> String:
 	if cost.is_empty():
 		return ""
 	if store_rule == RULE_PRIORITIES and not activities.any(is_encouraged):
-		return "the stores go to the community's priorities first"
+		if household == null or household.first_claim_until < city.construction.day:
+			return "the stores go to the community's priorities first"
 	if not city.construction.can_supply(cost, get_protected_reserve()):
 		return "the stores hold too little beyond what is kept back"
 	return ""

@@ -67,6 +67,8 @@ var trade_routes: Array[TradeRoute] = []
 var top_bar_action_options: Array[Dictionary] = []
 var region_action_options: Array[Dictionary] = []
 var city_action_options: Array[Dictionary] = []
+# The family roster over the town view (L; household social prototype).
+var show_household_roster: bool = false
 # Whether a top bar status chip's detail was drawn last frame (redraw when the mouse leaves it).
 var top_bar_tooltip_shown: bool = false
 var build_menu_options: Array[Dictionary] = []
@@ -1055,6 +1057,7 @@ func found_player_city_at_pending_site() -> bool:
 	if OS.get_cmdline_user_args().has("--influence") or OS.get_cmdline_args().has("--influence"):
 		founded_city.influence.enabled = true
 		founded_city.set_hand_method_fallback(true)
+		founded_city.social.set_enabled(true)
 	cities.append(founded_city)
 	var founded_city_index: int = cities.size() - 1
 	if not pending_local_map.is_empty():
@@ -1174,6 +1177,19 @@ func try_handle_city_action_click(mouse_pos: Vector2) -> bool:
 					influence.toggle_encouraged(str(option_data["activity"]))
 				else:
 					influence.store_rule = TownInfluence.RULE_OPEN if influence.store_rule == TownInfluence.RULE_PRIORITIES else TownInfluence.RULE_PRIORITIES
+			queue_redraw()
+		elif action == "toggle_norm" or action == "toggle_incentive" or action == "honour_household":
+			if selected_city_index >= 0 and selected_city_index < cities.size():
+				var social: TownSocial = cities[selected_city_index].social
+				if action == "toggle_norm":
+					var norm_id: String = str(option_data["norm"])
+					social.set_promoted(norm_id, not bool(social.norms[norm_id]["promoted"]))
+				elif action == "toggle_incentive":
+					social.incentive = not social.incentive
+				else:
+					var honoured: Household = cities[selected_city_index].get_household_by_id(int(option_data["household"]))
+					if honoured != null:
+						social.recognize(honoured)
 			queue_redraw()
 		else:
 			apply_time_control_action(action)
@@ -1401,7 +1417,10 @@ func handle_building_selection_key_event(key_event: InputEventKey) -> bool:
 		var town: City = cities[selected_city_index]
 		town.influence.enabled = not town.influence.enabled
 		town.set_hand_method_fallback(town.influence.enabled)
-		print("Influence prototype ", "on" if town.influence.enabled else "off", " for ", town.name)
+		town.social.set_enabled(town.influence.enabled)
+		print("Influence and household social prototypes ", "on" if town.influence.enabled else "off", " for ", town.name)
+	elif is_letter_key(keycode, physical_keycode, KEY_L):
+		show_household_roster = not show_household_roster
 	else:
 		return false
 
@@ -1832,6 +1851,7 @@ func draw_city_view():
 
 	# The town itself is drawn by town_map_view, under these panels.
 	draw_city_sidebar(font, font_size)
+	draw_household_roster(font, font_size - 1)
 
 	if selected_city_index < 0 or selected_city_index >= cities.size():
 		draw_string(font, Vector2(24, 82), "No city map selected.", HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size, VisualStyle.COLOR_UI_TEXT)
@@ -2481,7 +2501,42 @@ func draw_influence_section(font: Font, font_size: int, city: City, x: float, y:
 			continue
 		y = draw_sidebar_line(font, font_size, "%s, if asked for better work: %s" % [city.get_household_label(household.id), outlook["outlook"]], x, y, VisualStyle.COLOR_MUTED)
 		shown += 1
-	return draw_sidebar_line(font, font_size, "K: mark ground families may open work on", x, y, VisualStyle.COLOR_MUTED)
+	y = draw_social_controls(font, font_size, city, x, y, width, half)
+	return draw_sidebar_line(font, font_size, "K: mark ground for work, L: families", x, y, VisualStyle.COLOR_MUTED)
+
+# Household social prototype (TownSocial): the two norms the community can ask for and how far the
+# town follows them, the reward for helping, and honouring the selected family.
+func draw_social_controls(font: Font, font_size: int, city: City, x: float, y: float, width: float, half: float) -> float:
+	if not city.social.enabled:
+		return y
+	for line: String in city.social.get_sidebar_lines():
+		y = draw_sidebar_line(font, font_size, line, x, y, VisualStyle.COLOR_MUTED)
+	var norm_ids: Array[String] = [TownSocial.NORM_HELP, TownSocial.NORM_CLAIMS]
+	for column in range(2):
+		var on: bool = bool(city.social.norms[norm_ids[column]]["promoted"])
+		draw_city_action_button(font, font_size, ("Asked: " if on else "Ask: ") + ("helping" if column == 0 else "claims"), x + column * (half + 4.0), y + 4.0, half, {"action": "toggle_norm", "norm": norm_ids[column]}, VisualStyle.COLOR_UI_BUTTON_ACTIVE if on else VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
+	y += 22.0
+	draw_city_action_button(font, font_size, "Reward help: " + ("on" if city.social.incentive else "off"), x, y + 4.0, half, {"action": "toggle_incentive"}, VisualStyle.COLOR_UI_BUTTON_ACTIVE if city.social.incentive else VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
+	var selected: Household = get_inspected_household()
+	if selected != null:
+		draw_city_action_button(font, font_size, "Honour family", x + half + 4.0, y + 4.0, half, {"action": "honour_household", "household": selected.id}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
+	return y + 26.0
+
+# The family roster (L), over the left of the town view: one line a family (HouseholdRosterHelper).
+func draw_household_roster(font: Font, font_size: int) -> void:
+	if not show_household_roster or selected_city_index < 0 or selected_city_index >= cities.size():
+		return
+	var city: City = cities[selected_city_index]
+	var lines: Array[String] = HouseholdRosterHelper.get_lines(city) if city.social.enabled else ["Press I to turn on the household social prototype for this town."]
+	var width: float = minf(760.0, get_viewport_rect().size.x - get_city_sidebar_rect().size.x - 40.0)
+	var rect: Rect2 = Rect2(Vector2(12.0, 52.0), Vector2(width, 30.0 + lines.size() * 17.0))
+	draw_rect(rect, Color(0.08, 0.09, 0.08, 0.9))
+	draw_rect(rect, VisualStyle.COLOR_UI_OPTION_BORDER, false, 1.0)
+	var y: float = rect.position.y + 20.0
+	draw_string(font, Vector2(rect.position.x + 10.0, y), "Families (L to close)", HORIZONTAL_ALIGNMENT_LEFT, width - 20.0, font_size + 1, VisualStyle.COLOR_UI_TITLE)
+	for line: String in lines:
+		y += 17.0
+		draw_string(font, Vector2(rect.position.x + 10.0, y), line, HORIZONTAL_ALIGNMENT_LEFT, width - 20.0, font_size, VisualStyle.COLOR_UI_TEXT_NORMAL)
 
 func draw_sidebar_like_line(font: Font, font_size: int, text: String, x: float, y: float, width: float, color: Color) -> float:
 	draw_string(font, Vector2(x, y), text, HORIZONTAL_ALIGNMENT_LEFT, width, font_size, color)

@@ -53,9 +53,12 @@ func profile(overrides: Dictionary) -> Dictionary:
 		preset[category] = overrides[category]
 	return CultureValues.make_random_profile(rng, preset)
 
+# About seven weeks of food: enough to live on, not enough to feel secure (FamilyInitiative weighs
+# the risk of waiting against the risk of acting).
 func enabled_city() -> City:
 	var city: City = ConstructionTest.make_city()
 	city.influence.enabled = true
+	city.resources["food"] = 600
 	return city
 
 # A family on a forager's garden on the farmland.

@@ -73,6 +73,42 @@ var initiative_note: String = ""
 var initiative_day: int = -1
 var improve_decision_day: int = -1
 
+# The household's character and social life (docs/HOUSEHOLD_SOCIAL_MODEL.md; HouseholdCharacter,
+# TownSocial). Empty until the social model or influence prototype gives the household one.
+# Personality: axis id -> -2..2. Value strengths: value id -> 0..3 (catalog values held in
+# `values` count as 1 unless set here). Evidence for or against a value from interpreted
+# experiences, and the day each value last changed.
+var personality: Dictionary = {}
+var value_strengths: Dictionary = {}
+var value_evidence: Dictionary = {}
+var value_changed_day: Dictionary = {}
+# Trust in the community's leadership and standing among households, -3..3, with the fractions
+# that accumulate toward the next step.
+var trust: int = 0
+var standing: int = 0
+var trust_progress: float = 0.0
+var standing_progress: float = 0.0
+# Sparse ties to other households (HouseholdMemory): {"with", "disposition", "kind", "reasons",
+# "owed", "grievance", "since"}; and bounded memories of significant experiences.
+var ties: Array = []
+var memories: Array = []
+# Recent changes of conviction, explained, newest last.
+var value_change_notes: Array = []
+# The project this household gives its spare time to this week (-1: its own work only).
+var helping_project_id: int = -1
+# Shortage hardship moved to (positive) or from (negative) this household by sharing this month.
+var shortage_hardship_adjust: int = 0
+# Until this day the household's own projects have first claim on the stores (incentive or grant).
+var first_claim_until: int = -1
+# Weeks this household helped others build, and was helped; times it was publicly recognized.
+var help_given: int = 0
+var help_received: int = 0
+var recognized: int = 0
+var grants_received: int = 0
+# The household's latest dealing with others and why (TownSocial), and the day of it.
+var social_note: String = ""
+var social_note_day: int = -1
+
 func _init(household_id: int = -1, building_id: int = -1, work_preference: String = WORK_PREF_NEUTRAL, population: int = 4, residence_status: String = RESIDENCE_TEMPORARY):
 	id = household_id
 	house_building_id = building_id

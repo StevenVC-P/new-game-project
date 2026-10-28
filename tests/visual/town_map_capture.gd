@@ -317,6 +317,26 @@ func capture_game_flow() -> void:
 	main.get_viewport().warp_mouse(Vector2(600.0, 400.0))
 	main.queue_redraw()
 	await shot("game_influence")
+	# The household social prototype (TownSocial): a family's card with its character, ties, and
+	# memories, then the roster of every family (L).
+	town.social.set_enabled(true)
+	town.social.set_promoted(TownSocial.NORM_HELP, true)
+	for _day in range(60):
+		town.tick()
+	var richest: int = -1
+	for index in range(town.buildings.size()):
+		var resident: Household = town.get_household_for_building_id(index) if town.buildings[index].is_house() else null
+		if resident != null and (richest < 0 or resident.ties.size() + resident.memories.size() > town.get_household_for_building_id(richest).ties.size() + town.get_household_for_building_id(richest).memories.size()):
+			richest = index
+	if richest >= 0:
+		main.city_building_overlay.inspected_building_index = richest
+		main.city_building_overlay.selected_house_building_index = richest
+	main.queue_redraw()
+	await shot("game_social_card")
+	main.show_household_roster = true
+	main.queue_redraw()
+	await shot("game_roster")
+	main.show_household_roster = false
 	main.clear_selected_household()
 	main.regional_terrain.wait_for_tasks()
 	main.queue_free()

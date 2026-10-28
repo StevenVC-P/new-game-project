@@ -30,13 +30,10 @@ const IMPROVE_THRESHOLD: float = 2.0
 # predict(), so a family predicted likely or opposed always does what was predicted.
 const NOISE: float = 0.75
 const ENCOURAGE_WEIGHT: float = 2.0
-# Days of food in store below which a cautious family will not change its work.
-const CAUTIOUS_SECURE_FOOD_DAYS: float = 60.0
+const SECURE_FOOD_DAYS: float = 180.0
 # How far a family looks for workplace sites, and how many valid ones it compares.
 const SITE_SEARCH_RADIUS: int = 30
 const SITE_CANDIDATES: int = 8
-# Families whose homes stand this close, and kin, are the neighbours whose work a family watches.
-const NEIGHBOUR_RADIUS: float = 10.0
 const HEART_PULL: float = FamilyDevelopment.HEART_PULL
 
 const OUTLOOK_LIKELY: String = "likely"
@@ -98,6 +95,7 @@ static func take_up_work(city: City, household: Household) -> ConstructionProjec
 		if project == null:
 			continue
 		city.influence.workplaces_opened += 1
+		use_first_claim(city, household, project)
 		note(city, household, "Took up %s (%s)" % [describe_type(building_type), "; ".join(get_reasons(choice["terms"], true))])
 		return project
 	note(city, household, "Found no work it could take up")
@@ -111,11 +109,11 @@ static func get_work_desire(city: City, household: Household, activity: String) 
 		add(terms, 3.0, "it is the family's calling")
 	elif match_quality == CultureEffects.MATCH_POOR:
 		add(terms, -2.0, "it is not the family's calling")
-	var cautious: bool = has(household, "cautious")
+	var cautious: bool = HouseholdCharacter.get_axis(household, HouseholdCharacter.RISK) < 0
 	match activity:
 		TownInfluence.ACTIVITY_FOOD:
 			var ratio: float = get_food_ratio(city)
-			var weight: float = 1.5 if cautious else 1.0
+			var weight: float = 1.0 + 0.25 * maxi(0, -HouseholdCharacter.get_axis(household, HouseholdCharacter.RISK))
 			if ratio < 1.0:
 				add(terms, 3.0 * weight, "the town grows less food than it eats" + (", and it puts food first" if cautious else ""))
 			elif ratio < 1.25:
@@ -152,14 +150,16 @@ static func consider_improving(city: City, household: Household, holding: Buildi
 	if float(desire["score"]) + get_noise(city, household, "improve") < IMPROVE_THRESHOLD:
 		note(city, household, "Keeps to hand work at its %s (%s)" % [name, "; ".join(get_reasons(desire["terms"], false))])
 		return null
-	var block: String = city.influence.get_funding_block(EconomyBalance.get_build_cost(proper), [get_activity(proper), TownInfluence.ACTIVITY_IMPROVE] as Array[String])
+	var block: String = city.influence.get_funding_block(EconomyBalance.get_build_cost(proper), [get_activity(proper), TownInfluence.ACTIVITY_IMPROVE] as Array[String], household)
 	if block != "":
 		city.influence.held_back_by_stores += 1
+		city.social.on_held_back(household)
 		note(city, household, "Wants to improve its %s, but %s" % [name, block])
 		return null
 	var project: ConstructionProject = city.construction.request_upgrade(holding.id, ConstructionProject.REQUESTED_BY_HOUSEHOLD, household.id)
 	if project == null:
 		return null
+	use_first_claim(city, household, project)
 	city.influence.improvements_started += 1
 	if household.improve_decision_day < 0:
 		household.improve_decision_day = city.construction.day
@@ -167,59 +167,102 @@ static func consider_improving(city: City, household: Household, holding: Buildi
 	return project
 
 # How much a family wants to improve work into a proper holding of this type: {"score", "terms"}.
+#
+# Temperament never fixes an order (docs/HOUSEHOLD_SOCIAL_MODEL.md, Section 6). Risk tolerance sets
+# how heavily a family weighs risk at all, and the risk of acting (spending scarce stores, a method
+# untried here) is weighed against the risk of waiting (the work the town is short of): a cautious
+# family improves first when waiting is the greater danger. Tradition resists what is new but
+# backs what is already the established way; an aspiring family may hold off for work of its
+# calling.
 static func get_improve_desire(city: City, household: Household, proper_type: String) -> Dictionary:
 	var terms: Array = []
-	var cautious: bool = has(household, "cautious")
-	var daring: bool = has(household, "daring")
+	var risk_tolerance: int = HouseholdCharacter.get_axis(household, HouseholdCharacter.RISK)
 	add(terms, 1.0, "proper work yields three times as much")
-	# What the improvement would give the town, and what it would spend of the stores.
-	match get_activity(proper_type):
-		TownInfluence.ACTIVITY_FOOD:
-			if get_food_ratio(city) < 1.25 or get_food_days(city) < 90.0:
-				add(terms, 1.5, "more food for the winter")
-		TownInfluence.ACTIVITY_WOOD:
-			if int(city.resources["wood"]) < 20:
-				add(terms, 1.5, "the town needs wood")
-		TownInfluence.ACTIVITY_TOOLS:
-			if int(city.resources["tools"]) < 10:
-				add(terms, 1.5, "the town needs tools")
-	var risk: float = get_spending_risk(city, EconomyBalance.get_build_cost(proper_type))
-	if risk > 0.2:
-		add(terms, -2.0 * risk * (1.5 if cautious else 0.5 if daring else 1.0), "it would spend scarce wood and tools")
-	# A cautious family changes nothing while the town's food or stores are precarious: it waits
-	# until they are secure, then weighs the change like anyone, a little warily.
-	if daring:
-		add(terms, 2.0, "the family is daring")
-	elif cautious:
-		add(terms, -1.5, "the family is cautious")
-		if get_food_days(city) < CAUTIOUS_SECURE_FOOD_DAYS or risk > 0.3:
-			add(terms, -1.5, "it waits until the town's food and stores are secure")
-	if has(household, "traditionalist"):
-		add(terms, -2.0, "it keeps to the old ways")
-	elif has(household, "reformist"):
-		add(terms, 1.0, "it welcomes new ways")
-	if has(household, "industrious"):
-		add(terms, 1.0, "the family is industrious")
-	elif has(household, "leisurely"):
-		add(terms, -1.0, "the family is leisurely")
-	if has(household, "acquisitive") or has(household, "private_holdings"):
-		add(terms, 1.0, "it invests in what is its own")
-	if has(household, "fatalistic"):
-		add(terms, -1.0, "it expects little to change")
-	elif has(household, "hopeful"):
-		add(terms, 0.5, "the family is hopeful")
-	# What its neighbours' improved work shows. Cautious and traditional families are moved more by
-	# what they have seen than by what they are told.
+	var waiting: float = get_waiting_risk(city, get_activity(proper_type))
+	if waiting > 0.0:
+		add(terms, 1.5 * waiting, {TownInfluence.ACTIVITY_FOOD: "more food for the winter", TownInfluence.ACTIVITY_WOOD: "the town needs wood", TownInfluence.ACTIVITY_TOOLS: "the town needs tools"}[get_activity(proper_type)])
+	var spending: float = get_spending_risk(city, EconomyBalance.get_build_cost(proper_type))
+	var established: int = count_proper(city, proper_type)
+	var untried: float = 0.5 if established == 0 else 0.0
+	var acting: float = spending + untried
+	var weight: float = 1.0 - 0.4 * risk_tolerance
+	var balance: float = weight * (waiting - acting)
+	if absf(balance) >= 0.2:
+		if balance > 0.0:
+			add(terms, balance, "waiting is the greater risk")
+		else:
+			add(terms, balance, "it would spend scarce wood and tools" if spending >= untried else "the method is untried here")
+	if risk_tolerance != 0:
+		add(terms, 0.75 * risk_tolerance, "the family is " + HouseholdCharacter.describe_axis(HouseholdCharacter.RISK, risk_tolerance))
+	var ambition: int = HouseholdCharacter.get_axis(household, HouseholdCharacter.AMBITION)
+	if ambition > 0 and household.ambition == FamilyAmbitions.CALLING and household.get_match_quality(proper_type) != CultureEffects.MATCH_GOOD:
+		add(terms, -1.5, "it is holding out for work of its calling")
+	elif ambition != 0:
+		add(terms, 0.75 * ambition, "the family is " + HouseholdCharacter.describe_axis(HouseholdCharacter.AMBITION, ambition))
+	var diligence: int = HouseholdCharacter.get_axis(household, HouseholdCharacter.DILIGENCE)
+	if diligence != 0:
+		add(terms, 0.5 * diligence, "the family is " + HouseholdCharacter.describe_axis(HouseholdCharacter.DILIGENCE, diligence))
+	var openness: int = HouseholdCharacter.get_axis(household, HouseholdCharacter.OPENNESS)
+	if openness != 0 and untried > 0.0:
+		add(terms, 0.75 * openness, "the family is " + HouseholdCharacter.describe_axis(HouseholdCharacter.OPENNESS, openness))
+	var tradition: int = HouseholdCharacter.get_strength(household, "traditionalist")
+	if tradition > 0:
+		if established >= 2:
+			add(terms, 0.75 * tradition, "it is the established way here")
+		else:
+			add(terms, -1.0 * tradition, "it keeps to the old ways")
+	var reform: int = HouseholdCharacter.get_strength(household, "reformist")
+	if reform > 0:
+		add(terms, 0.5 * reform, "it welcomes new ways")
+	var owning: int = maxi(HouseholdCharacter.get_strength(household, "acquisitive"), HouseholdCharacter.get_strength(household, "private_holdings"))
+	if owning > 0:
+		add(terms, 0.5 * owning, "it invests in what is its own")
+	var fatalism: int = HouseholdCharacter.get_strength(household, "fatalistic")
+	if fatalism > 0:
+		add(terms, -0.5 * fatalism, "it expects little to change")
+	var hope: int = HouseholdCharacter.get_strength(household, "hopeful")
+	if hope > 0:
+		add(terms, 0.25 * hope, "the family is hopeful")
+	# What its neighbours' improved work shows. Wary and traditional families are moved more by what
+	# they have seen than by what they are told.
 	var seen: Dictionary = get_neighbours_example(city, household)
-	var example_weight: float = 1.5 if cautious or has(household, "traditionalist") else 1.0
+	var example_weight: float = 1.0 + 0.25 * maxi(0, -risk_tolerance) + 0.25 * tradition
 	if int(seen["paying"]) > 0:
 		add(terms, minf(3.0, 0.75 * int(seen["paying"])) * example_weight, "its neighbours' improved work is paying")
 	if int(seen["idle"]) > 0:
 		add(terms, -minf(2.0, float(seen["idle"])) * example_weight, "its neighbours' improved work stands short of tools")
-	if city.resources["food_shortage"] == true:
-		add(terms, -2.0, "the town is hungry: survival first")
 	add_encouragement(city, household, TownInfluence.ACTIVITY_IMPROVE, terms, "the community asks for better work")
 	return {"score": sum(terms), "terms": terms}
+
+# How dangerous it is for the town to go on without more of an activity's output, 0 to 1.5.
+static func get_waiting_risk(city: City, activity: String) -> float:
+	match activity:
+		TownInfluence.ACTIVITY_FOOD:
+			var risk: float = 0.0
+			var ratio: float = get_food_ratio(city)
+			var days: float = get_food_days(city)
+			# Half a year of food in store is security, whatever the fields grow meanwhile.
+			if days >= SECURE_FOOD_DAYS:
+				return 0.0
+			if ratio < 1.0 or days < 45.0:
+				risk = 1.0
+			elif ratio < 1.25 or days < 90.0:
+				risk = 0.5
+			if days < 30.0:
+				risk += 0.5
+			return risk
+		TownInfluence.ACTIVITY_WOOD:
+			return 0.75 if int(city.resources["wood"]) < 20 else 0.0
+		TownInfluence.ACTIVITY_TOOLS:
+			return 0.75 if int(city.resources["tools"]) < 10 else 0.0
+	return 0.0
+
+# Proper workplaces of a type standing in the town.
+static func count_proper(city: City, proper_type: String) -> int:
+	var count: int = 0
+	for building: Building in city.buildings:
+		count += 1 if building.type == proper_type else 0
+	return count
 
 # How a family is expected to answer a call to improve its work, before the player decides:
 # {"outlook", "reasons"}. Grounded in the same terms as the decision, without the unknown.
@@ -248,33 +291,34 @@ static func predict_improvement(city: City, household: Household, encouraged: bo
 static func add_encouragement(city: City, household: Household, activity: String, terms: Array, reason: String) -> void:
 	if not city.influence.is_encouraged(activity):
 		return
-	var receptive: float = 1.0
-	if has(household, "deferential"):
-		receptive = 1.5
-		reason += ", and it heeds the community"
-	elif has(household, "self_governing"):
-		receptive = 0.6
-		reason += ", though it judges for itself"
-	if has(household, "communal_labor"):
-		receptive += 0.25
-	elif has(household, "solitary"):
-		receptive -= 0.25
-	add(terms, ENCOURAGE_WEIGHT * receptive, reason)
+	var receptive: Dictionary = get_receptiveness(household)
+	add(terms, ENCOURAGE_WEIGHT * float(receptive["factor"]), reason + str(receptive["note"]))
+
+# How readily a family heeds the community's appeals, {"factor", "note"}: deference and trust in the
+# leadership make it readier, self-government less; communal labor and solitary work nudge it.
+static func get_receptiveness(household: Household) -> Dictionary:
+	var factor: float = 1.0
+	var note_text: String = ""
+	var deference: int = HouseholdCharacter.get_strength(household, "deferential")
+	var self_rule: int = HouseholdCharacter.get_strength(household, "self_governing")
+	if deference > 0:
+		factor += 0.25 * deference
+		note_text = ", and it heeds the community"
+	elif self_rule > 0:
+		factor -= 0.2 * self_rule
+		note_text = ", though it judges for itself"
+	factor += 0.15 * household.trust
+	if household.trust <= -2:
+		note_text += ", though it distrusts the leadership"
+	factor += 0.25 * signf(HouseholdCharacter.get_strength(household, "communal_labor") - HouseholdCharacter.get_strength(household, "solitary"))
+	return {"factor": maxf(0.2, factor), "note": note_text}
 
 # Proper workplaces worked by kin and near neighbours: how many pay (well kept) and how many stand
 # short of tools (working by hand or idle for want of upkeep).
 static func get_neighbours_example(city: City, household: Household) -> Dictionary:
 	var paying: int = 0
 	var idle: int = 0
-	var home: Vector2i = city.logistics.get_home_tile(household) if not city.local_map.is_empty() else Vector2i(-1, -1)
-	for other: Household in city.households:
-		if other == household:
-			continue
-		var kin: bool = household.is_child_of(other.id) or other.is_child_of(household.id)
-		if not kin and home.x >= 0:
-			var other_home: Vector2i = city.logistics.get_home_tile(other)
-			if other_home.x < 0 or Vector2(home).distance_to(Vector2(other_home)) > NEIGHBOUR_RADIUS:
-				continue
+	for other: Household in city.social.get_known_households(household):
 		var holding: Building = get_holding(city, other)
 		if holding == null or not holding.needs_maintenance():
 			continue
@@ -378,6 +422,15 @@ static func get_anchor(city: City, household: Household) -> Vector2i:
 	if city.logistics.stockpile_tile.x >= 0:
 		return city.logistics.stockpile_tile
 	return Vector2i(city.logistics.map_size() / 2)
+
+# A household with first claim on the stores (an incentive it earned, or a grant; TownSocial) has
+# its project put at the front of the queue, so builders and materials reach it first: the promise
+# kept, which the household notices.
+static func use_first_claim(city: City, household: Household, project: ConstructionProject) -> void:
+	if household.first_claim_until < city.construction.day:
+		return
+	city.construction.prioritize(project.id)
+	city.social.on_first_claim_used(household)
 
 # --- Helpers ------------------------------------------------------------------------------------
 

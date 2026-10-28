@@ -58,6 +58,9 @@ static func _add_home_links(lines: Array[String], city: City, house_index: int) 
 		lines.append("Wants: " + wants + (" (waiting %d months)" % household.ambition_months if household.ambition_months > EconomyBalance.AMBITION_PATIENCE_MONTHS else ""))
 	if household.contentment > 0:
 		lines.append("Content: %d ambition%s fulfilled" % [household.fulfilled_ambitions, "" if household.fulfilled_ambitions == 1 else "s"])
+	# Who the family is and how it stands with its neighbours (household social prototype).
+	if city.social.enabled:
+		lines.append_array(HouseholdRosterHelper.get_card_lines(city, household))
 	# Families developing their own work say what they decided and why (influence prototype).
 	if city.influence.enabled and household.initiative_note != "":
 		lines.append("Decided: " + household.initiative_note)

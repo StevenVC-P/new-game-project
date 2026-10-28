@@ -484,12 +484,15 @@ func advance_day() -> void:
 		complete(project)
 
 func project_add_spare(project: ConstructionProject, household: Household) -> void:
+	city.social.record_help_day(household, project)
 	project.crew_household_ids.append(household.id)
 	spare_time_today[household.id] = EconomyBalance.SPARE_TIME_SHARE
 	apply_labor(project, get_builder_labor(household) * EconomyBalance.SPARE_TIME_SHARE)
 
 # A family at work on a holding gives spare time to its own project first (its home, or its
 # workplace's upgrade), else to the first site in the queue whose crew has room.
+# With the household social model on, helping is a choice (TownSocial.choose_help): a family gives
+# spare time only to its own project or to the one it chose to help this week.
 func get_spare_time_project(household: Household, workable: Array[ConstructionProject]) -> ConstructionProject:
 	var fallback: ConstructionProject = null
 	for project: ConstructionProject in workable:
@@ -497,6 +500,8 @@ func get_spare_time_project(household: Household, workable: Array[ConstructionPr
 			continue
 		if project.claimant_household_id == household.id:
 			return project
+		if city.social.enabled and project.id != household.helping_project_id:
+			continue
 		if fallback == null:
 			fallback = project
 	return fallback

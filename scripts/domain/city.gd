@@ -92,6 +92,9 @@ var settlement: SettlementStage = null
 # What the community asks of families who develop their own work (influence prototype; off unless
 # enabled).
 var influence: TownInfluence = null
+# How households deal with one another and what the community expects of them (household social
+# prototype; off unless enabled).
+var social: TownSocial = null
 # Proper workplaces short of tools work by hand instead of standing idle (influence prototype).
 var hand_method_fallback: bool = false
 # Today's day of the year (1-360), set by the game before each day's tick; -1 where nothing sets
@@ -115,6 +118,7 @@ func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO, city_r
 	settlement = SettlementStage.new(self)
 	influence = TownInfluence.new(self)
 	founding_seed = random_seed
+	social = TownSocial.new(self)
 	var normalized_household_count: int = max(0, starter_household_count)
 	resources = make_starting_resources(normalized_household_count)
 	create_starter_households(normalized_household_count)
@@ -956,6 +960,7 @@ func tick():
 	# at once.
 	if influence.enabled and construction.day % FamilyInitiative.INTERVAL_DAYS == 1:
 		FamilyInitiative.advance(self)
+	social.advance_day()
 	land.advance_day()
 
 	for building: Building in buildings:
