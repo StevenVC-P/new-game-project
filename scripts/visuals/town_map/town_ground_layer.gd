@@ -73,9 +73,11 @@ func rebuild() -> void:
 	var trodden: PackedByteArray = PackedByteArray()
 	trodden.resize(cells.x * cells.y * 4)
 	var logistics: TownLogistics = view.city.logistics
-	for cell: Vector2i in logistics.cell_levels.keys():
+	var levels: Dictionary = logistics.cell_levels.duplicate()
+	extend_paths_to_roads(levels, size, cells)
+	for cell: Vector2i in levels.keys():
 		var j: int = (cell.y * cells.x + cell.x) * 4
-		trodden[j] = logistics.get_cell_path_level(cell) * 255 / TownLogistics.PATH_WORN
+		trodden[j] = int(levels[cell]) * 255 / TownLogistics.PATH_WORN
 		trodden[j + 3] = 255
 	set_mask("path_mask", trodden, cells)
 	shader_material.set_shader_parameter("path_cells", Vector2(cells))
@@ -86,6 +88,35 @@ func rebuild() -> void:
 	shader_material.set_shader_parameter("forest_floor", Vector3(floor_color.r, floor_color.g, floor_color.b))
 	shader_material.set_shader_parameter("noise_offset", view.noise_offset)
 	queue_redraw()
+
+# Cells beside a road never wear (the road is the quick ground there), so a path that runs into
+# a road would stop half a tile short of it, with grass between. For drawing only, a worn path is
+# carried on through the road-side cells it meets (two half-tile steps), so its earth reaches the
+# road and the road's soft edge blends over it.
+func extend_paths_to_roads(levels: Dictionary, size: Vector2i, cells: Vector2i) -> void:
+	var road_side: Dictionary = {}
+	for y in range(size.y):
+		for x in range(size.x):
+			if (view.city.local_map[y][x] as Dictionary).get("has_road", false) == true:
+				for dy in range(3):
+					for dx in range(3):
+						road_side[Vector2i(x * 2 + dx, y * 2 + dy)] = true
+	if road_side.is_empty():
+		return
+	var frontier: Array[Vector2i] = []
+	for cell: Vector2i in levels.keys():
+		if not road_side.has(cell):
+			frontier.append(cell)
+	for _step in range(2):
+		var next: Array[Vector2i] = []
+		for cell: Vector2i in frontier:
+			for dy in range(-1, 2):
+				for dx in range(-1, 2):
+					var beside: Vector2i = cell + Vector2i(dx, dy)
+					if road_side.has(beside) and not levels.has(beside) and beside.x < cells.x and beside.y < cells.y:
+						levels[beside] = levels[cell]
+						next.append(beside)
+		frontier = next
 
 func set_mask(parameter: String, bytes: PackedByteArray, size: Vector2i) -> void:
 	var image: Image = Image.create_from_data(size.x, size.y, false, Image.FORMAT_RGBA8, bytes)
