@@ -44,6 +44,7 @@ static func get_sidebar_lines(city: City) -> Array[String]:
 	if marked > 0:
 		lines.append("Woods to clear: %d tile%s%s" % [marked, "" if marked == 1 else "s", "" if not city.woodland.get_woodcutters().is_empty() else " (needs a working woodcutter)"])
 	lines.append_array(city.land.get_notices())
+	lines.append_array(FamilyAmbitions.get_notices(city))
 	var tilling: int = city.farmland.marked.size()
 	if tilling > 0:
 		lines.append("Land to till: %d tile%s%s" % [tilling, "" if tilling == 1 else "s", "" if not city.farmland.get_farms().is_empty() else " (needs a working field)"])

@@ -31,8 +31,9 @@ var blocked_by_map: Dictionary = {}
 # instead of placing houses) and "scattered" (build far out instead of close to the stockpile);
 # and "instant" (the rules before construction: pay and place finished buildings at once), as a
 # control for measuring what construction changes; and "planned" (every month after the first
-# few, fence fields people walk through and put a storehouse beside a workplace that loses much
-# of its day to carrying), for the planning check.
+# few, fence fields people walk through, put a storehouse beside a workplace that loses much of
+# its day to carrying), for the planning check; with "answer_wishes", it also builds the work
+# families wish for (FamilyAmbitions).
 func play(city, scenario: Dictionary, days: int) -> Dictionary:
 	var uses_map: bool = not city.local_map.is_empty()
 	for entry: String in scenario.get("prebuild", []):
@@ -71,7 +72,7 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 			if tools_out_day < 0:
 				tools_out_day = day
 		if scenario.get("planned", false) and uses_map and day >= PLANNING_START_DAY and day % PLANNING_INTERVAL_DAYS == 0:
-			plan_town(city)
+			plan_town(city, scenario)
 		if day % POLICY_INTERVAL_DAYS == 0 and day >= int(scenario.get("idle_until", 0)):
 			upgrade_one(city, scenario, day)
 			var wanted: String = choose_build(city, scenario, day)
@@ -118,7 +119,9 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 		"households": city.households.size(),
 		"food": int(city.resources["food"]),
 		"fences": count_fences(city),
-		"storehouses": count_kinds(city).get("storehouse", 0)
+		"storehouses": count_kinds(city).get("storehouse", 0),
+		"content": city.households.filter(func(h: Household) -> bool: return h.contentment > 0).size(),
+		"calling_wishes": city.households.filter(func(h: Household) -> bool: return h.ambition == FamilyAmbitions.CALLING).size()
 	}
 
 func choose_build(city, scenario: Dictionary, day: int) -> String:
@@ -230,7 +233,9 @@ const FENCE_TRAMPLING_TRIPS: float = 0.5
 
 # What a thoughtful player does once the town is running: fence the fields people trample, and
 # bring a store to the workplace that carries farthest.
-func plan_town(city) -> void:
+func plan_town(city, scenario: Dictionary = {}) -> void:
+	if scenario.get("answer_wishes", false):
+		answer_calling_wish(city)
 	for building: Building in city.buildings:
 		if TownLogistics.is_field(building) and float(city.logistics.trampled_trips.get(building.id, 0.0)) >= FENCE_TRAMPLING_TRIPS and city.construction.can_fence(building.id) and city.construction.can_supply(EconomyBalanceScript.get_fence_cost(building.size)):
 			city.construction.request_fence(building.id)
@@ -247,6 +252,40 @@ func plan_town(city) -> void:
 	var spot: Vector2i = find_spot_near(city, "storehouse", TownLogistics.center_tile(farthest.tile, farthest.size))
 	if spot.x >= 0:
 		city.construction.request_building("storehouse", spot)
+
+# Work a planner builds when families wish for work of their calling (FamilyAmbitions), only while
+# some family has labor to spare: the wishing family moves to it, and the spare family takes up
+# the work it leaves.
+const CALLING_ANSWERS: Array[String] = ["fisher", "hunter", "farm", "woodcutter", "toolmaker"]
+
+# A thoughtful player answers the town's most common calling wish, one workplace at a time.
+func answer_calling_wish(city) -> void:
+	for building: Building in city.buildings:
+		if building.is_production_building() and building.assigned_workers <= 0:
+			return
+	if city.get_available_households().is_empty():
+		return
+	var wanted: Dictionary = {}
+	for household: Household in city.households:
+		if household.ambition == FamilyAmbitions.CALLING:
+			for building_type: String in FamilyAmbitions.get_calling_work(household, city):
+				if CALLING_ANSWERS.has(building_type):
+					wanted[building_type] = int(wanted.get(building_type, 0)) + 1
+	for project: ConstructionProject in city.construction.projects:
+		wanted.erase(BuildingTiersScript.get_base_type(project.building_type))
+	var best: String = ""
+	for building_type: String in wanted.keys():
+		if best == "" or int(wanted[building_type]) > int(wanted[best]):
+			best = building_type
+	if best == "" or not city.construction.can_supply(EconomyBalanceScript.get_build_cost(best)):
+		return
+	var spot: Vector2i = find_spot(city, best)
+	if spot.x < 0:
+		return
+	# Only where the water or woods in reach give a good catch, as for a food opening.
+	if (best == Building.BUILDING_FISHER or best == Building.BUILDING_HUNTER) and city.land.get_reach_factor_at(best, spot, city.construction.get_size(best)) < LAND_FOOD_MIN_REACH:
+		return
+	city.construction.request_building(best, spot)
 
 # A spot for a home next to the workplace whose family has the longest walk to it.
 func home_spot_near_work(city, building_type: String) -> Vector2i:

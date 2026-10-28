@@ -132,6 +132,30 @@ Later opportunities (clay and bricks, woods planted on open land, ore) follow mi
 - **Judgment on variety.** The count of best openings rose to 4, but the leaders on each kind of land are within one or two people of each other, so the count overstates it. What clearly differs: opening on fishers and hunters works on woods and water (45-51 people, every town) and fails on plain and rock land (23 people, half the towns). Farms remain the safe opening everywhere. Real divergence will come from trade (milestone 4): what a town is good at decides what it can sell.
 - **Not yet seen by eye:** the fisher's hut and lodge drawings (the screenshot catalog stands on dry plains, where neither can be placed). Worth a look in the owner's playtest.
 
+### Milestone 3: family ambitions (2026-10-28)
+
+- **Three ambitions** (`FamilyAmbitions`, monthly, before hardship): each family wants one thing at a time, the first that applies: **a proper home** (it lives in a tent, in the open, or in a hut), **its field fenced** (it works a field others walk through), then **work for its calling** (it works a holding its calling is not drawn to, and the town's land allows work it is drawn to: no fisher's hut wish without water). The house card says what a family wants and whether it is content; the sidebar sums up the town's wishes.
+- **Contentment.** A fulfilled ambition adds 2 contentment (at most 4). Each point lets a family endure one more point of hardship before leaving, and every content family adds 3 to the town's monthly arrival chance (15 at most). Contentment lasts while a family has all it wants, and fades a point a year while it wants something. A wish waiting more than a year makes a family endure one point less; waiting for a home is left out, since rough housing already costs hardship.
+- **Families act within the player's frame.** They fence their own trampled field when the stores can spare the wood (beyond the reserve families keep for homes). A family wishing for its calling swaps work with a family that holds such work and is not drawn to it, or takes up a free workplace when another family is free to take up what it leaves. Work the player assigned is never traded. Building calling work stays the player's decision.
+- **Judgment calls, from measurement.**
+  - A wish left waiting first added a hardship point a month. It also stopped recovery, so every long-waiting family eventually left: compact towns fell from 106 to 73 people. It is now a lower threshold (a strain), which makes hard times harder but drives no one out alone.
+  - Contentment first faded on a clock, so after five years almost no family was content. It now fades only while a family wants something.
+  - The fence wish comes before the calling wish: families can answer it themselves, so it should not wait behind a wish only the player can answer.
+  - A family moving to calling work first left its old field empty when nobody was free, and a workplace built for a wish went to whichever family was free, not the one that wished for it. Answering wishes then cost a town a third of its people (72 against 105). The swap fixes both.
+- **Measured** (the planning check gains a "wishes" plan: planned, and the stand-in builds the work families wish for, food work where the catch is good, only while some family has labor to spare):
+
+  | Check | Milestone 2 | Milestone 3 |
+  | --- | --- | --- |
+  | Map luck, original / continuous | 48/48, 41/42 | 48/48, 41/42 |
+  | Opening: sensible / all wood on houses first / toolmaker by day 150 / idle 60 days | 19, 17, 19, 18 of 20 | 19, 17, 19, 20 |
+  | Town building: houses / homes on plots / scattered | 19 (47), 19 (37), 12 (27) | 19 (50), 19 (39), 11 (26) |
+  | Planning, five years: careless / compact / planned | 12/20 (59), 19/20 (106), 18/20 (100) | 11/20 (61), 19/20 (114), 18/20 (109) |
+  | Planning: wishes answered | | 18/20 (107), 3.4 content families against 1.9 |
+  | Different best openings across kinds of land | 4 | 2 |
+
+- **Variety fell back to 2 best openings** with the same leaders within a few people; farms first leads almost everywhere and land food leads by water. The count moves with near-ties and is not a signal on its own (milestone 2's judgment).
+- **Finding for later milestones.** Answering wishes now costs nothing, but it does not clearly pay either: content families stay and draw newcomers, yet the town ends the same size. What a content family is worth beyond staying (better work, more children, values) is for the values work after this stage. A family's wish for its calling is also where trade and specialised work (milestone 4) can give it something to want.
+
 ## Approved Decisions
 
 All approved by the owner on 2026-10-27, with the amendments above.

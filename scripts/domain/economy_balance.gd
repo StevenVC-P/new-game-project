@@ -200,6 +200,23 @@ const HIGH_WATER_FIELD_YIELD: float = 0.4
 const WOLF_WINTER_YIELD: float = 0.75
 const WOLF_WOODS_DISTANCE: int = 2
 
+# --- Ambitions (docs/FIRST_STAGE_LOOP.md, milestone 3; FamilyAmbitions) ---
+# A fulfilled ambition adds FULFILLED_CONTENTMENT to a family's contentment (at most
+# MAX_CONTENTMENT), which fades by one every CONTENTMENT_FADE_MONTHS. Each point of contentment
+# raises the hardship a family endures before leaving by one. Every content family adds
+# CONTENT_ATTRACTION to the town's monthly arrival chance, at most CONTENT_ATTRACTION_MAX in all.
+# An ambition waiting longer than AMBITION_PATIENCE_MONTHS lowers the hardship a family endures by
+# AMBITION_WAITING_STRAIN.
+# A family wants its field fenced once FENCE_WISH_TRIPS trips a day cross it.
+const MAX_CONTENTMENT: int = 4
+const FULFILLED_CONTENTMENT: int = 2
+const CONTENTMENT_FADE_MONTHS: int = 12
+const AMBITION_PATIENCE_MONTHS: int = 12
+const AMBITION_WAITING_STRAIN: int = 1
+const FENCE_WISH_TRIPS: float = 0.5
+const CONTENT_ATTRACTION: int = 3
+const CONTENT_ATTRACTION_MAX: int = 15
+
 # --- Errands (docs/TOWN_BUILDING_MODEL.md, Errands) ---
 # Round trips a day each family makes from home besides work (TownErrands): to the store for
 # food and goods every three days, to the nearest bank for water daily, to the woods' edge for
