@@ -156,6 +156,24 @@ Later opportunities (clay and bricks, woods planted on open land, ore) follow mi
 - **Variety fell back to 2 best openings** with the same leaders within a few people; farms first leads almost everywhere and land food leads by water. The count moves with near-ties and is not a signal on its own (milestone 2's judgment).
 - **Finding for later milestones.** Answering wishes now costs nothing, but it does not clearly pay either: content families stay and draw newcomers, yet the town ends the same size. What a content family is worth beyond staying (better work, more children, values) is for the values work after this stage. A family's wish for its calling is also where trade and specialised work (milestone 4) can give it something to want.
 
+### Milestone 4: the first neighbour (2026-10-28)
+
+- **Traders.** In summer and autumn a trader from the nearest neutral town (named in the game, for example Callow Ford) comes to a linked town and stays 10 days: about every 20 days at a crossroads, 30 on a road, 45 by river. A town is linked when a road joins its heart to the map's edge (the regional road, or one the player builds with G) or a river runs within 12 tiles of its heart. An isolated town is told it needs a road out. `TownTrade` (`city.trade`); numbers in `EconomyBalance` (Trade); saved.
+- **Barter with friction from supply and demand** (`docs/ECONOMY_MODEL.md`). Each trader wants three goods and offers two, valued in grain (food 1, wood 1.5, tools 10, stone blocks 3, bricks 4, cut stone 5, carved goods 8). It pays 85% of value and asks 115%, and each unit it takes or sells moves its price by up to half again over the visit. It takes only what it wants. The sidebar's Trader section shows its prices in grain and up to six lots ("Give 10 wood for 11 food"), one click each. Nothing trades without the player. The first trade and the count of trades are recorded on the sidebar; the chronicle (milestone 6) will carry it.
+- **Judgment calls.**
+  - Clothing is left out of traders' goods for now: the clothing need asks a unit per person a day, so a trader's lot would vanish in a day. Milestone 6 (herder and wool) settles what clothing is.
+  - The stand-in for the "trading" plan builds a road out once it has 40 wood, and takes lots only to turn a surplus into a shortage.
+- **Measured.** Of the planning check's 20 real sites, none has a regional road on its town map and 16 are tagged isolated, so every link was a road out the town built (17 of 20; on three no road could be planned to open ground at the edge). Over five years: about 18 trader visits and 6 trades a town.
+
+  | Planning, five years | People | Towns off the ground | Content families |
+  | --- | --- | --- | --- |
+  | wishes (milestone 3) | 107 | 18/20 | 3.4 |
+  | trading | 110 | 19/20 | 3.6 |
+
+  Openings and map luck are unchanged from milestone 3 (sensible 19/20, idle 60 days 20/20, map luck 48/48 and 41/42): traders change nothing until the player trades.
+- **Finding.** Trade is a modest help, as intended (not required for Village). It will matter more once towns have real surpluses and needs that only trade answers: clothing, and goods the land cannot give. The neutral town does not yet run out of stock or remember earlier trades; refusal is by wants only.
+- **Seen by eye:** the Trader section in the real game (`game_trader` in `tests/visual/town_map_capture.gd`).
+
 ## Approved Decisions
 
 All approved by the owner on 2026-10-27, with the amendments above.

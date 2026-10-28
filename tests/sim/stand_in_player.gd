@@ -73,6 +73,8 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 				tools_out_day = day
 		if scenario.get("planned", false) and uses_map and day >= PLANNING_START_DAY and day % PLANNING_INTERVAL_DAYS == 0:
 			plan_town(city, scenario)
+		if scenario.get("trades", false) and uses_map:
+			trade(city, day)
 		if day % POLICY_INTERVAL_DAYS == 0 and day >= int(scenario.get("idle_until", 0)):
 			upgrade_one(city, scenario, day)
 			var wanted: String = choose_build(city, scenario, day)
@@ -121,6 +123,9 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 		"fences": count_fences(city),
 		"storehouses": count_kinds(city).get("storehouse", 0),
 		"content": city.households.filter(func(h: Household) -> bool: return h.contentment > 0).size(),
+		"linked": 1 if city.trade.get_link() != TownTrade.LINK_NONE else 0,
+		"trader_visits": city.trade.visits,
+		"trades": city.trade.trades_made,
 		"calling_wishes": city.households.filter(func(h: Household) -> bool: return h.ambition == FamilyAmbitions.CALLING).size()
 	}
 
@@ -286,6 +291,65 @@ func answer_calling_wish(city) -> void:
 	if (best == Building.BUILDING_FISHER or best == Building.BUILDING_HUNTER) and city.land.get_reach_factor_at(best, spot, city.construction.get_size(best)) < LAND_FOOD_MIN_REACH:
 		return
 	city.construction.request_building(best, spot)
+
+# Trading (TownTrade): an isolated town builds a road out once it has wood to spare; with a trader
+# in town, it takes lots that swap a surplus for a shortage, a few a day.
+const ROAD_OUT_WOOD: int = 40
+const TRADES_PER_DAY: int = 3
+const SURPLUS_FOOD_DAYS: float = 90.0
+const SHORT_FOOD_DAYS: float = 30.0
+const SURPLUS: Dictionary = {"wood": 80, "stone_blocks": 30, "bricks": 30, "carved_goods": 5, "tools": 25}
+const SHORT: Dictionary = {"wood": 20, "tools": 8, "stone_blocks": 5}
+
+func trade(city, day: int) -> void:
+	if day % PLANNING_INTERVAL_DAYS == 0 and city.trade.get_link() == TownTrade.LINK_NONE and int(city.resources["wood"]) >= ROAD_OUT_WOOD and not city.construction.projects.any(func(p: ConstructionProject) -> bool: return p.kind == ConstructionProject.KIND_ROAD):
+		build_road_out(city)
+	if not city.trade.is_trader_here():
+		return
+	for _i in range(TRADES_PER_DAY):
+		var chosen: int = -1
+		var lots: Array[Dictionary] = city.trade.get_lots()
+		for index in range(lots.size()):
+			if is_surplus(city, lots[index]["give"], int(lots[index]["give_amount"])) and is_short(city, lots[index]["get"]):
+				chosen = index
+				break
+		if chosen < 0 or not city.trade.accept_lot(chosen):
+			return
+
+func food_days(city) -> float:
+	return float(city.resources["food"]) / maxf(1.0, float(city.resources["food_consumption_rate"]))
+
+func is_surplus(city, good: String, amount: int) -> bool:
+	if good == "food":
+		return (float(city.resources["food"]) - amount) / maxf(1.0, float(city.resources["food_consumption_rate"])) >= SURPLUS_FOOD_DAYS
+	return SURPLUS.has(good) and int(city.resources.get(good, 0)) - amount >= int(SURPLUS[good])
+
+func is_short(city, good: String) -> bool:
+	if good == "food":
+		return food_days(city) < SHORT_FOOD_DAYS
+	return SHORT.has(good) and int(city.resources.get(good, 0)) < int(SHORT[good])
+
+# A road from open ground beside the town's heart to the nearest road already on the map, or else
+# to the nearest open ground on the map's edge (a road's ends must be ground a road can take).
+func build_road_out(city) -> void:
+	var heart: Vector2i = city.trade.get_heart()
+	var size: Vector2i = city.logistics.map_size()
+	var start: Vector2i = Vector2i(-1, -1)
+	var best: Vector2i = Vector2i(-1, -1)
+	for y in range(size.y):
+		for x in range(size.x):
+			var tile: Vector2i = Vector2i(x, y)
+			var on_edge: bool = x == 0 or y == 0 or x == size.x - 1 or y == size.y - 1
+			var roadable: bool = city.construction.is_roadable(tile)
+			if roadable and city.trade.is_near_heart(tile, 3) and (start.x < 0 or tile.distance_squared_to(heart) < start.distance_squared_to(heart)):
+				start = tile
+			if (city.trade.has_road(tile) or (on_edge and roadable)) and (best.x < 0 or tile.distance_squared_to(heart) < best.distance_squared_to(heart)):
+				best = tile
+	if start.x < 0 or best.x < 0:
+		return
+	var tiles: Array[Vector2i] = city.construction.plan_road(start, best)
+	if not tiles.is_empty():
+		city.construction.request_road(tiles)
 
 # A spot for a home next to the workplace whose family has the longest walk to it.
 func home_spot_near_work(city, building_type: String) -> Vector2i:

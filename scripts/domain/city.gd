@@ -83,6 +83,8 @@ var farmland: TownFarmland = null
 var errands: TownErrands = null
 # What the land and season give each workplace, and the season's hazards.
 var land: TownLand = null
+# Traders from the neutral town, and the town's link to them.
+var trade: TownTrade = null
 # Today's day of the year (1-360), set by the game before each day's tick; -1 where nothing sets
 # it (tests, balance tools), which count years from founding instead.
 var day_of_year: int = -1
@@ -99,6 +101,7 @@ func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO, city_r
 	farmland = TownFarmland.new(self)
 	errands = TownErrands.new(self)
 	land = TownLand.new(self)
+	trade = TownTrade.new(self)
 	founding_seed = random_seed
 	var normalized_household_count: int = max(0, starter_household_count)
 	resources = make_starting_resources(normalized_household_count)
@@ -944,6 +947,7 @@ func tick():
 	logistics.advance_day()
 	woodland.advance_day()
 	farmland.advance_day()
+	trade.advance_day()
 
 	resolve_soft_needs()
 	if resources["food_shortage"] == true:

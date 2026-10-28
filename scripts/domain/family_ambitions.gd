@@ -202,11 +202,11 @@ static func get_notices(city: City) -> Array[String]:
 		var names: Array[String] = []
 		for building_type: String in types.slice(0, 2):
 			names.append(BuildingTiers.get_display_name(building_type).to_lower())
-		lines.append("Wishes: %d famil%s want work for their calling (%s)" % [calling_families, "y" if calling_families == 1 else "ies", ", ".join(names)])
+		lines.append("Want calling work: %d (%s)" % [calling_families, ", ".join(names)])
 	if fence_families > 0:
-		lines.append("Wishes: %d famil%s want their trampled field fenced" % [fence_families, "y" if fence_families == 1 else "ies"])
+		lines.append("Want a fenced field: %d" % fence_families)
 	if content_families > 0:
-		lines.append("Content: %d famil%s (they endure more and draw newcomers)" % [content_families, "y" if content_families == 1 else "ies"])
+		lines.append("Content families: %d" % content_families)
 	return lines
 
 # What a family wants, for its card.

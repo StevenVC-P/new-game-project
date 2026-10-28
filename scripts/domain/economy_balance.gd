@@ -217,6 +217,37 @@ const FENCE_WISH_TRIPS: float = 0.5
 const CONTENT_ATTRACTION: int = 3
 const CONTENT_ATTRACTION_MAX: int = 15
 
+# --- Trade (docs/FIRST_STAGE_LOOP.md, The Way To Trade; TownTrade) ---
+# What goods are worth in grain at the neutral town. A trader wants TRADER_WANT_KINDS goods from
+# TRADER_WANTS and offers TRADER_OFFER_KINDS from TRADER_OFFERS, about TRADER_GRAIN_PER_GOOD grain
+# of each. It pays TRADER_BID_SHARE of a good's value and asks TRADER_ASK_SHARE, and each unit it
+# takes or sells moves its price by up to TRADER_PRICE_SLOPE of that over the visit. Lots are worth
+# about TRADER_LOT_GRAIN. Traders come in summer and autumn every TRADER_INTERVAL_DAYS by the
+# town's link (plus up to TRADER_INTERVAL_JITTER_DAYS) and stay TRADER_STAY_DAYS.
+const VALUE_IN_GRAIN: Dictionary = {
+	"food": 1.0,
+	"wood": 1.5,
+	"tools": 10.0,
+	"stone_blocks": 3.0,
+	"bricks": 4.0,
+	"cut_stone": 5.0,
+	"carved_goods": 8.0,
+}
+const TRADER_WANTS: Array[String] = ["food", "wood", "tools", "stone_blocks", "bricks", "carved_goods"]
+# Clothing waits for milestone 6: the clothing need asks a unit per person a day, which no
+# trader's lot could answer.
+const TRADER_OFFERS: Array[String] = ["food", "wood", "tools", "stone_blocks"]
+const TRADER_WANT_KINDS: int = 3
+const TRADER_OFFER_KINDS: int = 2
+const TRADER_GRAIN_PER_GOOD: float = 80.0
+const TRADER_LOT_GRAIN: float = 15.0
+const TRADER_BID_SHARE: float = 0.85
+const TRADER_ASK_SHARE: float = 1.15
+const TRADER_PRICE_SLOPE: float = 0.5
+const TRADER_STAY_DAYS: int = 10
+const TRADER_INTERVAL_DAYS: Dictionary = {"crossroads": 20, "road": 30, "river": 45}
+const TRADER_INTERVAL_JITTER_DAYS: int = 6
+
 # --- Errands (docs/TOWN_BUILDING_MODEL.md, Errands) ---
 # Round trips a day each family makes from home besides work (TownErrands): to the store for
 # food and goods every three days, to the nearest bank for water daily, to the woods' edge for
