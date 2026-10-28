@@ -220,7 +220,7 @@ What to try, and what to judge, in the owner's playtest:
 Open decisions for the owner:
 
 1. **Pacing** (above): accept Village at about year 1-2, or slow it by conditions, founders, or family formation.
-2. **The sidebar is full:** sections now run past the bottom of the panel at common window sizes. A tabbed or scrolling panel would be a UI pass of its own.
+2. **The sidebar is full:** sections now run past the bottom of the panel at common window sizes. A tabbed or scrolling panel would be a UI pass of its own. *Eased 2026-10-28 (owner):* a status bar in the top bar now shows people, free homes, labor, and alerts (hunger, families leaving, bandits, a trader), with detail on hover; the sidebar lost the rows it duplicated.
 3. **What contentment is worth:** today it only steadies families and draws newcomers, so answering wishes and defending cost about as much as they return. Should content families also work better or have more children, or wait for values?
 4. **Clothing scale:** one garment per 90 people a day was a judgment call to make the need answerable; the household goods need still asks a unit per household a day and has no early answer.
 

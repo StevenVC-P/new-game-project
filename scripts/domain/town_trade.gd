@@ -236,10 +236,8 @@ func get_notices() -> Array[String]:
 	var lines: Array[String] = []
 	if not has_map():
 		return lines
-	if is_trader_here():
-		var days_left: int = trader_until_day - city.construction.day + 1
-		lines.append("Trader from %s: %d day%s" % [partner_name, days_left, "" if days_left == 1 else "s"])
-	else:
+	# A trader in town is an alert in the top bar (TownStatusBar) and has its own sidebar section.
+	if not is_trader_here():
 		match get_link():
 			LINK_NONE:
 				lines.append("No road out: traders cannot reach the town (build a road (G) from the town to the map's edge)")

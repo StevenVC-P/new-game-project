@@ -139,15 +139,14 @@ func resolve_raid() -> void:
 	raid_strength = 0
 	called_household_ids.clear()
 
-# Sidebar lines: a band on the road, the guard, the last raid.
+# Sidebar lines: the guard and the last raid. A band on the road is an alert in the top bar
+# (TownStatusBar), with the militia button in the sidebar.
 func get_notices() -> Array[String]:
 	var lines: Array[String] = []
 	if not has_map():
 		return lines
-	if is_band_coming():
-		var days: int = maxi(0, raid_day - city.construction.day)
-		lines.append("Bandits on the road: here in %d day%s" % [days, "" if days == 1 else "s"])
-		lines.append("Band %d, guard %d%s" % [raid_strength, get_guard(), "" if not called_household_ids.is_empty() else " (M: militia)"])
+	if is_band_coming() and not called_household_ids.is_empty():
+		lines.append("Militia called: %d families (guard %d)" % [called_household_ids.size(), get_guard()])
 	elif city.trade.get_link() == TownTrade.LINK_NONE:
 		pass
 	elif get_watch_posts_kept() > 0:

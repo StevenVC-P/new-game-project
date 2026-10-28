@@ -292,6 +292,12 @@ func capture_game_flow() -> void:
 	town.defense.raid_strength = 3
 	main.queue_redraw()
 	await shot("game_bandits")
+	# Hovering a status chip in the top bar shows its detail (TownStatusBar): the free-homes chip.
+	main.get_viewport().warp_mouse(Vector2(1060.0, 20.0))
+	for _frame in range(3):
+		await process_frame
+	main.queue_redraw()
+	await shot("game_status_hover")
 	main.regional_terrain.wait_for_tasks()
 	main.queue_free()
 	await process_frame

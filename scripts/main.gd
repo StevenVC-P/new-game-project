@@ -67,6 +67,8 @@ var trade_routes: Array[TradeRoute] = []
 var top_bar_action_options: Array[Dictionary] = []
 var region_action_options: Array[Dictionary] = []
 var city_action_options: Array[Dictionary] = []
+# Whether a top bar status chip's detail was drawn last frame (redraw when the mouse leaves it).
+var top_bar_tooltip_shown: bool = false
 var build_menu_options: Array[Dictionary] = []
 var hovered_tile: Vector2i = Vector2i(-1, -1)
 var hovered_city_index: int = -1
@@ -806,6 +808,9 @@ func _input(event: InputEvent):
 		elif current_view == VIEW_CITY and town_map_view != null and town_map_view.handle_gesture(event):
 			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion:
+		# Status chips in the top bar show their detail while hovered.
+		if current_view == VIEW_CITY and (get_local_mouse_position().y < TOP_BAR_HEIGHT or top_bar_tooltip_shown):
+			queue_redraw()
 		if current_view == VIEW_REGION and trade_menu.handle_mouse_motion(get_local_mouse_position(), get_viewport_rect().size):
 			queue_redraw()
 		elif current_view == VIEW_REGION and region_map_view != null and region_map_view.handle_mouse_event(event):
@@ -1743,21 +1748,41 @@ func draw_top_bar():
 		x = draw_top_bar_button(font, font_size, "World", x, y, 78.0, {"action": "open_world_map"}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
 		x += 14.0
 
+	var in_town: bool = current_view == VIEW_CITY and selected_city_index >= 0 and selected_city_index < cities.size()
 	draw_string(font, Vector2(x, y), get_top_bar_title(), HORIZONTAL_ALIGNMENT_LEFT, 230.0, title_size, VisualStyle.COLOR_UI_TITLE)
 	x += 250.0
 	draw_string(font, Vector2(x, y), world_calendar.get_formatted_date(), HORIZONTAL_ALIGNMENT_LEFT, 330.0, font_size, VisualStyle.COLOR_POPULATION_LABOR)
-	x += 350.0
+	# In a town the date gives up some room to the town's status chips.
+	x += 240.0 if in_town else 350.0
 	draw_string(font, Vector2(x, y), "Speed: " + simulation_clock.get_speed_label(), HORIZONTAL_ALIGNMENT_LEFT, 105.0, font_size, VisualStyle.COLOR_POPULATION_LABOR)
 	x += 118.0
 
 	x = draw_top_bar_button(font, font_size, "Pause", x, y, 60.0, {"action": "toggle_pause"}, get_time_control_color("Paused"))
 	x = draw_top_bar_button(font, font_size, "1x", x, y, 42.0, {"action": "speed_1x"}, get_time_control_color("1x"))
 	x = draw_top_bar_button(font, font_size, "3x", x, y, 42.0, {"action": "speed_3x"}, get_time_control_color("3x"))
-	draw_top_bar_button(font, font_size, "10x", x, y, 48.0, {"action": "speed_10x"}, get_time_control_color("10x"))
+	x = draw_top_bar_button(font, font_size, "10x", x, y, 48.0, {"action": "speed_10x"}, get_time_control_color("10x"))
 	draw_top_bar_button(font, font_size, "Menu", get_viewport_rect().size.x - 78.0, y, 66.0, {"action": "open_menu"}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
+	top_bar_tooltip_shown = false
+	if in_town:
+		draw_town_status_chips(font, font_size, cities[selected_city_index], x + 12.0, y, get_viewport_rect().size.x - 90.0)
+
+# The town's status at a glance (TownStatusBar): people, free homes, labor, and alerts while they
+# matter, with detail on hover.
+func draw_town_status_chips(font: Font, font_size: int, city: City, x: float, y: float, max_x: float) -> void:
+	var chips: Array[Dictionary] = TownStatusBar.get_chips(city)
+	(chips[0]["tooltip"] as Array).append("Agrarian/Industrial homes: " + get_house_preference_count_text(city))
+	var drawn: Array[Dictionary] = TownStatusBar.draw_chips(self, font, font_size, chips, x, y, max_x)
+	var mouse: Vector2 = get_local_mouse_position()
+	for chip: Dictionary in drawn:
+		var rect: Rect2 = chip["rect"]
+		if rect.has_point(mouse):
+			TownStatusBar.draw_tooltip(self, font, font_size, chip["tooltip"], Vector2(rect.position.x, TOP_BAR_HEIGHT + 4.0), get_viewport_rect().size.x)
+			top_bar_tooltip_shown = true
 
 func get_top_bar_title() -> String:
 	if current_view == VIEW_CITY:
+		if selected_city_index >= 0 and selected_city_index < cities.size():
+			return get_selected_city_name() + " · " + cities[selected_city_index].settlement.get_title()
 		return get_selected_city_name() + " Local Map"
 	if world_map_data != null and (entered_world_region_id >= 0 or is_continuous_region_map()):
 		var region: WorldMapData.Region = get_region_in_view()
@@ -1841,14 +1866,13 @@ func draw_city_sidebar(font: Font, font_size: int):
 		placement_color = VisualStyle.COLOR_WARNING
 
 	y = draw_sidebar_section_title(font, "Settlement", text_x, y)
-	for settlement_line: String in city.settlement.get_display_lines():
+	for settlement_line: String in city.settlement.get_display_lines(false):
 		y = draw_sidebar_line(font, font_size, settlement_line, text_x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
 	y += 4.0
 
 	y = draw_sidebar_section_title(font, "City Health", text_x, y)
 	y = draw_pressure_row(font, font_size, "Food", pressure_summary["food"] as Dictionary, text_x, y)
 	y = draw_pressure_row(font, font_size, "Shelter", pressure_summary["shelter"] as Dictionary, text_x, y)
-	y = draw_pressure_row(font, font_size, "Labor", pressure_summary["labor"] as Dictionary, text_x, y)
 	y = draw_pressure_row(font, font_size, "Tools", pressure_summary["tools"] as Dictionary, text_x, y)
 	y = draw_pressure_row(font, font_size, "Maintenance", pressure_summary["maintenance"] as Dictionary, text_x, y)
 	y += 4.0
@@ -1884,18 +1908,12 @@ func draw_city_sidebar(font: Font, font_size: int):
 	y += 4.0
 
 	y = draw_sidebar_section_title(font, "Population", text_x, y)
-	y = draw_sidebar_label_value(font, font_size, "People", str(resources["total_population"]), text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
-	y = draw_sidebar_label_value(font, font_size, "Households", str(resources["household_count"]) + "  A/I " + get_house_preference_count_text(city), text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
 	y = draw_sidebar_label_value(font, font_size, "Shelter", str(resources["housing_capacity"]) + " total", text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
 	y = draw_sidebar_label_value(font, font_size, "Housed", str(resources["housed_population"]) + " / " + str(resources["house_shelter_capacity"]), text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
 	y = draw_sidebar_label_value(font, font_size, "Temporary", str(resources["temporary_sheltered_population"]) + " / " + str(resources["temporary_shelter_capacity"]), text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
 	if int(resources["unsheltered_population"]) > 0:
 		y = draw_sidebar_label_value(font, font_size, "Unsheltered", str(resources["unsheltered_population"]), text_x, y, VisualStyle.COLOR_WARNING)
 	y = draw_sidebar_label_value(font, font_size, "Newcomers", HouseholdMigration.get_arrival_blocker_text(HouseholdMigration.get_arrival_blocker(city)), text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
-	if int(resources["households_considering_departure"]) > 0:
-		y = draw_sidebar_label_value(font, font_size, "Leaving?", str(resources["households_considering_departure"]) + " families", text_x, y, VisualStyle.COLOR_WARNING)
-	y = draw_sidebar_label_value(font, font_size, "Labor", str(resources["assigned_workers"]) + " / " + str(resources["total_labor_capacity"]) + " used", text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
-	y = draw_sidebar_label_value(font, font_size, "Idle", str(resources["idle_workers"]), text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
 	y += 4.0
 
 	y = draw_sidebar_section_title(font, "Selected Object", text_x, y)
