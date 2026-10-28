@@ -60,6 +60,13 @@ var hardship_points: int = 0
 var suffered_hardship_this_month: bool = false
 # Consecutive months in a hut or temporary shelter.
 var rough_housing_months: int = 0
+# What the family wants next (FamilyAmbitions: "home", "calling", "fence", or ""), and for how many
+# months it has waited. Fulfilled ambitions make it content, which fades slowly.
+var ambition: String = ""
+var ambition_months: int = 0
+var contentment: int = 0
+var contentment_months: int = 0
+var fulfilled_ambitions: int = 0
 
 func _init(household_id: int = -1, building_id: int = -1, work_preference: String = WORK_PREF_NEUTRAL, population: int = 4, residence_status: String = RESIDENCE_TEMPORARY):
 	id = household_id

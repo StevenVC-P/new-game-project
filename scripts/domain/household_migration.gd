@@ -56,6 +56,7 @@ static func advance_month(city, city_index: int = 0) -> void:
 	var month_index: int = int(city.resources["migration_month_index"]) + 1
 	city.resources["migration_month_index"] = month_index
 
+	FamilyAmbitions.advance_month(city)
 	update_hardship(city)
 	resolve_departure(city, city_index)
 	if month_index % POOL_REFILL_MONTHS == 0:
@@ -103,8 +104,10 @@ static func update_hardship(city) -> void:
 		else:
 			household.hardship_points = max(0, household.hardship_points - HARDSHIP_RECOVERY_POINTS)
 
+# Content families (FamilyAmbitions) endure more before leaving; a family whose wish has waited
+# too long endures less.
 static func get_departure_threshold(household: Household) -> int:
-	return CultureEffectsScript.get_departure_threshold(household.values)
+	return CultureEffectsScript.get_departure_threshold(household.values) + household.contentment - FamilyAmbitions.get_waiting_strain(household)
 
 static func is_considering_departure(household: Household) -> bool:
 	return household.hardship_points > 0 and household.hardship_points >= get_departure_threshold(household) - DEPARTURE_WARNING_MARGIN
@@ -186,9 +189,13 @@ static func get_attractiveness(city) -> int:
 			score -= SOFT_NEED_UNMET_PENALTY
 
 	var profiles: Array = []
+	var content_families: int = 0
 	for household: Household in city.households:
 		profiles.append(household.values)
+		content_families += 1 if household.contentment > 0 else 0
 	score += CultureEffectsScript.get_community_attraction(profiles)
+	# Word of content families travels.
+	score += mini(EconomyBalanceScript.CONTENT_ATTRACTION_MAX, content_families * EconomyBalanceScript.CONTENT_ATTRACTION)
 	return clampi(score, 0, MAX_ARRIVAL_CHANCE)
 
 # Expected daily food from every worked workplace that makes food (farms, fishers, hunters),
