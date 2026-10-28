@@ -6,8 +6,10 @@ extends SceneTree
 #  2. A town grown by the stand-in player for a year and a half: houses, workplaces, walkers.
 #  3. Every building type, tier 1 and tier 0, side by side.
 #  4. The real game: a town founded through main.gd, grown, with a house selected.
-#  5. Building in the real game: sites at every stage, plots, a road being built, a site's card;
-#     then a town grown with families building their own homes on plots, and a workplace selected
+#  5. Building in the real game: sites at every stage, plots, a road being built, a site's card,
+#     woods marked for clearing; then a town grown with families building their own homes on
+#     plots, the trails and paths its people wore (along the lines between yards and fields too),
+#     the woods its woodcutter cleared and, years on, spreading back; and a workplace selected
 #     with its routes to the store and from home.
 # Needs a real window and GPU, so run it without --headless:
 #   & (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/town_map_capture.gd -- <output_dir>
@@ -281,6 +283,21 @@ func capture_game_flow() -> void:
 	await shot("game_house_selected")
 	await measure("game town view")
 	main.clear_selected_household()
+	# A trader from the neutral town in the sidebar (TownTrade), with its lots.
+	town.trade.arrive(town.construction.day, TownTrade.LINK_ROAD)
+	main.queue_redraw()
+	await shot("game_trader")
+	# Bandits seen on the road (TownDefense): the warning and the militia call-up.
+	town.defense.raid_day = town.construction.day + EconomyBalance.BANDIT_WARNING_DAYS
+	town.defense.raid_strength = 3
+	main.queue_redraw()
+	await shot("game_bandits")
+	# Hovering a status chip in the top bar shows its detail (TownStatusBar): the free-homes chip.
+	main.get_viewport().warp_mouse(Vector2(1060.0, 20.0))
+	for _frame in range(3):
+		await process_frame
+	main.queue_redraw()
+	await shot("game_status_hover")
 	main.regional_terrain.wait_for_tasks()
 	main.queue_free()
 	await process_frame
@@ -294,8 +311,25 @@ func nearest_roadable(town: City, near: Vector2i) -> Vector2i:
 					return Vector2i(x, y)
 	return near
 
+static func nearest_wooded(town: City, near: Vector2i) -> Vector2i:
+	var best: Vector2i = near
+	var best_distance: int = 1 << 30
+	for y in range(town.local_map.size()):
+		for x in range((town.local_map[y] as Array).size()):
+			var distance: int = (Vector2i(x, y) - near).length_squared()
+			if town.local_map[y][x]["has_trees"] == true and distance < best_distance:
+				best = Vector2i(x, y)
+				best_distance = distance
+	return best
+
+static func count_path_levels(town: City) -> Array[int]:
+	var counts: Array[int] = [0, 0, 0]
+	for cell: Vector2i in town.logistics.cell_levels.keys():
+		counts[town.logistics.get_cell_path_level(cell)] += 1
+	return counts
+
 # Building in the real game: plan a start, let a few days pass, look at the sites; then grow a
-# town where families build their own homes on plots.
+# town where families build their own homes on plots, and look at the paths they wore.
 func capture_construction() -> void:
 	var main: Node2D = (load("res://scenes/main.tscn") as PackedScene).instantiate()
 	# Looks up places by name, so it plays on the hand-authored planet.
@@ -317,10 +351,10 @@ func capture_construction() -> void:
 	for _plot in range(3):
 		player.set_aside_plot(town, {})
 	var store: Vector2i = town.logistics.get_store_tiles()[0]
-	var route: Array[Vector2i] = town.construction.plan_road(nearest_roadable(town, store + Vector2i(3, 0)), nearest_roadable(town, store + Vector2i(16, 4)))
-	print("[CAPTURE] road planned: %d tiles" % route.size())
-	if not route.is_empty():
-		town.construction.request_road(route)
+	var road: Array[Vector2i] = town.construction.plan_road(nearest_roadable(town, store + Vector2i(3, 0)), nearest_roadable(town, store + Vector2i(16, 4)))
+	print("[CAPTURE] road planned: %d tiles" % road.size())
+	if not road.is_empty():
+		town.construction.request_road(road)
 	for _day in range(5):
 		town.tick()
 	print("[CAPTURE] after 5 days: %s" % [str(ConstructionDisplayHelper.get_sidebar_lines(town))])
@@ -335,11 +369,56 @@ func capture_construction() -> void:
 		main.queue_redraw()
 		await shot("build_site_selected")
 		main.clear_selected_household()
+	# Woods marked for clearing beside the woodcutter: felled through the year, then left.
+	var woodcutter_tile: Vector2i = store
+	for building: Building in town.buildings:
+		if building.type == Building.BUILDING_WOODCUTTER:
+			woodcutter_tile = building.tile
+	for project: ConstructionProject in town.construction.projects:
+		if project.building_type == Building.BUILDING_WOODCUTTER:
+			woodcutter_tile = project.tile
+	var woods: Vector2i = nearest_wooded(town, woodcutter_tile)
+	var marked: int = town.woodland.mark_block(woods - Vector2i(2, 2), woods + Vector2i(3, 3))
+	print("[CAPTURE] woods marked for clearing: %d tiles" % marked)
+	main.town_map_view.focus_on(TownMapStyle.tile_rect(woods).get_center(), 3.0)
+	await shot("build_woods_marked")
 	player.play(town, {"homes_on_plots": true}, 360)
+	print("[CAPTURE] woods felled in a year: %d, still marked %d, spread %d" % [town.woodland.felled_count, town.woodland.marked.size(), town.woodland.spread_count])
 	print("[CAPTURE] grown with plots: %d buildings, %d households, %d homes built by families, sites: %s" % [town.buildings.size(), town.households.size(), town.construction.completed_by_households, str(ConstructionDisplayHelper.get_sidebar_lines(town))])
+	# Fence the first field, so the screenshots show one, and give the town a fortnight to build it.
+	for building: Building in town.buildings:
+		if TownLogistics.is_field(building):
+			town.construction.request_fence(building.id)
+			break
+	for _day in range(15):
+		town.tick()
+	var fenced: int = 0
+	for building: Building in town.buildings:
+		fenced += 1 if building.fenced else 0
+	print("[CAPTURE] fenced fields: %d; trampled fields yesterday: %s" % [fenced, str(town.logistics.trampled_trips)])
+	var levels: Array[int] = count_path_levels(town)
+	print("[CAPTURE] worn ground after a year: %d trail tiles, %d path tiles" % [levels[TownLogistics.PATH_TRAIL], levels[TownLogistics.PATH_WORN]])
 	for _frame in range(4):
 		await process_frame
 	await shot("build_grown")
+	main.town_map_view.focus_on(TownMapStyle.tile_rect(store).get_center(), 4.0)
+	await shot("build_paths_near")
+	main.town_map_view.focus_on(TownMapStyle.tile_rect(woods).get_center(), 3.0)
+	await shot("build_woods_cleared")
+	# Two more years of the town, then twenty more years of the woods alone (no families: only
+	# the yearly spread), to see the edges creep.
+	for _day in range(720):
+		town.tick()
+	print("[CAPTURE] two years later: woods spread to %d tiles" % town.woodland.spread_count)
+	await shot("build_woods_two_years")
+	for year in range(20):
+		var rng: RandomNumberGenerator = town.woodland.make_spread_rng(100 + year)
+		town.woodland.spread_forest(func() -> float: return rng.randf())
+	town.woodland.land_version += 1
+	print("[CAPTURE] twenty more years of spreading: woods spread to %d tiles" % town.woodland.spread_count)
+	for _frame in range(4):
+		await process_frame
+	await shot("build_woods_twenty_years")
 	var far: int = -1
 	for index in range(town.buildings.size()):
 		var building: Building = town.buildings[index]

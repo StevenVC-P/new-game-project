@@ -4,6 +4,10 @@ const CityScript = preload("res://scripts/domain/city.gd")
 const GoodsNeedBucketHelperScript = preload("res://scripts/domain/goods_need_bucket_helper.gd")
 const HouseholdProsperityDisplayHelperScript = preload("res://scripts/ui/household_prosperity_display_helper.gd")
 
+# A garment lasts a person EconomyBalance.CLOTHING_DAYS_PER_PERSON (90) days: three households
+# of this many people need 12 garments a day.
+const CLOTHING_TEST_PEOPLE: int = 360
+
 var failure_count: int = 0
 
 func _init() -> void:
@@ -19,7 +23,7 @@ func run_all() -> void:
 	test_unavailable_bucket_is_not_consumed()
 	test_missing_resource_key_is_safe()
 	test_soft_consumption_does_not_change_prosperity()
-	test_wool_still_does_not_satisfy_clothing()
+	test_wool_satisfies_clothing()
 
 	if failure_count > 0:
 		push_error("Soft need consumption validation failed: " + str(failure_count) + " failure(s)")
@@ -66,7 +70,7 @@ func test_household_goods_consumption_unmet() -> void:
 	_check(_floats_match(float(result["satisfaction_ratio"]), 0.0), "unmet household goods ratio should be 0")
 
 func test_clothing_consumption_met() -> void:
-	var city = _make_city_with_housed_households(3, 4)
+	var city = _make_city_with_housed_households(3, CLOTHING_TEST_PEOPLE)
 	city.resources["clothing"] = 12
 
 	var result: Dictionary = city.resolve_soft_needs()[GoodsNeedBucketHelperScript.BUCKET_CLOTHING]
@@ -79,7 +83,7 @@ func test_clothing_consumption_met() -> void:
 	_check(int(city.resources["clothing"]) == 0, "clothing stock should be reduced")
 
 func test_clothing_consumption_low() -> void:
-	var city = _make_city_with_housed_households(3, 4)
+	var city = _make_city_with_housed_households(3, CLOTHING_TEST_PEOPLE)
 	city.resources["clothing"] = 5
 
 	var result: Dictionary = city.resolve_soft_needs()[GoodsNeedBucketHelperScript.BUCKET_CLOTHING]
@@ -91,7 +95,7 @@ func test_clothing_consumption_low() -> void:
 	_check(int(city.resources["clothing"]) == 0, "partial clothing should not go negative")
 
 func test_clothing_consumption_unmet() -> void:
-	var city = _make_city_with_housed_households(3, 4)
+	var city = _make_city_with_housed_households(3, CLOTHING_TEST_PEOPLE)
 
 	var result: Dictionary = city.resolve_soft_needs()[GoodsNeedBucketHelperScript.BUCKET_CLOTHING]
 
@@ -132,9 +136,10 @@ func test_soft_consumption_does_not_change_prosperity() -> void:
 	_check(before_status == "stable", "baseline household should start stable")
 	_check(after_status == before_status, "soft need consumption should not change prosperity status in v0")
 
-func test_wool_still_does_not_satisfy_clothing() -> void:
-	_check(not GoodsNeedBucketHelperScript.get_need_buckets_for_good("wool").has(GoodsNeedBucketHelperScript.BUCKET_CLOTHING), "wool should remain a future textile input, not final clothing")
-	_check(not CityScript.new("Wool Safety City").resources.has("wool"), "wool should not be introduced as a stockpile key")
+# Wool from a herder's fold is spun and worn at home: it meets the clothing need (milestone 6).
+func test_wool_satisfies_clothing() -> void:
+	_check(GoodsNeedBucketHelperScript.get_need_buckets_for_good("wool").has(GoodsNeedBucketHelperScript.BUCKET_CLOTHING), "wool meets the clothing need")
+	_check(CityScript.new("Wool City").resources.has("wool"), "towns keep a wool store")
 
 func _make_city_with_housed_households(household_count: int, population_per_household: int):
 	var city = CityScript.new("Soft Need Consumption Test City")

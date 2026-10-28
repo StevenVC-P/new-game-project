@@ -3,8 +3,10 @@ extends SceneTree
 # The town view in the real game (main.gd + TownMapView): it opens fitted beside the sidebar;
 # screen and tile coordinates agree at every zoom; a click on the map plans the chosen building
 # on the tile under the cursor, and the town builds it there; the road tool lays a road between
-# two clicks and the plot tool sets land aside; a click on a site selects it; a drag pans instead
-# of placing; the wheel zooms; a click on the sidebar never reaches the map; and decoration
+# two clicks; the plot tool sets land aside; the
+# clearing tool marks woods between two clicks; a
+# click on a site selects it; a drag pans instead of placing; the wheel zooms; a click on the
+# sidebar never reaches the map; paths worn by the townsfolk show on the ground; and decoration
 # stands only where the town map allows it.
 
 const MainScript = preload("res://scripts/main.gd")
@@ -32,6 +34,7 @@ func run_all() -> void:
 	await test_drag_pans_without_placing(main, view)
 	await test_wheel_zooms(main, view)
 	await test_sidebar_click_stays_off_the_map(main, view)
+	await test_paths_show_on_the_ground(main, view)
 	test_decoration_follows_the_map(main, view)
 
 	main.regional_terrain.wait_for_tasks()
@@ -132,9 +135,35 @@ func test_planning_tools(main: Node2D, view: TownMapView) -> void:
 	await _settle()
 	_check(city.construction.plots.size() == plots + 1, "the plot tool should set land aside")
 	main.select_building_type(MainScript.BUILDING_HOUSE)
-	_click(view.tile_rect_to_screen(plot_tile + Vector2i.ONE).get_center())
+	_click(view.tile_rect_to_screen(plot_tile).get_center())
 	await _settle()
 	_check(city.construction.projects[-1].plot_id == int(city.construction.plots[-1]["id"]), "a house placed on a plot is built on that plot")
+
+	# The clearing tool marks the woods between two clicks, with a preview between them.
+	var woods: Vector2i = _nearest_wooded(city)
+	var far_corner: Vector2i = (woods + Vector2i(2, 2)).min(view.map_size - Vector2i.ONE)
+	main.select_building_type(TownWoodland.CLEAR)
+	_click(view.tile_rect_to_screen(woods).get_center())
+	await _settle()
+	_check(city.woodland.marked.is_empty(), "the first click only marks where the block starts")
+	main.update_city_hovered_tile(view.tile_rect_to_screen(far_corner).get_center())
+	main.sync_town_map_view()
+	_check(view.block_preview.has_point(woods) and view.block_preview.has_point(far_corner), "the block to be marked should show while the player picks its corner")
+	_click(view.tile_rect_to_screen(far_corner).get_center())
+	await _settle()
+	_check(city.woodland.is_marked(woods), "the second click should mark the woods in the block for clearing")
+	_check(view.block_preview.size == Vector2i.ZERO, "the preview goes once the block is marked")
+
+	# The tilling tool marks open ground the same way.
+	var open: Vector2i = _valid_spot(main, MainScript.BUILDING_HOUSE)
+	var tillable: int = city.farmland.get_tillable_in_block(open, open + Vector2i(2, 2)).size()
+	main.select_building_type(TownFarmland.TILL)
+	_click(view.tile_rect_to_screen(open).get_center())
+	await _settle()
+	_click(view.tile_rect_to_screen(open + Vector2i(2, 2)).get_center())
+	await _settle()
+	_check(tillable > 0 and city.farmland.marked.size() == tillable, "the tilling tool should mark the open ground in the block (%d of %d)" % [city.farmland.marked.size(), tillable])
+	main.select_building_type(MainScript.BUILDING_HOUSE)
 
 	main.is_placing_building = false
 	_click(view.tile_rect_to_screen(plot_tile).get_center())
@@ -185,7 +214,21 @@ func test_sidebar_click_stays_off_the_map(main: Node2D, view: TownMapView) -> vo
 	_check(city.buildings.size() == before and city.construction.projects.size() == planned, "a click on the sidebar should not place a building")
 	_check(view.press_button == MOUSE_BUTTON_NONE, "a click on the sidebar should not start a drag on the map")
 
-# Trees only on tree tiles; ground details never on occupied, wooded, rough, road, or water tiles.
+# Families walking to work and carrying goods wear paths, and the view redraws the ground.
+func test_paths_show_on_the_ground(main: Node2D, view: TownMapView) -> void:
+	var city: City = main.cities[main.selected_city_index]
+	var spot: Vector2i = _valid_spot(main, "forager_garden")
+	_check(city.construction.request_building("forager_garden", spot) != null, "the town should have room for a garden to walk to")
+	for _day in range(60):
+		city.tick()
+	await _settle()
+	var trodden: int = city.logistics.cell_levels.size()
+	print("[TOWN] trodden route cells after 60 days: %d" % trodden)
+	_check(trodden > 0 and city.logistics.paths_version > 0, "two months of working a garden should wear a trail to it")
+	_check(view.ground_paths_version == city.logistics.paths_version, "the view should redraw the ground when paths change")
+
+# Trees only on tree tiles; ground details never on occupied, wooded, rough, road, path, or
+# water tiles.
 func test_decoration_follows_the_map(main: Node2D, view: TownMapView) -> void:
 	var city: City = main.cities[main.selected_city_index]
 	var features: TownFeatureLayer = view.feature_layer
@@ -195,13 +238,31 @@ func test_decoration_follows_the_map(main: Node2D, view: TownMapView) -> void:
 		for x in range(view.map_size.x):
 			var tile: Dictionary = city.local_map[y][x]
 			trees += 1 if tile["has_trees"] else 0
-			if features.is_open_ground(tile):
+			if features.is_open_ground(tile, Vector2i(x, y)):
 				shrub_tiles += 1
-				_check(tile["type"] == "ground" and not tile["has_trees"] and not tile["occupied"] and not tile["has_road"], "ground details should only stand on open ground")
+				_check(tile["type"] == "ground" and not tile["has_trees"] and not tile["occupied"] and not tile["has_road"] and city.logistics.get_tile_path_level(Vector2i(x, y)) == TownLogistics.PATH_NONE, "ground details should only stand on open ground")
 	_check(trees > 0 and shrub_tiles > 0, "the town map should have woods and open ground")
 	for building: Building in city.buildings:
 		var tile: Dictionary = city.local_map[building.tile.y][building.tile.x]
-		_check(not features.is_open_ground(tile), "no ground details under a building")
+		_check(not features.is_open_ground(tile, building.tile), "no ground details under a building")
+
+func _roadable_spot(city: City, near: Vector2i) -> Vector2i:
+	for radius in range(0, 12):
+		for y in range(near.y - radius, near.y + radius + 1):
+			for x in range(near.x - radius, near.x + radius + 1):
+				if city.construction.is_roadable(Vector2i(x, y)):
+					return Vector2i(x, y)
+	return Vector2i(-1, -1)
+
+func _nearest_wooded(city: City) -> Vector2i:
+	var size: Vector2i = city.logistics.map_size()
+	var center: Vector2 = Vector2(size) * 0.5
+	var best: Vector2i = Vector2i(-1, -1)
+	for y in range(size.y):
+		for x in range(size.x):
+			if city.local_map[y][x]["has_trees"] == true and (best.x < 0 or Vector2(x, y).distance_squared_to(center) < Vector2(best).distance_squared_to(center)):
+				best = Vector2i(x, y)
+	return best
 
 func _valid_spot(main: Node2D, building_type: String) -> Vector2i:
 	var center: Vector2i = Vector2i(MainScript.CITY_MAP_WIDTH, MainScript.CITY_MAP_HEIGHT) / 2
@@ -209,14 +270,6 @@ func _valid_spot(main: Node2D, building_type: String) -> Vector2i:
 		for y in range(center.y - radius, center.y + radius + 1):
 			for x in range(center.x - radius, center.x + radius + 1):
 				if main.is_valid_building_placement(main.selected_city_index, building_type, Vector2i(x, y)):
-					return Vector2i(x, y)
-	return Vector2i(-1, -1)
-
-func _roadable_spot(city: City, near: Vector2i) -> Vector2i:
-	for radius in range(0, 12):
-		for y in range(near.y - radius, near.y + radius + 1):
-			for x in range(near.x - radius, near.x + radius + 1):
-				if city.construction.is_roadable(Vector2i(x, y)):
 					return Vector2i(x, y)
 	return Vector2i(-1, -1)
 

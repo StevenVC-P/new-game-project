@@ -115,6 +115,8 @@ func test_outsider_marriage_wait_depends_on_culture() -> void:
 
 func _city():
 	var city = CityScript.new("Test", Vector2(9, 9), CityScript.ROLE_PLAYER, 0)
+	# Midsummer, when a field yields its plain rate (EconomyBalance.FARM_SEASON_YIELD).
+	city.day_of_year = 120
 	city.resources["food"] = 1000
 	city.resources["food_shortage"] = false
 	return city

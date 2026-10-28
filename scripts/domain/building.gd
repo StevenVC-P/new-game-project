@@ -9,6 +9,10 @@ const BUILDING_FARM: String = "farm"
 const BUILDING_WOODCUTTER: String = "woodcutter"
 const BUILDING_TOOLMAKER: String = "toolmaker"
 const BUILDING_QUARRY: String = "quarry"
+const BUILDING_FISHER: String = "fisher"
+const BUILDING_HUNTER: String = "hunter"
+const BUILDING_WATCH_POST: String = "watch_post"
+const BUILDING_HERDER: String = "herder"
 const BUILDING_STONECUTTER: String = "stonecutter"
 const BUILDING_BRICKWORKS: String = "brickworks"
 const BUILDING_LIME_KILN: String = "lime_kiln"
@@ -40,10 +44,14 @@ var succession_source_household_id: int = -1
 # it is not a succession vacancy (for example a player hold, which is never auto-filled).
 var succession_vacancy_months: int = -1
 var maintenance_timer: int = 0
+# Days a new or newly upgraded workplace runs before it needs tools (EconomyBalance).
+var upkeep_grace_days: int = EconomyBalanceScript.MAINTENANCE_GRACE_DAYS
 var maintenance_level: int = 100
 var receives_maintenance: bool = true
 # Fractional output carried between days when values modify output; starts at 0.5 so it rounds.
 var output_carry: float = 0.5
+# A fence round a field keeps everyone but its own family out (TownLogistics).
+var fenced: bool = false
 
 func _init(building_id: int = -1, building_type: String = BUILDING_HOUSE, tile_pos: Vector2i = Vector2i.ZERO, footprint_size: Vector2i = Vector2i(2, 2)):
 	id = building_id

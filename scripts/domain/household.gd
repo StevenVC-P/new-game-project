@@ -60,6 +60,13 @@ var hardship_points: int = 0
 var suffered_hardship_this_month: bool = false
 # Consecutive months in a hut or temporary shelter.
 var rough_housing_months: int = 0
+# What the family wants next (FamilyAmbitions: "home", "calling", "fence", or ""), and for how many
+# months it has waited. Fulfilled ambitions make it content, which fades slowly.
+var ambition: String = ""
+var ambition_months: int = 0
+var contentment: int = 0
+var contentment_months: int = 0
+var fulfilled_ambitions: int = 0
 
 func _init(household_id: int = -1, building_id: int = -1, work_preference: String = WORK_PREF_NEUTRAL, population: int = 4, residence_status: String = RESIDENCE_TEMPORARY):
 	id = household_id
@@ -275,7 +282,7 @@ func get_match_quality(building_type: String) -> String:
 
 func get_preferred_worker_for_building(building_type: String) -> String:
 	building_type = BuildingTiers.get_base_type(building_type)
-	if building_type == Building.BUILDING_FARM:
+	if building_type == Building.BUILDING_FARM or building_type == Building.BUILDING_FISHER or building_type == Building.BUILDING_HUNTER:
 		return WORK_PREF_AGRARIAN
 	if building_type == Building.BUILDING_WOODCUTTER or building_type == Building.BUILDING_TOOLMAKER:
 		return WORK_PREF_INDUSTRIAL

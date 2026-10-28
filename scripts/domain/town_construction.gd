@@ -9,8 +9,8 @@ extends RefCounted
 # 2. Builders carry the materials from the nearest store to the site (TownLogistics), taking
 #    them out of the stores only as they arrive, so a site waits while the stores are short.
 # 3. With every material on site, builders work until the building is done; it then becomes a
-#    real Building (a house's family moves in), an upgrade swaps its type in place, or a road
-#    opens.
+#    real Building (a house's family moves in), an upgrade swaps its type in place, a field is
+#    fenced, or a road opens.
 #
 # Labor, in family-days: families without a holding are the town's builders and work a site full
 # time, up to a crew per site. A family that works a holding can still give a little time
@@ -23,7 +23,9 @@ extends RefCounted
 
 const ROAD: String = "road"
 const PLOT: String = "plot"
-const PLOT_SIZE: Vector2i = Vector2i(2, 2)
+const FENCE: String = "fence"
+# A plot holds one home, which stands on a single tile.
+const PLOT_SIZE: Vector2i = Vector2i(1, 1)
 # Construction work draws on these callings (masons and carpenters); see CultureEffects.
 const CONSTRUCTION_WORK: String = "construction"
 
@@ -132,6 +134,39 @@ func request_upgrade(building_id: int, requested_by: String = ConstructionProjec
 		project.claimant_household_id = building.assigned_household_id
 	return add_project(project)
 
+# Plans a fence round a field or a yard, which keeps everyone but its own family out and off its
+# edges (TownLogistics). The family working or living there takes it on as its own, as with an
+# upgrade.
+func request_fence(building_id: int, requested_by: String = ConstructionProject.REQUESTED_BY_PLAYER) -> ConstructionProject:
+	if not can_fence(building_id):
+		return null
+	var building: Building = city.buildings[building_id]
+	var project: ConstructionProject = make_project(ConstructionProject.KIND_FENCE, FENCE, requested_by, -1)
+	project.tile = building.tile
+	project.size = building.size
+	project.target_building_id = building_id
+	project.materials_needed = EconomyBalance.get_fence_cost(building.size)
+	project.work_required = EconomyBalance.get_fence_work_days(building.size)
+	if building.is_house():
+		var resident: Household = city.get_household_for_building_id(building_id)
+		project.claimant_household_id = resident.id if resident != null else -1
+	else:
+		project.claimant_household_id = building.assigned_household_id
+	return add_project(project)
+
+# Any field or building with an open yard (owner, 2026-10-27): all but a quarry, an open pit.
+func can_fence(building_id: int) -> bool:
+	if building_id < 0 or building_id >= city.buildings.size():
+		return false
+	var building: Building = city.buildings[building_id]
+	return BuildingTiers.get_base_type(building.type) != Building.BUILDING_QUARRY and not building.fenced and get_fence_project(building_id) == null
+
+func get_fence_project(building_id: int) -> ConstructionProject:
+	for project: ConstructionProject in projects:
+		if project.kind == ConstructionProject.KIND_FENCE and project.target_building_id == building_id:
+			return project
+	return null
+
 # Plans a road over the given tiles; tiles that already carry a road are skipped.
 func request_road(tiles: Array[Vector2i], requested_by: String = ConstructionProject.REQUESTED_BY_PLAYER) -> ConstructionProject:
 	var new_tiles: Array[Vector2i] = []
@@ -211,7 +246,7 @@ func cancel(project_id: int) -> bool:
 		var plot: Dictionary = get_plot(project.plot_id)
 		if not plot.is_empty():
 			plot["project_id"] = -1
-	elif project.kind != ConstructionProject.KIND_UPGRADE:
+	elif not project.is_on_standing_building():
 		set_occupied(project.get_footprint(), false)
 	projects.erase(project)
 	logistics().mark_layout_changed()
@@ -285,7 +320,7 @@ func get_project(project_id: int) -> ConstructionProject:
 
 func get_project_at_tile(tile: Vector2i) -> ConstructionProject:
 	for project: ConstructionProject in projects:
-		if project.kind != ConstructionProject.KIND_UPGRADE and project.contains_tile(tile):
+		if not project.is_on_standing_building() and project.contains_tile(tile):
 			return project
 	return null
 
@@ -388,6 +423,8 @@ func get_status_text(project: ConstructionProject) -> String:
 static func get_display_name(project: ConstructionProject) -> String:
 	if project.kind == ConstructionProject.KIND_ROAD:
 		return "Road (%d tiles)" % project.road_tiles.size()
+	if project.kind == ConstructionProject.KIND_FENCE:
+		return "Fence"
 	var name: String = BuildingTiers.get_display_name(project.building_type)
 	if project.kind == ConstructionProject.KIND_UPGRADE:
 		return "Upgrade to " + name
@@ -533,6 +570,7 @@ func apply_labor(project: ConstructionProject, labor: float) -> void:
 		project.haul_progress = 0.0
 		city.remove_resource(material, 1)
 		project.materials_delivered[material] = int(project.materials_delivered.get(material, 0)) + 1
+		logistics().record_site_delivery(project.get_site_tile())
 	if project.has_all_materials():
 		project.work_done = minf(project.work_required, project.work_done + left)
 
@@ -549,6 +587,9 @@ func complete(project: ConstructionProject) -> void:
 		ConstructionProject.KIND_UPGRADE:
 			city.complete_upgrade(project.target_building_id)
 			move_claimant_in(project, project.target_building_id)
+		ConstructionProject.KIND_FENCE:
+			city.buildings[project.target_building_id].fenced = true
+			logistics().mark_layout_changed()
 		_:
 			if project.plot_id >= 0:
 				var plot: Dictionary = get_plot(project.plot_id)

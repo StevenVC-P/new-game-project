@@ -23,6 +23,7 @@ const CURRENT_GOOD_IDS: Array[String] = [
 	"tiles",
 	"paving_stones",
 	"clothing",
+	"wool",
 ]
 
 const GOOD_TO_NEED_BUCKETS: Dictionary = {
@@ -40,6 +41,7 @@ const GOOD_TO_NEED_BUCKETS: Dictionary = {
 	"carved_goods": [BUCKET_HOUSEHOLD_GOODS, BUCKET_CIVIC_GOODS],
 	"statues": [BUCKET_HOUSEHOLD_GOODS, BUCKET_CIVIC_GOODS],
 	"clothing": [BUCKET_CLOTHING],
+	"wool": [BUCKET_CLOTHING],
 }
 
 const BUCKET_DISPLAY_NAMES: Dictionary = {
@@ -67,6 +69,7 @@ const GOOD_DISPLAY_NAMES: Dictionary = {
 	"tiles": "Tiles",
 	"paving_stones": "Paving Stones",
 	"clothing": "Clothing",
+	"wool": "Wool",
 }
 
 # Future goods planned in the demand model include wheat, bread, fish, planks,

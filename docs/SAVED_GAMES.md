@@ -34,12 +34,13 @@ Saves live in `user://saves/` (on Windows `%APPDATA%\Godot\app_userdata\<project
 - **Binary Variant files, zstd-compressed.** JSON rounds floats (the town would drift after a load) and needs type tags for vectors and typed arrays. Godot's Variant encoding keeps every value exact. Objects are never decoded (`FileAccess.get_var` default), so a save file cannot run code. Each file holds a small header first, so the load list reads headers without loading games.
 - **Writes are atomic.** A save is written to a temporary file and renamed over the old one, so a crash mid-write keeps the previous save.
 - **The domain's randomness needs no saving.** Every random roll in `City` and its helpers is seeded from a hash of the town and the moment (`founding_seed`, tile, household, month), so a loaded town rolls the same as the original would have. `main.gd`'s own `rng` only picks a new house's work preference and the founding seed, and is not saved.
-- **Format version.** `GameState.FORMAT` is written in every header; saves from a newer format are hidden from the list. Missing fields in an older save keep their defaults, and fields a newer build no longer has are ignored, so most additions need no version bump.
+- **Format version.** `GameState.FORMAT` is written in every header; saves from a newer format are hidden from the list. Missing fields in an older save keep their defaults, and fields a newer build no longer has are ignored, so most additions need no version bump. Known losses so far: saves from before routes ran on the lines between tiles (2026-10-27) lose their worn paths, because wear moved from tiles to route cells (`TownLogistics.cell_wear`); the town is otherwise unchanged and wears new paths as it plays.
 
 ## Not Saved
 
 - The pending founding site and its survey (the player picks it again).
 - The town view's camera (a loaded town opens fitted to the window) and the atlas camera.
+- The route grid and its per-cell and per-tile values, and the woods' spreading frontier: rebuilt from the town map when first needed.
 - Hover, selection, open panels, and the trade menu.
 
 ## When You Change The Game

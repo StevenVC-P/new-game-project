@@ -7,7 +7,7 @@ extends RefCounted
 # around the player from the planet (RegionalTerrain.extract_window). A fingerprint of the
 # world refuses a save whose planet this build would rebuild differently. Everything play
 # changes is saved: every town in the neighbourhood (families, buildings, stores, town map,
-# construction), the player's road spur, trade routes, the calendar, and where the player was
+# construction, woodland, farmland), the player's road spur, trade routes, the calendar, and where the player was
 # looking. Town maps are saved whole rather than regenerated, so construction marks on them and
 # changes to the town map generator cannot shift a town under its buildings.
 
@@ -15,7 +15,7 @@ extends RefCounted
 const FORMAT: int = 1
 
 # Travel caches are rebuilt from the layout on first use.
-const LOGISTICS_SKIP: Array[String] = ["grid", "grid_version", "cache_version", "store_cache", "commute_cache", "site_cache"]
+const LOGISTICS_SKIP: Array[String] = ["grid", "grid_version", "cell_effort", "cell_inside", "tile_owner", "tile_base", "tile_margin", "tile_open", "tile_kind", "cell_flags", "closed_cells", "cache_version", "store_cache", "commute_cache", "site_cache"]
 # Fixed tables, not state.
 const CALENDAR_SKIP: Array[String] = ["month_names", "season_names"]
 const CLOCK_SKIP: Array[String] = ["speed_options"]
@@ -113,6 +113,12 @@ static func capture_city(city: City) -> Dictionary:
 		"logistics": SaveCodec.capture(city.logistics, LOGISTICS_SKIP),
 		"construction": SaveCodec.capture(city.construction),
 		"projects": projects,
+		"woodland": SaveCodec.capture(city.woodland),
+		"farmland": SaveCodec.capture(city.farmland),
+		"land": SaveCodec.capture(city.land),
+		"trade": SaveCodec.capture(city.trade),
+		"defense": SaveCodec.capture(city.defense),
+		"settlement": SaveCodec.capture(city.settlement),
 	}
 
 static func restore_city(data: Dictionary) -> City:
@@ -136,6 +142,13 @@ static func restore_city(data: Dictionary) -> City:
 	SaveCodec.restore(city.site_profile, data["site_profile"])
 	SaveCodec.restore(city.logistics, data["logistics"])
 	SaveCodec.restore(city.construction, data["construction"])
+	# Saves from before woodland have nothing marked or felled.
+	SaveCodec.restore(city.woodland, data.get("woodland", {}))
+	SaveCodec.restore(city.farmland, data.get("farmland", {}))
+	SaveCodec.restore(city.land, data.get("land", {}))
+	SaveCodec.restore(city.trade, data.get("trade", {}))
+	SaveCodec.restore(city.defense, data.get("defense", {}))
+	SaveCodec.restore(city.settlement, data.get("settlement", {}))
 	var projects: Array[ConstructionProject] = []
 	for project_data: Dictionary in data["projects"]:
 		var project: ConstructionProject = ConstructionProject.new()

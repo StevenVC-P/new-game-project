@@ -3,12 +3,13 @@ extends TownMapLayer
 
 # Natural features on the town map, painted like the regional map's (LandscapePainter) at four
 # times the scale: trees only on tree tiles, boulders only on rough ground and deposits, and up
-# close shrubs on open ground and flowers on farmland, never under a building. What the map
-# shows as woods is woodland the town can use.
+# close shrubs on open ground and flowers on farmland, never under a building or on a trodden
+# path. What the map shows as woods is woodland the town can use.
 #
-# Trees and boulders are recorded once per town map. Shrubs and flowers sit on their own
-# canvases, shown or hidden by level of detail in the rendering server (toggling `visible`
-# would re-record them), and recorded again only when buildings cover new ground.
+# Trees and boulders are recorded once per town map and again when woods are felled or spread
+# (TownMapView.refresh_development). Shrubs and flowers sit on their own canvases, shown or
+# hidden by level of detail in the rendering server (toggling `visible` would re-record them),
+# and recorded again only when buildings cover new ground, paths wear, or woods change.
 
 var tree_style: Dictionary = {}
 var shrub_canvas: Canvas = null
@@ -120,8 +121,8 @@ func _draw() -> void:
 
 # --- Ground details -------------------------------------------------------------------------
 
-func is_open_ground(tile: Dictionary) -> bool:
-	return tile["type"] == "ground" and not tile["has_trees"] and not tile.get("has_road", false) and not tile["occupied"]
+func is_open_ground(tile: Dictionary, at: Vector2i) -> bool:
+	return tile["type"] == "ground" and not tile["has_trees"] and not tile.get("has_road", false) and not tile["occupied"] and view.city.logistics.get_tile_path_level(at) == TownLogistics.PATH_NONE
 
 func paint_shrubs(canvas: CanvasItem) -> void:
 	if view == null or view.city == null:
@@ -130,7 +131,7 @@ func paint_shrubs(canvas: CanvasItem) -> void:
 	for y in range(view.map_size.y):
 		for x in range(view.map_size.x):
 			var tile: Dictionary = tile_at(x, y)
-			if not is_open_ground(tile):
+			if not is_open_ground(tile, Vector2i(x, y)):
 				continue
 			var h: Vector2i = view.hash_tile(x, y)
 			if hash01(h.x, h.y, 100) > (0.05 if tile["is_fertile"] else 0.11):
@@ -146,7 +147,7 @@ func paint_flowers(canvas: CanvasItem) -> void:
 	for y in range(view.map_size.y):
 		for x in range(view.map_size.x):
 			var tile: Dictionary = tile_at(x, y)
-			if not is_open_ground(tile) or not tile["is_fertile"]:
+			if not is_open_ground(tile, Vector2i(x, y)) or not tile["is_fertile"]:
 				continue
 			var h: Vector2i = view.hash_tile(x, y)
 			for k in range(3):

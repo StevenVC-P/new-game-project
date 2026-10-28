@@ -40,6 +40,16 @@ static func get_sidebar_lines(city: City) -> Array[String]:
 		lines.append("+%d more planned" % (construction.projects.size() - SIDEBAR_PROJECT_LINES))
 	if construction.families_without_plot > 0:
 		lines.append("%d famil%s want a home plot (P)" % [construction.families_without_plot, "y" if construction.families_without_plot == 1 else "ies"])
+	var marked: int = city.woodland.marked.size()
+	if marked > 0:
+		lines.append("Woods to clear: %d tile%s%s" % [marked, "" if marked == 1 else "s", "" if not city.woodland.get_woodcutters().is_empty() else " (needs a working woodcutter)"])
+	lines.append_array(city.land.get_notices())
+	lines.append_array(FamilyAmbitions.get_notices(city))
+	lines.append_array(city.trade.get_notices())
+	lines.append_array(city.defense.get_notices())
+	var tilling: int = city.farmland.marked.size()
+	if tilling > 0:
+		lines.append("Land to till: %d tile%s%s" % [tilling, "" if tilling == 1 else "s", "" if not city.farmland.get_farms().is_empty() else " (needs a working field)"])
 	return lines
 
 static func get_project_lines(city: City, project: ConstructionProject) -> Array[String]:
@@ -89,4 +99,21 @@ static func get_travel_lines(city: City, building: Building) -> Array[String]:
 	if building.assigned_household_id >= 0:
 		detail += ", walk %d -%d%%" % [int(round(float(travel["commute_effort"]))), int(round(float(travel["commute_share"]) * 100.0))]
 	lines.append("  " + detail)
+	var trodden: float = city.logistics.get_trodden_share(building)
+	if trodden > 0.0:
+		lines.append("  %d%% of the way on paths or roads" % int(round(trodden * 100.0)))
+	var base: String = BuildingTiers.get_base_type(building.type)
+	if base == Building.BUILDING_FISHER:
+		lines.append("Catch: %d%% of a full one (water in reach)" % int(round(city.land.get_reach_factor(building) * 100.0)))
+	elif base == Building.BUILDING_HUNTER:
+		lines.append("Game: %d%% of a full bag (woods in reach)" % int(round(city.land.get_reach_factor(building) * 100.0)))
+	elif base == Building.BUILDING_HERDER:
+		lines.append("Grazing: %d%% of a full flock (open land in reach)" % int(round(city.land.get_reach_factor(building) * 100.0)))
+	if city.land.is_wolf_exposed(building):
+		lines.append("Wolves in winter: -%d%% (fence the yard)" % int(round((1.0 - EconomyBalance.WOLF_WINTER_YIELD) * 100.0)))
+	if city.land.is_waterlogged(building):
+		lines.append("High water: waterlogged this spring")
+	var trips: float = float(city.logistics.trampled_trips.get(building.id, 0.0))
+	if TownLogistics.is_field(building) and not building.fenced and trips > 0.0:
+		lines.append("Trampled: -%d%% harvest (%.1f trips a day through it)" % [int(round(city.logistics.get_field_trample_loss(building) * 100.0)), trips])
 	return lines

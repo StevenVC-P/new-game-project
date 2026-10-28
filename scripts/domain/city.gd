@@ -38,7 +38,6 @@ const STARTING_POPULATION: int = STARTING_HOUSEHOLD_COUNT * STARTING_HOUSEHOLD_P
 const HOUSE_CAPACITY: int = 4
 const FOOD_PER_POPULATION_DIVISOR: int = EconomyBalanceScript.PEOPLE_FED_PER_FOOD
 const OLDER_CHILD_SUPPORT_TICK_INTERVAL: int = 4
-const STARTING_MAINTENANCE_GRACE_TICKS: int = EconomyBalanceScript.MAINTENANCE_GRACE_DAYS
 const RESOURCE_HISTORY_LIMIT: int = 16
 const BIRTH_FOOD_SURPLUS_DAYS: float = 10.0
 const BIRTH_MIN_FOOD_DAYS: float = 5.0
@@ -76,6 +75,23 @@ var site_profile: SettlementSiteProfile = SettlementSiteProfile.new()
 # How goods and people move around the town map, and everything being built (docs/TOWN_BUILDING_MODEL.md).
 var logistics: TownLogistics = null
 var construction: TownConstruction = null
+# Woods marked for clearing, and woods spreading.
+var woodland: TownWoodland = null
+# Land marked to till into farmland.
+var farmland: TownFarmland = null
+# Families' own trips from home: the store, water, firewood, kin.
+var errands: TownErrands = null
+# What the land and season give each workplace, and the season's hazards.
+var land: TownLand = null
+# Traders from the neutral town, and the town's link to them.
+var trade: TownTrade = null
+# Bandits on the roads, the watch, and the militia.
+var defense: TownDefense = null
+# The settlement's stage (camp, hamlet, village) and chronicle.
+var settlement: SettlementStage = null
+# Today's day of the year (1-360), set by the game before each day's tick; -1 where nothing sets
+# it (tests, balance tools), which count years from founding instead.
+var day_of_year: int = -1
 
 # `random_seed` makes each founding differ between games; 0 (the default, used by tests and
 # tools) keeps a town reproducible from its tile alone.
@@ -85,6 +101,13 @@ func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO, city_r
 	role = get_normalized_role(city_role)
 	logistics = TownLogistics.new(self)
 	construction = TownConstruction.new(self)
+	woodland = TownWoodland.new(self)
+	farmland = TownFarmland.new(self)
+	errands = TownErrands.new(self)
+	land = TownLand.new(self)
+	trade = TownTrade.new(self)
+	defense = TownDefense.new(self)
+	settlement = SettlementStage.new(self)
 	founding_seed = random_seed
 	var normalized_household_count: int = max(0, starter_household_count)
 	resources = make_starting_resources(normalized_household_count)
@@ -134,6 +157,7 @@ func make_starting_resources(starter_household_count: int = STARTING_HOUSEHOLD_C
 		"tiles": 0,
 		"paving_stones": 0,
 		"clothing": 0,
+		"wool": 0,
 		"house_shelter_capacity": 0,
 		"temporary_shelter_capacity": starting_population,
 		"housing_capacity": starting_population,
@@ -148,8 +172,7 @@ func make_starting_resources(starter_household_count: int = STARTING_HOUSEHOLD_C
 		"idle_workers": 0,
 		"food_consumption_rate": 2,
 		"food_shortage": false,
-		"production_tick_count": 0,
-		"maintenance_grace_ticks": STARTING_MAINTENANCE_GRACE_TICKS
+		"production_tick_count": 0
 	}
 	starting.merge(HouseholdMigrationScript.make_starting_resources())
 	return starting
@@ -898,10 +921,17 @@ func add_building(building: Building, household: Household = null):
 	update_worker_counts()
 	auto_assign_workers()
 
+func get_day_of_year() -> int:
+	if day_of_year > 0:
+		return day_of_year
+	return posmod(construction.day - 1, Calendar.DAYS_PER_YEAR) + 1
+
+# 0 spring, 1 summer, 2 autumn, 3 winter.
+func get_season_index() -> int:
+	return clampi((get_day_of_year() - 1) / Calendar.DAYS_PER_MONTH / 3, 0, 3)
+
 func tick():
 	update_shelter_counts()
-	if int(resources["maintenance_grace_ticks"]) > 0:
-		resources["maintenance_grace_ticks"] = int(resources["maintenance_grace_ticks"]) - 1
 	resources["production_tick_count"] = int(resources["production_tick_count"]) + 1
 	update_worker_counts()
 	consume_food()
@@ -909,14 +939,24 @@ func tick():
 	construction.advance_day()
 	if construction.day % FamilyDevelopment.INTERVAL_DAYS == 0:
 		FamilyDevelopment.advance(self)
+	land.advance_day()
 
 	for building: Building in buildings:
 		if building.is_house():
 			continue
-		if building.needs_maintenance() and int(resources["maintenance_grace_ticks"]) <= 0:
-			update_building_maintenance(building)
+		if building.needs_maintenance():
+			if building.upkeep_grace_days > 0:
+				building.upkeep_grace_days -= 1
+			else:
+				update_building_maintenance(building)
 		if building.can_produce():
 			apply_building_production(building)
+	logistics.advance_day()
+	woodland.advance_day()
+	farmland.advance_day()
+	trade.advance_day()
+	defense.advance_day()
+	settlement.advance_day()
 
 	resolve_soft_needs()
 	if resources["food_shortage"] == true:
@@ -1308,6 +1348,12 @@ func get_base_building_output_amount(building_type: String) -> float:
 		return EconomyBalanceScript.FARM_FOOD_PER_DAY
 	if building_type == BUILDING_WOODCUTTER:
 		return EconomyBalanceScript.WOODCUTTER_WOOD_PER_DAY
+	if building_type == Building.BUILDING_FISHER:
+		return EconomyBalanceScript.FISHER_FOOD_PER_DAY
+	if building_type == Building.BUILDING_HUNTER:
+		return EconomyBalanceScript.HUNTER_FOOD_PER_DAY
+	if building_type == Building.BUILDING_HERDER:
+		return EconomyBalanceScript.HERDER_WOOL_PER_DAY
 	if building_type == BUILDING_TOOLMAKER:
 		return EconomyBalanceScript.TOOLMAKER_TOOLS_PER_DAY
 	if building_type in [BUILDING_QUARRY, BUILDING_STONECUTTER, BUILDING_BRICKWORKS, BUILDING_LIME_KILN, BUILDING_MORTAR_YARD, BUILDING_MASON_YARD, BUILDING_SCULPTOR, BUILDING_CARVER, BUILDING_TILEWORKS, BUILDING_PAVER_YARD]:
@@ -1317,6 +1363,13 @@ func get_base_building_output_amount(building_type: String) -> float:
 
 func apply_building_output_modifiers(base_output: float, tick_count: int, building: Building) -> int:
 	var family_output: float = base_output * get_family_labor_factor(get_household_by_id(building.assigned_household_id)) * get_work_time_factor(building)
+	# A field people walk through loses some of its harvest underfoot; the land and season decide
+	# the rest (TownLand).
+	family_output *= 1.0 - logistics.get_field_trample_loss(building)
+	family_output *= land.get_output_factor(building)
+	# A family called up to the militia leaves its work until the band is dealt with.
+	if defense.is_called_up(building.assigned_household_id):
+		family_output = 0.0
 	var output_amount: int = apply_output_percent(family_output, building, get_worker_output_percent(building))
 	return apply_older_child_support_output_modifier(output_amount, tick_count, building)
 
@@ -1384,7 +1437,7 @@ func apply_older_child_support_output_modifier(output_amount: int, tick_count: i
 
 func get_preferred_worker_for_building(building_type: String) -> String:
 	building_type = BuildingTiersScript.get_base_type(building_type)
-	if building_type == BUILDING_FARM:
+	if building_type == BUILDING_FARM or building_type == Building.BUILDING_FISHER or building_type == Building.BUILDING_HUNTER:
 		return WORK_PREF_AGRARIAN
 	if building_type == BUILDING_WOODCUTTER or building_type == BUILDING_TOOLMAKER:
 		return WORK_PREF_INDUSTRIAL
@@ -1534,6 +1587,7 @@ func complete_upgrade(building_index: int) -> void:
 	building.type = upgrade_type
 	building.maintenance_level = 100
 	building.maintenance_timer = 0
+	building.upkeep_grace_days = EconomyBalanceScript.MAINTENANCE_GRACE_DAYS
 	update_shelter_counts()
 	update_worker_counts()
 
@@ -1768,12 +1822,15 @@ func get_clothing_need_pressure() -> Dictionary:
 
 	return make_need_pressure(GoodsNeedBucketHelperScript.BUCKET_CLOTHING, status, severity, demand, available, shortage_amount, true)
 
+# A garment lasts a person CLOTHING_DAYS_PER_PERSON, so the town needs one a day for every that
+# many people (at least one while anyone lives here).
 func get_clothing_need_demand() -> int:
-	var demand: int = 0
+	var people: int = 0
 	for household: Household in households:
-		demand += max(0, household.total_population)
-
-	return demand
+		people += max(0, household.total_population)
+	if people <= 0:
+		return 0
+	return maxi(1, ceili(float(people) / EconomyBalanceScript.CLOTHING_DAYS_PER_PERSON))
 
 func get_inactive_need_pressure(bucket_id: String) -> Dictionary:
 	return make_need_pressure(bucket_id, "pressure_only", "neutral", 0, get_available_need_bucket_amount(bucket_id), 0, false)

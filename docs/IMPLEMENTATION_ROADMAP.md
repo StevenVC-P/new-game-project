@@ -32,6 +32,8 @@ Known gaps that block the vision:
 
 ## Milestones
 
+M4-M8 are now planned and ordered by `docs/FIRST_STAGE_LOOP.md` (owner-approved 2026-10-27), which adds a balance foundation and geography-driven opportunities before them and sets the terms for working through them. Where the two differ, `FIRST_STAGE_LOOP.md` wins.
+
 ### M0 - Housekeeping
 
 **Objective:** a clean starting point.

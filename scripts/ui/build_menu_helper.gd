@@ -9,6 +9,8 @@ static func get_building_catalog() -> Array[Dictionary]:
 		{"id": "plot", "display_name": "Residential Plot", "category": "Town Planning"},
 		{"id": "road", "display_name": "Road", "category": "Town Planning"},
 		{"id": "storehouse", "display_name": "Storehouse", "category": "Town Planning"},
+		{"id": "clear_woods", "display_name": "Clear Woods", "category": "Town Planning"},
+		{"id": "till_land", "display_name": "Till Land", "category": "Town Planning"},
 		{
 			"id": "house",
 			"display_name": "House",
@@ -19,6 +21,10 @@ static func get_building_catalog() -> Array[Dictionary]:
 			"display_name": "Farm",
 			"category": "Food"
 		},
+		{"id": "fisher", "display_name": "Fisher's Hut", "category": "Food"},
+		{"id": "hunter", "display_name": "Hunter's Lodge", "category": "Food"},
+		{"id": "herder", "display_name": "Herder's Fold", "category": "Clothing"},
+		{"id": "watch_post", "display_name": "Watch Post", "category": "Defense"},
 		{
 			"id": "woodcutter",
 			"display_name": "Woodcutter",

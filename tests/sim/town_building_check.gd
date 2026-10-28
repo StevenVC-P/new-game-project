@@ -43,8 +43,9 @@ func run() -> void:
 		summarize(policy["name"], results)
 	quit()
 
-# [label, global site, town map, site profile] for valid sites across the frontier.
-static func collect_sites() -> Array:
+# [label, global site, town map, site profile] for valid sites across the frontier (also used by
+# planning_check.gd and site_variety_check.gd).
+static func collect_sites(regions: int = REGIONS, per_region: int = SITES_PER_REGION) -> Array:
 	var world: WorldMapData = FixedWorldDefinition.build()
 	var terrain: RegionalTerrain = RegionalTerrain.new(world)
 	var frontier: Array[WorldMapData.Region] = []
@@ -55,8 +56,8 @@ static func collect_sites() -> Array:
 	var size: Vector2i = MainScript.NEIGHBOURHOOD_SIZE
 	var generator: LocalCityMapGenerator = LocalCityMapGenerator.new(MainScript.CITY_MAP_WIDTH, MainScript.CITY_MAP_HEIGHT)
 	var sites: Array = []
-	for pick in range(REGIONS):
-		var region: WorldMapData.Region = frontier[pick * frontier.size() / REGIONS]
+	for pick in range(regions):
+		var region: WorldMapData.Region = frontier[pick * frontier.size() / regions]
 		var focus: Vector2i = terrain.world_to_tile_index(terrain.region_focus(region))
 		var origin: Vector2i = Vector2i(terrain.wrap_tile_x(focus.x - size.x / 2), clampi(focus.y - size.y / 2, 0, terrain.size_tiles.y - size.y))
 		var tiles: Array = terrain.extract_window(origin, size)
@@ -68,7 +69,7 @@ static func collect_sites() -> Array:
 					valid.append(Vector2i(x, y))
 		var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 		rng.seed = 9000 + region.id
-		for _site in range(SITES_PER_REGION):
+		for _site in range(per_region):
 			if valid.is_empty():
 				break
 			var site: Vector2i = valid[rng.randi_range(0, valid.size() - 1)]

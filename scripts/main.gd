@@ -67,6 +67,8 @@ var trade_routes: Array[TradeRoute] = []
 var top_bar_action_options: Array[Dictionary] = []
 var region_action_options: Array[Dictionary] = []
 var city_action_options: Array[Dictionary] = []
+# Whether a top bar status chip's detail was drawn last frame (redraw when the mouse leaves it).
+var top_bar_tooltip_shown: bool = false
 var build_menu_options: Array[Dictionary] = []
 var hovered_tile: Vector2i = Vector2i(-1, -1)
 var hovered_city_index: int = -1
@@ -83,6 +85,8 @@ var household_debug_inspector: Control = null
 var trade_menu: TradeMenu = TradeMenu.new()
 var selected_building_type: String = BUILDING_HOUSE
 var is_placing_building: bool = true
+# First corner of a block being marked for clearing or tilling; (-1, -1) until the first click.
+var block_start_tile: Vector2i = Vector2i(-1, -1)
 # First end of a road being laid with the road tool; (-1, -1) until the first click.
 var road_start_tile: Vector2i = Vector2i(-1, -1)
 var is_build_menu_open: bool = false
@@ -238,6 +242,7 @@ func sync_town_map_view() -> void:
 	town_map_view.preview_type = selected_building_type if is_placing_building else ""
 	town_map_view.preview_size = get_building_size(selected_building_type)
 	town_map_view.preview_valid = is_placing_building and is_inside_city_map(city_hovered_tile.x, city_hovered_tile.y) and is_valid_building_placement(selected_city_index, selected_building_type, city_hovered_tile)
+	town_map_view.block_preview = get_block_preview(city)
 	town_map_view.road_preview = get_road_preview(city)
 	town_map_view.inspected_index = city_building_overlay.inspected_building_index
 	town_map_view.inspected_project_id = city_building_overlay.inspected_project_id
@@ -803,6 +808,9 @@ func _input(event: InputEvent):
 		elif current_view == VIEW_CITY and town_map_view != null and town_map_view.handle_gesture(event):
 			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion:
+		# Status chips in the top bar show their detail while hovered.
+		if current_view == VIEW_CITY and (get_local_mouse_position().y < TOP_BAR_HEIGHT or top_bar_tooltip_shown):
+			queue_redraw()
 		if current_view == VIEW_REGION and trade_menu.handle_mouse_motion(get_local_mouse_position(), get_viewport_rect().size):
 			queue_redraw()
 		elif current_view == VIEW_REGION and region_map_view != null and region_map_view.handle_mouse_event(event):
@@ -1051,6 +1059,7 @@ func found_player_city_at_pending_site() -> bool:
 	else:
 		configure_new_city_map(founded_city)
 	clear_pending_founding_tile()
+	founded_city.trade.partner_name = get_nearest_neutral_town_name(founded_city)
 	generate_roads()
 	notify_region_map_changed()
 	if is_continuous_region_map():
@@ -1065,6 +1074,14 @@ func found_player_city_at_pending_site() -> bool:
 	simulation_clock.pause()
 	queue_redraw()
 	return true
+
+# Traders come from the nearest neutral town in the neighbourhood (TownTrade.partner_name).
+func get_nearest_neutral_town_name(town: City) -> String:
+	var nearest: City = null
+	for other: City in cities:
+		if other.is_neutral_city() and (nearest == null or other.tile.distance_to(town.tile) < nearest.tile.distance_to(town.tile)):
+			nearest = other
+	return nearest.name if nearest != null else town.trade.partner_name
 
 func create_player_city_at_tile(tile_pos: Vector2i) -> City:
 	return City.new("Player Town", Vector2(tile_pos.x, tile_pos.y), City.ROLE_PLAYER, FOUNDING_HOUSEHOLD_COUNT, rng.randi())
@@ -1138,7 +1155,16 @@ func try_handle_city_action_click(mouse_pos: Vector2) -> bool:
 			continue
 
 		var action: String = option_data["action"] as String
-		apply_time_control_action(action)
+		if action == "trade_lot":
+			if selected_city_index >= 0 and selected_city_index < cities.size():
+				cities[selected_city_index].trade.accept_lot(int(option_data["lot"]))
+			queue_redraw()
+		elif action == "call_militia":
+			if selected_city_index >= 0 and selected_city_index < cities.size():
+				cities[selected_city_index].defense.call_militia()
+			queue_redraw()
+		else:
+			apply_time_control_action(action)
 		return true
 
 	return false
@@ -1253,6 +1279,7 @@ func try_handle_building_click_at_tile(tile_pos: Vector2i, toggle_maintenance: b
 	var city: City = cities[selected_city_index]
 	if city_building_overlay.select_building_at_tile(city, tile_pos, toggle_maintenance) or city_building_overlay.select_site_at_tile(city, tile_pos):
 		is_placing_building = false
+		block_start_tile = Vector2i(-1, -1)
 		road_start_tile = Vector2i(-1, -1)
 		queue_redraw()
 		return true
@@ -1278,6 +1305,7 @@ func handle_clear_selection_key(key_event: InputEventKey) -> bool:
 
 	is_placing_building = false
 	is_build_menu_open = false
+	block_start_tile = Vector2i(-1, -1)
 	road_start_tile = Vector2i(-1, -1)
 	clear_selected_household()
 	queue_redraw()
@@ -1335,10 +1363,25 @@ func handle_building_selection_key_event(key_event: InputEventKey) -> bool:
 		select_building_type(BUILDING_PAVER_YARD)
 	elif is_letter_key(keycode, physical_keycode, KEY_T):
 		select_building_type(BUILDING_STOREHOUSE)
-	elif is_letter_key(keycode, physical_keycode, KEY_G):
-		select_building_type(TownConstruction.ROAD)
+	elif is_letter_key(keycode, physical_keycode, KEY_Y):
+		select_building_type(Building.BUILDING_FISHER)
+	elif is_letter_key(keycode, physical_keycode, KEY_U):
+		select_building_type(Building.BUILDING_HUNTER)
+	elif is_letter_key(keycode, physical_keycode, KEY_O):
+		select_building_type(Building.BUILDING_WATCH_POST)
+	elif is_letter_key(keycode, physical_keycode, KEY_H):
+		select_building_type(Building.BUILDING_HERDER)
+	elif is_letter_key(keycode, physical_keycode, KEY_M):
+		if selected_city_index >= 0 and selected_city_index < cities.size():
+			cities[selected_city_index].defense.call_militia()
 	elif is_letter_key(keycode, physical_keycode, KEY_P):
 		select_building_type(TownConstruction.PLOT)
+	elif is_letter_key(keycode, physical_keycode, KEY_C):
+		select_building_type(TownWoodland.CLEAR)
+	elif is_letter_key(keycode, physical_keycode, KEY_F):
+		select_building_type(TownFarmland.TILL)
+	elif is_letter_key(keycode, physical_keycode, KEY_G):
+		select_building_type(TownConstruction.ROAD)
 	else:
 		return false
 
@@ -1348,6 +1391,7 @@ func handle_building_selection_key_event(key_event: InputEventKey) -> bool:
 func select_building_type(building_type: String):
 	selected_building_type = building_type
 	is_placing_building = true
+	block_start_tile = Vector2i(-1, -1)
 	road_start_tile = Vector2i(-1, -1)
 	clear_selected_household()
 
@@ -1364,7 +1408,10 @@ func is_letter_key(keycode: int, physical_keycode: int, letter_key: int) -> bool
 
 # Plans what the build tool holds at the hovered tile. Buildings become construction sites the
 # town's families build (TownConstruction); a plot sets land aside for a family home; the road
-# tool takes two clicks, one at each end, and plans the road between them.
+# tool takes two clicks, one at each end, and plans the road between them; the clearing tool
+# takes two clicks, at opposite corners, and marks the woods between for the woodcutters
+# (TownWoodland). Paths nobody builds: they wear where people walk (TownLogistics), and a road
+# is only quicker ground, used where it is the easiest way.
 func try_place_selected_building():
 	if selected_city_index < 0 or selected_city_index >= cities.size():
 		return
@@ -1374,6 +1421,10 @@ func try_place_selected_building():
 	var city: City = cities[selected_city_index]
 	if selected_building_type == TownConstruction.ROAD:
 		place_road_end(city)
+		queue_redraw()
+		return
+	if is_block_tool(selected_building_type):
+		place_block_corner(city)
 		queue_redraw()
 		return
 	if selected_building_type == TownConstruction.PLOT:
@@ -1408,6 +1459,29 @@ func get_road_preview(city: City) -> Array[Vector2i]:
 		return route
 	return city.construction.plan_road(road_start_tile, city_hovered_tile)
 
+# The clearing and tilling tools mark a block between two clicks.
+static func is_block_tool(building_type: String) -> bool:
+	return building_type == TownWoodland.CLEAR or building_type == TownFarmland.TILL
+
+func place_block_corner(city: City) -> void:
+	if block_start_tile.x < 0:
+		block_start_tile = city_hovered_tile
+		return
+	if selected_building_type == TownFarmland.TILL:
+		if city.farmland.mark_block(block_start_tile, city_hovered_tile) == 0:
+			print("No open ground to till there")
+	elif city.woodland.mark_block(block_start_tile, city_hovered_tile) == 0:
+		print("No woods to clear there")
+	block_start_tile = Vector2i(-1, -1)
+
+# The block the clearing or tilling tool would mark from its first click to the hovered tile.
+func get_block_preview(city: City) -> Rect2i:
+	if not is_placing_building or not is_block_tool(selected_building_type) or block_start_tile.x < 0:
+		return Rect2i()
+	if not is_inside_city_map(city_hovered_tile.x, city_hovered_tile.y):
+		return Rect2i()
+	return city.woodland.block_rect(block_start_tile, city_hovered_tile)
+
 # Whether a click would put the chosen home on an open residential plot.
 func is_placing_home_on_plot(tile_pos: Vector2i) -> bool:
 	if not is_placing_building or BuildingTiers.get_base_type(selected_building_type) != BUILDING_HOUSE:
@@ -1422,6 +1496,7 @@ func run_simulation_day():
 
 	for city: City in cities:
 		if city.should_tick_simulation():
+			city.day_of_year = world_calendar.get_day_of_year()
 			city.tick()
 
 	apply_trade_routes()
@@ -1486,10 +1561,27 @@ func get_building_placement_status(city_index: int, building_type: String, origi
 # Whether the build tool may plan here. Materials are not needed yet: a site waits for them.
 func get_building_placement_result(city_index: int, building_type: String, origin: Vector2i) -> Dictionary:
 	var city: City = cities[city_index]
+	if is_block_tool(building_type):
+		return get_block_result(city, origin)
 	return city.construction.validate(building_type, origin)
 
+# The clearing tool may start anywhere; its block must hold woods.
+func get_block_result(city: City, origin: Vector2i) -> Dictionary:
+	var footprint: Array[Vector2i] = [origin]
+	if block_start_tile.x < 0:
+		return building_placement.make_result(true, "Valid placement: click one corner of the " + ("land to till" if selected_building_type == TownFarmland.TILL else "woods to clear"), footprint)
+	if selected_building_type == TownFarmland.TILL:
+		var open: int = city.farmland.get_tillable_in_block(block_start_tile, origin).size()
+		if open == 0:
+			return building_placement.make_result(false, "No open ground to till in that block", footprint)
+		return building_placement.make_result(true, "Valid placement: click the opposite corner (%d tiles to till; all marked: unmark)" % open, footprint)
+	var woods: int = city.woodland.get_wooded_in_block(block_start_tile, origin).size()
+	if woods == 0:
+		return building_placement.make_result(false, "No woods in that block", footprint)
+	return building_placement.make_result(true, "Valid placement: click the opposite corner (%d wooded tiles; all marked: unmark)" % woods, footprint)
+
 func get_building_size(building_type: String) -> Vector2i:
-	if building_type == TownConstruction.ROAD:
+	if is_block_tool(building_type) or building_type == TownConstruction.ROAD:
 		return Vector2i.ONE
 	if building_type == TownConstruction.PLOT:
 		return TownConstruction.PLOT_SIZE
@@ -1656,21 +1748,41 @@ func draw_top_bar():
 		x = draw_top_bar_button(font, font_size, "World", x, y, 78.0, {"action": "open_world_map"}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
 		x += 14.0
 
+	var in_town: bool = current_view == VIEW_CITY and selected_city_index >= 0 and selected_city_index < cities.size()
 	draw_string(font, Vector2(x, y), get_top_bar_title(), HORIZONTAL_ALIGNMENT_LEFT, 230.0, title_size, VisualStyle.COLOR_UI_TITLE)
 	x += 250.0
 	draw_string(font, Vector2(x, y), world_calendar.get_formatted_date(), HORIZONTAL_ALIGNMENT_LEFT, 330.0, font_size, VisualStyle.COLOR_POPULATION_LABOR)
-	x += 350.0
+	# In a town the date gives up some room to the town's status chips.
+	x += 240.0 if in_town else 350.0
 	draw_string(font, Vector2(x, y), "Speed: " + simulation_clock.get_speed_label(), HORIZONTAL_ALIGNMENT_LEFT, 105.0, font_size, VisualStyle.COLOR_POPULATION_LABOR)
 	x += 118.0
 
 	x = draw_top_bar_button(font, font_size, "Pause", x, y, 60.0, {"action": "toggle_pause"}, get_time_control_color("Paused"))
 	x = draw_top_bar_button(font, font_size, "1x", x, y, 42.0, {"action": "speed_1x"}, get_time_control_color("1x"))
 	x = draw_top_bar_button(font, font_size, "3x", x, y, 42.0, {"action": "speed_3x"}, get_time_control_color("3x"))
-	draw_top_bar_button(font, font_size, "10x", x, y, 48.0, {"action": "speed_10x"}, get_time_control_color("10x"))
+	x = draw_top_bar_button(font, font_size, "10x", x, y, 48.0, {"action": "speed_10x"}, get_time_control_color("10x"))
 	draw_top_bar_button(font, font_size, "Menu", get_viewport_rect().size.x - 78.0, y, 66.0, {"action": "open_menu"}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
+	top_bar_tooltip_shown = false
+	if in_town:
+		draw_town_status_chips(font, font_size, cities[selected_city_index], x + 12.0, y, get_viewport_rect().size.x - 90.0)
+
+# The town's status at a glance (TownStatusBar): people, free homes, labor, and alerts while they
+# matter, with detail on hover.
+func draw_town_status_chips(font: Font, font_size: int, city: City, x: float, y: float, max_x: float) -> void:
+	var chips: Array[Dictionary] = TownStatusBar.get_chips(city)
+	(chips[0]["tooltip"] as Array).append("Agrarian/Industrial homes: " + get_house_preference_count_text(city))
+	var drawn: Array[Dictionary] = TownStatusBar.draw_chips(self, font, font_size, chips, x, y, max_x)
+	var mouse: Vector2 = get_local_mouse_position()
+	for chip: Dictionary in drawn:
+		var rect: Rect2 = chip["rect"]
+		if rect.has_point(mouse):
+			TownStatusBar.draw_tooltip(self, font, font_size, chip["tooltip"], Vector2(rect.position.x, TOP_BAR_HEIGHT + 4.0), get_viewport_rect().size.x)
+			top_bar_tooltip_shown = true
 
 func get_top_bar_title() -> String:
 	if current_view == VIEW_CITY:
+		if selected_city_index >= 0 and selected_city_index < cities.size():
+			return get_selected_city_name() + " · " + cities[selected_city_index].settlement.get_title()
 		return get_selected_city_name() + " Local Map"
 	if world_map_data != null and (entered_world_region_id >= 0 or is_continuous_region_map()):
 		var region: WorldMapData.Region = get_region_in_view()
@@ -1753,10 +1865,14 @@ func draw_city_sidebar(font: Font, font_size: int):
 	elif placement_status != "Move over the city map to place." and placement_status != "Placement off":
 		placement_color = VisualStyle.COLOR_WARNING
 
+	y = draw_sidebar_section_title(font, "Settlement", text_x, y)
+	for settlement_line: String in city.settlement.get_display_lines(false):
+		y = draw_sidebar_line(font, font_size, settlement_line, text_x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
+	y += 4.0
+
 	y = draw_sidebar_section_title(font, "City Health", text_x, y)
 	y = draw_pressure_row(font, font_size, "Food", pressure_summary["food"] as Dictionary, text_x, y)
 	y = draw_pressure_row(font, font_size, "Shelter", pressure_summary["shelter"] as Dictionary, text_x, y)
-	y = draw_pressure_row(font, font_size, "Labor", pressure_summary["labor"] as Dictionary, text_x, y)
 	y = draw_pressure_row(font, font_size, "Tools", pressure_summary["tools"] as Dictionary, text_x, y)
 	y = draw_pressure_row(font, font_size, "Maintenance", pressure_summary["maintenance"] as Dictionary, text_x, y)
 	y += 4.0
@@ -1782,6 +1898,8 @@ func draw_city_sidebar(font: Font, font_size: int):
 	for construction_line: String in ConstructionDisplayHelper.get_sidebar_lines(city):
 		y = draw_sidebar_line(font, font_size, construction_line, text_x, y, VisualStyle.COLOR_MUTED)
 	y += 4.0
+	y = draw_trader_section(font, font_size, city, text_x, y)
+	y = draw_militia_button(font, font_size, city, text_x, y)
 
 	y = draw_sidebar_section_title(font, "Resources", text_x, y)
 	y = draw_sidebar_label_value(font, font_size, "Food", str(resources["food"]) + "  use " + str(resources["food_consumption_rate"]) + "/tick", text_x, y, VisualStyle.COLOR_RESOURCE_FOOD)
@@ -1790,18 +1908,12 @@ func draw_city_sidebar(font: Font, font_size: int):
 	y += 4.0
 
 	y = draw_sidebar_section_title(font, "Population", text_x, y)
-	y = draw_sidebar_label_value(font, font_size, "People", str(resources["total_population"]), text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
-	y = draw_sidebar_label_value(font, font_size, "Households", str(resources["household_count"]) + "  A/I " + get_house_preference_count_text(city), text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
 	y = draw_sidebar_label_value(font, font_size, "Shelter", str(resources["housing_capacity"]) + " total", text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
 	y = draw_sidebar_label_value(font, font_size, "Housed", str(resources["housed_population"]) + " / " + str(resources["house_shelter_capacity"]), text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
 	y = draw_sidebar_label_value(font, font_size, "Temporary", str(resources["temporary_sheltered_population"]) + " / " + str(resources["temporary_shelter_capacity"]), text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
 	if int(resources["unsheltered_population"]) > 0:
 		y = draw_sidebar_label_value(font, font_size, "Unsheltered", str(resources["unsheltered_population"]), text_x, y, VisualStyle.COLOR_WARNING)
 	y = draw_sidebar_label_value(font, font_size, "Newcomers", HouseholdMigration.get_arrival_blocker_text(HouseholdMigration.get_arrival_blocker(city)), text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
-	if int(resources["households_considering_departure"]) > 0:
-		y = draw_sidebar_label_value(font, font_size, "Leaving?", str(resources["households_considering_departure"]) + " families", text_x, y, VisualStyle.COLOR_WARNING)
-	y = draw_sidebar_label_value(font, font_size, "Labor", str(resources["assigned_workers"]) + " / " + str(resources["total_labor_capacity"]) + " used", text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
-	y = draw_sidebar_label_value(font, font_size, "Idle", str(resources["idle_workers"]), text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
 	y += 4.0
 
 	y = draw_sidebar_section_title(font, "Selected Object", text_x, y)
@@ -1815,14 +1927,12 @@ func draw_city_sidebar(font: Font, font_size: int):
 	else:
 		y = draw_sidebar_label_value(font, font_size, "Building", "none", text_x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
 	# The key list is long; when a selection fills the panel it shrinks to one line.
-	var key_lines: Array[String] = ["1 house, 2 farm, 3 woodcutter", "4 toolmaker, 5 quarry, 6 stonecutter", "7 brickworks, 8 lime, 9 mortar", "0 mason, Q sculptor, W carver", "E tileworks, R paver yard", "T storehouse, P home plot, G road"]
+	var key_lines: Array[String] = ["1 house, 2 farm, 3 woodcutter", "4 toolmaker, 5 quarry, 6 stonecutter", "7 brickworks, 8 lime, 9 mortar", "0 mason, Q sculptor, W carver", "E tileworks, R paver yard", "Y fisher's hut, U hunter's lodge", "O watch post, M call the militia", "H herder's fold (wool for clothing)", "T storehouse, P home plot, G road", "C clear woods, F till land (click both corners)"]
 	if y + (key_lines.size() + 4) * 15.0 > sidebar_rect.end.y:
-		key_lines = ["Keys 1-0, Q-R, T choose a building", "P home plot, G road (click both ends)"]
+		key_lines = ["Keys 1-0, Q-R, T choose a building", "P plot, G road, C clear, F till"]
 	for key_line: String in key_lines:
 		y = draw_sidebar_line(font, font_size, key_line, text_x, y, VisualStyle.COLOR_MUTED)
 	y = draw_sidebar_line(font, font_size, "B: build menu, Right click/Esc: clear", text_x, y, VisualStyle.COLOR_MUTED)
-	if int(resources["maintenance_grace_ticks"]) > 0:
-		y = draw_sidebar_line(font, font_size, "Grace: " + str(resources["maintenance_grace_ticks"]) + " ticks", text_x, y, VisualStyle.COLOR_MUTED)
 	y += 4.0
 	draw_sidebar_line(font, font_size, placement_status, text_x, y, placement_color)
 
@@ -1889,7 +1999,7 @@ func draw_sidebar_label_value(font: Font, font_size: int, label: String, value: 
 	return y + 15.0
 
 func get_building_display_name(building_type: String) -> String:
-	if BuildingTiers.is_tier0(building_type):
+	if BuildingTiers.is_tier0(building_type) or BuildingTiers.DISPLAY_NAMES.has(building_type):
 		return BuildingTiers.get_display_name(building_type)
 	if building_type == BUILDING_HOUSE:
 		return "House"
@@ -1919,7 +2029,7 @@ func get_building_display_name(building_type: String) -> String:
 		return "Tileworks"
 	if building_type == BUILDING_PAVER_YARD:
 		return "Paver Yard"
-	if building_type == BUILDING_STOREHOUSE or building_type == TownConstruction.ROAD or building_type == TownConstruction.PLOT:
+	if building_type == BUILDING_STOREHOUSE or building_type == TownConstruction.ROAD or building_type == TownConstruction.PLOT or is_block_tool(building_type):
 		return BuildMenuHelper.get_display_name(building_type)
 
 	return building_type
@@ -2292,6 +2402,34 @@ func draw_city_action_button(font: Font, font_size: int, text: String, x: float,
 	draw_rect(option_rect, color)
 	draw_rect(option_rect, VisualStyle.COLOR_UI_OPTION_BORDER, false, VisualStyle.OPTION_BORDER_WIDTH)
 	draw_string(font, Vector2(x + 5.0, y), text, HORIZONTAL_ALIGNMENT_LEFT, width - 10.0, font_size, VisualStyle.COLOR_UI_TEXT)
+
+# The trader in town (TownTrade): its prices in grain and the lots the player can take, one click
+# each.
+func draw_trader_section(font: Font, font_size: int, city: City, x: float, y: float) -> float:
+	if not city.trade.is_trader_here():
+		return y
+	var width: float = get_city_sidebar_rect().size.x - CITY_SIDEBAR_PADDING * 2.0
+	y = draw_sidebar_section_title(font, "Trader", x, y)
+	for price_line: String in city.trade.get_price_lines():
+		y = draw_sidebar_line(font, font_size, price_line, x, y, VisualStyle.COLOR_MUTED)
+	var lots: Array[Dictionary] = city.trade.get_lots()
+	if lots.is_empty():
+		y = draw_sidebar_line(font, font_size, "Nothing the town holds is wanted.", x, y, VisualStyle.COLOR_MUTED)
+	for index in range(lots.size()):
+		draw_city_action_button(font, font_size, "Give " + TownTrade.describe_lot(lots[index]), x, y + 4.0, width, {"action": "trade_lot", "lot": index}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
+		y += 22.0
+	if city.trade.last_trade_text != "":
+		y = draw_sidebar_line(font, font_size, "Last trade: " + city.trade.last_trade_text, x, y + 4.0, VisualStyle.COLOR_MUTED)
+	return y + 4.0
+
+# While bandits are on the road and no militia is called: the call-up (TownDefense), at the cost of
+# the called families' work.
+func draw_militia_button(font: Font, font_size: int, city: City, x: float, y: float) -> float:
+	if not city.defense.is_band_coming() or not city.defense.called_household_ids.is_empty():
+		return y
+	var width: float = get_city_sidebar_rect().size.x - CITY_SIDEBAR_PADDING * 2.0
+	draw_city_action_button(font, font_size, "Call the militia (%d families leave work)" % EconomyBalance.MILITIA_FAMILIES, x, y + 4.0, width, {"action": "call_militia"}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
+	return y + 26.0
 
 func draw_sidebar_like_line(font: Font, font_size: int, text: String, x: float, y: float, width: float, color: Color) -> float:
 	draw_string(font, Vector2(x, y), text, HORIZONTAL_ALIGNMENT_LEFT, width, font_size, color)

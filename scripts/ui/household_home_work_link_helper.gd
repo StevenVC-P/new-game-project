@@ -53,6 +53,11 @@ static func _add_home_links(lines: Array[String], city: City, house_index: int) 
 
 	lines.append("Home: " + city.get_household_label(household.id))
 	lines.append("Household: pop " + str(household.total_population) + ", " + household.preference + ", labor " + str(household.assigned_workers) + "/" + str(household.labor_capacity))
+	var wants: String = FamilyAmbitions.describe(city, household)
+	if wants != "":
+		lines.append("Wants: " + wants + (" (waiting %d months)" % household.ambition_months if household.ambition_months > EconomyBalance.AMBITION_PATIENCE_MONTHS else ""))
+	if household.contentment > 0:
+		lines.append("Content: %d ambition%s fulfilled" % [household.fulfilled_ambitions, "" if household.fulfilled_ambitions == 1 else "s"])
 
 	var assigned_production_ids: Array[int] = city.get_assigned_building_ids_for_house(house_index)
 	if assigned_production_ids.is_empty():
@@ -104,7 +109,7 @@ static func _count_buildings_of_type_through_index(buildings: Array[Building], b
 	return count
 
 static func _capitalize_building_type(building_type: String) -> String:
-	if BuildingTiers.is_tier0(building_type):
+	if BuildingTiers.is_tier0(building_type) or BuildingTiers.DISPLAY_NAMES.has(building_type):
 		return BuildingTiers.get_display_name(building_type)
 	if building_type == Building.BUILDING_HOUSE:
 		return "House"

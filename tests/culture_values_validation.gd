@@ -210,6 +210,8 @@ func _farm_output_over(days: int, profile: Dictionary) -> int:
 
 func _empty_city_with_food():
 	var city = CityScript.new("Test", Vector2.ZERO, CityScript.ROLE_PLAYER, 0)
+	# Midsummer, when a field yields its plain rate (EconomyBalance.FARM_SEASON_YIELD).
+	city.day_of_year = 120
 	city.resources["food"] = 1000
 	city.resources["food_consumption_rate"] = 2
 	city.resources["food_shortage"] = false

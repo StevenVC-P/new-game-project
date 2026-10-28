@@ -15,7 +15,9 @@ extends RefCounted
 # that give every town room to start.
 #
 # Town tiles: "type" (ground, water, rough), "has_trees", "is_fertile", "occupied", and
-# "water_kind" (river, lake, sea, or ""), "resource" (none, stone, iron), "has_road".
+# "water_kind" (river, lake, sea, or ""), "resource" (none, stone, iron), "has_road", "is_hill"
+# (sloping land on the regional map's hills). Play adds "path_level" (TownLogistics), and fells
+# and spreads trees (TownWoodland).
 
 const TOWN_TILES_PER_REGIONAL_TILE: int = 4
 # Bounded regional maps carry no climate; they read as the temperate valley they always were.
@@ -127,9 +129,11 @@ func generate(site: Vector2i, regional_tiles: Array, hash_origin: Vector2i, clim
 			regional += Vector2(warp_noise_x.get_noise_2d(global.x, global.y), warp_noise_y.get_noise_2d(global.x, global.y)).limit_length(1.0) * WARP_TILES
 			var fields: PackedFloat32Array = blended_fields(regional)
 			var edge: float = edge_noise.get_noise_2d(global.x, global.y) * EDGE_NOISE
-			var tile: Dictionary = {"type": "ground", "has_trees": false, "is_fertile": false, "occupied": false, "water_kind": "", "resource": "none", "has_road": false}
+			var tile: Dictionary = {"type": "ground", "has_trees": false, "is_fertile": false, "occupied": false, "water_kind": "", "resource": "none", "has_road": false, "is_hill": false}
 			var i: int = y * width + x
 			hill_amount[i] = fields[FIELD_HILL]
+			# Sloping land, slow to cross; its steepest share becomes rock (add_hill_outcrops).
+			tile["is_hill"] = hill_amount[i] > FEATURE_THRESHOLD
 			forest_amount[i] = fields[FIELD_FOREST]
 			fertile_amount[i] = fields[FIELD_FERTILE] + edge
 			if fields[FIELD_WATER] + edge > WATER_THRESHOLD:

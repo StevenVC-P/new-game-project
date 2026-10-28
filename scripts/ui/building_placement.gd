@@ -64,6 +64,10 @@ func validate(city: City, local_map: Array, building_type: String, origin: Vecto
 		return make_result(false, "Requires fertile land", footprint)
 	if rule_type == BUILDING_WOODCUTTER and not has_trees_near_building(local_map, origin, size, woodcutter_tree_radius):
 		return make_result(false, "Requires nearby trees", footprint)
+	if rule_type == Building.BUILDING_HUNTER and not has_trees_near_building(local_map, origin, size, HUNTER_TREE_RADIUS):
+		return make_result(false, "Requires woods close by", footprint)
+	if rule_type == Building.BUILDING_FISHER and not has_water_beside(local_map, origin, size):
+		return make_result(false, "Requires a bank: water beside it", footprint)
 
 	return make_result(true, "Valid placement", footprint)
 
@@ -83,6 +87,21 @@ func get_footprint_tiles(origin: Vector2i, size: Vector2i) -> Array[Vector2i]:
 
 	return footprint
 
+# A hunter's lodge stands at the woods' edge.
+const HUNTER_TREE_RADIUS: int = 3
+
+# Water on a side of the footprint: a fisher's hut stands on the bank.
+func has_water_beside(local_map: Array, origin: Vector2i, size: Vector2i) -> bool:
+	for y in range(origin.y - 1, origin.y + size.y + 1):
+		for x in range(origin.x - 1, origin.x + size.x + 1):
+			var inside: bool = x >= origin.x and x < origin.x + size.x and y >= origin.y and y < origin.y + size.y
+			var corner: bool = (x < origin.x or x >= origin.x + size.x) and (y < origin.y or y >= origin.y + size.y)
+			if inside or corner or not is_inside_city_map(x, y):
+				continue
+			if (local_map[y][x] as Dictionary)["type"] == "water":
+				return true
+	return false
+
 func has_trees_near_building(local_map: Array, origin: Vector2i, size: Vector2i, radius: int) -> bool:
 	var start_x: int = max(0, origin.x - radius)
 	var end_x: int = min(city_map_width, origin.x + size.x + radius)
@@ -99,7 +118,11 @@ func has_trees_near_building(local_map: Array, origin: Vector2i, size: Vector2i,
 
 func get_building_size(building_type: String) -> Vector2i:
 	building_type = BuildingTiersScript.get_base_type(building_type)
-	if building_type == BUILDING_FARM:
+	# Homes stand on a single tile (owner, 2026-10-27), huts too, and so do a fisher's hut and a
+	# watch post.
+	if building_type == BUILDING_HOUSE or building_type == Building.BUILDING_FISHER or building_type == Building.BUILDING_WATCH_POST:
+		return Vector2i.ONE
+	if building_type == BUILDING_FARM or building_type == Building.BUILDING_HERDER:
 		return Vector2i(3, 3)
 	if building_type == BUILDING_TOOLMAKER:
 		return Vector2i(3, 3)

@@ -149,6 +149,8 @@ func apply_action(option_data: Dictionary, city: City):
 		city.toggle_building_maintenance(inspected_building_index)
 	elif action == "upgrade":
 		city.construction.request_upgrade(inspected_building_index)
+	elif action == "fence":
+		city.construction.request_fence(inspected_building_index)
 
 func draw(canvas: CanvasItem, font: Font, font_size: int, city: City):
 	action_options.clear()
@@ -194,11 +196,13 @@ func draw(canvas: CanvasItem, font: Font, font_size: int, city: City):
 		y = draw_overlay_section_title(canvas, font, font_size, "Household Status", text_x, y, overlay_size.x)
 		for prosperity_text: String in get_house_prosperity_lines(city, inspected_building_index):
 			y = draw_overlay_line(canvas, font, font_size, prosperity_text, text_x, y, overlay_size.x)
+		y = draw_fence_option(canvas, font, font_size, text_x, y, overlay_size.x, city, building)
 		draw_upgrade_option(canvas, font, font_size, text_x, y, overlay_size.x, city, building)
 		return
 	if building.is_store():
 		y = draw_overlay_line(canvas, font, font_size, "Keeps the town's goods.", text_x, y, overlay_size.x)
-		draw_overlay_line(canvas, font, font_size, "Workplaces nearby carry less far.", text_x, y, overlay_size.x)
+		y = draw_overlay_line(canvas, font, font_size, "Workplaces nearby carry less far.", text_x, y, overlay_size.x)
+		draw_fence_option(canvas, font, font_size, text_x, y, overlay_size.x, city, building)
 		return
 
 	y = draw_overlay_line(canvas, font, font_size, "Maintenance: " + str(building.maintenance_level) + "%", text_x, y, overlay_size.x)
@@ -220,6 +224,7 @@ func draw(canvas: CanvasItem, font: Font, font_size: int, city: City):
 	else:
 		y = draw_overlay_available_worker_options(canvas, font, font_size, text_x, y, overlay_size.x, city, building)
 
+	y = draw_fence_option(canvas, font, font_size, text_x, y, overlay_size.x, city, building)
 	if building.is_tier0():
 		y = draw_upgrade_option(canvas, font, font_size, text_x, y, overlay_size.x, city, building)
 	else:
@@ -238,6 +243,30 @@ func draw_upgrade_option(canvas: CanvasItem, font: Font, font_size: int, x: floa
 	var label: String = "Upgrade to " + capitalize_building_name(upgrade_type) + " (" + get_cost_summary(cost) + ")"
 	var color: Color = VisualStyle.COLOR_UI_BUTTON_CONFIRM if city.construction.can_supply(cost) else VisualStyle.COLOR_UI_BUTTON_DISABLED
 	return draw_overlay_action_option(canvas, font, font_size, label, x, y, overlay_width, {"action": "upgrade"}, color)
+
+# A fence round a field or a yard is a construction project too; once it stands, nobody else
+# walks through it or along its edges.
+func draw_fence_option(canvas: CanvasItem, font: Font, font_size: int, x: float, y: float, overlay_width: float, city: City, building: Building) -> float:
+	if building.fenced:
+		return draw_overlay_line(canvas, font, font_size, "Fenced: nobody else walks through or beside it", x, y, overlay_width)
+	if BuildingTiers.get_base_type(building.type) == Building.BUILDING_QUARRY:
+		return y
+	var project: ConstructionProject = city.construction.get_fence_project(building.id)
+	if project != null:
+		y = draw_overlay_line(canvas, font, font_size, "Fencing: " + city.construction.get_status_text(project), x, y, overlay_width)
+		return draw_overlay_action_option(canvas, font, font_size, "Cancel fence", x, y, overlay_width, {"action": "cancel_project", "project_id": project.id}, VisualStyle.COLOR_UI_BUTTON_DANGER)
+	var cost: Dictionary = EconomyBalance.get_fence_cost(building.size)
+	var color: Color = VisualStyle.COLOR_UI_BUTTON_CONFIRM if city.construction.can_supply(cost) else VisualStyle.COLOR_UI_BUTTON_DISABLED
+	var what: String = "field" if TownLogistics.is_field(building) else "yard"
+	return draw_overlay_action_option(canvas, font, font_size, "Fence the " + what + " (" + get_cost_summary(cost) + ")", x, y, overlay_width, {"action": "fence"}, color)
+
+# Card rows the fence takes: (lines, options).
+static func count_fence_rows(city: City, building: Building) -> Vector2i:
+	if building.fenced:
+		return Vector2i(1, 0)
+	if BuildingTiers.get_base_type(building.type) == Building.BUILDING_QUARRY:
+		return Vector2i.ZERO
+	return Vector2i(1 if city.construction.get_fence_project(building.id) != null else 0, 1)
 
 # --- Building sites and plots ------------------------------------------------------------------
 
@@ -342,6 +371,9 @@ func get_building_overlay_size(city: City, building: Building) -> Vector2:
 		option_count += 1
 	if building.is_tier0() and city.construction.get_upgrade_project(building.id) != null:
 		line_count += 1
+	var fence_rows: Vector2i = count_fence_rows(city, building)
+	line_count += fence_rows.x
+	option_count += fence_rows.y
 
 	var height: float = 18.0 + float(line_count) * 18.0 + float(option_count) * 22.0
 	return Vector2(width, height)
@@ -420,7 +452,7 @@ func count_buildings_of_type_through_index(buildings: Array, building_type: Stri
 	return count
 
 func capitalize_building_name(building_type: String) -> String:
-	if BuildingTiers.is_tier0(building_type):
+	if BuildingTiers.is_tier0(building_type) or BuildingTiers.DISPLAY_NAMES.has(building_type):
 		return BuildingTiers.get_display_name(building_type)
 	if building_type == BUILDING_HOUSE:
 		return "House"
