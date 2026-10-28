@@ -109,7 +109,8 @@ const BUILD_COSTS: Dictionary = {
 	"paver_yard": {"wood": 8, "tools": 1},
 	"storehouse": {"wood": 8, "tools": 0},
 	"fisher": {"wood": 4, "tools": 0},
-	"hunter": {"wood": 5, "tools": 1}
+	"hunter": {"wood": 5, "tools": 1},
+	"watch_post": {"wood": 6, "tools": 1}
 }
 
 # --- Construction (docs/TOWN_BUILDING_MODEL.md) ---
@@ -127,7 +128,8 @@ const BUILD_WORK_DAYS: Dictionary = {
 	"toolmaker": 10.0,
 	"storehouse": 8.0,
 	"fisher": 4.0,
-	"hunter": 5.0
+	"hunter": 5.0,
+	"watch_post": 5.0
 }
 const BUILD_WORK_DEFAULT_DAYS: float = 12.0
 # An upgrade in place reuses the site, so it takes this share of building the tier 1 type new.
@@ -247,6 +249,31 @@ const TRADER_PRICE_SLOPE: float = 0.5
 const TRADER_STAY_DAYS: int = 10
 const TRADER_INTERVAL_DAYS: Dictionary = {"crossroads": 20, "road": 30, "river": 45}
 const TRADER_INTERVAL_JITTER_DAYS: int = 6
+
+# --- Defense (docs/FIRST_STAGE_LOOP.md, milestone 5; TownDefense) ---
+# From BANDITS_FROM_DAY, every BANDIT_ROLL_INTERVAL_DAYS outside winter, a band takes to the road
+# toward a town with BANDIT_MONTHLY_CHANCE by how traders reach it, times the town's temptation
+# (its stores' worth in grain against TEMPTING_STORE_GRAIN, between TEMPTATION_MIN and _MAX). It is
+# seen BANDIT_WARNING_DAYS before it comes, with strength BANDIT_BASE_STRENGTH times temptation
+# (plus 0-1, at most BANDIT_MAX_STRENGTH). A kept watch post guards with WATCH_POST_GUARD, each of
+# up to MILITIA_FAMILIES called-up families with MILITIA_GUARD. A band meeting less guard takes
+# RAID_TAKE_SHARE of the food, tools, and wood, less in proportion to the guard it met, leaving
+# RAID_FOOD_KEPT_DAYS of food; every family loses RAID_CONTENTMENT_LOSS contentment.
+const BANDITS_FROM_DAY: int = 360
+const BANDIT_ROLL_INTERVAL_DAYS: int = 30
+const BANDIT_MONTHLY_CHANCE: Dictionary = {"crossroads": 0.12, "road": 0.08, "river": 0.04}
+const TEMPTING_STORE_GRAIN: float = 3000.0
+const TEMPTATION_MIN: float = 0.5
+const TEMPTATION_MAX: float = 2.0
+const BANDIT_WARNING_DAYS: int = 10
+const BANDIT_BASE_STRENGTH: float = 2.0
+const BANDIT_MAX_STRENGTH: int = 5
+const WATCH_POST_GUARD: int = 2
+const MILITIA_GUARD: int = 1
+const MILITIA_FAMILIES: int = 3
+const RAID_TAKE_SHARE: float = 0.3
+const RAID_FOOD_KEPT_DAYS: float = 30.0
+const RAID_CONTENTMENT_LOSS: int = 1
 
 # --- Errands (docs/TOWN_BUILDING_MODEL.md, Errands) ---
 # Round trips a day each family makes from home besides work (TownErrands): to the store for

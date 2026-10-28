@@ -174,6 +174,22 @@ Later opportunities (clay and bricks, woods planted on open land, ore) follow mi
 - **Finding.** Trade is a modest help, as intended (not required for Village). It will matter more once towns have real surpluses and needs that only trade answers: clothing, and goods the land cannot give. The neutral town does not yet run out of stock or remember earlier trades; refusal is by wants only.
 - **Seen by eye:** the Trader section in the real game (`game_trader` in `tests/visual/town_map_capture.gd`).
 
+### Milestone 5: village defense (2026-10-28)
+
+- **Bandits follow the roads.** From the second year, each month outside winter, a band may take the road toward a town traders can reach: 12% a month at a crossroads, 8% on a road, 4% by river, times how tempting the stores are (their worth in grain against 3,000, from half to double). Isolated towns see none: being far from roads is its own protection. A band is **seen on the road 10 days before it comes**, with its strength (2 times temptation, plus 0-1, at most 5). `TownDefense` (`city.defense`); numbers in `EconomyBalance` (Defense); saved.
+- **The counters are families** (`docs/WARFARE_AND_CONFLICT_MODEL.md`): a **watch post** (O, one tile, 6 wood and a tool) kept by a family guards with 2 all year, and suits families of the shield; the **militia** (M, or the sidebar button) calls up 3 families, the shield first, never the watch's keepers, for 1 guard each. They leave their work until the band is dealt with, so their fields go unworked: a call-up at harvest is a real sacrifice.
+- **A raid.** A band meeting enough guard is driven off. Otherwise it takes up to 30% of the food, tools, and wood, less in proportion to the guard it met, never the town's last 30 days of food, and every family loses a point of contentment. No raid alone ends a town; raids sap stores, not lives.
+- **Measured.** Openings, map luck, and town building are unchanged (none of their towns has a road). In the planning check, where towns build a road out to trade:
+
+  | Planning, five years | People | Towns off the ground | Raids (driven off) | Content families | Food in store |
+  | --- | --- | --- | --- | --- | --- |
+  | trading, milestone 4 (no bandits) | 110 | 19/20 | | 3.6 | 14,100 |
+  | trading, undefended | 104 | 19/20 | 5.1 (0) | 1.1 | 8,800 |
+  | defended | 99 | 18/20 | 5.2 (4.8) | 5.0 | 11,100 |
+
+- **Judgment and finding.** A rich, linked town draws about a raid a year: rich stores tempt bands, as the land table says. Defending keeps stores and contentment but costs a family's work for the watch and the militia's days away, so a defended town ends with a few fewer people. That is a real choice, which the loop wants; it will lean toward defense once contentment and trust (a failure to defend, `docs/WARFARE_AND_CONFLICT_MODEL.md`) weigh more. The stand-in builds its watch post only once tempting or raided, and calls the militia whenever a band outnumbers its guard.
+- **Seen by eye:** the warning, guard, and call-up in the sidebar (`game_bandits`), and the watch post in the building catalog.
+
 ## Approved Decisions
 
 All approved by the owner on 2026-10-27, with the amendments above.

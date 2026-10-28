@@ -75,6 +75,8 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 			plan_town(city, scenario)
 		if scenario.get("trades", false) and uses_map:
 			trade(city, day)
+		if scenario.get("defends", false) and uses_map:
+			defend(city, day)
 		if day % POLICY_INTERVAL_DAYS == 0 and day >= int(scenario.get("idle_until", 0)):
 			upgrade_one(city, scenario, day)
 			var wanted: String = choose_build(city, scenario, day)
@@ -126,6 +128,8 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 		"linked": 1 if city.trade.get_link() != TownTrade.LINK_NONE else 0,
 		"trader_visits": city.trade.visits,
 		"trades": city.trade.trades_made,
+		"raids": city.defense.raids,
+		"raids_driven_off": city.defense.raids_driven_off,
 		"calling_wishes": city.households.filter(func(h: Household) -> bool: return h.ambition == FamilyAmbitions.CALLING).size()
 	}
 
@@ -328,6 +332,20 @@ func is_short(city, good: String) -> bool:
 	if good == "food":
 		return food_days(city) < SHORT_FOOD_DAYS
 	return SHORT.has(good) and int(city.resources.get(good, 0)) < int(SHORT[good])
+
+# Defense (TownDefense): call the militia when a band outnumbers the guard, and keep a watch post
+# once the town is linked and either tempting or already raided.
+func defend(city, day: int) -> void:
+	if city.defense.is_band_coming() and city.defense.get_guard() < city.defense.raid_strength:
+		city.defense.call_militia()
+	if day % PLANNING_INTERVAL_DAYS != 0 or city.trade.get_link() == TownTrade.LINK_NONE:
+		return
+	if count_kinds(city).get(Building.BUILDING_WATCH_POST, 0) > 0 or city.construction.projects.any(func(p: ConstructionProject) -> bool: return p.building_type == Building.BUILDING_WATCH_POST):
+		return
+	if (city.defense.raids > 0 or city.defense.get_temptation() >= 1.0) and city.construction.can_supply(EconomyBalanceScript.get_build_cost(Building.BUILDING_WATCH_POST)):
+		var spot: Vector2i = find_spot(city, Building.BUILDING_WATCH_POST)
+		if spot.x >= 0:
+			city.construction.request_building(Building.BUILDING_WATCH_POST, spot)
 
 # A road from open ground beside the town's heart to the nearest road already on the map, or else
 # to the nearest open ground on the map's edge (a road's ends must be ground a road can take).

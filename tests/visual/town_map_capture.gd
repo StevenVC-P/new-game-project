@@ -287,6 +287,11 @@ func capture_game_flow() -> void:
 	town.trade.arrive(town.construction.day, TownTrade.LINK_ROAD)
 	main.queue_redraw()
 	await shot("game_trader")
+	# Bandits seen on the road (TownDefense): the warning and the militia call-up.
+	town.defense.raid_day = town.construction.day + EconomyBalance.BANDIT_WARNING_DAYS
+	town.defense.raid_strength = 3
+	main.queue_redraw()
+	await shot("game_bandits")
 	main.regional_terrain.wait_for_tasks()
 	main.queue_free()
 	await process_frame
