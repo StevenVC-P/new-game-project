@@ -67,6 +67,11 @@ var ambition_months: int = 0
 var contentment: int = 0
 var contentment_months: int = 0
 var fulfilled_ambitions: int = 0
+# The family's latest decision about its own work and why (FamilyInitiative, influence prototype),
+# the day it was made, and the first day it decided to improve its work (-1: never).
+var initiative_note: String = ""
+var initiative_day: int = -1
+var improve_decision_day: int = -1
 
 func _init(household_id: int = -1, building_id: int = -1, work_preference: String = WORK_PREF_NEUTRAL, population: int = 4, residence_status: String = RESIDENCE_TEMPORARY):
 	id = household_id

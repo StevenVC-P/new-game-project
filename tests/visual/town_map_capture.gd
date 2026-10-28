@@ -298,6 +298,26 @@ func capture_game_flow() -> void:
 		await process_frame
 	main.queue_redraw()
 	await shot("game_status_hover")
+	# The influence prototype (TownInfluence, --influence): its sidebar section, ground marked for
+	# families' work, and a family's card saying what it decided and how it would answer a call.
+	town.influence.enabled = true
+	town.set_hand_method_fallback(true)
+	town.influence.set_encouraged(TownInfluence.ACTIVITY_FOOD, true)
+	town.influence.store_rule = TownInfluence.RULE_PRIORITIES
+	var heart: Vector2i = town.logistics.stockpile_tile
+	town.influence.mark_work_ground(heart + Vector2i(6, -4), heart + Vector2i(13, 3))
+	for _day in range(15):
+		town.tick()
+	for index in range(town.buildings.size()):
+		var resident: Household = town.get_household_for_building_id(index) if town.buildings[index].is_house() else null
+		if resident != null and resident.initiative_note != "":
+			main.city_building_overlay.inspected_building_index = index
+			main.city_building_overlay.selected_house_building_index = index
+			break
+	main.get_viewport().warp_mouse(Vector2(600.0, 400.0))
+	main.queue_redraw()
+	await shot("game_influence")
+	main.clear_selected_household()
 	main.regional_terrain.wait_for_tasks()
 	main.queue_free()
 	await process_frame

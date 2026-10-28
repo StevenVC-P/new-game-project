@@ -1051,6 +1051,10 @@ func found_player_city_at_pending_site() -> bool:
 		return false
 
 	var founded_city: City = create_player_city_at_tile(pending_founding_tile)
+	# Development configuration for the family influence prototype (docs/FAMILY_INFLUENCE_PROTOTYPE.md).
+	if OS.get_cmdline_user_args().has("--influence"):
+		founded_city.influence.enabled = true
+		founded_city.set_hand_method_fallback(true)
 	cities.append(founded_city)
 	var founded_city_index: int = cities.size() - 1
 	if not pending_local_map.is_empty():
@@ -1162,6 +1166,14 @@ func try_handle_city_action_click(mouse_pos: Vector2) -> bool:
 		elif action == "call_militia":
 			if selected_city_index >= 0 and selected_city_index < cities.size():
 				cities[selected_city_index].defense.call_militia()
+			queue_redraw()
+		elif action == "toggle_encourage" or action == "toggle_store_rule":
+			if selected_city_index >= 0 and selected_city_index < cities.size():
+				var influence: TownInfluence = cities[selected_city_index].influence
+				if action == "toggle_encourage":
+					influence.toggle_encouraged(str(option_data["activity"]))
+				else:
+					influence.store_rule = TownInfluence.RULE_OPEN if influence.store_rule == TownInfluence.RULE_PRIORITIES else TownInfluence.RULE_PRIORITIES
 			queue_redraw()
 		else:
 			apply_time_control_action(action)
@@ -1382,6 +1394,8 @@ func handle_building_selection_key_event(key_event: InputEventKey) -> bool:
 		select_building_type(TownFarmland.TILL)
 	elif is_letter_key(keycode, physical_keycode, KEY_G):
 		select_building_type(TownConstruction.ROAD)
+	elif is_letter_key(keycode, physical_keycode, KEY_K) and selected_city_index >= 0 and selected_city_index < cities.size() and cities[selected_city_index].influence.enabled:
+		select_building_type(TownInfluence.WORK_GROUND)
 	else:
 		return false
 
@@ -1461,13 +1475,15 @@ func get_road_preview(city: City) -> Array[Vector2i]:
 
 # The clearing and tilling tools mark a block between two clicks.
 static func is_block_tool(building_type: String) -> bool:
-	return building_type == TownWoodland.CLEAR or building_type == TownFarmland.TILL
+	return building_type == TownWoodland.CLEAR or building_type == TownFarmland.TILL or building_type == TownInfluence.WORK_GROUND
 
 func place_block_corner(city: City) -> void:
 	if block_start_tile.x < 0:
 		block_start_tile = city_hovered_tile
 		return
-	if selected_building_type == TownFarmland.TILL:
+	if selected_building_type == TownInfluence.WORK_GROUND:
+		city.influence.mark_work_ground(block_start_tile, city_hovered_tile)
+	elif selected_building_type == TownFarmland.TILL:
 		if city.farmland.mark_block(block_start_tile, city_hovered_tile) == 0:
 			print("No open ground to till there")
 	elif city.woodland.mark_block(block_start_tile, city_hovered_tile) == 0:
@@ -1568,6 +1584,8 @@ func get_building_placement_result(city_index: int, building_type: String, origi
 # The clearing tool may start anywhere; its block must hold woods.
 func get_block_result(city: City, origin: Vector2i) -> Dictionary:
 	var footprint: Array[Vector2i] = [origin]
+	if selected_building_type == TownInfluence.WORK_GROUND:
+		return building_placement.make_result(true, "Valid placement: click %s corner of the ground families may open work on (all marked: unmark)" % ("one" if block_start_tile.x < 0 else "the opposite"), footprint)
 	if block_start_tile.x < 0:
 		return building_placement.make_result(true, "Valid placement: click one corner of the " + ("land to till" if selected_building_type == TownFarmland.TILL else "woods to clear"), footprint)
 	if selected_building_type == TownFarmland.TILL:
@@ -1900,6 +1918,7 @@ func draw_city_sidebar(font: Font, font_size: int):
 	y += 4.0
 	y = draw_trader_section(font, font_size, city, text_x, y)
 	y = draw_militia_button(font, font_size, city, text_x, y)
+	y = draw_influence_section(font, font_size, city, text_x, y)
 
 	y = draw_sidebar_section_title(font, "Resources", text_x, y)
 	y = draw_sidebar_label_value(font, font_size, "Food", str(resources["food"]) + "  use " + str(resources["food_consumption_rate"]) + "/tick", text_x, y, VisualStyle.COLOR_RESOURCE_FOOD)
@@ -2430,6 +2449,33 @@ func draw_militia_button(font: Font, font_size: int, city: City, x: float, y: fl
 	var width: float = get_city_sidebar_rect().size.x - CITY_SIDEBAR_PADDING * 2.0
 	draw_city_action_button(font, font_size, "Call the militia (%d families leave work)" % EconomyBalance.MILITIA_FAMILIES, x, y + 4.0, width, {"action": "call_militia"}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
 	return y + 26.0
+
+# Influence prototype (TownInfluence; only with --influence): what the community asks for, the
+# stores rule, and how families on hand work are expected to answer a call for better work.
+func draw_influence_section(font: Font, font_size: int, city: City, x: float, y: float) -> float:
+	if not city.influence.enabled:
+		return y
+	var width: float = get_city_sidebar_rect().size.x - CITY_SIDEBAR_PADDING * 2.0
+	var half: float = (width - 4.0) * 0.5
+	y = draw_sidebar_section_title(font, "Influence (prototype)", x, y)
+	for line: String in city.influence.get_sidebar_lines():
+		y = draw_sidebar_line(font, font_size, line, x, y, VisualStyle.COLOR_MUTED)
+	for row in range(2):
+		for column in range(2):
+			var activity: String = TownInfluence.ACTIVITIES[row * 2 + column]
+			var on: bool = city.influence.is_encouraged(activity)
+			draw_city_action_button(font, font_size, ("Asked: " if on else "Ask: ") + TownInfluence.get_activity_name(activity), x + column * (half + 4.0), y + 4.0, half, {"action": "toggle_encourage", "activity": activity}, VisualStyle.COLOR_UI_BUTTON_ACTIVE if on else VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
+		y += 22.0
+	draw_city_action_button(font, font_size, "Stores: " + ("priorities first (click: open)" if city.influence.store_rule == TownInfluence.RULE_PRIORITIES else "open (click: priorities first)"), x, y + 4.0, width, {"action": "toggle_store_rule"}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
+	y += 26.0
+	var shown: int = 0
+	for household: Household in city.households:
+		var outlook: Dictionary = FamilyInitiative.predict_improvement(city, household, true)
+		if str(outlook["outlook"]) == "" or shown >= 4:
+			continue
+		y = draw_sidebar_line(font, font_size, "%s, if asked for better work: %s" % [city.get_household_label(household.id), outlook["outlook"]], x, y, VisualStyle.COLOR_MUTED)
+		shown += 1
+	return draw_sidebar_line(font, font_size, "K: mark ground families may open work on", x, y, VisualStyle.COLOR_MUTED)
 
 func draw_sidebar_like_line(font: Font, font_size: int, text: String, x: float, y: float, width: float, color: Color) -> float:
 	draw_string(font, Vector2(x, y), text, HORIZONTAL_ALIGNMENT_LEFT, width, font_size, color)

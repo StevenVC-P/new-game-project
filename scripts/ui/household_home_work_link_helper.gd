@@ -58,6 +58,12 @@ static func _add_home_links(lines: Array[String], city: City, house_index: int) 
 		lines.append("Wants: " + wants + (" (waiting %d months)" % household.ambition_months if household.ambition_months > EconomyBalance.AMBITION_PATIENCE_MONTHS else ""))
 	if household.contentment > 0:
 		lines.append("Content: %d ambition%s fulfilled" % [household.fulfilled_ambitions, "" if household.fulfilled_ambitions == 1 else "s"])
+	# Families developing their own work say what they decided and why (influence prototype).
+	if city.influence.enabled and household.initiative_note != "":
+		lines.append("Decided: " + household.initiative_note)
+		var outlook: Dictionary = FamilyInitiative.predict_improvement(city, household, true)
+		if str(outlook["outlook"]) != "":
+			lines.append("If asked for better work: %s (%s)" % [outlook["outlook"], "; ".join(outlook["reasons"])])
 
 	var assigned_production_ids: Array[int] = city.get_assigned_building_ids_for_house(house_index)
 	if assigned_production_ids.is_empty():

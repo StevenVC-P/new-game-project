@@ -88,6 +88,14 @@ const MAINTENANCE_INTERVAL_DAYS: Dictionary = {
 }
 const MAINTENANCE_INTERVAL_DEFAULT_DAYS: int = 20
 
+# --- Influence prototype (docs/FAMILY_INFLUENCE_PROTOTYPE.md) ---
+# What the stores always keep back from families' own workplace projects: wood for homes and
+# workshops (as FamilyDevelopment keeps for homes), and tools for every proper workplace's upkeep
+# for about two intervals, so families investing on their own cannot empty the tool store.
+const INFLUENCE_WOOD_RESERVE: int = 10
+const INFLUENCE_TOOL_RESERVE_MIN: int = 4
+const INFLUENCE_TOOL_RESERVE_PER_WORKPLACE: int = 2
+
 # --- Construction costs ---
 const BUILD_COSTS: Dictionary = {
 	"hut": {},

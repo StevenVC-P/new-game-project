@@ -22,6 +22,8 @@ const COLOR_HAUL_ROUTE: Color = Color(0.96, 0.72, 0.30, 0.9)
 const COLOR_COMMUTE_ROUTE: Color = Color(0.70, 0.86, 0.98, 0.9)
 const COLOR_CLEARING: Color = Color(0.95, 0.56, 0.22)
 const COLOR_TILLING: Color = Color(0.62, 0.42, 0.22)
+# Ground the player opened for families' workplaces (influence prototype).
+const COLOR_WORK_GROUND: Color = Color(0.48, 0.66, 0.92)
 # What an errand brings home: water, firewood, goods.
 const ERRAND_LOADS: Dictionary = {
 	"water": Color(0.42, 0.62, 0.78),
@@ -288,6 +290,8 @@ func draw_clearing(city: City) -> void:
 		draw_marked_tile(tile, float(city.woodland.marked[tile]) / EconomyBalance.CLEAR_DAYS_PER_TILE, COLOR_CLEARING)
 	for tile: Vector2i in city.farmland.marked.keys():
 		draw_marked_tile(tile, float(city.farmland.marked[tile]) / EconomyBalance.TILL_DAYS_PER_TILE, COLOR_TILLING)
+	for tile: Vector2i in city.influence.get_work_ground():
+		draw_marked_tile(tile, 0.0, COLOR_WORK_GROUND)
 	if view.block_preview.size == Vector2i.ZERO:
 		return
 	var block: Rect2 = Rect2(TownMapStyle.tile_rect(view.block_preview.position).position, Vector2(view.block_preview.size) * TownMapStyle.TILE)
