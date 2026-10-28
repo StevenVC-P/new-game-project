@@ -283,6 +283,10 @@ func capture_game_flow() -> void:
 	await shot("game_house_selected")
 	await measure("game town view")
 	main.clear_selected_household()
+	# A trader from the neutral town in the sidebar (TownTrade), with its lots.
+	town.trade.arrive(town.construction.day, TownTrade.LINK_ROAD)
+	main.queue_redraw()
+	await shot("game_trader")
 	main.regional_terrain.wait_for_tasks()
 	main.queue_free()
 	await process_frame

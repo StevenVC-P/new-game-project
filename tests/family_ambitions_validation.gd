@@ -55,7 +55,7 @@ func test_work_for_the_calling() -> void:
 	FamilyAmbitions.advance_month(city)
 	_check(household.ambition == FamilyAmbitions.CALLING, "a family of the water working a field wants work for its calling, wanted '%s'" % household.ambition)
 	_check(FamilyAmbitions.get_calling_work(household, city).has("fisher"), "a lake in reach makes a fisher's hut its wish")
-	_check(ConstructionDisplayHelper.get_sidebar_lines(city).any(func(line: String) -> bool: return line.begins_with("Wishes:") and line.contains("fisher's hut")), "the town is told of the wish")
+	_check(ConstructionDisplayHelper.get_sidebar_lines(city).any(func(line: String) -> bool: return line.begins_with("Want calling work:") and line.contains("fisher's hut")), "the town is told of the wish")
 	var card: Array[String] = HouseholdHomeWorkLinkHelper.get_links(city, 0)
 	_check(card.any(func(line: String) -> bool: return line.begins_with("Wants: work for its calling")), "the house card tells what it wants: %s" % str(card))
 	# A fisher's hut stands empty: the family moves to it and leaves its field to others.

@@ -1054,6 +1054,7 @@ func found_player_city_at_pending_site() -> bool:
 	else:
 		configure_new_city_map(founded_city)
 	clear_pending_founding_tile()
+	founded_city.trade.partner_name = get_nearest_neutral_town_name(founded_city)
 	generate_roads()
 	notify_region_map_changed()
 	if is_continuous_region_map():
@@ -1068,6 +1069,14 @@ func found_player_city_at_pending_site() -> bool:
 	simulation_clock.pause()
 	queue_redraw()
 	return true
+
+# Traders come from the nearest neutral town in the neighbourhood (TownTrade.partner_name).
+func get_nearest_neutral_town_name(town: City) -> String:
+	var nearest: City = null
+	for other: City in cities:
+		if other.is_neutral_city() and (nearest == null or other.tile.distance_to(town.tile) < nearest.tile.distance_to(town.tile)):
+			nearest = other
+	return nearest.name if nearest != null else town.trade.partner_name
 
 func create_player_city_at_tile(tile_pos: Vector2i) -> City:
 	return City.new("Player Town", Vector2(tile_pos.x, tile_pos.y), City.ROLE_PLAYER, FOUNDING_HOUSEHOLD_COUNT, rng.randi())
@@ -1141,7 +1150,12 @@ func try_handle_city_action_click(mouse_pos: Vector2) -> bool:
 			continue
 
 		var action: String = option_data["action"] as String
-		apply_time_control_action(action)
+		if action == "trade_lot":
+			if selected_city_index >= 0 and selected_city_index < cities.size():
+				cities[selected_city_index].trade.accept_lot(int(option_data["lot"]))
+			queue_redraw()
+		else:
+			apply_time_control_action(action)
 		return true
 
 	return false
@@ -1844,6 +1858,7 @@ func draw_city_sidebar(font: Font, font_size: int):
 	for construction_line: String in ConstructionDisplayHelper.get_sidebar_lines(city):
 		y = draw_sidebar_line(font, font_size, construction_line, text_x, y, VisualStyle.COLOR_MUTED)
 	y += 4.0
+	y = draw_trader_section(font, font_size, city, text_x, y)
 
 	y = draw_sidebar_section_title(font, "Resources", text_x, y)
 	y = draw_sidebar_label_value(font, font_size, "Food", str(resources["food"]) + "  use " + str(resources["food_consumption_rate"]) + "/tick", text_x, y, VisualStyle.COLOR_RESOURCE_FOOD)
@@ -2352,6 +2367,25 @@ func draw_city_action_button(font: Font, font_size: int, text: String, x: float,
 	draw_rect(option_rect, color)
 	draw_rect(option_rect, VisualStyle.COLOR_UI_OPTION_BORDER, false, VisualStyle.OPTION_BORDER_WIDTH)
 	draw_string(font, Vector2(x + 5.0, y), text, HORIZONTAL_ALIGNMENT_LEFT, width - 10.0, font_size, VisualStyle.COLOR_UI_TEXT)
+
+# The trader in town (TownTrade): its prices in grain and the lots the player can take, one click
+# each.
+func draw_trader_section(font: Font, font_size: int, city: City, x: float, y: float) -> float:
+	if not city.trade.is_trader_here():
+		return y
+	var width: float = get_city_sidebar_rect().size.x - CITY_SIDEBAR_PADDING * 2.0
+	y = draw_sidebar_section_title(font, "Trader", x, y)
+	for price_line: String in city.trade.get_price_lines():
+		y = draw_sidebar_line(font, font_size, price_line, x, y, VisualStyle.COLOR_MUTED)
+	var lots: Array[Dictionary] = city.trade.get_lots()
+	if lots.is_empty():
+		y = draw_sidebar_line(font, font_size, "Nothing the town holds is wanted.", x, y, VisualStyle.COLOR_MUTED)
+	for index in range(lots.size()):
+		draw_city_action_button(font, font_size, "Give " + TownTrade.describe_lot(lots[index]), x, y + 4.0, width, {"action": "trade_lot", "lot": index}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
+		y += 22.0
+	if city.trade.last_trade_text != "":
+		y = draw_sidebar_line(font, font_size, "Last trade: " + city.trade.last_trade_text, x, y + 4.0, VisualStyle.COLOR_MUTED)
+	return y + 4.0
 
 func draw_sidebar_like_line(font: Font, font_size: int, text: String, x: float, y: float, width: float, color: Color) -> float:
 	draw_string(font, Vector2(x, y), text, HORIZONTAL_ALIGNMENT_LEFT, width, font_size, color)

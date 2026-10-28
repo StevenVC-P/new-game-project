@@ -9,7 +9,9 @@ extends SceneTree
 # - compact: everything built outward from the heart, homes placed by the player;
 # - planned: compact, and once the town runs, fields people walk through are fenced and a
 #   storehouse goes up beside the workplace that loses the most of its day to carrying;
-# - wishes: planned, and the work families wish for (FamilyAmbitions) is built for them.
+# - wishes: planned, and the work families wish for (FamilyAmbitions) is built for them;
+# - trading: wishes, and the town trades surplus for shortage with visiting traders, building a
+#   road out first if it is isolated.
 #
 # Reports towns off the ground, people, households, the share of the working day lost to travel,
 # food in store, and the fences and storehouses the plan built.
@@ -25,6 +27,7 @@ const POLICIES: Array = [
 	{"name": "compact"},
 	{"name": "planned", "planned": true},
 	{"name": "wishes", "planned": true, "answer_wishes": true},
+	{"name": "trading", "planned": true, "answer_wishes": true, "trades": true},
 ]
 
 func _init() -> void:
@@ -53,14 +56,20 @@ func summarize(policy_name: String, results: Array[Dictionary]) -> void:
 	var n: float = maxf(1.0, results.size())
 	var reasons: Dictionary = {}
 	var buildings: float = 0.0
+	var linked: int = 0
+	var visits: float = 0.0
+	var trades: float = 0.0
 	for result: Dictionary in results:
 		buildings += float(result["buildings"])
+		linked += int(result["linked"])
+		visits += float(result["trader_visits"])
+		trades += float(result["trades"])
 		for reason: String in result["reasons"]:
 			reasons[reason] = int(reasons.get(reason, 0)) + 1
 	_report("%-9s %2d/%d off the ground | people %.0f | households %.1f | travel %.0f%% of the working day | food in store %.0f | fences %.1f | storehouses %.1f | content families %.1f | waiting on a calling %.1f" % [
 		policy_name, made_it, results.size(), float(totals["population"]) / n, float(totals["households"]) / n,
 		float(totals["travel_share"]) / n * 100.0, float(totals["food"]) / n, float(totals["fences"]) / n, float(totals["storehouses"]) / n, float(totals["content"]) / n, float(totals["calling_wishes"]) / n])
-	_report("%-9s buildings %.1f | problems: %s" % [policy_name, buildings / n, str(reasons)])
+	_report("%-9s buildings %.1f | linked to traders %d/%d | trader visits %.1f | trades %.1f | problems: %s" % [policy_name, buildings / n, linked, results.size(), visits / n, trades / n, str(reasons)])
 
 func _report(line: String) -> void:
 	print("[PLAN] " + line)
