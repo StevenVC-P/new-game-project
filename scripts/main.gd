@@ -1052,7 +1052,7 @@ func found_player_city_at_pending_site() -> bool:
 
 	var founded_city: City = create_player_city_at_tile(pending_founding_tile)
 	# Development configuration for the family influence prototype (docs/FAMILY_INFLUENCE_PROTOTYPE.md).
-	if OS.get_cmdline_user_args().has("--influence"):
+	if OS.get_cmdline_user_args().has("--influence") or OS.get_cmdline_args().has("--influence"):
 		founded_city.influence.enabled = true
 		founded_city.set_hand_method_fallback(true)
 	cities.append(founded_city)
@@ -1396,6 +1396,12 @@ func handle_building_selection_key_event(key_event: InputEventKey) -> bool:
 		select_building_type(TownConstruction.ROAD)
 	elif is_letter_key(keycode, physical_keycode, KEY_K) and selected_city_index >= 0 and selected_city_index < cities.size() and cities[selected_city_index].influence.enabled:
 		select_building_type(TownInfluence.WORK_GROUND)
+	elif is_letter_key(keycode, physical_keycode, KEY_I) and selected_city_index >= 0 and selected_city_index < cities.size():
+		# Influence prototype on or off for this town (development configuration).
+		var town: City = cities[selected_city_index]
+		town.influence.enabled = not town.influence.enabled
+		town.set_hand_method_fallback(town.influence.enabled)
+		print("Influence prototype ", "on" if town.influence.enabled else "off", " for ", town.name)
 	else:
 		return false
 

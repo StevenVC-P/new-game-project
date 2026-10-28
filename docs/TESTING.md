@@ -24,6 +24,11 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # (write to a file, then filter for [BUILD]; piping Godot's household log stalls it on Windows)
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/town_building_check.gd > building.log
 
+# Family influence prototype (docs/FAMILY_INFLUENCE_PROTOTYPE.md): the rules, then direct building against
+# families developing their own work on 20 real town maps (write to a file, filter for [INFL]; "-- --years=N")
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/family_initiative_validation.gd
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/influence_check.gd > influence.log
+
 # Multi-year settlement run, yearly report (filter output for [SIM])
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/settlement_growth_run.gd
 
