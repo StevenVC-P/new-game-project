@@ -59,6 +59,8 @@ static func draw(c: CanvasItem, rect: Rect2, profile: Dictionary, state: Diction
 			draw_fisher(c, rect, state, roof, wall)
 		"lodge":
 			draw_lodge(c, rect, state, roof, wall)
+		"watch_post":
+			draw_watch_post(c, rect, state, roof, wall)
 		_:
 			draw_house(c, rect, state, roof, wall)
 
@@ -282,6 +284,19 @@ static func draw_fisher(c: CanvasItem, r: Rect2, state: Dictionary, roof: Color,
 	blob(c, boat + Vector2(0.4, 0.5), Vector2(0.9, 2.0), SHADOW, 8)
 	blob(c, boat, Vector2(0.8, 1.9), TownMapStyle.COLOR_TIMBER, 8)
 	blob(c, boat, Vector2(0.45, 1.4), TownMapStyle.COLOR_TIMBER_DARK, 8)
+
+# A watch post: a timber tower on four posts with a banner, and a fire for the watch.
+static func draw_watch_post(c: CanvasItem, r: Rect2, state: Dictionary, roof: Color, wall: Color) -> void:
+	yard(c, r, state, 1.5)
+	var tower: Rect2 = Rect2(at(r, 0.3, 0.22), r.size * Vector2(0.4, 0.4))
+	c.draw_rect(Rect2(tower.position + Vector2(0.8, 0.9), tower.size), SHADOW)
+	for corner: Vector2 in [tower.position, tower.position + Vector2(tower.size.x, 0.0), tower.position + Vector2(0.0, tower.size.y), tower.end]:
+		blob(c, corner, Vector2(0.35, 0.35), TownMapStyle.COLOR_TIMBER_DARK, 6)
+	gabled(c, tower.get_center(), tower.size * 0.9, roof, wall, state)
+	var pole: Vector2 = at(r, 0.68, 0.18)
+	c.draw_line(pole, pole + Vector2(0.0, -r.size.y * 0.16), TownMapStyle.COLOR_TIMBER_DARK, 0.3)
+	c.draw_colored_polygon(PackedVector2Array([pole + Vector2(0.0, -r.size.y * 0.16), pole + Vector2(r.size.x * 0.16, -r.size.y * 0.12), pole + Vector2(0.0, -r.size.y * 0.08)]), Color(0.66, 0.22, 0.18))
+	fire_ring(c, at(r, 0.3, 0.8), r.size.x * 0.08, not state.get("idle", false))
 
 # A hunter's lodge at the woods' edge: a long low lodge, a frame of hides, and a fire.
 static func draw_lodge(c: CanvasItem, r: Rect2, state: Dictionary, roof: Color, wall: Color) -> void:

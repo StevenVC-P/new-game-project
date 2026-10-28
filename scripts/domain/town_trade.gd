@@ -238,7 +238,7 @@ func get_notices() -> Array[String]:
 		return lines
 	if is_trader_here():
 		var days_left: int = trader_until_day - city.construction.day + 1
-		lines.append("Trader from %s here: %d day%s left" % [partner_name, days_left, "" if days_left == 1 else "s"])
+		lines.append("Trader from %s: %d day%s" % [partner_name, days_left, "" if days_left == 1 else "s"])
 	else:
 		match get_link():
 			LINK_NONE:

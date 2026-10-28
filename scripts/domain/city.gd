@@ -85,6 +85,8 @@ var errands: TownErrands = null
 var land: TownLand = null
 # Traders from the neutral town, and the town's link to them.
 var trade: TownTrade = null
+# Bandits on the roads, the watch, and the militia.
+var defense: TownDefense = null
 # Today's day of the year (1-360), set by the game before each day's tick; -1 where nothing sets
 # it (tests, balance tools), which count years from founding instead.
 var day_of_year: int = -1
@@ -102,6 +104,7 @@ func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO, city_r
 	errands = TownErrands.new(self)
 	land = TownLand.new(self)
 	trade = TownTrade.new(self)
+	defense = TownDefense.new(self)
 	founding_seed = random_seed
 	var normalized_household_count: int = max(0, starter_household_count)
 	resources = make_starting_resources(normalized_household_count)
@@ -948,6 +951,7 @@ func tick():
 	woodland.advance_day()
 	farmland.advance_day()
 	trade.advance_day()
+	defense.advance_day()
 
 	resolve_soft_needs()
 	if resources["food_shortage"] == true:
@@ -1356,6 +1360,9 @@ func apply_building_output_modifiers(base_output: float, tick_count: int, buildi
 	# the rest (TownLand).
 	family_output *= 1.0 - logistics.get_field_trample_loss(building)
 	family_output *= land.get_output_factor(building)
+	# A family called up to the militia leaves its work until the band is dealt with.
+	if defense.is_called_up(building.assigned_household_id):
+		family_output = 0.0
 	var output_amount: int = apply_output_percent(family_output, building, get_worker_output_percent(building))
 	return apply_older_child_support_output_modifier(output_amount, tick_count, building)
 

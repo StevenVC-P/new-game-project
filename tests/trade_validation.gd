@@ -31,7 +31,7 @@ func run_summer_days(city: City, days: int) -> void:
 		city.day_of_year = 120
 		city.tick()
 
-func lay_road_north(city: City) -> void:
+static func lay_road_north(city: City) -> void:
 	var heart: Vector2i = city.trade.get_heart()
 	for y in range(0, heart.y + 1):
 		city.local_map[y][heart.x]["has_road"] = true
