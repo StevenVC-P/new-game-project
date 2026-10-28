@@ -112,15 +112,20 @@ func get_village_conditions() -> Dictionary:
 static func format_entry_time(entry: Dictionary) -> String:
 	return "Year %d, %s" % [maxi(0, int(entry["day"]) - 1) / Calendar.DAYS_PER_YEAR + 1, SEASON_NAMES[clampi(int(entry.get("season", 0)), 0, 3)]]
 
+# "Hamlet", or "A declining village" for a village shrunk below village size.
+func get_title() -> String:
+	if stage == VILLAGE and city.households.size() < VILLAGE_HOUSEHOLDS:
+		return "A declining village"
+	return NAMES[stage]
+
 # The sidebar, kept short (the panel is full): the stage, what stands between it and the next,
-# and the latest chronicle entries.
-func get_display_lines() -> Array[String]:
+# and the latest chronicle entries. The game's top bar already names the stage and counts the
+# people, so it leaves the first line out (with_title false).
+func get_display_lines(with_title: bool = true) -> Array[String]:
 	var lines: Array[String] = []
 	var households: int = city.households.size()
-	var title: String = NAMES[stage]
-	if stage == VILLAGE and households < VILLAGE_HOUSEHOLDS:
-		title = "A declining village"
-	lines.append("%s: %d households, %d people" % [title, households, city.get_total_population()])
+	if with_title:
+		lines.append("%s: %d households, %d people" % [get_title(), households, city.get_total_population()])
 	if stage == CAMP:
 		lines.append("Hamlet when every family is housed")
 	elif stage == HAMLET:

@@ -48,7 +48,7 @@ func test_bandits_follow_roads_and_riches() -> void:
 	print("[DEFENSE] monthly chance of a band on a road: %.0f%% poor, %.0f%% rich" % [poor * 100.0, rich * 100.0])
 	_check(poor > 0.0 and rich > poor, "rich stores tempt bands more")
 	band_coming(city, 3)
-	_check(ConstructionDisplayHelper.get_sidebar_lines(city).any(func(line: String) -> bool: return line.begins_with("Bandits on the road")), "a band is seen before it comes")
+	_check(TownStatusBar.get_chips(city).any(func(chip: Dictionary) -> bool: return chip["icon"] == "bandits"), "a band is seen before it comes (an alert in the top bar)")
 
 func test_unguarded_raid() -> void:
 	var city: City = linked_city()
