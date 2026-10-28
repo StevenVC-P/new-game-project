@@ -108,6 +108,8 @@ func _first_day_output(per_day: float) -> int:
 
 func _make_city() -> City:
 	var city: City = City.new("Test City")
+	# Midsummer, when a field yields its plain rate (EconomyBalance.FARM_SEASON_YIELD).
+	city.day_of_year = 120
 	city.resources["food_shortage"] = false
 	city.resources["production_tick_count"] = 0
 	return city

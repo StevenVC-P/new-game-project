@@ -134,7 +134,7 @@ func choose_build(city, scenario: Dictionary, day: int) -> String:
 	if houses < city.households.size():
 		wants.append("house")
 	if idle_labor and HouseholdMigrationScript.estimate_daily_food_production(city) < float(food_needed) * 1.15:
-		wants.append("farm")
+		wants.append(choose_food(city, scenario, day, counts))
 	if idle_labor and toolmakers == 0 and int(city.resources["tools"]) < 10:
 		wants.append("toolmaker")
 	if idle_labor and int(city.resources["wood"]) < 10 and woodcutters < 1 + toolmakers:
@@ -145,6 +145,26 @@ func choose_build(city, scenario: Dictionary, day: int) -> String:
 		if allowed(want, scenario, day, counts):
 			return want
 	return ""
+
+# Food from the land where it is good (docs/FIRST_STAGE_LOOP.md, Geography): a fisher's hut on a
+# bank with water in reach, a hunter's lodge at the edge of plenty of woods, each taken while the
+# town has fewer of them than farms; otherwise a farm.
+const LAND_FOOD_MIN_REACH: float = 0.75
+const LAND_FOOD_MAX_EACH: int = 2
+
+func choose_food(city, scenario: Dictionary, day: int, counts: Dictionary) -> String:
+	if city.local_map.is_empty() or not scenario.get("land_food", true):
+		return "farm"
+	var land_food: int = int(counts.get(Building.BUILDING_FISHER, 0)) + int(counts.get(Building.BUILDING_HUNTER, 0))
+	if land_food > int(counts.get(Building.BUILDING_FARM, 0)):
+		return "farm"
+	for kind: String in [Building.BUILDING_FISHER, Building.BUILDING_HUNTER]:
+		if not allowed(kind, scenario, day, counts) or int(counts.get(kind, 0)) >= LAND_FOOD_MAX_EACH:
+			continue
+		var spot: Vector2i = find_spot(city, kind)
+		if spot.x >= 0 and city.land.get_reach_factor_at(kind, spot, city.construction.get_size(kind)) >= LAND_FOOD_MIN_REACH:
+			return kind
+	return "farm"
 
 # Scenario rules apply to the kind of building, so delaying the woodcutter also delays the
 # gatherer's camp (forgetting wood means forgetting both).

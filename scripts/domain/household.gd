@@ -275,7 +275,7 @@ func get_match_quality(building_type: String) -> String:
 
 func get_preferred_worker_for_building(building_type: String) -> String:
 	building_type = BuildingTiers.get_base_type(building_type)
-	if building_type == Building.BUILDING_FARM:
+	if building_type == Building.BUILDING_FARM or building_type == Building.BUILDING_FISHER or building_type == Building.BUILDING_HUNTER:
 		return WORK_PREF_AGRARIAN
 	if building_type == Building.BUILDING_WOODCUTTER or building_type == Building.BUILDING_TOOLMAKER:
 		return WORK_PREF_INDUSTRIAL

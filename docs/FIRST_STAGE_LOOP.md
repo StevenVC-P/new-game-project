@@ -114,6 +114,24 @@ Later opportunities (clay and bricks, woods planted on open land, ore) follow mi
 - **Tuning tried:** a sharp year (40/100/220/40%) starved towns founded in spring (map luck 32/48). 70/100/160/70% with 300 food still lost three sensible openings. 80/100/140/80% keeps the shape and the towns. The three continuous-map towns that fail are tool shortages with founders of few farming callings; watched in later milestones.
 - **Findings for later milestones.** Planning pays: a compact town ends five years with 60% more people than a careless one. The stand-in's extra planning (storehouses beside far workplaces, homes beside work) does not add to that: storehouses cost 8 wood for a modest saving, and homes beside far workplaces spread the town and lengthen errands. Storehouse cost and value, and why homes cluster, are for the ambitions and village milestones. Openings barely differ by land yet (two best openings): milestone 2's purpose.
 
+### Milestone 2: geography shapes the town (2026-10-27)
+
+- **Fisher's hut** (Y, 1x1, 4 wood): stands beside water and catches up to 4 food a day, all year, by how much water lies within 3 tiles (12 tiles for a full catch, a quarter at least). **Hunter's lodge** (U, 2x2, 5 wood and a tool): stands near woods and brings in up to 3.5 food a day by the woods within 6 tiles (40 for a full bag), more in autumn and winter, less as the woods are felled. Both work for families of the water and the forest. Numbers in `EconomyBalance` (Land).
+- **High water:** a third of springs, in towns with a river or lake, fields beside the water yield 40% of their spring harvest. **Wolves:** in winter, an unfenced lodge or gatherer's camp within 2 tiles of woods works at 75%; a fence answers them. Stores are never touched. Both show on the sidebar and on workplace cards. `TownLand` (`city.land`) holds all of it; saves keep it.
+- **Fixed along the way:** newcomers' food estimate counted only farms, so towns fed by fishers and hunters turned families away.
+- **Measured** (after raising the first guesses, fisher 3.5 to 4 and hunter 3 to 3.5, which made "land food first" viable on woods and water):
+
+  | Check | Milestone 1 | Milestone 2 |
+  | --- | --- | --- |
+  | Map luck, original / continuous | 48/48, 39/42 | 48/48, 41/42 |
+  | Opening: sensible / all wood on houses first / toolmaker by day 150 | 19, 17, 19 of 20 | 19, 17, 19 |
+  | Town building: houses / homes on plots / scattered | 19 (46), 19 (36), 13 (29) | 19 (47), 19 (37), 12 (27) |
+  | Planning, five years: careless / compact / planned | 13/20 (65), 19/20 (105), 18/20 (98) | 12/20 (59), 19/20 (106), 18/20 (100) |
+  | Different best openings across kinds of land | 2 | 4 |
+
+- **Judgment on variety.** The count of best openings rose to 4, but the leaders on each kind of land are within one or two people of each other, so the count overstates it. What clearly differs: opening on fishers and hunters works on woods and water (45-51 people, every town) and fails on plain and rock land (23 people, half the towns). Farms remain the safe opening everywhere. Real divergence will come from trade (milestone 4): what a town is good at decides what it can sell.
+- **Not yet seen by eye:** the fisher's hut and lodge drawings (the screenshot catalog stands on dry plains, where neither can be placed). Worth a look in the owner's playtest.
+
 ## Approved Decisions
 
 All approved by the owner on 2026-10-27, with the amendments above.

@@ -55,6 +55,10 @@ static func draw(c: CanvasItem, rect: Rect2, profile: Dictionary, state: Diction
 			draw_paver_yard(c, rect, state, roof, wall)
 		"storehouse":
 			TownConstructionPainter.draw_storehouse(c, rect, state, roof, wall)
+		"fisher":
+			draw_fisher(c, rect, state, roof, wall)
+		"lodge":
+			draw_lodge(c, rect, state, roof, wall)
 		_:
 			draw_house(c, rect, state, roof, wall)
 
@@ -263,6 +267,31 @@ static func draw_camp(c: CanvasItem, r: Rect2, state: Dictionary) -> void:
 	for i in range(4):
 		blob(c, at(r, 0.22 + i * 0.09, 0.72), Vector2(1.5, 1.1), Color(0.42, 0.34, 0.20).lightened(i * 0.04), 7)
 	fire_ring(c, at(r, 0.76, 0.7), r.size.x * 0.07, not state.get("idle", false))
+
+# A fisher's hut on the bank: a small hut, a drying rack of fish, and a boat pulled up.
+static func draw_fisher(c: CanvasItem, r: Rect2, state: Dictionary, roof: Color, wall: Color) -> void:
+	yard(c, r, state, 1.5)
+	gabled(c, at(r, 0.42, 0.34), r.size * Vector2(0.62, 0.42), roof, wall, state)
+	if int(state.get("lod", 0)) >= 1:
+		var rack: Vector2 = at(r, 0.12, 0.78)
+		c.draw_line(rack, rack + Vector2(r.size.x * 0.5, 0.0), TownMapStyle.COLOR_TIMBER_DARK, 0.35)
+		for i in range(4):
+			var fish: Vector2 = rack + Vector2(r.size.x * (0.06 + i * 0.12), 0.7)
+			blob(c, fish, Vector2(0.35, 0.8), Color(0.66, 0.70, 0.72), 6)
+	var boat: Vector2 = at(r, 0.82, 0.72)
+	blob(c, boat + Vector2(0.4, 0.5), Vector2(0.9, 2.0), SHADOW, 8)
+	blob(c, boat, Vector2(0.8, 1.9), TownMapStyle.COLOR_TIMBER, 8)
+	blob(c, boat, Vector2(0.45, 1.4), TownMapStyle.COLOR_TIMBER_DARK, 8)
+
+# A hunter's lodge at the woods' edge: a long low lodge, a frame of hides, and a fire.
+static func draw_lodge(c: CanvasItem, r: Rect2, state: Dictionary, roof: Color, wall: Color) -> void:
+	yard(c, r, state)
+	gabled(c, at(r, 0.46, 0.3), r.size * Vector2(0.66, 0.3), roof, wall, state)
+	var frame: Rect2 = Rect2(at(r, 0.14, 0.6), r.size * Vector2(0.26, 0.24))
+	c.draw_rect(Rect2(frame.position + Vector2(0.6, 0.7), frame.size), SHADOW)
+	c.draw_rect(frame, Color(0.62, 0.48, 0.32))
+	c.draw_rect(frame, TownMapStyle.COLOR_TIMBER_DARK, false, 0.35)
+	fire_ring(c, at(r, 0.72, 0.72), r.size.x * 0.07, not state.get("idle", false))
 
 # --- Tools ---------------------------------------------------------------------------------------
 

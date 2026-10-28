@@ -1,7 +1,7 @@
 extends SceneTree
 
 # Site variety check (docs/FIRST_STAGE_LOOP.md, Geography Shapes The Town): does the best opening
-# differ between kinds of land, and does more than one opening work on each? Plays the same four
+# differ between kinds of land, and does more than one opening work on each? Plays the same
 # openings on real town sites across the frontier for two years and groups the results by what
 # the land within the town map holds. A site can count under several kinds (a wooded riverside
 # is both water and woods); "plain" is land with none of them.
@@ -20,6 +20,8 @@ const OPENINGS: Array = [
 	{"name": "farms first", "prebuild": ["farm", "farm"]},
 	{"name": "hand work first", "prebuild": ["forager_garden", "gatherer_camp", "forager_garden"]},
 	{"name": "houses first", "prebuild": ["house", "house", "house", "farm", "woodcutter", "toolmaker"]},
+	{"name": "land food first", "prebuild": ["fisher", "hunter"]},
+	{"name": "farms only", "land_food": false},
 ]
 # Shares of the town map that make a kind of land.
 const WATER_SHARE: float = 0.02

@@ -1340,6 +1340,10 @@ func handle_building_selection_key_event(key_event: InputEventKey) -> bool:
 		select_building_type(BUILDING_PAVER_YARD)
 	elif is_letter_key(keycode, physical_keycode, KEY_T):
 		select_building_type(BUILDING_STOREHOUSE)
+	elif is_letter_key(keycode, physical_keycode, KEY_Y):
+		select_building_type(Building.BUILDING_FISHER)
+	elif is_letter_key(keycode, physical_keycode, KEY_U):
+		select_building_type(Building.BUILDING_HUNTER)
 	elif is_letter_key(keycode, physical_keycode, KEY_P):
 		select_building_type(TownConstruction.PLOT)
 	elif is_letter_key(keycode, physical_keycode, KEY_C):
@@ -1873,7 +1877,7 @@ func draw_city_sidebar(font: Font, font_size: int):
 	else:
 		y = draw_sidebar_label_value(font, font_size, "Building", "none", text_x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
 	# The key list is long; when a selection fills the panel it shrinks to one line.
-	var key_lines: Array[String] = ["1 house, 2 farm, 3 woodcutter", "4 toolmaker, 5 quarry, 6 stonecutter", "7 brickworks, 8 lime, 9 mortar", "0 mason, Q sculptor, W carver", "E tileworks, R paver yard", "T storehouse, P home plot, G road", "C clear woods, F till land (click both corners)"]
+	var key_lines: Array[String] = ["1 house, 2 farm, 3 woodcutter", "4 toolmaker, 5 quarry, 6 stonecutter", "7 brickworks, 8 lime, 9 mortar", "0 mason, Q sculptor, W carver", "E tileworks, R paver yard", "Y fisher's hut, U hunter's lodge", "T storehouse, P home plot, G road", "C clear woods, F till land (click both corners)"]
 	if y + (key_lines.size() + 4) * 15.0 > sidebar_rect.end.y:
 		key_lines = ["Keys 1-0, Q-R, T choose a building", "P plot, G road, C clear, F till"]
 	for key_line: String in key_lines:
@@ -1945,7 +1949,7 @@ func draw_sidebar_label_value(font: Font, font_size: int, label: String, value: 
 	return y + 15.0
 
 func get_building_display_name(building_type: String) -> String:
-	if BuildingTiers.is_tier0(building_type):
+	if BuildingTiers.is_tier0(building_type) or BuildingTiers.DISPLAY_NAMES.has(building_type):
 		return BuildingTiers.get_display_name(building_type)
 	if building_type == BUILDING_HOUSE:
 		return "House"
