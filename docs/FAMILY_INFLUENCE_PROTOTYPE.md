@@ -89,7 +89,33 @@ The **measurement** at milestone 6 was Hamlet at about day 35 and Village at abo
 
 ## Measured
 
-MEASURED_PLACEHOLDER
+`tests/sim/influence_check.gd`, 20 real town sites, five years, three industries only (2026-10-28). "Direct" is the planning check's planned town; the influence policies set home plots aside and plan public works but no workplaces.
+
+| Policy | Off the ground | People | Households | Travel | Content families | Village (median) | Player decisions | Workplaces from stockpile |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| direct, today's rules | 18/20 | 105 | 28.0 | 7% | 1.2 | year 1.1 | 52 | 9.0 tiles |
+| direct, hand method | 18/20 | 105 | 28.0 | 7% | 1.2 | year 1.1 | 52 | 9.0 |
+| families alone | 19/20 | 76 | 20.8 | 6% | 7.8 | year 1.9 | 26 | 8.4 |
+| guided | 18/20 | 70 | 19.1 | 6% | 6.2 | year 2.1 | 33 | 7.9 |
+| guided, scattered plots | 17/20 | 65 | 17.8 | 8% | 6.0 | year 1.9 | 32 | 13.1 |
+
+Founding families' first decision to improve their work (median day; every founder improved in the first year unless noted):
+
+| Policy | Daring | Neither | Traditionalist | Cautious |
+| --- | --- | --- | --- | --- |
+| families alone | 15 | 22 | 29 | 43 |
+| guided | 8 | 15 | 22 | 22 |
+| guided, scattered plots | 8 | 15 | 533 (1 of 2 in year 1) | 127 (8 of 10 in year 1) |
+
+What it shows:
+
+- **Towns survive without the player placing workplaces,** as often as directed ones (17-19 of 20 against 18), with half the player's decisions.
+- **Families act differently for their own reasons,** in the order the owner described: the daring first, then the unremarkable, then the traditional, and the cautious last. Asking for better work pulls everyone earlier.
+- **Layout still answers the player.** Plots set aside far out sent work far out (13 tiles against 8) and cost travel (8% against 6%) and people. Spread-out homes also left cautious and traditional families with fewer neighbours to learn from, so they waited far longer. That effect was not designed; it came out of the neighbour term.
+- **Contented families are much more common** (6-8 against 1.2): families working work they chose fulfil their calling ambitions.
+- **Towns grow more slowly:** 70-76 people against 105 after five years, and Village at about year 2 instead of 1.1, nearer the year-3 target. The likely causes are untested: homes only on plots (the town building check measured plots alone at about 15% fewer people) and no family left free to build, since every family takes up work at once. Worth isolating before tuning.
+- **The guided stand-in did worse than leaving families alone** (70 against 76 people). Keeping the stores for priorities held back about 34 improvements per town against 5. A cruder player than a person, but a sign that a restrictive stores rule has a real cost, which is what makes it a decision.
+- **The hand method fallback changed nothing measurable** in direct play (identical figures): with the per-building grace, upkeep rarely runs out. It mostly matters for families' own projects.
 
 ## Judgment Calls (Open To Veto)
 
