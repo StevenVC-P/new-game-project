@@ -81,11 +81,14 @@ func summarize(name: String, results: Array[Dictionary]) -> void:
 	var trust_sources: Dictionary = {}
 	var declines: Dictionary = {}
 	var housed_days: Array[int] = []
+	var stalls: Dictionary = {}
 	for result: Dictionary in results:
 		made_it += 1 if result["off_the_ground"] else 0
 		for key: String in ["population", "households", "content", "food", "opened_by_families", "improvements_by_families", "player_actions", "stalled_site_days", "homes_by_families"]:
 			totals[key] = float(totals.get(key, 0.0)) + float(result[key])
 		housed_days.append(int(result["founders_housed_day"]))
+		for kind: String in (result["stalled_by_kind"] as Dictionary).keys():
+			stalls[kind] = int(stalls.get(kind, 0)) + int(result["stalled_by_kind"][kind])
 		var social: Dictionary = result["social"]
 		if social.is_empty():
 			continue
@@ -126,6 +129,10 @@ func summarize(name: String, results: Array[Dictionary]) -> void:
 	var housed: Array[int] = housed_days.filter(func(d: int) -> bool: return d >= 0)
 	_report("%-10s building: founders all in proper homes by day %s (median; %d towns never) | site-days with no builder free %.0f | homes families built %.1f | long-day weeks %.1f | help to kin %.0f%% of help-weeks" % [
 		name, str(housed[housed.size() / 2]) if not housed.is_empty() else "-", never, avg.call("stalled_site_days"), avg.call("homes_by_families"), avg.call("s_long_day_weeks"), avg.call("s_kin_help_share") * 100.0])
+	var stall_words: Array[String] = []
+	for kind: String in stalls.keys():
+		stall_words.append("%s %.0f" % [kind, int(stalls[kind]) / n])
+	_report("%-10s site-days waiting for a builder, by site: %s | weeks a working family helped no one %.0f (no site in its reach %.0f)" % [name, ", ".join(stall_words), avg.call("s_spare_weeks_unused"), avg.call("s_spare_weeks_no_site")])
 	_report("%-10s behavior and conviction: help choices changed %.1f times, value changes %.1f (reversed %.1f) | readings of each honour %.1f | land contests %.1f (yielded %.1f, kept %.1f, not pressed %.1f) | respected voices %.1f" % [
 		name, avg.call("s_help_choice_changes"), avg.call("s_value_changes"), avg.call("s_value_reversals"), avg.call("s_honour_readings"), avg.call("s_land_contests"), avg.call("s_land_yielded"), avg.call("s_land_kept"), avg.call("s_land_not_pressed"), avg.call("s_voices")])
 	var sources: Array[String] = []

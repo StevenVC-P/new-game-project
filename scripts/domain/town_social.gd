@@ -107,6 +107,10 @@ var land_kept: int = 0
 var land_taken: int = 0
 var long_day_weeks: int = 0
 var kin_help_weeks: int = 0
+# Weeks a household on a holding, with no building of its own, helped no one (whether or not
+# anyone's site was open to it).
+var spare_weeks_unused: int = 0
+var spare_weeks_no_site: int = 0
 # Why households passed over a neighbour's or the town's project, by their strongest reason:
 # reason -> weeks (for watching whether voluntary help leaves building short of hands).
 var decline_reasons: Dictionary = {}
@@ -364,7 +368,10 @@ func choose_help(household: Household) -> void:
 		if passed_over != null:
 			torn = ", though it would also have helped %s" % describe_project(passed_over, get_project_owner(passed_over))
 		note(household, "Helping %s (%s)%s" % [describe_project(best, target), "; ".join(FamilyInitiative.get_reasons(best_desire["terms"], true)), torn])
-	elif declined_project != null:
+	else:
+		spare_weeks_unused += 1
+		spare_weeks_no_site += 1 if declined_project == null else 0
+	if best == null and declined_project != null:
 		var reasons: Array[String] = FamilyInitiative.get_reasons(declined["terms"], false)
 		if not reasons.is_empty():
 			var main: String = reasons[0].get_slice(":", 0)
@@ -489,9 +496,12 @@ func ensure_project_index() -> void:
 			_projects_by_owner[owner_id] = []
 		(_projects_by_owner[owner_id] as Array).append(project)
 
-# Roads, stores, and the watch are the community's, whoever builds them; anything else is the
-# project of the family it is built for.
+# Roads, stores, the watch, and homes built ahead for families still to come (no family claims
+# them yet) are the community's, whoever builds them; anything else is the project of the family it
+# is built for.
 static func is_communal(project: ConstructionProject) -> bool:
+	if project.is_home() and project.claimant_household_id < 0:
+		return true
 	return project.kind == ConstructionProject.KIND_ROAD or project.building_type in [Building.BUILDING_STOREHOUSE, Building.BUILDING_WATCH_POST]
 
 func get_project_owner(project: ConstructionProject) -> Household:
@@ -1170,7 +1180,7 @@ func note(household: Household, text: String) -> void:
 func describe_project(project: ConstructionProject, target: Household) -> String:
 	var what: String = TownConstruction.get_display_name(project).to_lower()
 	if target == null:
-		return "build the town's " + what
+		return ("build a %s for a family to come" if project.is_home() else "build the town's %s") % what
 	return "%s build its %s" % [city.get_household_label(target.id), what]
 
 func get_sidebar_lines() -> Array[String]:

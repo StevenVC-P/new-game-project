@@ -29,8 +29,10 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/family_initiative_validation.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/influence_check.gd > influence.log
 
-# Household social model (docs/HOUSEHOLD_SOCIAL_MODEL.md): the rules and the directive's ten demonstrations, then five
-# player approaches on the same towns plus a scale probe (write to a file, filter for [SOC]; "-- --years=N --sites=N")
+# Household social model (docs/HOUSEHOLD_SOCIAL_MODEL.md): the rules, the directive's ten demonstrations, and the owner
+# review's cases (kin, recognition, trust, four land scenarios); then eight player approaches on the same towns (with
+# the model off as the yardstick for construction) plus a scale probe (write to a file, filter for [SOC];
+# "-- --years=N --sites=N --approaches=none,fair --no-scale")
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/household_social_validation.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/social_check.gd > social.log
 

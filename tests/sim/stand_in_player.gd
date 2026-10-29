@@ -93,6 +93,8 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 		for project: ConstructionProject in city.construction.projects:
 			if project.blocked_reason == "no builders free":
 				stalled_site_days += 1
+				var kind: String = stall_kind(city, project)
+				stalled_by_kind[kind] = int(stalled_by_kind.get(kind, 0)) + 1
 		if first_home_day < 0 and int(city.resources["house_shelter_capacity"]) > 0:
 			first_home_day = day
 		if day > 30 and int(city.resources["tools"]) == 0:
@@ -187,7 +189,25 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 		"social": snapshot_social(city) if scenario.get("social", false) else {},
 		"social_years": social_years,
 		"founders_housed_day": founders_housed_day,
+		"stalled_by_kind": stalled_by_kind,
 	}
+
+# Site-days waiting for a builder, by what the site is: for diagnosing voluntary help (social check).
+var stalled_by_kind: Dictionary = {}
+
+static func stall_kind(city, project: ConstructionProject) -> String:
+	if TownSocial.is_communal(project):
+		return "communal"
+	if project.kind == ConstructionProject.KIND_FENCE:
+		return "fence"
+	if project.kind == ConstructionProject.KIND_UPGRADE:
+		return "upgrade"
+	if project.is_home():
+		var claimant: Household = city.get_household_by_id(project.claimant_household_id)
+		if claimant == null:
+			return "home, no family yet"
+		return "home of a family on a holding" if claimant.assigned_workers > 0 else "home of a free family"
+	return "new workplace"
 
 const HARD_WINTER_DAY: int = 270
 const HARD_WINTER_FOOD_DAYS: int = 8
@@ -278,6 +298,8 @@ static func snapshot_social(city) -> Dictionary:
 		"help_choice_changes": social.help_choice_changes,
 		"honour_readings": float(social.honour_readings) / maxf(1.0, social.honours),
 		"long_day_weeks": social.long_day_weeks,
+		"spare_weeks_unused": social.spare_weeks_unused,
+		"spare_weeks_no_site": social.spare_weeks_no_site,
 		"kin_help_share": float(social.kin_help_weeks) / maxf(1.0, social.help_weeks),
 		"land_contests": social.land_contests,
 		"land_yielded": social.land_yielded,

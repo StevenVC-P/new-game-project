@@ -247,12 +247,123 @@ The weekly pass costs about 0.16 ms a household in these towns (1.3 ms for 8). T
 
 Watching one household, the card answers: what it wanted ("Lately", "Work"), why (the reasons), what circumstances weighed (security, food, its neighbours' example), what the player did (appeals and rewards appear among its reasons, as "the community asks families to ..."), why it accepted or refused (the strongest reasons for or against), what resulted (ties, standing, trust), and how it changed it (memories with the lesson drawn, value changes with the experience behind them). The roster gives the town at a glance. What still needs the owner's playtest: whether these words make the families feel like characters, and whether choosing between appeals, rewards, and honours feels like leading.
 
+## Owner Review (2026-10-28)
+
+The owner approved the design direction, with four decisions, a required refinement of trust, and further verification. "The goal is not to maximize productivity, happiness, cooperation, or trust. The goal is to make households behave coherently according to their own circumstances and convictions, while giving the player meaningful opportunities to influence how their civilization develops."
+
+| Decision | What changed | Where |
+| --- | --- | --- |
+| 1. No automatic industriousness modifier | Industrious/leisurely no longer change output, in every town. Diligence now shapes decisions: long days (Section 7, item 2), helping (±0.5 a level), improving (±0.5 a level). No compensating bonus | `CultureEffects`, `SocialDecisions.get_hours_desire`, `TownSocial.choose_hours`, `HouseholdMigration` (overwork hardship) |
+| 2. Help between relatives stays voluntary | Kin obligation +2 and up, scaled by kin values; kin disposition counts above or below its warm start; help never returned weighs against helping again; the note names a project passed over | `SocialDecisions.get_kin_obligation`, `add_unreturned`, `TownSocial.choose_help` |
+| 3. Recognition by kind | Four kinds, judged by each household's convictions; inspiration; prosperity and benefit to the town weighed | `TownSocial.recognize`, `judge_recognition`, `get_merit`, `get_esteem`; four honour buttons in the sidebar |
+| 4. Informal gatherings | Every appeal and honour is the gathering's; respected voices emerge from standing; trust means trust in the gathering | `TownSocial.get_respected_voices`, `FamilyInitiative.get_receptiveness`, all wording |
+| Trust refinement | Positive sources: promises kept, need answered, steady decisions, deserved honours, shared work finished, legitimate settlements, being asked rather than forced. Negative: broken promises, favouritism, undeserved honours, changing decisions, land taken | Section 4 table; `TownSocial.review_month`, `judge_settlement`, `on_project_finished` |
+
+All 33 headless test scripts pass. `tests/household_social_validation.gd` grew from 16 to 26 tests: the ten demonstrations still pass, plus diligence deciding hours, kin first but voluntary (five cases), recognition by kind, trust sources by conviction, respected voices, the four land scenarios, and opposite values.
+
+### Decision 1: before and after removing the modifier
+
+The same balance checks on the commit before the change and after it (the social model is off in all of these, so only the modifier differs):
+
+| Check (towns, years) | Policy | Off the ground before → after | People | Other |
+| --- | --- | --- | --- | --- |
+| Opening (20, 2) | sensible | 19 → 19 | 49 → 50 | |
+| | owner's first playtest | 20 → 19 | 52 → 51 | |
+| | four farms first | 20 → 20 | 59 → 60 | |
+| | toolmaker on day 150 / 180 | 19 → 18 / 1 → 2 | 49 → 46 / 4 → 7 | the edge cases move both ways |
+| Town building (20, 2) | houses / homes on plots | 19 → 18 / 19 → 18 | 52 → 49 / 39 → 36 | first home day unchanged; no site waited for builders |
+| | scattered | 11 → 12 | 27 → 31 | |
+| Planning (20, 5) | careless / compact / planned | 11 → 12 / 19 → 18 / 18 → 18 | 62 → 69 / 119 → 112 / 112 → 112 | village by year 1.1 for planned, unchanged |
+| | wishes / trading / defended | 18 → 18 / 19 → 18 / 18 → 16 | 109 → 111 / 109 → 106 / 95 → 91 | content families 4.8 → 4.3, 2.3 → 1.4, 5.7 → 4.6 |
+| Influence (20, 5) | direct / families / guided | 18 → 18 / 19 → 19 / 18 → 18 | 105 → 106 / 70 → 70 / 69 → 70 | villages 18, 16 → 17, 18 |
+
+**Reading.** No systematic loss of production, survival, construction, or development: the modifier was symmetric (as many leisurely as industrious families, and the pairs exclude each other), so removing it moves individual towns in both directions. Across the 20 policies, off-the-ground counts moved by at most two towns, up as often as down. The largest drops are the planning check's *defended* policy (18 → 16 towns, both from families leaving after raids) and contentment in three planning policies; both sit in the longest, most path-dependent runs (five years with raids and trade). Nothing here points at an unrelated formula, and none was changed.
+
+### Decision 2: kin
+
+Kin now receive 25-37% of all help-weeks where nobody appeals for help, and 14-16% under appeals or rewards, which bring more help to unrelated neighbours in need (not measured before; a household has one or two kin among its six candidates). The unit tests show the boundaries: kin first all else equal; a close-knit family helps kin over an old friend and says what it passed over; a grievance, its own survival, or no spare labor still decide against it.
+
+### Decision 3 and the trust refinement: the comparison again
+
+`tests/sim/social_check.gd`, same 12 sites, 3 years, lost first harvest. New approaches: *fair* (every few months the family that did most of one kind of contribution is honoured for it, the kind changing each time), *brief unfair* (the unfair honours stop after the first year), and *social off* (the yardstick for construction, below). These numbers include both fixes described below (steadiness, and homes for families to come).
+
+| Approach | Off the ground | People | Helped a family in need | Friends / rivals | Trust (year 1, 2, 3) | Main trust sources a household | Value changes (reversed) | Readings of each honour |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| none | 11/12 | 36 | 20% | 0.20 / 0 | 0.00, 0.02, 0.03 | shared work finished +0.10 | 1.5 (0) | |
+| encourage | 11/12 | 37 | 50% | 0.64 / 0.01 | 0.34, 0.50, 0.51 | steady decisions +0.58, hardship answered +0.37, shared work +0.17 | 4.9 (0) | |
+| incentives | 11/12 | 40 | 47% | 0.66 / 0.02 | 0.32, 0.53, 0.59 | steady +0.57, shared work +0.47, hardship answered +0.40 | 6.5 (0) | |
+| restricted | 6/12 | 20 | 17% | 0.17 / 0 | 0.12, 0.19, 0.11 | held back in hardship -1.96, steady +1.70 | 3.0 (0) | |
+| unfair | 11/12 | 35 | 19% | 0.21 / 1.04 | -1.38, -1.95, -1.84 | undeserved honours -5.31, favouritism -2.92 | 15.7 (0) | 1.3 |
+| fair | 11/12 | 36 | 20% | 0.20 / 0.01 | 0.10, 0.33, 0.53 | deserved honours +0.65, honoured +0.26, shared work +0.15 | 3.6 (0) | 2.5 |
+| brief unfair | 11/12 | 33 | 19% | 0.16 / 0.30 | -1.38, -1.24, -0.83 | undeserved -1.95, favouritism -0.67 | 5.9 (0) | 1.3 |
+| social off | 11/12 | 44 | | | | | | |
+
+- **Trust now has positive sources, and each needs the household's own reading.** Appeals and rewards earn trust through help that came when it was needed, shared buildings finished, and steadiness (only to households that value order, only up to mild trust, never for a family the policy held back); fair honours earn it through honours households judged deserved. No source is universal: under *fair*, some households still judged an honour undeserved (-0.09).
+- **A first run exposed a flaw, fixed before these numbers.** Steadiness first gave trust to every orderly household every month while any policy stood, so the ruinous restricted stores ended with trust +0.74 (against -0.12 in the first prototype): a choice rewarded merely for being kept. Now restricted ends at +0.11, orderly households reassured and held-back families distrustful. Whether ruinous but steady rule should earn even that is a judgment call to watch.
+- **Same honour, different readings.** A fair honour draws 2.5 distinct readings across households (verdict and main reason), an unfair one 1.3 (almost everyone sees that the family did little).
+- **Social choices now have material consequences too:** rewarding help builds the most (40 people), unfair honours the least of the stable approaches (35, 33 after a single unfair year).
+
+### Verification: value change and social stability
+
+Six-year runs of five approaches (same 12 sites):
+
+| Approach | Value changes a town, year 1 → 6 | Total | Reversed | Trust year 1 → 6 | People, households at year 6 |
+| --- | --- | --- | --- | --- | --- |
+| none | 0.7, 0.3, 0.6, 1.6, 1.3, 2.3 | 6.6 | 0 | 0.00 → 0.19 | 65, 16.3 |
+| encourage | 2.0, 1.2, 1.8, 4.0, 3.8, 6.8 | 19.5 | 0.1 | 0.34 → 0.73 | 76, 20.2 |
+| fair | 0.7, 0.8, 2.2, 4.8, 5.2, 5.8 | 19.3 | 0.1 | 0.10 → 0.40 | 73, 18.5 |
+| unfair (all six years) | 5.0, 5.3, 5.3, 6.2, 5.4, 6.4 | 33.7 | 0 | -1.38 → -1.91 | 57, 14.3 |
+| brief unfair (first year only) | 5.0, 0.3, 0.6, 1.8, 1.3, 1.8 | 10.8 | 0 | -1.38 → -0.28 | 59, 14.9 |
+
+- **No oscillation.** Over 6 years and 60 town-runs, two value changes in all reversed an earlier change of the same value by the same household. Opposite values cannot both grow: evidence for one wears down the other first (test `test_opposite_values_do_not_both_grow`).
+- **Every change is explained.** Each change writes the experience that tipped it (the card's "Changed:" line); the rule allows one move per value per year, after accumulated evidence.
+- **Different conclusions from the same event:** the unit test for the directive's case 10, the recognition test (a farmer honoured for achievement: the striving family reads "building up a holding is honoured here", the levelling family "honours go to the already prosperous"), and the readings column above.
+- **A short spell of unfairness does not destabilize the town for good.** With unfair honours in the first year only, value changes fall from 5.0 to 0.3 the next year, rivalries fade (disposition -1.02 to +0.11 by year 6), and trust recovers by about a quarter of a point a year (-1.38 to -0.28). Continued unfairness keeps changing values at 5-6 a town a year and keeps trust near -2, and those towns grow least (57 people against 65 with no intervention).
+- **The pace needs the owner's eye.** Value changes grow with the town: per household a year, about 0.05 in the first years and 0.14 by year 6 with no intervention, 0.34 by year 6 under appeals (mostly communal labor and mutual aid strengthening as help becomes common), 0.45 under continued unfairness. One change a household every three years where the town has been asked to help for six years may be faster than "values change slowly" means; the evidence threshold (3) and the year between moves are the levers (Open Questions).
+- **Personality is more stable than values by construction:** it never changes in the prototype (inheritance aside); the owner's earlier refinement ("relatively stable but not fixed") is noted as later work.
+- **Behavior changes before conviction.** Weekly help choices change 19-70 times a town in three years against 1.5-6.5 value changes. Under unfairness it is the other way around (15.5 behavior changes, 15.7 value changes): households keep their habits and change their beliefs about the gathering.
+
+### Verification: contested land
+
+The 3-year runs produce almost no land contests (0.1 a town: a family that respects claims leaving a claim be), as expected on open sites; the owner asked for controlled scenarios with real competing needs rather than more random conflict. Each runs the real decision path in `tests/household_social_validation.gd`:
+
+1. **Two households, the same field** (`test_land_same_field`): one patch of open ground, which one family has just claimed. Its kin asks; a close-knit, sharing family makes room; the claim changes hands; the asker owes it, and the giver has kept the peace (civic merit). The pair does not contest again while the matter rests. A family that respects claims does not ask at all. A forceful family asks a family that sets store by land: refused, it holds a grievance, the pressure for agreed rules rises, and the town's respect for claims weakens. Where respecting claims is the custom, the same two settle it with no grievance.
+2. **A path across an established field** (`test_land_path_across_holding`): a family's daily walk laid through a neighbour's field, over 16 real days. The town's trampling count names the crosser; the owner presses its claim; the crosser, who respects holdings, makes amends; the owner's tie records it, the claims norm sees a claim respected, and the field stays its owner's. (Town routes slip along field edges wherever they can, so the walk is laid explicitly, as the existing trampling test does.)
+3. **A newcomer needing land in use** (`test_land_newcomer_needs_land_in_use`): the only ground open to families is worked by one. The settled family will not give up the only work it has ("it has nowhere else to work"); the newcomer holds a grievance the player can see; the player opens more ground and the newcomer takes up work with no further contest. A deeply generous parent household gives its garden to its child's, and both draw their lessons.
+4. **A communal designation over a household's claim** (`test_land_communal_designation`): the gathering wants a family's claimed land for a storehouse. A deferential family agrees and gets first claim on the stores for new work; a self-governing family that sets store by land refuses and, asked rather than forced, trusts the gathering a little more; required anyway, the land is taken, that family's trust falls by more than a point, a family that holds holdings dear trusts the gathering less, and a deferential one does not.
+
+### Watching the balance of voluntary help
+
+The first prototype's comparison never set voluntary help against the old automatic help. The new *social off* approach does (same towns, families developing their own work, every working family giving spare time to the first site with room). **The gap was large:** 44 people with automatic help against 31 with voluntary help, under every approach, with about 700 site-days waiting for a builder against 31.
+
+**Diagnosis** (stalled site-days by kind of site, and weeks a working family helped no one): 520 of the 698 waiting site-days were **homes being built ahead for families still to come** (plots set aside, no family claiming them yet). With no owner, they were nobody's project: no household could even weigh helping, and 806 of the 1,028 weeks in which a working family helped no one had no site within its reach at all. Families were not refusing; the model could not see the work.
+
+**Fix** (not automatic help): a home built ahead for a family to come is the community's work, like a storehouse or a road (`TownSocial.is_communal`). Households now decide on it as on any communal project: self-governing and solitary families decline, deferential and communal-minded ones help, appeals and rewards move them.
+
+| Approach (3 years) | People | Founders all in proper homes (median day) | Site-days waiting for a builder | Of which communal | Homes families built | Long-day weeks a town |
+| --- | --- | --- | --- | --- | --- | --- |
+| social off (automatic help) | 44 | 99 | 31 | 9 | 40.3 | |
+| none, before the fix | 31 | 111 | 698 | 591 (520 homes to come) | 27.0 | 7.1 |
+| none | 36 | 160 | 512 | 395 | 31.4 | 11.1 |
+| encourage | 37 | 252 | 470 | 382 | 33.1 | 12.9 |
+| incentives | 40 | 159 | 182 | 96 | 36.8 | 19.3 |
+| restricted | 20 | 389 | 436 | 366 | 24.6 | 9.3 |
+
+- **Voluntary help still builds less than automatic help,** and the consequences are real: about 18% fewer people after three years with no intervention. Over six years the gap persists but towns keep growing (65 people with no intervention, 76 under appeals).
+- **The player has meaningful responses, and they differ:** rewarding help nearly closes the gap (40 people, a quarter of the waiting); appeals help families in need but do little for communal sites (they appeal to helping neighbours in need, not to building for the town); the stores rule shapes the rest.
+- **Why families still decline** (top reasons, all approaches): "every hand is needed for food" (the lost harvest), "it would cost a fifth of its own working day" (no strong pull either way), "it prefers to work alone", "it holds that families should choose their own work", "it guards its rest". Under unfairness, "it distrusts the gathering's decisions" becomes the leading reason.
+- **Founders reach proper homes later** with appeals (median day 252) than without (160): helpers go to the neediest family's home or to sites the appeal does not cover, so the last founder waits. Watch in the playtest.
+
+### Performance
+
+The scale probe on a quiet machine: 50 households 6.4 ms, 100 16.4 ms, 200 44.2 ms, 400 135 ms a week (128-337 µs a household), the same as before the review's additions. A first run beside six other simulations measured about twice that. The owner's point stands: household-level simulation is for towns, and millions need demographic aggregation (not built). Bounded ties, scheduled evaluations, and event-driven interactions are kept.
+
 ## Judgment Calls
 
 Made during implementation, open to veto. Numbers are first guesses, in the scripts named.
 
 - **Branch.** `feature/household-social-prototype` is cut from `feature/family-influence-prototype`, not `develop`: this slice extends that unmerged prototype (families developing their own work), which still awaits review. Both merge together, or not at all.
-- **Spare time is a choice.** With the model on, a working family gives its spare fifth of a day only to its own project or the one it chose to help that week (`TownConstruction.get_spare_time_project`). Before, every family helped the first site in the queue. The town building model once found towns stall without automatic helpers; families' own homes and full-time builders are unaffected, and the comparison below did not show stalls, but it is the main balance risk.
+- **Spare time is a choice** (confirmed by the owner, decision 2). With the model on, a working family gives its spare fifth of a day only to its own project or the one it chose to help that week (`TownConstruction.get_spare_time_project`). Before, every family helped the first site in the queue. It costs construction (Watching the balance of voluntary help); homes built ahead for families to come count as communal work, so families can choose them.
 - **Sharing moves hardship, not food.** Stores are communal, so a family's "ration" is its share of the shortage's hardship: a donor takes one point of it, the family helped is spared one (`Household.shortage_hardship_adjust`). A donor gives at most once a month, and only if doing so leaves it clear of considering departure itself.
 - **Field claims and land claims.** Disputes arise from trampling, now attributed to the walking household (`TownLogistics.trampled_by`), and, since the owner review, from contested land (Section 7, item 5). Amends mean the crossing family fences the field with its labor (or owes the field's family a favour when no wood can be spared). A dispute rests 90 days before the same pair can quarrel again; a second unsettled one is a feud.
 - **The help norm is judged per family in need,** not per family that could help: each week, a family building its first home or close to leaving either got some neighbour's help or none. Counting every non-helping family as a violation drove acceptance to nothing within weeks, because one helper is enough.
@@ -263,9 +374,23 @@ Made during implementation, open to veto. Numbers are first guesses, in the scri
 - **Character drawing:** axes mostly balanced (40% zero, 20% each ±1, 10% each ±2); a held migrated value sets its axis to ±1 or ±2; each conduct value 45%; 3-5 strong convictions, 1-2 defining. New households: averaged temperament with a 15% chance of a step either way; parent strengths kept, 15% one weaker, 10% one stronger.
 - **A town with half a year of food in store is secure** for the purpose of weighing improvements, whatever its fields grow meanwhile (`FamilyInitiative.SECURE_FOOD_DAYS`).
 
+Made for the owner review (2026-10-28):
+
+- **The modifier is gone everywhere,** not only with the social model on: the owner's decision is about the game, and the direct game has no decision layer to replace it with, so there diligence simply does nothing yet.
+- **Long days take time from rest only for building** (a family's own project or the one it chose to help), never for extra production on its holding: more labor on the holding would be the removed bonus by another name. Overwork costs one hardship point in a month with 3 long weeks; desire threshold 1, weariness -0.75 a week past the second.
+- **Kin obligation** 2 + 0.75 per level of close-knit + 0.5 of clannish - 0.5 of leave-the-nest (+0.5 of elder reverence toward the household it came from), at least 1. Help never returned counts from three favours owed, -0.5 each, at most -2, halved for kin.
+- **Recognition:** merit and esteem as in Section 9; deserved means at least the town's middle and at least 1; fair at a score of 1, unfair at -1, resentment at -2; a deserved honour is worth +0.25 trust to each household that judges it so, an undeserved one -0.25 (-1 with resentment); inspiration lasts 120 days. The honoured family's own trust gain fell from 1 to 0.5.
+- **Respected voices:** standing 2 or more, at most three; ±0.1-0.15 receptiveness per voice the household is on good or bad terms with, capped at ±0.3.
+- **Trust sources** and amounts are in the Section 4 table and `TownSocial`; steadiness is the smallest (0.05 a month per level of regard for order) and stops at trust 1.
+- **Contested land** arises only where land is scarce: when a family can open work nowhere, or when land another family claimed but has not started building is at least 4 tiles nearer its home than any open land. A contest rests 90 days for that pair, either way round. Yielding a built holding hands the workplace over; the giver takes up work elsewhere if it can.
+- **The gathering's request for land** works only on claims not yet built on (nothing can clear a standing workplace), has no button yet (domain and tests only), and offers first claim on the stores for 180 days as compensation.
+- **Homes built ahead for families to come are communal work** (from the construction diagnosis).
+- **Every exclusive pair of values** now behaves like forgiveness and vindication: evidence for one wears down the other first.
+
 ## Open Questions For The Owner
 
-1. **Temperament and output.** Industrious and leisurely are now temperament, which the directive says must not be a production bonus, yet as catalog values they still give ±10% output. Remove the output effect (every balance run moves), or keep it as the effect of the underlying value?
-2. **Automatic helpers.** Should spare-time helping stay purely voluntary when the model is on, or should a family still give spare time to its own kin's homes without deciding to?
-3. **What contribution means.** Fairness is judged by help and food given. Should good work at a family's own holding (production) count as contribution too?
-4. **Where the player's appeals come from.** In the fiction, who asks families to help their neighbours: a gathering, respected elders, the founders? It decides what trust in leadership is trust *in* before any institution exists.
+1. **How fast should values change?** Over six years, values change about once a household every three years in towns asked to help each other (0.34 a household a year by year 6), and faster under continued unfairness. Slow it (more evidence per move, or longer between moves), or is that right for a town whose way of life is changing?
+2. **Voluntary help costs construction** (36 people against 44 with automatic help after three years with no intervention; 40 when helping is rewarded). Is that the intended price of autonomy, or should the influence ladder's next rung, commissioning a willing household to build (paid from the stores), come next to give the player a direct answer?
+3. **Steady but ruinous rule.** Households that value order still gain a little trust from a stores rule that keeps the town poor (restricted ends at +0.11). Should steadiness count only when the household is doing well under it?
+4. **The gathering's request for land** has no button yet. Add it to the sidebar (ask, then require), or keep coercion out of the playable prototype for now?
+5. **Personality change** ("relatively stable but not fixed") is still not built: personality only varies between generations. Build it now (major, repeated experiences), or leave it for later?
