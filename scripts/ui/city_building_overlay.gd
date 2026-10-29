@@ -187,12 +187,18 @@ func draw(canvas: CanvasItem, font: Font, font_size: int, city: City):
 			y = draw_overlay_line(canvas, font, font_size, "Calling: " + resident_calling, text_x, y, overlay_size.x)
 		y = draw_overlay_line(canvas, font, font_size, "Available labor: " + get_house_available_worker_text(city, inspected_building_index), text_x, y, overlay_size.x)
 		y = draw_overlay_line(canvas, font, font_size, "Assigned: " + get_house_assignment_text(city, inspected_building_index), text_x, y, overlay_size.x)
-		y = draw_overlay_section_title(canvas, font, font_size, "Household Lifecycle", text_x, y, overlay_size.x)
-		for lifecycle_text: String in get_house_lifecycle_lines(city, inspected_building_index):
-			y = draw_overlay_line(canvas, font, font_size, lifecycle_text, text_x, y, overlay_size.x)
-		y = draw_overlay_section_title(canvas, font, font_size, "Family Demand", text_x, y, overlay_size.x)
-		for demand_text: String in get_house_demand_lines(city, inspected_building_index):
-			y = draw_overlay_line(canvas, font, font_size, demand_text, text_x, y, overlay_size.x)
+		var family_lines: Array[String] = get_house_family_lines(city, inspected_building_index)
+		if not family_lines.is_empty():
+			y = draw_overlay_section_title(canvas, font, font_size, "Family", text_x, y, overlay_size.x)
+			for family_text: String in family_lines:
+				y = draw_overlay_line(canvas, font, font_size, family_text, text_x, y, overlay_size.x)
+		else:
+			y = draw_overlay_section_title(canvas, font, font_size, "Household Lifecycle", text_x, y, overlay_size.x)
+			for lifecycle_text: String in get_house_lifecycle_lines(city, inspected_building_index):
+				y = draw_overlay_line(canvas, font, font_size, lifecycle_text, text_x, y, overlay_size.x)
+			y = draw_overlay_section_title(canvas, font, font_size, "Family Demand", text_x, y, overlay_size.x)
+			for demand_text: String in get_house_demand_lines(city, inspected_building_index):
+				y = draw_overlay_line(canvas, font, font_size, demand_text, text_x, y, overlay_size.x)
 		y = draw_overlay_section_title(canvas, font, font_size, "Household Status", text_x, y, overlay_size.x)
 		for prosperity_text: String in get_house_prosperity_lines(city, inspected_building_index):
 			y = draw_overlay_line(canvas, font, font_size, prosperity_text, text_x, y, overlay_size.x)
@@ -347,6 +353,36 @@ func get_building_screen_rect(building: Building) -> Rect2:
 	var pos: Vector2 = Vector2(tile_pos.x * city_tile_size, city_view_top + tile_pos.y * city_tile_size)
 	return Rect2(pos, Vector2(size.x * city_tile_size - 1, size.y * city_tile_size - 1))
 
+# With the household social prototype on, a house's card shows who its family is, how it stands
+# with its neighbours, what it did lately and why (HouseholdRosterHelper), wrapped to the card.
+const FAMILY_CARD_WIDTH: float = 470.0
+const FAMILY_LINE_CHARS: int = 66
+
+func get_house_family_lines(city: City, building_index: int) -> Array[String]:
+	var lines: Array[String] = []
+	var household: Household = city.get_household_for_building_id(building_index)
+	if household == null or not city.social.enabled:
+		return lines
+	var raw: Array[String] = HouseholdRosterHelper.get_card_lines(city, household)
+	if household.initiative_note != "":
+		raw.append("Work: " + household.initiative_note)
+	for line: String in raw:
+		lines.append_array(wrap_line(line, FAMILY_LINE_CHARS))
+	return lines
+
+static func wrap_line(line: String, max_chars: int) -> Array[String]:
+	var wrapped: Array[String] = []
+	var current: String = ""
+	for word: String in line.split(" "):
+		if current != "" and current.length() + 1 + word.length() > max_chars:
+			wrapped.append(current)
+			current = "   " + word
+		else:
+			current = word if current == "" else current + " " + word
+	if current != "":
+		wrapped.append(current)
+	return wrapped
+
 func get_building_overlay_size(city: City, building: Building) -> Vector2:
 	var width: float = 260.0
 	var line_count: int = 4
@@ -355,7 +391,12 @@ func get_building_overlay_size(city: City, building: Building) -> Vector2:
 	if building.is_store():
 		line_count = 3
 	elif building.is_house():
-		line_count = 7 + get_house_lifecycle_lines(city, building.id).size() + get_house_demand_lines(city, building.id).size() + get_house_prosperity_lines(city, building.id).size()
+		var family_lines: Array[String] = get_house_family_lines(city, building.id)
+		if not family_lines.is_empty():
+			width = FAMILY_CARD_WIDTH
+			line_count = 6 + family_lines.size() + get_house_prosperity_lines(city, building.id).size()
+		else:
+			line_count = 7 + get_house_lifecycle_lines(city, building.id).size() + get_house_demand_lines(city, building.id).size() + get_house_prosperity_lines(city, building.id).size()
 	else:
 		line_count = 6 + ProductionRequirementHelper.get_requirement_lines(city, building).size() + ConstructionDisplayHelper.get_travel_lines(city, building).size()
 		if building.assigned_workers <= 0 and get_work_succession_hint(city, building) != "":

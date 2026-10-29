@@ -55,7 +55,7 @@ func add_daily_traffic() -> void:
 				continue
 			var route: Array = get_errand(household, kind)["route"]
 			if not route.is_empty():
-				city.logistics.add_traffic(route, rate * 2.0)
+				city.logistics.add_traffic(route, rate * 2.0, household.id)
 
 # Where a family goes on an errand and the way there from home: {"tile", "route"}; the route is
 # empty when there is nowhere to go (no water, no woods, no kin) or no way there.
