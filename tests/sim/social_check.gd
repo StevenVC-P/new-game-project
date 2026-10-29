@@ -28,6 +28,10 @@ const APPROACHES: Array = [
 	{"name": "incentives", "incentive": true},
 	{"name": "restricted", "restricted": true},
 	{"name": "unfair", "unfair": true},
+	# After the owner's review: honours where they were earned, one kind of contribution after another;
+	# and unfair honours for the first year only, to see whether the town settles again.
+	{"name": "fair", "fair": true},
+	{"name": "brief_unfair", "unfair": true, "brief": true},
 ]
 
 func _init() -> void:
@@ -36,14 +40,22 @@ func _init() -> void:
 func run() -> void:
 	var years: int = 3
 	var site_count: int = 12
+	var only: Array[String] = []
+	var scale: bool = true
 	for argument: String in OS.get_cmdline_user_args():
 		if argument.begins_with("--years="):
 			years = int(argument.trim_prefix("--years="))
 		elif argument.begins_with("--sites="):
 			site_count = int(argument.trim_prefix("--sites="))
+		elif argument.begins_with("--approaches="):
+			only.assign(argument.trim_prefix("--approaches=").split(","))
+		elif argument == "--no-scale":
+			scale = false
 	var sites: Array = TownBuildingCheck.collect_sites().slice(0, site_count)
 	_report("%d towns on real town maps, %d years, six founding families, first winter's stores lost" % [sites.size(), years])
 	for approach: Dictionary in APPROACHES:
+		if not only.is_empty() and not only.has(str(approach["name"])):
+			continue
 		var scenario: Dictionary = BASE.duplicate(true)
 		scenario.merge(approach, true)
 		var results: Array[Dictionary] = []
@@ -53,7 +65,8 @@ func run() -> void:
 			city.local_map = (site["map"] as Array).duplicate(true)
 			results.append(StandInPlayerScript.new().play(city, scenario, years * Calendar.DAYS_PER_YEAR))
 		summarize(approach["name"], results)
-	probe_scale()
+	if scale:
+		probe_scale()
 	quit()
 
 func summarize(name: String, results: Array[Dictionary]) -> void:
@@ -62,24 +75,34 @@ func summarize(name: String, results: Array[Dictionary]) -> void:
 	var totals: Dictionary = {}
 	var statuses: Dictionary = {}
 	var by_year: Array = []
+	var trust_sources: Dictionary = {}
+	var declines: Dictionary = {}
+	var housed_days: Array[int] = []
 	for result: Dictionary in results:
 		made_it += 1 if result["off_the_ground"] else 0
-		for key: String in ["population", "households", "content", "food", "opened_by_families", "improvements_by_families", "player_actions"]:
+		for key: String in ["population", "households", "content", "food", "opened_by_families", "improvements_by_families", "player_actions", "stalled_site_days", "homes_by_families"]:
 			totals[key] = float(totals.get(key, 0.0)) + float(result[key])
+		housed_days.append(int(result["founders_housed_day"]))
 		var social: Dictionary = result["social"]
 		for key: String in social.keys():
 			if social[key] is float or social[key] is int:
 				totals["s_" + key] = float(totals.get("s_" + key, 0.0)) + float(social[key])
+		for source: String in (social["trust_by_source"] as Dictionary).keys():
+			trust_sources[source] = float(trust_sources.get(source, 0.0)) + float(social["trust_by_source"][source]) / maxf(1.0, float(social["households"]))
+		for reason: String in (social["decline_reasons"] as Dictionary).keys():
+			declines[reason] = int(declines.get(reason, 0)) + int(social["decline_reasons"][reason])
 		for key: String in ["help_status", "claims_status"]:
 			var label: String = key + ": " + str(social[key])
 			statuses[label] = int(statuses.get(label, 0)) + 1
 		for year in range((result["social_years"] as Array).size()):
 			if by_year.size() <= year:
-				by_year.append({"help": 0.0, "trust": 0.0, "disposition": 0.0, "count": 0})
+				by_year.append({"help": 0.0, "trust": 0.0, "disposition": 0.0, "values": 0.0, "count": 0})
 			var snapshot: Dictionary = result["social_years"][year]
 			by_year[year]["help"] += float(snapshot["help_acceptance"])
 			by_year[year]["trust"] += float(snapshot["trust"])
 			by_year[year]["disposition"] += float(snapshot["mean_disposition"])
+			var before: int = int(result["social_years"][year - 1]["value_changes"]) if year > 0 else 0
+			by_year[year]["values"] += float(int(snapshot["value_changes"]) - before)
 			by_year[year]["count"] += 1
 	var avg: Callable = func(key: String) -> float: return float(totals.get(key, 0.0)) / n
 	_report("%-10s %2d/%d off the ground | people %.0f | households %.1f | content families %.1f | food in store %.0f | families opened %.1f, improved %.1f | player decisions %.0f" % [
@@ -91,8 +114,25 @@ func summarize(name: String, results: Array[Dictionary]) -> void:
 	var course: Array[String] = []
 	for year in range(by_year.size()):
 		var c: float = maxf(1.0, by_year[year]["count"])
-		course.append("year %d: help %.2f, trust %+.2f, disposition %+.2f" % [year + 1, by_year[year]["help"] / c, by_year[year]["trust"] / c, by_year[year]["disposition"] / c])
+		course.append("year %d: help %.2f, trust %+.2f, disposition %+.2f, value changes %.1f" % [year + 1, by_year[year]["help"] / c, by_year[year]["trust"] / c, by_year[year]["disposition"] / c, by_year[year]["values"] / c])
 	_report("%-10s %s | norms: %s" % [name, " | ".join(course), str(statuses)])
+	housed_days.sort()
+	var never: int = housed_days.filter(func(d: int) -> bool: return d < 0).size()
+	var housed: Array[int] = housed_days.filter(func(d: int) -> bool: return d >= 0)
+	_report("%-10s building: founders all in proper homes by day %s (median; %d towns never) | site-days with no builder free %.0f | homes families built %.1f | long-day weeks %.1f | help to kin %.0f%% of help-weeks" % [
+		name, str(housed[housed.size() / 2]) if not housed.is_empty() else "-", never, avg.call("stalled_site_days"), avg.call("homes_by_families"), avg.call("s_long_day_weeks"), avg.call("s_kin_help_share") * 100.0])
+	_report("%-10s behavior and conviction: help choices changed %.1f times, value changes %.1f (reversed %.1f) | readings of each honour %.1f | land contests %.1f (yielded %.1f, kept %.1f, not pressed %.1f) | respected voices %.1f" % [
+		name, avg.call("s_help_choice_changes"), avg.call("s_value_changes"), avg.call("s_value_reversals"), avg.call("s_honour_readings"), avg.call("s_land_contests"), avg.call("s_land_yielded"), avg.call("s_land_kept"), avg.call("s_land_not_pressed"), avg.call("s_voices")])
+	var sources: Array[String] = []
+	for source: String in trust_sources.keys():
+		sources.append("%s %+.2f" % [source, float(trust_sources[source]) / n])
+	sources.sort()
+	var reasons: Array = declines.keys()
+	reasons.sort_custom(func(a: String, b: String) -> bool: return int(declines[a]) > int(declines[b]))
+	var top: Array[String] = []
+	for reason: String in reasons.slice(0, 4):
+		top.append("%s (%.0f)" % [reason, int(declines[reason]) / n])
+	_report("%-10s trust a household, by source: %s | declined help mostly because: %s" % [name, ", ".join(sources) if not sources.is_empty() else "none", "; ".join(top)])
 
 # The weekly pass on towns of 50 to 400 households with homes spread over a map, each on a holding,
 # with a home being built for every tenth: what one household costs a week, and whether that cost

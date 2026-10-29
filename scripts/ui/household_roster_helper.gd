@@ -14,7 +14,7 @@ static func get_lines(city: City) -> Array[String]:
 	return lines
 
 # "Household 3: farm, housed, secure; wants its field fenced; very cautious, communal labor; trusts
-# the leadership."
+# the gathering."
 static func get_line(city: City, household: Household) -> String:
 	var parts: Array[String] = []
 	var work: Building = FamilyInitiative.get_holding(city, household)
@@ -32,14 +32,14 @@ static func get_line(city: City, household: Household) -> String:
 
 static func describe_trust(household: Household) -> String:
 	if household.trust >= 2:
-		return "trusts the leadership"
+		return "trusts the gathering"
 	if household.trust == 1:
-		return "inclined to trust the leadership"
+		return "inclined to trust the gathering"
 	if household.trust == -1:
-		return "wary of the leadership"
+		return "wary of the gathering"
 	if household.trust <= -2:
-		return "distrusts the leadership"
-	return "undecided about the leadership"
+		return "distrusts the gathering"
+	return "undecided about the gathering"
 
 static func describe_standing(household: Household) -> String:
 	if household.standing >= 2:
@@ -73,6 +73,10 @@ static func get_card_lines(city: City, household: Household) -> Array[String]:
 		lines.append("Ties: " + "; ".join(tie_words))
 	if household.social_note != "":
 		lines.append("Lately: " + household.social_note)
+	if household.hours_note != "":
+		lines.append("Hours: " + household.hours_note)
+	if household.inspired_until >= city.construction.day and household.inspired_by != "":
+		lines.append("Inspired by %s's honour for %s" % [city.get_household_label(household.inspired_by_household), TownSocial.RECOGNITION_NAMES.get(household.inspired_by, household.inspired_by)])
 	for memory: Dictionary in household.memories.slice(maxi(0, household.memories.size() - 2)):
 		var lessons: Array = memory["lessons"]
 		lines.append("Remembers: %s%s" % [memory["text"], " - \"" + "\"; \"".join(lessons) + "\"" if not lessons.is_empty() else ""])

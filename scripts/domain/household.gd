@@ -108,6 +108,18 @@ var grants_received: int = 0
 # The household's latest dealing with others and why (TownSocial), and the day of it.
 var social_note: String = ""
 var social_note_day: int = -1
+# This week it works long days, giving its spare time out of its rest instead of its holding; the
+# long weeks so far this month (enough of them are a month's hardship), and why it chose its hours.
+var long_days: bool = false
+var long_weeks_this_month: int = 0
+var hours_note: String = ""
+# Peace kept: amends made, land given up or a claim settled by agreement (civic recognition).
+var civic_acts: int = 0
+# An honour it saw as deserved and wants to match: its kind (TownSocial.RECOGNITION_*), whose it
+# was, and until when it inspires.
+var inspired_by: String = ""
+var inspired_by_household: int = -1
+var inspired_until: int = -1
 
 func _init(household_id: int = -1, building_id: int = -1, work_preference: String = WORK_PREF_NEUTRAL, population: int = 4, residence_status: String = RESIDENCE_TEMPORARY):
 	id = household_id

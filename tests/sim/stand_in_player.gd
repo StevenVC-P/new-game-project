@@ -110,7 +110,12 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 		if scenario.get("hard_winter", false) and day == HARD_WINTER_DAY:
 			city.resources["food"] = mini(int(city.resources["food"]), int(city.resources["food_consumption_rate"]) * HARD_WINTER_FOOD_DAYS)
 		if scenario.get("unfair", false) and day >= UNFAIR_FIRST_DAY and (day - UNFAIR_FIRST_DAY) % UNFAIR_INTERVAL_DAYS == 0:
-			favour_least_deserving(city)
+			if not scenario.get("brief", false) or day < BRIEF_UNFAIR_DAYS:
+				favour_least_deserving(city)
+		if scenario.get("fair", false) and day >= UNFAIR_FIRST_DAY and (day - UNFAIR_FIRST_DAY) % UNFAIR_INTERVAL_DAYS == 0:
+			honour_most_deserving(city, (day - UNFAIR_FIRST_DAY) / UNFAIR_INTERVAL_DAYS)
+		if founders_housed_day < 0 and day > 0 and founders_housed(city):
+			founders_housed_day = day
 		if scenario.get("social", false) and day % 360 == 359:
 			social_years.append(snapshot_social(city))
 		if day % POLICY_INTERVAL_DAYS == 0 and day >= int(scenario.get("idle_until", 0)):
@@ -181,15 +186,41 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 		"founder_improvements": founder_improvements(city),
 		"social": snapshot_social(city) if scenario.get("social", false) else {},
 		"social_years": social_years,
+		"founders_housed_day": founders_housed_day,
 	}
 
 const HARD_WINTER_DAY: int = 270
 const HARD_WINTER_FOOD_DAYS: int = 8
 const UNFAIR_FIRST_DAY: int = 90
 const UNFAIR_INTERVAL_DAYS: int = 120
+# "brief" with "unfair": the unfair honours stop after the first year.
+const BRIEF_UNFAIR_DAYS: int = 360
 
 # The social state of a town at a moment, for the social check.
 var social_years: Array = []
+# The first day every founding family still in town lived in a proper home (-1: never).
+var founders_housed_day: int = -1
+
+func founders_housed(city) -> bool:
+	for household: Household in city.households:
+		if household.id < EconomyBalanceScript.FOUNDING_FAMILIES and (household.housing_status != Household.RESIDENCE_HOUSED or city.is_household_in_rough_housing(household)):
+			return false
+	return true
+
+# "fair": every few months, honour the family that has done most of one kind of contribution, the
+# kind changing each time, so households see each kind recognized where it was earned.
+func honour_most_deserving(city, turn: int) -> void:
+	var category: String = TownSocial.RECOGNITIONS[turn % TownSocial.RECOGNITIONS.size()]
+	var chosen: Household = null
+	var best: float = 0.0
+	for household: Household in city.households:
+		var merit: float = city.social.get_merit(household, category)
+		if merit > best:
+			chosen = household
+			best = merit
+	if chosen != null:
+		city.social.recognize(chosen, category)
+		player_actions += 1
 
 # The household that has given the community least (ties: the newest) is honoured and given first
 # claim on the stores: a deliberately unfair distribution.
@@ -243,6 +274,18 @@ static func snapshot_social(city) -> Dictionary:
 		"claims_acceptance": float(social.norms[TownSocial.NORM_CLAIMS]["acceptance"]),
 		"claims_status": social.norms[TownSocial.NORM_CLAIMS]["status"],
 		"value_changes": social.value_changes,
+		"value_reversals": social.value_reversals,
+		"help_choice_changes": social.help_choice_changes,
+		"honour_readings": float(social.honour_readings) / maxf(1.0, social.honours),
+		"long_day_weeks": social.long_day_weeks,
+		"kin_help_share": float(social.kin_help_weeks) / maxf(1.0, social.help_weeks),
+		"land_contests": social.land_contests,
+		"land_yielded": social.land_yielded,
+		"land_kept": social.land_kept,
+		"land_not_pressed": social.land_not_pressed,
+		"trust_by_source": social.trust_by_source.duplicate(),
+		"decline_reasons": social.decline_reasons.duplicate(),
+		"voices": social.get_respected_voices().size(),
 		"week_usec": float(social.week_usec_total) / maxf(1.0, social.weeks_run),
 		"households": city.households.size(),
 	}

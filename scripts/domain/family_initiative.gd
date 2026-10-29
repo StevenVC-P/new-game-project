@@ -85,6 +85,8 @@ static func take_up_work(city: City, household: Household) -> ConstructionProjec
 		desire["score"] = float(desire["score"]) + get_noise(city, household, activity)
 		choices.append(desire)
 	choices.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["score"]) > float(b["score"]))
+	if city.social.enabled and contest_for_land(city, household, choices):
+		return null
 	# Every workplace starts as hand work; improving it is a decision of its own, later.
 	for choice: Dictionary in choices:
 		var building_type: String = HAND_WORK[choice["activity"]]
@@ -100,6 +102,68 @@ static func take_up_work(city: City, household: Household) -> ConstructionProjec
 		return project
 	note(city, household, "Found no work it could take up")
 	return null
+
+# With the household social model on, land is contested where it is scarce (docs/HOUSEHOLD_SOCIAL_MODEL.md,
+# Contested land): when a family can open work nowhere, it may ask a neighbour for land it already
+# works by hand; and when land another family has only just claimed for the same work lies much
+# nearer its home than any land still open, it may ask for that. TownSocial.contest_land decides;
+# returns true when the land changed hands (it then works it, or builds on the claim, as its own).
+static func contest_for_land(city: City, household: Household, choices: Array[Dictionary]) -> bool:
+	var activity: String = choices[0]["activity"]
+	var building_type: String = HAND_WORK[activity]
+	var free: Vector2i = choose_site(city, household, building_type)
+	var nowhere_else: bool = free.x < 0 and choices.all(func(c: Dictionary) -> bool: return choose_site(city, household, HAND_WORK[c["activity"]]).x < 0)
+	var anchor: Vector2 = Vector2(get_anchor(city, household))
+	var size: Vector2i = city.construction.get_size(building_type)
+	var free_distance: float = INF if free.x < 0 else Vector2(TownLogistics.center_tile(free, size)).distance_to(anchor)
+	var holder: Household = null
+	var claim: ConstructionProject = null
+	var holding: Building = null
+	var nearest: float = INF
+	for other: Household in city.social.get_known_households(household):
+		for project: ConstructionProject in city.social.get_projects_of(other):
+			if project.kind == ConstructionProject.KIND_BUILDING and project.building_type == building_type and project.requested_by == ConstructionProject.REQUESTED_BY_HOUSEHOLD and project.get_progress() <= 0.0:
+				var distance: float = Vector2(TownLogistics.center_tile(project.tile, project.size)).distance_to(anchor)
+				if distance < nearest:
+					nearest = distance
+					holder = other
+					claim = project
+					holding = null
+		var worked: Building = get_holding(city, other) if nowhere_else else null
+		if worked != null and worked.is_tier0() and get_activity(worked.type) == activity:
+			var distance: float = Vector2(TownLogistics.center_tile(worked.tile, worked.size)).distance_to(anchor)
+			if distance < nearest:
+				nearest = distance
+				holder = other
+				claim = null
+				holding = worked
+	if holder == null:
+		return false
+	var nearer: float = free_distance - nearest if not is_inf(free_distance) else 8.0
+	if not nowhere_else and nearer < TownSocial.CONTEST_NEARER_TILES:
+		return false
+	var stake: Dictionary = {
+		"kind": TownSocial.CONTEST_NEWCOMER if holding != null else TownSocial.CONTEST_SAME_FIELD,
+		"nowhere_else": nowhere_else,
+		"nearer": nearer,
+		"built": holding != null,
+		"holder_has_alternative": choose_site(city, holder, building_type).x >= 0,
+		"what": describe_type(building_type, false),
+	}
+	if city.social.contest_land(household, holder, stake) != "yielded":
+		return false
+	if holding != null:
+		var index: int = city.buildings.find(holding)
+		city.unassign_building_worker(index)
+		city.assign_household_by_id_to_building(index, household.id)
+		note(city, household, "Took over %s's %s, which it made room for" % [city.get_household_label(holder.id), describe_type(holding.type, false)])
+		note(city, holder, "Gave up its %s to %s" % [describe_type(holding.type, false), city.get_household_label(household.id)])
+	else:
+		claim.claimant_household_id = household.id
+		claim.requester_household_id = household.id
+		note(city, household, "Took up %s on land %s made room for" % [describe_type(building_type), city.get_household_label(holder.id)])
+		note(city, holder, "Gave up the land it chose to %s" % city.get_household_label(household.id))
+	return true
 
 # How much a family wants to take up an activity: {"score", "terms"}.
 static func get_work_desire(city: City, household: Household, activity: String) -> Dictionary:
@@ -136,7 +200,7 @@ static func get_work_desire(city: City, household: Household, activity: String) 
 				add(terms, 1.0, "no one makes tools")
 			else:
 				add(terms, -2.5 * producers, "others already make tools")
-	add_encouragement(city, household, activity, terms, "the community asks for " + TownInfluence.get_activity_name(activity))
+	add_encouragement(city, household, activity, terms, "the gathering asks for " + TownInfluence.get_activity_name(activity))
 	return {"score": sum(terms), "terms": terms}
 
 # --- Improving work -----------------------------------------------------------------------------
@@ -231,7 +295,14 @@ static func get_improve_desire(city: City, household: Household, proper_type: St
 		add(terms, minf(3.0, 0.75 * int(seen["paying"])) * example_weight, "its neighbours' improved work is paying")
 	if int(seen["idle"]) > 0:
 		add(terms, -minf(2.0, float(seen["idle"])) * example_weight, "its neighbours' improved work stands short of tools")
-	add_encouragement(city, household, TownInfluence.ACTIVITY_IMPROVE, terms, "the community asks for better work")
+	add_encouragement(city, household, TownInfluence.ACTIVITY_IMPROVE, terms, "the gathering asks for better work")
+	# A deserved honour for a holding or a craft it admires (TownSocial.judge_recognition).
+	if household.inspired_until >= city.construction.day and household.inspired_by_household >= 0:
+		var whose: String = city.get_household_label(household.inspired_by_household)
+		if household.inspired_by == TownSocial.RECOGNITION_ACHIEVEMENT:
+			add(terms, 0.75, "it would match %s's honoured holding" % whose)
+		elif household.inspired_by == TownSocial.RECOGNITION_CRAFT:
+			add(terms, 0.5, "it would equal %s's honoured craft" % whose)
 	return {"score": sum(terms), "terms": terms}
 
 # How dangerous it is for the town to go on without more of an activity's output, 0 to 1.5.
@@ -291,26 +362,43 @@ static func predict_improvement(city: City, household: Household, encouraged: bo
 static func add_encouragement(city: City, household: Household, activity: String, terms: Array, reason: String) -> void:
 	if not city.influence.is_encouraged(activity):
 		return
-	var receptive: Dictionary = get_receptiveness(household)
+	var receptive: Dictionary = get_receptiveness(household, city)
 	add(terms, ENCOURAGE_WEIGHT * float(receptive["factor"]), reason + str(receptive["note"]))
 
-# How readily a family heeds the community's appeals, {"factor", "note"}: deference and trust in the
-# leadership make it readier, self-government less; communal labor and solitary work nudge it.
-static func get_receptiveness(household: Household) -> Dictionary:
+# How readily a family heeds the gathering's appeals, {"factor", "note"}. Before there are
+# institutions, the community's decisions come from informal gatherings of its households (owner
+# decision; docs/HOUSEHOLD_SOCIAL_MODEL.md), so trust is confidence in how those gatherings decide.
+# Deference and trust make a family readier, self-government less; communal labor and solitary work
+# nudge it; and an appeal carries more weight when the families it respects most stand behind it,
+# less when they are families it is at odds with (TownSocial.get_respected_voices).
+static func get_receptiveness(household: Household, city: City = null) -> Dictionary:
 	var factor: float = 1.0
 	var note_text: String = ""
 	var deference: int = HouseholdCharacter.get_strength(household, "deferential")
 	var self_rule: int = HouseholdCharacter.get_strength(household, "self_governing")
 	if deference > 0:
 		factor += 0.25 * deference
-		note_text = ", and it heeds the community"
+		note_text = ", and it heeds the gathering"
 	elif self_rule > 0:
 		factor -= 0.2 * self_rule
 		note_text = ", though it judges for itself"
 	factor += 0.15 * household.trust
 	if household.trust <= -2:
-		note_text += ", though it distrusts the leadership"
+		note_text += ", though it distrusts the gathering"
 	factor += 0.25 * signf(HouseholdCharacter.get_strength(household, "communal_labor") - HouseholdCharacter.get_strength(household, "solitary"))
+	if city != null and city.social.enabled:
+		var voices: float = 0.0
+		for voice: Household in city.social.get_respected_voices():
+			if voice == household:
+				continue
+			var disposition: int = HouseholdMemory.get_disposition(household, voice.id)
+			voices += 0.1 if disposition > 0 else -0.15 if disposition < 0 else 0.0
+		voices = clampf(voices, -0.3, 0.3)
+		if voices > 0.0:
+			note_text += ", and families it respects speak for it"
+		elif voices < 0.0:
+			note_text += ", though families it is at odds with speak for it"
+		factor += voices
 	return {"factor": maxf(0.2, factor), "note": note_text}
 
 # Proper workplaces worked by kin and near neighbours: how many pay (well kept) and how many stand

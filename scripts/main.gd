@@ -1189,7 +1189,7 @@ func try_handle_city_action_click(mouse_pos: Vector2) -> bool:
 				else:
 					var honoured: Household = cities[selected_city_index].get_household_by_id(int(option_data["household"]))
 					if honoured != null:
-						social.recognize(honoured)
+						social.recognize(honoured, str(option_data.get("category", TownSocial.RECOGNITION_SERVICE)))
 			queue_redraw()
 		else:
 			apply_time_control_action(action)
@@ -2517,10 +2517,17 @@ func draw_social_controls(font: Font, font_size: int, city: City, x: float, y: f
 		draw_city_action_button(font, font_size, ("Asked: " if on else "Ask: ") + ("helping" if column == 0 else "claims"), x + column * (half + 4.0), y + 4.0, half, {"action": "toggle_norm", "norm": norm_ids[column]}, VisualStyle.COLOR_UI_BUTTON_ACTIVE if on else VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
 	y += 22.0
 	draw_city_action_button(font, font_size, "Reward help: " + ("on" if city.social.incentive else "off"), x, y + 4.0, half, {"action": "toggle_incentive"}, VisualStyle.COLOR_UI_BUTTON_ACTIVE if city.social.incentive else VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
+	y += 26.0
+	# Honouring the selected family, for one of the four kinds of contribution.
 	var selected: Household = get_inspected_household()
 	if selected != null:
-		draw_city_action_button(font, font_size, "Honour family", x + half + 4.0, y + 4.0, half, {"action": "honour_household", "household": selected.id}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
-	return y + 26.0
+		y = draw_sidebar_line(font, font_size, "Honour %s for:" % city.get_household_label(selected.id), x, y, VisualStyle.COLOR_MUTED)
+		var quarter: float = (width - 12.0) * 0.25
+		var labels: Array[String] = ["Service", "Holding", "Craft", "Peace"]
+		for column in range(4):
+			draw_city_action_button(font, font_size, labels[column], x + column * (quarter + 4.0), y, quarter, {"action": "honour_household", "household": selected.id, "category": TownSocial.RECOGNITIONS[column]}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
+		y += 26.0
+	return y
 
 # The family roster (L), over the left of the town view: one line a family (HouseholdRosterHelper).
 func draw_household_roster(font: Font, font_size: int) -> void:

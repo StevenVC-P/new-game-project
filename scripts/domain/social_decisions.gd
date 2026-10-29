@@ -43,17 +43,71 @@ static func get_help_desire(city: City, household: Household, project: Construct
 		add_strength(terms, household, "private_holdings", -0.5, "it puts its own holding first")
 		add_strength(terms, household, "deferential", 0.5, "it answers the community's needs")
 		if household.trust != 0:
-			add(terms, 0.5 * household.trust, "it trusts the leadership" if household.trust > 0 else "it distrusts the leadership")
+			add(terms, 0.5 * household.trust, "it trusts the gathering's decisions" if household.trust > 0 else "it distrusts the gathering's decisions")
 	else:
 		add_strength(terms, household, "mutual_aid", 0.5, "it believes neighbours should help one another")
-		add_relationship(terms, household, target, 0.75, 1.5, -2.5)
+		add_relationship(terms, household, target, 0.75, get_kin_obligation(household, target), -2.5)
+		add_unreturned(terms, household, target)
 	add_own_security(city, household, terms, "it cannot spare time from its own work")
 	if target != null and in_need:
 		add_norm(city, household, TownSocial.NORM_HELP, terms)
 	if city.social.incentive:
-		add(terms, INCENTIVE_WEIGHT + 0.25 * maxi(0, axis(household, HouseholdCharacter.AMBITION)), "the community gives first claim on the stores to families who help")
-	if city.social.helping_honoured_recently() and axis(household, HouseholdCharacter.AMBITION) > 0:
-		add(terms, 0.5, "helping is honoured here")
+		add(terms, INCENTIVE_WEIGHT + 0.25 * maxi(0, axis(household, HouseholdCharacter.AMBITION)), "the gathering gives first claim on the stores to families who help")
+	add_inspiration(city, household, TownSocial.RECOGNITION_SERVICE, terms, 0.5, "helping is honoured here")
+	return {"score": sum(terms), "terms": terms}
+
+# How strongly a household feels bound to help kin: always a strong pull, stronger for close-knit
+# and clannish families and toward the household it came from when it reveres its elders, weaker
+# for families who hold that children should leave the nest. It weighs the decision; it never
+# makes it (owner decision: kinship influences willingness, it does not override autonomy).
+static func get_kin_obligation(household: Household, other: Household) -> float:
+	var obligation: float = 2.0
+	obligation += 0.75 * HouseholdCharacter.get_strength(household, "close_knit")
+	obligation += 0.5 * HouseholdCharacter.get_strength(household, "clannish")
+	obligation -= 0.5 * HouseholdCharacter.get_strength(household, "leave_the_nest")
+	if household.is_child_of(other.id):
+		obligation += 0.5 * HouseholdCharacter.get_strength(household, "elder_reverence")
+	return maxf(1.0, obligation)
+
+# Help given again and again without return wears thin, even with kin (a little less so with them).
+static func add_unreturned(terms: Array, household: Household, other: Household) -> void:
+	var they_owe: int = -int(HouseholdMemory.get_tie(household, other.id).get("owes", 0))
+	if they_owe < 3:
+		return
+	var weight: float = minf(2.0, 0.5 * (they_owe - 2))
+	if HouseholdMemory.is_kin(household, other):
+		weight *= 0.5
+	add(terms, -weight, "it has helped them %d times without return" % they_owe)
+
+# An honour the household saw as deserved, and wants to match (TownSocial.judge_recognition).
+static func add_inspiration(city: City, household: Household, kind: String, terms: Array, weight: float, reason: String) -> void:
+	if household.inspired_by == kind and household.inspired_until >= city.construction.day:
+		add(terms, weight, reason)
+
+# --- Long days ------------------------------------------------------------------------------------
+
+# A household's wish to work long days this week: to give its spare time to building out of its
+# rest instead of out of its holding. Diligence decides most; unfinished work of its own, a promise
+# of help, and ambition add to it; weariness and its own security weigh against. More work, at a
+# real cost: a month of long days is a month's hardship (HouseholdMigration).
+static func get_hours_desire(city: City, household: Household, project: ConstructionProject, own: bool) -> Dictionary:
+	var terms: Array = []
+	add(terms, -1.0, "long days cost the family its rest")
+	var diligence: int = axis(household, HouseholdCharacter.DILIGENCE)
+	if diligence != 0:
+		add(terms, 1.0 * diligence, "it is glad of the work" if diligence > 0 else "it guards its rest")
+	if own:
+		add(terms, 1.0, "its own %s is unfinished" % TownConstruction.get_display_name(project).to_lower())
+		if project.is_home() and TownSocial.is_in_need(city, household, project):
+			add(terms, 0.5, "it has no proper home yet")
+	else:
+		add(terms, 0.5, "it has promised its help")
+	var ambition: int = axis(household, HouseholdCharacter.AMBITION)
+	if ambition > 0:
+		add(terms, 0.25 * ambition, "it wants to get on")
+	if household.long_weeks_this_month >= 2:
+		add(terms, -0.75 * (household.long_weeks_this_month - 1), "it is weary")
+	add_own_security(city, household, terms, "it cannot afford to wear itself out")
 	return {"score": sum(terms), "terms": terms}
 
 # --- Sharing in a shortage ------------------------------------------------------------------------
@@ -81,10 +135,10 @@ static func get_share_desire(city: City, donor: Household, recipient: Household)
 	var risk: int = axis(donor, HouseholdCharacter.RISK)
 	if risk < 0:
 		add(terms, 0.5 * risk, "it keeps a margin against the worst")
-	add_relationship(terms, donor, recipient, 0.75, 2.0, -3.0)
+	add_relationship(terms, donor, recipient, 0.75, get_kin_obligation(donor, recipient), -3.0)
 	add_norm(city, donor, TownSocial.NORM_HELP, terms)
 	if city.social.incentive:
-		add(terms, 1.0, "the community gives first claim on the stores to families who share")
+		add(terms, 1.0, "the gathering gives first claim on the stores to families who share")
 	return {"score": sum(terms), "terms": terms}
 
 # --- A claim on a field ---------------------------------------------------------------------------
@@ -128,6 +182,93 @@ static func get_amends_desire(city: City, crosser: Household, victim: Household)
 		add(terms, 0.5 * victim.standing, "the other family is well regarded" if victim.standing > 0 else "the other family is little regarded")
 	add_own_security(city, crosser, terms, "it cannot spare the labor")
 	add_norm(city, crosser, TownSocial.NORM_CLAIMS, terms)
+	add_inspiration(city, crosser, TownSocial.RECOGNITION_CIVIC, terms, 0.5, "keeping the peace is honoured here")
+	return {"score": sum(terms), "terms": terms}
+
+# --- Contested land -------------------------------------------------------------------------------
+
+# Whether a household that wants land another household holds (or has just claimed) asks for it.
+# `stake`: {"kind" (TownSocial.CONTEST_*), "nowhere_else" (no other land it may use), "nearer" (tiles
+# nearer its home than its best other choice), "built" (the holder already works it)}.
+static func get_press_desire(city: City, claimant: Household, holder: Household, stake: Dictionary) -> Dictionary:
+	var terms: Array = []
+	add(terms, -1.0, "asking a neighbour for its land costs something")
+	if bool(stake.get("nowhere_else", false)):
+		add(terms, 3.0, "it has no other land to work")
+	elif float(stake.get("nearer", 0.0)) >= 4.0:
+		add(terms, minf(2.0, 0.25 * float(stake["nearer"])), "the land is much nearer its home")
+	if bool(stake.get("built", false)):
+		add(terms, -1.5, "the other family already works it")
+	var assertiveness: int = axis(claimant, HouseholdCharacter.ASSERTIVENESS)
+	if assertiveness != 0:
+		add(terms, 0.75 * assertiveness, "it presses its claims" if assertiveness > 0 else "it would rather not confront anyone")
+	add_strength(terms, claimant, "respect_for_holdings", -1.0, "it holds that a claim belongs to whoever made it first")
+	add_strength(terms, claimant, "landholding", 0.5, "it sets great store by land")
+	add_strength(terms, claimant, "negotiation", 0.25, "it would rather talk it through")
+	if HouseholdMemory.is_kin(claimant, holder):
+		add(terms, 0.5, "they are kin and may make room")
+	var disposition: int = HouseholdMemory.get_disposition(claimant, holder.id)
+	if disposition < 0:
+		add(terms, 0.5, "they are already at odds")
+	if holder.standing > claimant.standing:
+		add(terms, -0.5 * (holder.standing - claimant.standing), "the other family is better regarded")
+	# Respecting claims, as a habit or a custom, means not asking for land another family holds.
+	var norm_terms: Array = []
+	add_norm(city, claimant, TownSocial.NORM_CLAIMS, norm_terms)
+	for term: Dictionary in norm_terms:
+		add(terms, -float(term["weight"]), str(term["reason"]))
+	return {"score": sum(terms), "terms": terms}
+
+# Whether the holder makes room for a household that asked for its land.
+static func get_yield_desire(city: City, holder: Household, claimant: Household, stake: Dictionary) -> Dictionary:
+	var terms: Array = []
+	if bool(stake.get("built", false)):
+		add(terms, -2.5, "it would give up the work it built")
+	else:
+		add(terms, -1.0, "it would give up the land it chose")
+	if not bool(stake.get("holder_has_alternative", true)):
+		add(terms, -3.0, "it has nowhere else to work")
+	var empathy: int = axis(holder, HouseholdCharacter.EMPATHY)
+	if bool(stake.get("nowhere_else", false)):
+		add(terms, 1.0, "they have no other land")
+		if empathy != 0:
+			add(terms, 0.75 * empathy, "it is attuned to their need" if empathy > 0 else "it pays little heed to their need")
+	add_strength(terms, holder, "sharing", 0.5, "it believes in sharing")
+	add_strength(terms, holder, "mutual_aid", 0.5, "it believes neighbours should help one another")
+	add_strength(terms, holder, "private_holdings", -0.75, "it puts its own holding first")
+	add_strength(terms, holder, "landholding", -0.75, "it sets great store by land")
+	add_strength(terms, holder, "acquisitive", -0.5, "it holds on to what it has")
+	var assertiveness: int = axis(holder, HouseholdCharacter.ASSERTIVENESS)
+	if assertiveness != 0:
+		add(terms, -0.5 * assertiveness, "it stands its ground" if assertiveness > 0 else "it yields rather than quarrel")
+	add_relationship(terms, holder, claimant, 0.75, get_kin_obligation(holder, claimant), -2.0)
+	if claimant.standing != 0:
+		add(terms, 0.5 * claimant.standing, "the other family is well regarded" if claimant.standing > 0 else "the other family is little regarded")
+	add(terms, 0.5, "they offer their labor in return")
+	add_strength(terms, holder, "negotiation", 0.25, "it prefers to settle things")
+	var claims: Dictionary = city.social.norms[TownSocial.NORM_CLAIMS]
+	if str(claims["status"]) == TownSocial.STATUS_CUSTOM:
+		add(terms, -0.75, "the custom here backs its claim")
+	add_inspiration(city, holder, TownSocial.RECOGNITION_CIVIC, terms, 0.5, "keeping the peace is honoured here")
+	return {"score": sum(terms), "terms": terms}
+
+# Whether a household gives up its holding when the gathering asks for the land for the town's use
+# (TownSocial.ask_for_land): its deference, trust, and what it thinks of holding land weigh in,
+# and the compensation offered, first claim on the stores for new work.
+static func get_yield_to_community_desire(city: City, holder: Household, purpose: String) -> Dictionary:
+	var terms: Array = []
+	add(terms, -2.5, "it would give up the work it built")
+	add(terms, 1.0, "the town needs the ground for its %s" % purpose)
+	add(terms, 0.75, "the gathering offers first claim on the stores for new work")
+	add_strength(terms, holder, "deferential", 0.75, "it answers the community's needs")
+	add_strength(terms, holder, "communal_labor", 0.5, "it values working together")
+	add_strength(terms, holder, "common_stores", 0.5, "it holds that the town's needs come first")
+	add_strength(terms, holder, "self_governing", -0.75, "it holds that families should decide for themselves")
+	add_strength(terms, holder, "private_holdings", -0.75, "it puts its own holding first")
+	add_strength(terms, holder, "landholding", -0.75, "it sets great store by land")
+	if holder.trust != 0:
+		add(terms, 0.5 * holder.trust, "it trusts the gathering's decisions" if holder.trust > 0 else "it distrusts the gathering's decisions")
+	add_own_security(city, holder, terms, "it cannot afford to lose its work")
 	return {"score": sum(terms), "terms": terms}
 
 # --- Shared terms ---------------------------------------------------------------------------------
@@ -146,16 +287,20 @@ static func add_strength(terms: Array, household: Household, value_id: String, p
 	if strength > 0:
 		add(terms, per_level * strength, reason)
 
-# Kinship, how the household feels about the other, favours it owes them, and any grievance.
+# Kinship, how the household feels about the other, favours it owes them, and any grievance. Kin
+# ties start warm (HouseholdMemory.ensure_kin_ties), so with kin only feeling above or below that
+# counts: relatives can fall out.
 static func add_relationship(terms: Array, household: Household, other: Household, per_disposition: float, kin_weight: float, grievance_weight: float) -> void:
-	if HouseholdMemory.is_kin(household, other):
+	var kin: bool = HouseholdMemory.is_kin(household, other)
+	if kin:
 		add(terms, kin_weight, "they are kin")
 	var tie: Dictionary = HouseholdMemory.get_tie(household, other.id)
 	if tie.is_empty():
 		return
-	var disposition: int = int(tie["disposition"])
-	if disposition != 0 and not bool(tie.get("kin", false)):
-		add(terms, per_disposition * disposition, "they are on good terms" if disposition > 0 else "they are on bad terms")
+	var disposition: int = int(tie["disposition"]) - (HouseholdMemory.KIN_START_DISPOSITION if kin else 0)
+	if disposition != 0:
+		var words: String = ("they are close" if disposition > 0 else "they have fallen out") if kin else ("they are on good terms" if disposition > 0 else "they are on bad terms")
+		add(terms, per_disposition * disposition, words)
 	if int(tie["owes"]) > 0:
 		add(terms, minf(2.0, float(tie["owes"])), "it owes them for past help")
 	if str(tie["grievance"]) != "":
@@ -178,5 +323,5 @@ static func add_norm(city: City, household: Household, norm_id: String, terms: A
 	if str(norm["status"]) == TownSocial.STATUS_CUSTOM:
 		add(terms, 0.5, "it is the custom here")
 	if bool(norm["promoted"]):
-		var receptive: Dictionary = FamilyInitiative.get_receptiveness(household)
-		add(terms, NORM_APPEAL_WEIGHT * float(receptive["factor"]), "the community asks families to " + str(TownSocial.NORM_ASKS[norm_id]) + str(receptive["note"]))
+		var receptive: Dictionary = FamilyInitiative.get_receptiveness(household, city)
+		add(terms, NORM_APPEAL_WEIGHT * float(receptive["factor"]), "the gathering asks families to " + str(TownSocial.NORM_ASKS[norm_id]) + str(receptive["note"]))

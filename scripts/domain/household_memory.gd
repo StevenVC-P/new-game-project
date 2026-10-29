@@ -87,11 +87,13 @@ static func drop_weakest_tie(household: Household) -> void:
 	if weakest >= 0:
 		household.ties.remove_at(weakest)
 
-# Kin ties to the households a family came from and the ones it founded.
+# Kin ties to the households a family came from and the ones it founded, warm to begin with.
+const KIN_START_DISPOSITION: int = 1
+
 static func ensure_kin_ties(city: City, household: Household) -> void:
 	for other: Household in city.social.get_kin(household):
 		if get_tie(household, other.id).is_empty():
-			touch_tie(city, household, other, 1, "kin")
+			touch_tie(city, household, other, KIN_START_DISPOSITION, "kin")
 
 # --- Memories and interpretation -----------------------------------------------------------------
 
@@ -166,16 +168,52 @@ static func get_lessons(city: City, household: Household, kind: String, other: H
 				lessons.append(lesson("a footpath is no great harm", "respect_for_holdings", -1, 0.3 + 0.5 * assertiveness - 0.3 * empathy - 0.5 * s.call("respect_for_holdings")))
 				lessons.append(lesson("they make a quarrel of everything", "", 0, 0.5 + 0.3 * assertiveness - 0.3 * disposition))
 		"honour_unfair", "share_unfair":
-			lessons.append(lesson("the leadership plays favourites", "", 0, 0.8 + 0.5 * s.call("egalitarian") + 0.3 * float(facets.get("overlooked", 0.0))))
+			lessons.append(lesson("the gathering plays favourites", "", 0, 0.8 + 0.5 * s.call("egalitarian") + 0.3 * float(facets.get("overlooked", 0.0))))
 			lessons.append(lesson("everyone's work deserves its due", "egalitarian", 1, 0.3 + 0.6 * s.call("egalitarian") + 0.3 * empathy - 0.4 * s.call("hierarchical")))
 			lessons.append(lesson("honour goes to those who seek it", "hierarchical", 1, 0.3 * ambition + 0.6 * s.call("hierarchical") - 0.4 * s.call("egalitarian")))
 		"honour_fair":
-			lessons.append(lesson("service is noticed here", "communal_labor", 1, 0.5 + 0.3 * diligence + 0.3 * ambition + 0.3 * s.call("communal_labor")))
+			var fair_value: String = RECOGNITION_VALUES.get(str(facets.get("category", "")), "communal_labor")
+			lessons.append(lesson(str(RECOGNITION_LESSONS.get(str(facets.get("category", "")), "service is noticed here")), fair_value, 1, 0.5 + 0.3 * diligence + 0.3 * ambition + 0.3 * s.call(fair_value)))
 			lessons.append(lesson("honours are for others", "", 0, 0.3 - 0.4 * ambition - 0.3 * sociability))
 		"honoured":
-			lessons.append(lesson("the community values what we do", "communal_labor", 1, 0.6 + 0.5 * ambition + 0.3 * s.call("communal_labor")))
+			var own_value: String = RECOGNITION_VALUES.get(str(facets.get("category", "")), "communal_labor")
+			lessons.append(lesson("the town values what we do", own_value, 1, 0.6 + 0.5 * ambition + 0.3 * s.call(own_value)))
 			lessons.append(lesson("we would rather be left alone", "", 0, 0.2 - 0.6 * sociability - 0.3 * ambition))
+		"land_yielded":
+			lessons.append(lesson("neighbours should make room for each other", "mutual_aid", 1, 0.5 + 0.5 * empathy + 0.3 * s.call("sharing") + 0.3 * disposition))
+			lessons.append(lesson("we gave up what was ours", "private_holdings", 1, 0.3 + 0.5 * s.call("private_holdings") + 0.5 * s.call("landholding") - 0.3 * empathy))
+		"land_given":
+			lessons.append(lesson("neighbours make room for those in need", "mutual_aid", 1, 0.6 + 0.4 * empathy + 0.3 * disposition))
+			lessons.append(lesson("asking openly works", "negotiation", 1, 0.4 + 0.5 * s.call("negotiation") + 0.3 * sociability))
+		"land_refused":
+			if bool(facets.get("accepted", false)):
+				lessons.append(lesson("their claim came first", "respect_for_holdings", 1, 0.5 + 0.5 * s.call("respect_for_holdings") - 0.3 * assertiveness))
+			lessons.append(lesson("they keep everything for themselves", "", 0, 0.3 + 0.5 * assertiveness - 0.3 * disposition - (1.0 if bool(facets.get("accepted", false)) else 0.0)))
+			lessons.append(lesson("we must secure land of our own", "landholding", 1, 0.3 + 0.4 * ambition + 0.5 * s.call("landholding") - 0.2 * empathy))
+		"land_kept":
+			lessons.append(lesson("claims must be respected", "respect_for_holdings", 1, 0.6 + 0.5 * s.call("respect_for_holdings") + 0.3 * s.call("private_holdings")))
+			lessons.append(lesson("newcomers want what others built", "", 0, 0.3 + 0.3 * assertiveness - 0.4 * empathy))
+		"land_taken":
+			lessons.append(lesson("the gathering takes what it wants", "self_governing", 1, 0.5 + 0.5 * s.call("self_governing") + 0.5 * s.call("private_holdings") + 0.3 * assertiveness))
+			lessons.append(lesson("the town's needs come first", "common_stores", 1, 0.2 + 0.5 * s.call("deferential") + 0.5 * s.call("common_stores")))
+			lessons.append(lesson("no holding is safe", "landholding", 1, 0.3 + 0.5 * s.call("landholding") - 0.3 * risk))
+		"land_given_to_town":
+			lessons.append(lesson("the town's needs come first", "common_stores", 1, 0.5 + 0.5 * s.call("deferential") + 0.5 * s.call("common_stores") + 0.3 * s.call("communal_labor")))
+			lessons.append(lesson("we gave up what was ours", "private_holdings", 1, 0.3 + 0.5 * s.call("private_holdings") + 0.5 * s.call("landholding")))
+		"built_together":
+			lessons.append(lesson("working together builds the town", "communal_labor", 1, 0.5 + 0.3 * sociability + 0.3 * s.call("communal_labor")))
+			lessons.append(lesson("our own work waited for it", "solitary", 1, 0.2 - 0.4 * sociability + 0.5 * s.call("solitary") + 0.3 * s.call("private_holdings")))
+	if kind == "honour_unfair":
+		match str(facets.get("category", "")):
+			TownSocial.RECOGNITION_ACHIEVEMENT:
+				lessons.append(lesson("honours go to the already prosperous", "egalitarian", 1, 0.2 + 0.5 * s.call("egalitarian") + 0.4 * s.call("communal_labor") + (0.5 if bool(facets.get("prosperous", false)) else 0.0)))
+			TownSocial.RECOGNITION_SERVICE:
+				lessons.append(lesson("our own work goes unrewarded", "private_holdings", 1, 0.1 + 0.4 * diligence + 0.5 * s.call("private_holdings") + 0.3 * float(facets.get("overlooked", 0.0))))
 	return lessons
+
+# The value a deserved honour of each kind bears out, and how the household puts it.
+const RECOGNITION_VALUES: Dictionary = {"service": "communal_labor", "achievement": "private_holdings", "craft": "keepers_of_craft", "civic": "negotiation"}
+const RECOGNITION_LESSONS: Dictionary = {"service": "service is noticed here", "achievement": "building up a holding is honoured here", "craft": "good craft is honoured here", "civic": "keeping the peace is honoured here"}
 
 static func lesson(text: String, value_id: String, direction: int, support: float) -> Dictionary:
 	return {"text": text, "value": value_id, "direction": direction, "support": support}
@@ -184,8 +222,10 @@ static func lesson(text: String, value_id: String, direction: int, support: floa
 # level, if it has not moved in the last year; the evidence then starts again (hysteresis), and
 # the change is explained by the experience that tipped it.
 static func add_evidence(city: City, household: Household, value_id: String, amount: float, because: String) -> void:
-	if HouseholdCharacter.CONDUCT_OPPOSITES.has(value_id) and amount > 0.0 and HouseholdCharacter.get_strength(household, HouseholdCharacter.CONDUCT_OPPOSITES[value_id]) > 0:
-		value_id = HouseholdCharacter.CONDUCT_OPPOSITES[value_id]
+	# A household cannot hold both of a pair of opposites: evidence for one first wears down the other.
+	var opposite: String = HouseholdCharacter.get_opposite(value_id)
+	if amount > 0.0 and HouseholdCharacter.get_strength(household, opposite) > 0:
+		value_id = opposite
 		amount = -amount
 	var evidence: float = float(household.value_evidence.get(value_id, 0.0)) + amount
 	var last: int = int(household.value_changed_day.get(value_id, -DAYS_BETWEEN_CHANGES))
@@ -204,6 +244,12 @@ static func add_evidence(city: City, household: Household, value_id: String, amo
 static func note_change(city: City, household: Household, value_id: String, stronger: bool, because: String) -> void:
 	household.value_changed_day[value_id] = city.construction.day
 	city.social.value_changes += 1
+	# A value that moves back the way it last came is a reversal: the social check watches for
+	# convictions that swing back and forth.
+	var key: String = "%d:%s" % [household.id, value_id]
+	if city.social.value_change_directions.has(key) and bool(city.social.value_change_directions[key]) != stronger:
+		city.social.value_reversals += 1
+	city.social.value_change_directions[key] = stronger
 	var strength: int = HouseholdCharacter.get_strength(household, value_id)
 	var now: String = HouseholdCharacter.STRENGTH_WORDS[strength] + " " + HouseholdCharacter.get_value_name(value_id) if strength > 0 else "no longer holds to " + HouseholdCharacter.get_value_name(value_id)
 	household.value_change_notes.append("Day %d: after %s, it now %s" % [city.construction.day, because.to_lower(), now])

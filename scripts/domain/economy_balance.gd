@@ -152,6 +152,10 @@ const MAX_CREW: int = 3
 # A family that works a holding can still give this share of its day to its own home or to tier 0
 # hand work, at the same cost to its holding's output that day.
 const SPARE_TIME_SHARE: float = 0.2
+# Household social model: a family working long days gives that share out of its rest instead,
+# and a month with OVERWORK_WEEKS such weeks is a month's hardship of OVERWORK_HARDSHIP_POINTS.
+const OVERWORK_WEEKS: int = 3
+const OVERWORK_HARDSHIP_POINTS: int = 1
 
 # --- Logistics (docs/TOWN_BUILDING_MODEL.md) ---
 # Goods move between workplaces and stores on foot. Distances are in effort-tiles: a tile of open

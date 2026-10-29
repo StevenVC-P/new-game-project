@@ -158,6 +158,16 @@ static func get_strength(household: Household, value_id: String) -> int:
 		return int(household.value_strengths[value_id])
 	return 1 if CultureValues.has_value(household.values, value_id) else 0
 
+# The value a household cannot hold alongside this one ("" if none): a conduct opposite, or the other
+# half of one of the catalog's exclusive pairs.
+static func get_opposite(value_id: String) -> String:
+	if CONDUCT_OPPOSITES.has(value_id):
+		return CONDUCT_OPPOSITES[value_id]
+	for group: Array in CultureValues.EXCLUSIVE_GROUPS:
+		if group.size() == 2 and group.has(value_id):
+			return str(group[1] if group[0] == value_id else group[0])
+	return ""
+
 static func set_strength(household: Household, value_id: String, strength: int) -> void:
 	household.value_strengths[value_id] = clampi(strength, 0, 3)
 
