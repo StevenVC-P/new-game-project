@@ -1076,8 +1076,10 @@ func review_month() -> void:
 		var order: int = get_order_regard(household)
 		if changes >= MANY_CHANGES:
 			adjust_trust(household, -0.25 * maxi(1, order), "decisions keep changing")
-		elif changes == 0 and decided and order >= 1:
-			adjust_trust(household, 0.1 * order, "steady decisions")
+		# Predictability earns confidence, not devotion: it lifts trust no higher than mild, and not
+		# for a family the steady policy itself has been holding back.
+		elif changes == 0 and decided and order >= 1 and household.trust < 1 and city.construction.day - int(held_back_days.get(str(household.id), -1000)) > 60:
+			adjust_trust(household, 0.05 * order, "steady decisions")
 
 # How much a household cares that decisions are predictable and follow known rules.
 static func get_order_regard(household: Household) -> int:

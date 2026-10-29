@@ -32,6 +32,9 @@ const APPROACHES: Array = [
 	# and unfair honours for the first year only, to see whether the town settles again.
 	{"name": "fair", "fair": true},
 	{"name": "brief_unfair", "unfair": true, "brief": true},
+	# The social model off: every working family gives its spare time to the first site with room,
+	# as before. The yardstick for construction under voluntary help.
+	{"name": "social_off", "social": false},
 ]
 
 func _init() -> void:
@@ -84,6 +87,8 @@ func summarize(name: String, results: Array[Dictionary]) -> void:
 			totals[key] = float(totals.get(key, 0.0)) + float(result[key])
 		housed_days.append(int(result["founders_housed_day"]))
 		var social: Dictionary = result["social"]
+		if social.is_empty():
+			continue
 		for key: String in social.keys():
 			if social[key] is float or social[key] is int:
 				totals["s_" + key] = float(totals.get("s_" + key, 0.0)) + float(social[key])
