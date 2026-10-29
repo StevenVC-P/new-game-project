@@ -16,9 +16,9 @@ const CALLING_MATCH_PERCENT: int = 25
 const CALLING_POOR_MATCH_PERCENT: int = -25
 const OUTPUT_PERCENT_CAP: int = 30
 
+# Industrious and leisurely change no output (owner decision, docs/HOUSEHOLD_SOCIAL_MODEL.md):
+# diligence is temperament, and shapes how much a family chooses to work, not how well it works.
 const WORK_ETHIC_PERCENT: Dictionary = {
-	"industrious": 10,
-	"leisurely": -10,
 	"steady": 5,
 	"perfectionist": -10,
 	"expedient": 10

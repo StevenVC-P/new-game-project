@@ -34,8 +34,36 @@ var blocked_by_map: Dictionary = {}
 # few, fence fields people walk through, put a storehouse beside a workplace that loses much of
 # its day to carrying), for the planning check; with "answer_wishes", it also builds the work
 # families wish for (FamilyAmbitions).
+#
+# Influence prototype (docs/FAMILY_INFLUENCE_PROTOTYPE.md): "families_develop" turns on families
+# taking up and improving their own work (FamilyInitiative); the stand-in then plans no workplace and
+# no workplace upgrade, only homes (plots, with "homes_on_plots") and the planned public works.
+# "guided" adds what a player using influence does: keep the stores for the community's priorities
+# and ask for whatever the town is short of (guide()). "hand_method" turns on proper workplaces
+# working by hand when short of tools (City.set_hand_method_fallback).
 func play(city, scenario: Dictionary, days: int) -> Dictionary:
 	var uses_map: bool = not city.local_map.is_empty()
+	if scenario.get("families_develop", false):
+		city.influence.enabled = true
+		city.influence.reserved_builders = int(scenario.get("reserved_builders", 0))
+	if scenario.get("hand_method", false):
+		city.set_hand_method_fallback(true)
+	# Household social prototype (docs/HOUSEHOLD_SOCIAL_MODEL.md): "social" turns it on; "promote"
+	# asks for both norms; "incentive" gives helpers and sharers first claim on the stores;
+	# "restricted" keeps the stores for the community's priorities (food only); "unfair" honours and
+	# favours the household that has contributed least, every few months; "hard_winter" empties
+	# most of the stores as the first winter begins (a lost harvest), so the town meets a shortage.
+	if scenario.get("social", false):
+		city.social.set_enabled(true)
+		city.social.incentive = scenario.get("incentive", false)
+		if scenario.get("promote", false):
+			city.social.set_promoted(TownSocial.NORM_HELP, true)
+			city.social.set_promoted(TownSocial.NORM_CLAIMS, true)
+			player_actions += 2
+		if scenario.get("restricted", false):
+			city.influence.store_rule = TownInfluence.RULE_PRIORITIES
+			city.influence.set_encouraged(TownInfluence.ACTIVITY_FOOD, true)
+			player_actions += 2
 	for entry: String in scenario.get("prebuild", []):
 		if entry.ends_with("*"):
 			while try_build(city, entry.trim_suffix("*"), scenario, 0):
@@ -65,6 +93,8 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 		for project: ConstructionProject in city.construction.projects:
 			if project.blocked_reason == "no builders free":
 				stalled_site_days += 1
+				var kind: String = stall_kind(city, project)
+				stalled_by_kind[kind] = int(stalled_by_kind.get(kind, 0)) + 1
 		if first_home_day < 0 and int(city.resources["house_shelter_capacity"]) > 0:
 			first_home_day = day
 		if day > 30 and int(city.resources["tools"]) == 0:
@@ -77,8 +107,22 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 			trade(city, day)
 		if scenario.get("defends", false) and uses_map:
 			defend(city, day)
+		if scenario.get("guided", false) and day % GUIDE_INTERVAL_DAYS == 0:
+			guide(city)
+		if scenario.get("hard_winter", false) and day == HARD_WINTER_DAY:
+			city.resources["food"] = mini(int(city.resources["food"]), int(city.resources["food_consumption_rate"]) * HARD_WINTER_FOOD_DAYS)
+		if scenario.get("unfair", false) and day >= UNFAIR_FIRST_DAY and (day - UNFAIR_FIRST_DAY) % UNFAIR_INTERVAL_DAYS == 0:
+			if not scenario.get("brief", false) or day < BRIEF_UNFAIR_DAYS:
+				favour_least_deserving(city)
+		if scenario.get("fair", false) and day >= UNFAIR_FIRST_DAY and (day - UNFAIR_FIRST_DAY) % UNFAIR_INTERVAL_DAYS == 0:
+			honour_most_deserving(city, (day - UNFAIR_FIRST_DAY) / UNFAIR_INTERVAL_DAYS)
+		if founders_housed_day < 0 and day > 0 and founders_housed(city):
+			founders_housed_day = day
+		if scenario.get("social", false) and day % 360 == 359:
+			social_years.append(snapshot_social(city))
 		if day % POLICY_INTERVAL_DAYS == 0 and day >= int(scenario.get("idle_until", 0)):
-			upgrade_one(city, scenario, day)
+			if not scenario.get("families_develop", false):
+				upgrade_one(city, scenario, day)
 			var wanted: String = choose_build(city, scenario, day)
 			if wanted == "":
 				low_wood_streak = 0
@@ -132,8 +176,195 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 		"hamlet_day": city.settlement.stage_days[SettlementStage.HAMLET],
 		"village_day": city.settlement.stage_days[SettlementStage.VILLAGE],
 		"raids_driven_off": city.defense.raids_driven_off,
-		"calling_wishes": city.households.filter(func(h: Household) -> bool: return h.ambition == FamilyAmbitions.CALLING).size()
+		"calling_wishes": city.households.filter(func(h: Household) -> bool: return h.ambition == FamilyAmbitions.CALLING).size(),
+		"player_actions": player_actions,
+		"opened_by_families": city.influence.workplaces_opened,
+		"improvements_by_families": city.influence.improvements_started,
+		"held_back_by_stores": city.influence.held_back_by_stores,
+		"proper_workplaces": city.buildings.filter(func(b: Building) -> bool: return b.needs_maintenance()).size(),
+		"hand_workplaces": city.buildings.filter(func(b: Building) -> bool: return b.is_production_building() and b.is_tier0()).size(),
+		"working_by_hand": city.buildings.filter(func(b: Building) -> bool: return b.is_working_by_hand()).size(),
+		"workplace_spread": workplace_spread(city),
+		"founder_improvements": founder_improvements(city),
+		"social": snapshot_social(city) if scenario.get("social", false) else {},
+		"social_years": social_years,
+		"founders_housed_day": founders_housed_day,
+		"stalled_by_kind": stalled_by_kind,
 	}
+
+# Site-days waiting for a builder, by what the site is: for diagnosing voluntary help (social check).
+var stalled_by_kind: Dictionary = {}
+
+static func stall_kind(city, project: ConstructionProject) -> String:
+	if TownSocial.is_communal(project):
+		return "communal"
+	if project.kind == ConstructionProject.KIND_FENCE:
+		return "fence"
+	if project.kind == ConstructionProject.KIND_UPGRADE:
+		return "upgrade"
+	if project.is_home():
+		var claimant: Household = city.get_household_by_id(project.claimant_household_id)
+		if claimant == null:
+			return "home, no family yet"
+		return "home of a family on a holding" if claimant.assigned_workers > 0 else "home of a free family"
+	return "new workplace"
+
+const HARD_WINTER_DAY: int = 270
+const HARD_WINTER_FOOD_DAYS: int = 8
+const UNFAIR_FIRST_DAY: int = 90
+const UNFAIR_INTERVAL_DAYS: int = 120
+# "brief" with "unfair": the unfair honours stop after the first year.
+const BRIEF_UNFAIR_DAYS: int = 360
+
+# The social state of a town at a moment, for the social check.
+var social_years: Array = []
+# The first day every founding family still in town lived in a proper home (-1: never).
+var founders_housed_day: int = -1
+
+func founders_housed(city) -> bool:
+	for household: Household in city.households:
+		if household.id < EconomyBalanceScript.FOUNDING_FAMILIES and (household.housing_status != Household.RESIDENCE_HOUSED or city.is_household_in_rough_housing(household)):
+			return false
+	return true
+
+# "fair": every few months, honour the family that has done most of one kind of contribution, the
+# kind changing each time, so households see each kind recognized where it was earned.
+func honour_most_deserving(city, turn: int) -> void:
+	var category: String = TownSocial.RECOGNITIONS[turn % TownSocial.RECOGNITIONS.size()]
+	var chosen: Household = null
+	var best: float = 0.0
+	for household: Household in city.households:
+		var merit: float = city.social.get_merit(household, category)
+		if merit > best:
+			chosen = household
+			best = merit
+	if chosen != null:
+		city.social.recognize(chosen, category)
+		player_actions += 1
+
+# The household that has given the community least (ties: the newest) is honoured and given first
+# claim on the stores: a deliberately unfair distribution.
+func favour_least_deserving(city) -> void:
+	var chosen: Household = null
+	for household: Household in city.households:
+		if chosen == null or household.help_given < chosen.help_given or (household.help_given == chosen.help_given and household.id > chosen.id):
+			chosen = household
+	if chosen != null:
+		city.social.recognize(chosen)
+		city.social.grant(chosen)
+		player_actions += 2
+
+static func snapshot_social(city) -> Dictionary:
+	var social: TownSocial = city.social
+	var dispositions: Array[int] = []
+	var kinds: Dictionary = {}
+	var trust: float = 0.0
+	var standing: Array[int] = []
+	for household: Household in city.households:
+		trust += household.trust
+		standing.append(household.standing)
+		for tie: Dictionary in household.ties:
+			if bool(tie.get("kin", false)):
+				continue
+			dispositions.append(int(tie["disposition"]))
+			kinds[tie["kind"]] = int(kinds.get(tie["kind"], 0)) + 1
+	standing.sort()
+	var n: float = maxf(1.0, city.households.size())
+	var mean_disposition: float = 0.0
+	for d: int in dispositions:
+		mean_disposition += d
+	return {
+		"help_rate": float(social.help_followed) / maxf(1.0, social.help_opportunities),
+		"help_opportunities": social.help_opportunities,
+		"help_weeks": social.help_weeks,
+		"share_rate": float(social.shares) / maxf(1.0, social.share_requests),
+		"share_requests": social.share_requests,
+		"disputes_raised": social.disputes_raised,
+		"disputes_settled": social.disputes_settled,
+		"disputes_let_pass": social.disputes_let_pass,
+		"dispute_pressure": social.dispute_pressure,
+		"ties": dispositions.size() / n,
+		"mean_disposition": mean_disposition / maxf(1.0, dispositions.size()),
+		"friends": int(kinds.get("friend", 0)) / n,
+		"rivals": (int(kinds.get("rival", 0)) + int(kinds.get("feud", 0))) / n,
+		"trust": trust / n,
+		"standing_spread": float(standing.back() - standing.front()) if not standing.is_empty() else 0.0,
+		"help_acceptance": float(social.norms[TownSocial.NORM_HELP]["acceptance"]),
+		"help_status": social.norms[TownSocial.NORM_HELP]["status"],
+		"claims_acceptance": float(social.norms[TownSocial.NORM_CLAIMS]["acceptance"]),
+		"claims_status": social.norms[TownSocial.NORM_CLAIMS]["status"],
+		"value_changes": social.value_changes,
+		"value_reversals": social.value_reversals,
+		"help_choice_changes": social.help_choice_changes,
+		"honour_readings": float(social.honour_readings) / maxf(1.0, social.honours),
+		"long_day_weeks": social.long_day_weeks,
+		"spare_weeks_unused": social.spare_weeks_unused,
+		"spare_weeks_no_site": social.spare_weeks_no_site,
+		"kin_help_share": float(social.kin_help_weeks) / maxf(1.0, social.help_weeks),
+		"land_contests": social.land_contests,
+		"land_yielded": social.land_yielded,
+		"land_kept": social.land_kept,
+		"land_not_pressed": social.land_not_pressed,
+		"trust_by_source": social.trust_by_source.duplicate(),
+		"decline_reasons": social.decline_reasons.duplicate(),
+		"voices": social.get_respected_voices().size(),
+		"week_usec": float(social.week_usec_total) / maxf(1.0, social.weeks_run),
+		"households": city.households.size(),
+	}
+
+# Founding families by temperament, with the day each first decided to improve its work (-1 never):
+# {"daring": [days], "cautious": [...], "traditionalist": [...], "other": [...]}.
+static func founder_improvements(city) -> Dictionary:
+	var groups: Dictionary = {"daring": [], "cautious": [], "traditionalist": [], "other": []}
+	for household: Household in city.households:
+		if household.id >= EconomyBalanceScript.FOUNDING_FAMILIES:
+			continue
+		var group: String = "other"
+		if CultureValues.has_value(household.values, "daring"):
+			group = "daring"
+		elif CultureValues.has_value(household.values, "cautious"):
+			group = "cautious"
+		elif CultureValues.has_value(household.values, "traditionalist"):
+			group = "traditionalist"
+		(groups[group] as Array).append(household.improve_decision_day)
+	return groups
+
+# Mean distance of the town's workplaces from its stockpile, in tiles.
+static func workplace_spread(city) -> float:
+	if city.local_map.is_empty() or city.logistics.stockpile_tile.x < 0:
+		return 0.0
+	var total: float = 0.0
+	var count: int = 0
+	for building: Building in city.buildings:
+		if building.is_production_building():
+			total += Vector2(TownLogistics.center_tile(building.tile, building.size)).distance_to(Vector2(city.logistics.stockpile_tile))
+			count += 1
+	return total / count if count > 0 else 0.0
+
+const GUIDE_INTERVAL_DAYS: int = 15
+
+# Decisions the stand-in made: buildings, upgrades, plots, fences, roads, calls, and changes to what
+# the community asks for and to the stores rule. A rough measure of how much a player must do.
+var player_actions: int = 0
+
+# What a player using influence does: keep the stores for the community's priorities, ask for what
+# the town is short of, and ask for better work once the stores are comfortable.
+func guide(city) -> void:
+	var influence: TownInfluence = city.influence
+	if influence.store_rule != TownInfluence.RULE_PRIORITIES:
+		influence.store_rule = TownInfluence.RULE_PRIORITIES
+		player_actions += 1
+	var reserve: Dictionary = influence.get_protected_reserve()
+	var wanted: Dictionary = {
+		TownInfluence.ACTIVITY_FOOD: FamilyInitiative.get_food_ratio(city) < 1.15 or FamilyInitiative.get_food_days(city) < 45.0,
+		TownInfluence.ACTIVITY_WOOD: int(city.resources["wood"]) < 25,
+		TownInfluence.ACTIVITY_TOOLS: int(city.resources["tools"]) < 10 and FamilyInitiative.count_producers(city, TownInfluence.ACTIVITY_TOOLS) == 0,
+		TownInfluence.ACTIVITY_IMPROVE: int(city.resources["wood"]) >= 30 and int(city.resources["tools"]) >= int(reserve["tools"]) + 3,
+	}
+	for activity: String in wanted.keys():
+		if influence.is_encouraged(activity) != bool(wanted[activity]):
+			influence.set_encouraged(activity, bool(wanted[activity]))
+			player_actions += 1
 
 const HERDER_FROM_HOUSEHOLDS: int = 8
 
@@ -145,6 +376,11 @@ func choose_build(city, scenario: Dictionary, day: int) -> String:
 	var toolmakers: int = int(counts.get("toolmaker", 0))
 	var food_needed: int = city.get_food_consumption_for_population(city.get_total_population())
 	var wants: Array[String] = []
+	# Families open and improve their own work; the stand-in sets land aside for homes.
+	if scenario.get("families_develop", false):
+		if houses < city.households.size() + 2 and allowed("house", scenario, day, counts):
+			return "house"
+		return ""
 	if woodcutters == 0:
 		wants.append("woodcutter")
 	if houses < city.households.size():
@@ -220,7 +456,9 @@ func try_build(city, building_type: String, scenario: Dictionary, day: int) -> b
 			return false
 	if scenario.get("instant", false):
 		return build_at_once(city, building_type, origin)
-	return city.construction.request_building(building_type, origin) != null
+	var planned: bool = city.construction.request_building(building_type, origin) != null
+	player_actions += 1 if planned else 0
+	return planned
 
 func build_at_once(city, building_type: String, origin: Vector2i) -> bool:
 	var size: Vector2i = city.construction.get_size(building_type)
@@ -238,7 +476,9 @@ const SCATTERED_RADIUS: float = 22.0
 # count as planned homes in count_kinds).
 func set_aside_plot(city, scenario: Dictionary) -> bool:
 	var origin: Vector2i = find_spot(city, "plot", scenario.get("scattered", false))
-	return origin.x >= 0 and city.construction.designate_plot(origin) >= 0
+	var designated: bool = origin.x >= 0 and city.construction.designate_plot(origin) >= 0
+	player_actions += 1 if designated else 0
+	return designated
 
 const PLANNING_START_DAY: int = 120
 const PLANNING_INTERVAL_DAYS: int = 30
@@ -255,6 +495,7 @@ func plan_town(city, scenario: Dictionary = {}) -> void:
 	for building: Building in city.buildings:
 		if TownLogistics.is_field(building) and float(city.logistics.trampled_trips.get(building.id, 0.0)) >= FENCE_TRAMPLING_TRIPS and city.construction.can_fence(building.id) and city.construction.can_supply(EconomyBalanceScript.get_fence_cost(building.size)):
 			city.construction.request_fence(building.id)
+			player_actions += 1
 	var farthest: Building = null
 	var worst: float = STOREHOUSE_TRAVEL_SHARE
 	for building: Building in city.buildings:
@@ -266,8 +507,8 @@ func plan_town(city, scenario: Dictionary = {}) -> void:
 	if farthest == null or count_kinds(city).get("storehouse", 0) >= 3 or not city.construction.can_supply(EconomyBalanceScript.get_build_cost("storehouse")):
 		return
 	var spot: Vector2i = find_spot_near(city, "storehouse", TownLogistics.center_tile(farthest.tile, farthest.size))
-	if spot.x >= 0:
-		city.construction.request_building("storehouse", spot)
+	if spot.x >= 0 and city.construction.request_building("storehouse", spot) != null:
+		player_actions += 1
 
 # Work a planner builds when families wish for work of their calling (FamilyAmbitions), only while
 # some family has labor to spare: the wishing family moves to it, and the spare family takes up
@@ -484,4 +725,5 @@ func upgrade_one(city, scenario: Dictionary, day: int) -> void:
 				if city.upgrade_building(building.id):
 					return
 			elif city.construction.request_upgrade(building.id) != null:
+				player_actions += 1
 				return

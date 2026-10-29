@@ -90,6 +90,9 @@ var paths_version: int = 0
 # field's harvest pays for (City.apply_building_output_modifiers).
 var trampling_today: Dictionary = {}
 var trampled_trips: Dictionary = {}
+# The same, by the walking household: field id -> {household id: trips}.
+var trampled_by_today: Dictionary = {}
+var trampled_by: Dictionary = {}
 
 func _init(owner: City) -> void:
 	_city_ref = weakref(owner)
@@ -627,7 +630,7 @@ func get_site_store_route(site_tile: Vector2i) -> Dictionary:
 
 # Adds foot traffic along a route: trips are one-way walks (there and back is 2). Woods wear
 # slowly. Fields the route crosses, other than ones it starts or ends in, are trampled.
-func add_traffic(route: Array, trips: float) -> void:
+func add_traffic(route: Array, trips: float, walker_household_id: int = -1) -> void:
 	if trips <= 0.0 or route.is_empty():
 		return
 	ensure_grid()
@@ -647,6 +650,11 @@ func add_traffic(route: Array, trips: float) -> void:
 			crossed[inside] = true
 	for field: int in crossed.keys():
 		trampling_today[field] = float(trampling_today.get(field, 0.0)) + trips
+		# Who walks through it, for the field's family (TownSocial disputes).
+		if walker_household_id >= 0:
+			if not trampled_by_today.has(field):
+				trampled_by_today[field] = {}
+			trampled_by_today[field][walker_household_id] = float(trampled_by_today[field].get(walker_household_id, 0.0)) + trips
 
 static func is_field(building: Building) -> bool:
 	return BuildingTiers.get_base_type(building.type) == Building.BUILDING_FARM
@@ -671,11 +679,13 @@ func advance_day() -> void:
 		var travel: Dictionary = get_travel(building)
 		if travel["reachable"] != true:
 			continue
-		add_traffic(get_commute(building)["route"], 2.0)
-		add_traffic(get_store_route(building)["route"], get_daily_units(city, building) / EconomyBalance.CARRY_LOAD * 2.0)
+		add_traffic(get_commute(building)["route"], 2.0, building.assigned_household_id)
+		add_traffic(get_store_route(building)["route"], get_daily_units(city, building) / EconomyBalance.CARRY_LOAD * 2.0, building.assigned_household_id)
 	city.errands.add_daily_traffic()
 	trampled_trips = trampling_today
 	trampling_today = {}
+	trampled_by = trampled_by_today
+	trampled_by_today = {}
 	var changed: Array[Vector2i] = update_path_levels()
 	if not changed.is_empty():
 		paths_version += 1

@@ -52,6 +52,9 @@ var receives_maintenance: bool = true
 var output_carry: float = 0.5
 # A fence round a field keeps everyone but its own family out (TownLogistics).
 var fenced: bool = false
+# A proper workplace short of tools keeps its building and works by hand, at tier 0's pace, instead
+# of standing idle (influence prototype; City.set_hand_method_fallback). Off: today's rules.
+var works_by_hand_without_tools: bool = false
 
 func _init(building_id: int = -1, building_type: String = BUILDING_HOUSE, tile_pos: Vector2i = Vector2i.ZERO, footprint_size: Vector2i = Vector2i(2, 2)):
 	id = building_id
@@ -84,7 +87,11 @@ func has_worker() -> bool:
 	return assigned_workers > 0
 
 func can_produce() -> bool:
-	return is_production_building() and assigned_workers > 0 and maintenance_level > 0
+	return is_production_building() and assigned_workers > 0 and (maintenance_level > 0 or is_working_by_hand())
+
+# Short of tools, and working by hand rather than standing idle (works_by_hand_without_tools).
+func is_working_by_hand() -> bool:
+	return works_by_hand_without_tools and needs_maintenance() and maintenance_level < 50
 
 func assign_household(household: Household, source: String = ASSIGNMENT_PLAYER):
 	assigned_workers = required_workers

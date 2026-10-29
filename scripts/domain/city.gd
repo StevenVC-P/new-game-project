@@ -89,6 +89,14 @@ var trade: TownTrade = null
 var defense: TownDefense = null
 # The settlement's stage (camp, hamlet, village) and chronicle.
 var settlement: SettlementStage = null
+# What the community asks of families who develop their own work (influence prototype; off unless
+# enabled).
+var influence: TownInfluence = null
+# How households deal with one another and what the community expects of them (household social
+# prototype; off unless enabled).
+var social: TownSocial = null
+# Proper workplaces short of tools work by hand instead of standing idle (influence prototype).
+var hand_method_fallback: bool = false
 # Today's day of the year (1-360), set by the game before each day's tick; -1 where nothing sets
 # it (tests, balance tools), which count years from founding instead.
 var day_of_year: int = -1
@@ -108,7 +116,9 @@ func _init(city_name: String = "City", city_tile: Vector2 = Vector2.ZERO, city_r
 	trade = TownTrade.new(self)
 	defense = TownDefense.new(self)
 	settlement = SettlementStage.new(self)
+	influence = TownInfluence.new(self)
 	founding_seed = random_seed
+	social = TownSocial.new(self)
 	var normalized_household_count: int = max(0, starter_household_count)
 	resources = make_starting_resources(normalized_household_count)
 	create_starter_households(normalized_household_count)
@@ -908,6 +918,7 @@ func log_household_lifecycle_event(city_index: int, household_id: int, event_nam
 # to anyone else.
 func add_building(building: Building, household: Household = null):
 	building.id = buildings.size()
+	building.works_by_hand_without_tools = hand_method_fallback
 	buildings.append(building)
 	logistics.mark_layout_changed()
 	if building.is_production_building() and household != null:
@@ -920,6 +931,12 @@ func add_building(building: Building, household: Household = null):
 	update_shelter_counts()
 	update_worker_counts()
 	auto_assign_workers()
+
+# Proper workplaces short of tools keep their buildings and work by hand (influence prototype).
+func set_hand_method_fallback(on: bool) -> void:
+	hand_method_fallback = on
+	for building: Building in buildings:
+		building.works_by_hand_without_tools = on
 
 func get_day_of_year() -> int:
 	if day_of_year > 0:
@@ -939,6 +956,11 @@ func tick():
 	construction.advance_day()
 	if construction.day % FamilyDevelopment.INTERVAL_DAYS == 0:
 		FamilyDevelopment.advance(self)
+	# A day after families look at their homes, and from the first day, so founders take up work
+	# at once.
+	if influence.enabled and construction.day % FamilyInitiative.INTERVAL_DAYS == 1:
+		FamilyInitiative.advance(self)
+	social.advance_day()
 	land.advance_day()
 
 	for building: Building in buildings:
@@ -1322,6 +1344,9 @@ func get_current_building_output_amount(building: Building) -> int:
 	var tick_count: int = int(resources["production_tick_count"])
 	var base_output: float = get_base_building_output_amount(building.type)
 
+	# The building stays; only the method falls back, and returns when tools do.
+	if building.is_working_by_hand():
+		return apply_building_output_modifiers(base_output * EconomyBalanceScript.TIER0_OUTPUT_FRACTION, tick_count, building)
 	if maintenance_level <= 0:
 		return 0
 	if maintenance_level >= 100:

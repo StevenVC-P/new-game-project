@@ -462,6 +462,7 @@ func advance_day() -> void:
 			var household: Household = take_builder(free_families, project)
 			builders_today.append(household.id)
 			project.crew_household_ids.append(household.id)
+			city.social.record_contribution(household, project)
 			apply_labor(project, get_builder_labor(household))
 			if not can_progress(project):
 				break
@@ -484,12 +485,16 @@ func advance_day() -> void:
 		complete(project)
 
 func project_add_spare(project: ConstructionProject, household: Household) -> void:
+	city.social.record_help_day(household, project)
 	project.crew_household_ids.append(household.id)
-	spare_time_today[household.id] = EconomyBalance.SPARE_TIME_SHARE
+	# A family working long days (TownSocial.choose_hours) takes the time from its rest.
+	spare_time_today[household.id] = 0.0 if household.long_days else EconomyBalance.SPARE_TIME_SHARE
 	apply_labor(project, get_builder_labor(household) * EconomyBalance.SPARE_TIME_SHARE)
 
 # A family at work on a holding gives spare time to its own project first (its home, or its
 # workplace's upgrade), else to the first site in the queue whose crew has room.
+# With the household social model on, helping is a choice (TownSocial.choose_help): a family gives
+# spare time only to its own project or to the one it chose to help this week.
 func get_spare_time_project(household: Household, workable: Array[ConstructionProject]) -> ConstructionProject:
 	var fallback: ConstructionProject = null
 	for project: ConstructionProject in workable:
@@ -497,6 +502,8 @@ func get_spare_time_project(household: Household, workable: Array[ConstructionPr
 			continue
 		if project.claimant_household_id == household.id:
 			return project
+		if city.social.enabled and project.id != household.helping_project_id:
+			continue
 		if fallback == null:
 			fallback = project
 	return fallback
@@ -603,6 +610,7 @@ func complete(project: ConstructionProject) -> void:
 			city.add_building(building, claimant)
 	if project.requested_by == ConstructionProject.REQUESTED_BY_HOUSEHOLD:
 		completed_by_households += 1
+	city.social.on_project_finished(project)
 	recent_completions.append({"label": get_display_name(project), "day": day})
 	while recent_completions.size() > 5:
 		recent_completions.pop_front()

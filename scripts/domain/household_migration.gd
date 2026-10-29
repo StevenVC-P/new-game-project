@@ -57,7 +57,13 @@ static func advance_month(city, city_index: int = 0) -> void:
 	city.resources["migration_month_index"] = month_index
 
 	FamilyAmbitions.advance_month(city)
+	# Neighbours may share their rations before the shortage's hardship falls (TownSocial).
+	city.social.share_in_shortage()
 	update_hardship(city)
+	city.social.review_month()
+	for household: Household in city.households:
+		household.shortage_hardship_adjust = 0
+		household.long_weeks_this_month = 0
 	resolve_departure(city, city_index)
 	if month_index % POOL_REFILL_MONTHS == 0:
 		city.resources["regional_migrant_families"] = min(POOL_MAX_FAMILIES, int(city.resources["regional_migrant_families"]) + 1)
@@ -79,7 +85,11 @@ static func is_household_crowded(household: Household, city = null) -> bool:
 static func get_monthly_hardship_points(city, household: Household) -> int:
 	var points: int = 0
 	if int(city.resources["shortage_days_this_month"]) >= HARDSHIP_SHORTAGE_DAYS:
-		points += HARDSHIP_SHORTAGE_POINTS
+		# A family that shared its ration carries more of the shortage; one helped carries less.
+		points += maxi(0, HARDSHIP_SHORTAGE_POINTS + household.shortage_hardship_adjust)
+	# Long days out of a family's rest (TownSocial.choose_hours) wear on it.
+	if household.long_weeks_this_month >= EconomyBalance.OVERWORK_WEEKS:
+		points += EconomyBalance.OVERWORK_HARDSHIP_POINTS
 	if household.housing_status == Household.RESIDENCE_UNSHELTERED:
 		points += HARDSHIP_UNSHELTERED_POINTS
 	if household.housing_status == Household.RESIDENCE_HOUSED and household.total_population > CROWDED_ABOVE_POPULATION:
