@@ -12,6 +12,7 @@ signal save_requested(slot_name: String)
 signal resume_requested
 signal quit_to_start_requested
 signal quit_requested
+signal families_lead_chosen(on: bool)
 
 const PANEL_WIDTH: float = 900.0
 const LIST_HEIGHT: float = 260.0
@@ -20,6 +21,8 @@ const BACKDROP_IN_GAME: Color = Color(0.0, 0.0, 0.0, 0.55)
 var store: SaveStore
 # Offered as the name of a new save.
 var suggested_save_name: String = ""
+# The player's town for the Town rules page: {"name", "families_lead"}; empty before founding.
+var town_rules: Dictionary = {}
 # Whether a game is running behind the menu: Back and Escape return to the pause page then.
 var in_game: bool = false
 var backdrop: ColorRect
@@ -77,9 +80,23 @@ func show_pause() -> void:
 	add_button("Resume", resume_requested.emit).grab_focus()
 	add_button("Save game", show_save)
 	add_button("Load game", show_load).disabled = store.list().is_empty()
+	add_button("Town rules", show_town_rules).disabled = town_rules.is_empty()
 	add_button("Quit to start menu", quit_to_start_requested.emit)
 	add_button("Quit game", quit_requested.emit)
 	add_note("Leaving or quitting saves to the autosave first.")
+
+# How the player's town is run (docs/HOUSEHOLD_SOCIAL_MODEL.md). Families leading is the default
+# for new towns; the classic rules stay available for comparison.
+func show_town_rules() -> void:
+	open_page(BACKDROP_IN_GAME, show_pause)
+	add_title("Town rules: " + String(town_rules["name"]))
+	var lead: bool = bool(town_rules["families_lead"])
+	var lead_button: Button = add_button(("[x] " if lead else "[  ] ") + "Families lead (default)", func() -> void: families_lead_chosen.emit(true))
+	add_note("Each family takes up and improves its own work, chooses whether to help with building, how long to work, and whether to give way over land. You influence them through the gathering: appeals, rewards, honours and how fairly you share the stores.")
+	var classic_button: Button = add_button(("[x] " if not lead else "[  ] ") + "Classic", func() -> void: families_lead_chosen.emit(false))
+	add_note("You place every workplace; families help with building automatically. Families' convictions and memories are kept and come back if you switch again.")
+	add_button("Back", show_pause)
+	(lead_button if lead else classic_button).grab_focus()
 
 func show_save() -> void:
 	open_page(BACKDROP_IN_GAME, show_pause)

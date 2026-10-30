@@ -308,7 +308,7 @@ static func snapshot_social(city) -> Dictionary:
 		"trust_by_source": social.trust_by_source.duplicate(),
 		"decline_reasons": social.decline_reasons.duplicate(),
 		"voices": social.get_respected_voices().size(),
-		"week_usec": float(social.week_usec_total) / maxf(1.0, social.weeks_run),
+		"week_usec": float(social._week_usec_total) / maxf(1.0, social.weeks_run),
 		"households": city.households.size(),
 	}
 

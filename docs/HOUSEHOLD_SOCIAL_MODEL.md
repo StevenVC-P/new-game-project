@@ -190,7 +190,7 @@ What extends cleanly, and what conflicts:
 
 ## Prototype (Directive Section 16)
 
-Branch `feature/household-social-prototype`, 2026-10-28. Off unless a town enables it (`TownSocial.enabled`; in the game, **I** turns on both this and the influence prototype for the town in view, or start with `-- --influence`).
+Branch `feature/household-social-prototype`, 2026-10-28. On by default since 2026-10-30 (owner): a new town starts with families leading, which is this and the influence prototype together (`TownSocial.enabled`, `TownInfluence.enabled`, `City.hand_method_fallback`; `main.gd` `set_families_lead`). The in-game menu's **Town rules** page (Esc), or **I**, switches the town to the classic rules and back; `-- --classic` founds towns under the classic rules. Tests and balance tools that build a `City` directly still start with both off.
 
 | Piece | Where |
 | --- | --- |

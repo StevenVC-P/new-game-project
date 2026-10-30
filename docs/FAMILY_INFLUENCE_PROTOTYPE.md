@@ -4,7 +4,7 @@ A small, reversible experiment to answer one question (owner, 2026-10-28):
 
 > **Can the player experience meaningful agency and satisfaction by influencing families to develop a settlement rather than directly constructing everything?**
 
-**Status:** the owner approved the hybrid model for prototyping on 2026-10-28, with the refinements below. This is a **development configuration**, not a game mode: off by default, the game plays exactly as before. `docs/GAME_VISION.md` and `docs/FIRST_STAGE_LOOP.md` remain the baseline until the owner resolves the conflicts listed at the end. Branch: `feature/family-influence-prototype` (not merged to `develop` without review).
+**Status:** the owner approved the hybrid model for prototyping on 2026-10-28, with the refinements below. **Since 2026-10-30 it is the default way to play** (owner): every new town starts with families leading (this and the household social model together), and the in-game menu's **Town rules** page switches a town to the classic rules and back. `docs/GAME_VISION.md` and `docs/FIRST_STAGE_LOOP.md` remain the baseline until the owner resolves the conflicts listed at the end. Branch: `feature/family-influence-prototype` (not merged to `develop` without review).
 
 ## The Principle
 
@@ -84,7 +84,7 @@ The **measurement** at milestone 6 was Hamlet at about day 35 and Village at abo
 
 - **Rules:** `tests/family_initiative_validation.gd` (headless, synthetic town map): off by default; founders take up work of their callings within a month and say why; a daring family improves while a cautious, traditional one keeps to hand work, each giving its reasons; predictions are uncertain for a neutral family and likely once a deferential family is asked; the unknown never makes a likely family refuse; the stores rule holds back an improvement nobody asked for, and says so, and never blocks hand work; the reserve keeps the tools for upkeep; a neighbour's paying farm draws a cautious family on, one short of tools puts it off; the hand method fallback keeps the building and works at hand pace; work ground restricts sites and unmarks; a saved town keeps all of it.
 - **Comparison:** `tests/sim/influence_check.gd` (`-- --years=N` to shorten). Write its output to a file and filter for `[INFL]`.
-- **Playtest:** in the town view, press **I** to turn the prototype on (or off) for that town; it saves with the town. Alternatively start the game with `-- --influence` and every town founded in that session starts with it on. The sidebar's **Influence (prototype)** section has the four asks, the stores rule, and how families on hand work would answer a call for better work; **K** marks work ground (two corners; again to unmark). A family's house card shows **Decided:** (what it last decided and why) and **If asked for better work:** (its outlook and reasons). Every direct tool still works.
+- **Playtest:** on by default in every new town. Esc > **Town rules** (or **I** in the town view) switches the town to the classic rules and back; it saves with the town. Start the game with `-- --classic` to found towns under the classic rules. The sidebar's **Influence (prototype)** section has the four asks, the stores rule, and how families on hand work would answer a call for better work; **K** marks work ground (two corners; again to unmark). A family's house card shows **Decided:** (what it last decided and why) and **If asked for better work:** (its outlook and reasons). Every direct tool still works.
 - **Screenshot:** `game_influence` in `tests/visual/town_map_capture.gd`.
 
 ## Measured
@@ -140,7 +140,7 @@ What it shows:
 
 ## Owner Playtest Brief
 
-Play the same seed twice, about a year each: once as before (no flag), once with `--influence`, placing no workplaces yourself unless you want to.
+Play the same seed twice, about a year each: once under the classic rules (Esc > Town rules, or start with `-- --classic`), once as families lead (the default), placing no workplaces yourself unless you want to.
 
 - **Decisions:** did you have interesting things to decide without placing workplaces? Were there long stretches with nothing to do?
 - **Families:** do the "Decided" lines and outlooks explain why families did what they did? Did a family surprise you, and could you see why afterwards?

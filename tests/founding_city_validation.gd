@@ -14,6 +14,7 @@ func run_all() -> void:
 	test_pending_site_creates_player_city()
 	test_second_player_city_is_prevented()
 	test_neutral_town_remains_neutral_and_not_tradable()
+	test_town_rules_page_reports_the_choice()
 
 	if failure_count > 0:
 		push_error("Founding city validation failed: " + str(failure_count) + " failure(s)")
@@ -63,6 +64,13 @@ func test_pending_site_creates_player_city() -> void:
 	_check(main.selected_city_index == 1, "founded city should become selected city")
 	_check(main.current_view == MainScript.VIEW_CITY, "founding should enter city view")
 	_check(main.simulation_clock.is_paused, "a newly founded town should start paused")
+	# Families leading their own work is the default way to play (Town rules in the menu).
+	_check(founded_city.influence.enabled and founded_city.social.enabled and founded_city.hand_method_fallback, "a new town should start with families leading")
+	_check(main.get_player_city() == founded_city, "the Town rules page should apply to the player's town")
+	main.set_families_lead(founded_city, false)
+	_check(not founded_city.influence.enabled and not founded_city.social.enabled and not founded_city.hand_method_fallback, "the classic rules should turn both prototypes off")
+	main.set_families_lead(founded_city, true)
+	_check(founded_city.influence.enabled and founded_city.social.enabled, "families should lead again when switched back")
 	main.free()
 
 func test_second_player_city_is_prevented() -> void:
@@ -92,6 +100,32 @@ func test_neutral_town_remains_neutral_and_not_tradable() -> void:
 	trade_menu.handle_city_selection(0, main.cities)
 	_check(trade_menu.source_city_index == -1, "trade menu should still reject neutral town")
 	main.free()
+
+func test_town_rules_page_reports_the_choice() -> void:
+	var menu: GameMenu = GameMenu.new()
+	menu.setup(SaveStore.new())
+	# In the tree, as in the game: pages give a button focus.
+	root.add_child(menu)
+	menu.show_pause()
+	_check(_menu_button(menu, "Town rules").disabled, "Town rules should wait until there is a town")
+	menu.town_rules = {"name": "Player Town", "families_lead": true}
+	menu.show_pause()
+	var rules_button: Button = _menu_button(menu, "Town rules")
+	_check(not rules_button.disabled, "Town rules should open once there is a town")
+	rules_button.pressed.emit()
+	var chosen: Array = []
+	menu.families_lead_chosen.connect(func(on: bool) -> void: chosen.append(on))
+	_menu_button(menu, "Classic").pressed.emit()
+	_check(chosen == [false], "choosing Classic should be reported to the app")
+	menu.free()
+
+# The live button whose text ends with `text` (the page may still hold the previous page's
+# buttons until they are freed).
+func _menu_button(menu: GameMenu, text: String) -> Button:
+	for child: Node in menu.content.get_children():
+		if child is Button and not child.is_queued_for_deletion() and (child as Button).text.ends_with(text):
+			return child
+	return null
 
 func _make_main_with_neutral_town() -> Node2D:
 	var main = MainScript.new()

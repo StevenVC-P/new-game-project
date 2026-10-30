@@ -131,8 +131,9 @@ var policy_change_days: Array = []
 var policy_signature: Array = []
 # Communal project id (as text) -> households that worked on it.
 var communal_contributors: Dictionary = {}
-# Time spent in weekly passes, for profiling (microseconds).
-var week_usec_total: int = 0
+# Time spent in weekly passes, for profiling (microseconds). Not saved: wall-clock time differs
+# every run, and a loaded town must play on exactly as the original.
+var _week_usec_total: int = 0
 var weeks_run: int = 0
 # This week's spare-time help: "helper:recipient" (recipient -1: communal) -> days.
 var help_days: Dictionary = {}
@@ -175,7 +176,7 @@ func advance_day() -> void:
 func advance_week() -> void:
 	var started: int = Time.get_ticks_usec()
 	run_week()
-	week_usec_total += Time.get_ticks_usec() - started
+	_week_usec_total += Time.get_ticks_usec() - started
 	weeks_run += 1
 
 func run_week() -> void:
