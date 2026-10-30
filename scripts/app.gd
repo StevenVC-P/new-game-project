@@ -27,6 +27,7 @@ func _ready() -> void:
 	menu.resume_requested.connect(resume)
 	menu.quit_to_start_requested.connect(quit_to_start)
 	menu.quit_requested.connect(quit)
+	menu.families_lead_chosen.connect(choose_families_lead)
 	menu.show_start()
 
 func _notification(what: int) -> void:
@@ -90,7 +91,20 @@ func open_menu() -> void:
 	# A disabled game neither simulates nor takes input, so time stands still under the menu.
 	game.process_mode = Node.PROCESS_MODE_DISABLED
 	menu.suggested_save_name = suggested_save_name()
+	refresh_town_rules()
 	menu.show_pause()
+
+func refresh_town_rules() -> void:
+	var town: City = game.get_player_city()
+	menu.town_rules = {} if town == null else {"name": town.name, "families_lead": town.influence.enabled}
+
+func choose_families_lead(on: bool) -> void:
+	var town: City = game.get_player_city() if game != null else null
+	if town == null:
+		return
+	game.set_families_lead(town, on)
+	refresh_town_rules()
+	menu.show_town_rules()
 
 func resume() -> void:
 	if game == null:

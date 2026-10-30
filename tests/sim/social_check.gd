@@ -171,12 +171,12 @@ func probe_scale() -> void:
 			project.materials_needed = {}
 			project.work_required = 8.0
 			city.construction.projects.append(project)
-		city.social.week_usec_total = 0
+		city.social._week_usec_total = 0
 		city.social.weeks_run = 0
 		for week in range(4):
 			city.construction.day = 7 * week + TownSocial.WEEK_OFFSET
 			city.social.advance_week()
-		var per_week: float = float(city.social.week_usec_total) / maxf(1.0, city.social.weeks_run)
+		var per_week: float = float(city.social._week_usec_total) / maxf(1.0, city.social.weeks_run)
 		_report("scale %3d households: weekly pass %.1f ms, %.0f us a household" % [count, per_week / 1000.0, per_week / count])
 
 func _report(line: String) -> void:
