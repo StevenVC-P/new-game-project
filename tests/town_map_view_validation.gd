@@ -106,7 +106,9 @@ func test_click_plans_a_site(main: Node2D, view: TownMapView) -> void:
 		city.tick()
 		if not city.construction.projects.has(project):
 			break
-	_check(city.buildings.size() == before + 1 and city.buildings[-1].tile == tile, "the house should stand on the clicked tile once built")
+	# Families lead their own work by default, so the town may build more than the player's house.
+	var house_stands: bool = city.buildings.any(func(building: Building) -> bool: return building.tile == tile and building.is_house())
+	_check(house_stands, "the house should stand on the clicked tile once built")
 	await _settle()
 	_check(view.development_signature != 0, "the view should notice the new building")
 
@@ -155,7 +157,7 @@ func test_planning_tools(main: Node2D, view: TownMapView) -> void:
 	_check(view.block_preview.size == Vector2i.ZERO, "the preview goes once the block is marked")
 
 	# The tilling tool marks open ground the same way.
-	var open: Vector2i = _valid_spot(main, MainScript.BUILDING_HOUSE)
+	var open: Vector2i = _open_block_corner(main)
 	var tillable: int = city.farmland.get_tillable_in_block(open, open + Vector2i(2, 2)).size()
 	main.select_building_type(TownFarmland.TILL)
 	_click(view.tile_rect_to_screen(open).get_center())
@@ -260,9 +262,26 @@ func _nearest_wooded(city: City) -> Vector2i:
 	var best: Vector2i = Vector2i(-1, -1)
 	for y in range(size.y):
 		for x in range(size.x):
-			if city.local_map[y][x]["has_trees"] == true and (best.x < 0 or Vector2(x, y).distance_squared_to(center) < Vector2(best).distance_squared_to(center)):
+			var far_corner: Vector2i = (Vector2i(x, y) + Vector2i(2, 2)).min(size - Vector2i.ONE)
+			if city.local_map[y][x]["has_trees"] == true and _is_free(city, Vector2i(x, y)) and _is_free(city, far_corner) and (best.x < 0 or Vector2(x, y).distance_squared_to(center) < Vector2(best).distance_squared_to(center)):
 				best = Vector2i(x, y)
 	return best
+
+# Nothing stands or is being built there, so a click on it is not taken as selecting it.
+func _is_free(city: City, tile: Vector2i) -> bool:
+	return city.construction.get_project_at_tile(tile) == null and not city.buildings.any(func(building: Building) -> bool: return building.contains_tile(tile))
+
+# A block whose two corners are both free ground: a click on a site or building selects it, and
+# families leading their own work claim ground of their own (it differs with each founding).
+func _open_block_corner(main: Node2D) -> Vector2i:
+	var center: Vector2i = Vector2i(MainScript.CITY_MAP_WIDTH, MainScript.CITY_MAP_HEIGHT) / 2
+	for radius in range(0, 20):
+		for y in range(center.y - radius, center.y + radius + 1):
+			for x in range(center.x - radius, center.x + radius + 1):
+				var corner: Vector2i = Vector2i(x, y)
+				if main.is_valid_building_placement(main.selected_city_index, MainScript.BUILDING_HOUSE, corner) and main.is_valid_building_placement(main.selected_city_index, MainScript.BUILDING_HOUSE, corner + Vector2i(2, 2)):
+					return corner
+	return Vector2i(-1, -1)
 
 func _valid_spot(main: Node2D, building_type: String) -> Vector2i:
 	var center: Vector2i = Vector2i(MainScript.CITY_MAP_WIDTH, MainScript.CITY_MAP_HEIGHT) / 2

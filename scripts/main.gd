@@ -1048,17 +1048,30 @@ func get_player_city_index() -> int:
 			return city_index
 	return -1
 
+# The player's town, or null before founding: the town the menu's Town rules page applies to.
+func get_player_city() -> City:
+	var index: int = get_player_city_index()
+	return cities[index] if index != -1 else null
+
+# Families lead: the influence prototype (families take up and improve their own work) and the
+# household social model (help, hours, land and trust decided by each family) together. Off: the
+# earlier rules, where the player places the work and help is automatic.
+func set_families_lead(town: City, on: bool) -> void:
+	town.influence.enabled = on
+	town.set_hand_method_fallback(on)
+	town.social.set_enabled(on)
+	queue_redraw()
+
 func found_player_city_at_pending_site() -> bool:
 	if not can_found_player_city():
 		return false
 
 	var founded_city: City = create_player_city_at_tile(pending_founding_tile)
-	# Development configuration for the family influence prototype (docs/FAMILY_INFLUENCE_PROTOTYPE.md).
-	if OS.get_cmdline_user_args().has("--influence") or OS.get_cmdline_args().has("--influence"):
-		founded_city.influence.enabled = true
-		founded_city.set_hand_method_fallback(true)
-		founded_city.social.set_enabled(true)
+	# Families leading their own work is how the game is played (owner, 2026-10-30); --classic
+	# founds a town under the earlier rules, for comparison. Either can be switched in the menu.
+	var classic: bool = OS.get_cmdline_user_args().has("--classic") or OS.get_cmdline_args().has("--classic")
 	cities.append(founded_city)
+	set_families_lead(founded_city, not classic)
 	var founded_city_index: int = cities.size() - 1
 	if not pending_local_map.is_empty():
 		founded_city.site_profile = pending_site_profile
@@ -1413,12 +1426,9 @@ func handle_building_selection_key_event(key_event: InputEventKey) -> bool:
 	elif is_letter_key(keycode, physical_keycode, KEY_K) and selected_city_index >= 0 and selected_city_index < cities.size() and cities[selected_city_index].influence.enabled:
 		select_building_type(TownInfluence.WORK_GROUND)
 	elif is_letter_key(keycode, physical_keycode, KEY_I) and selected_city_index >= 0 and selected_city_index < cities.size():
-		# Influence prototype on or off for this town (development configuration).
+		# Shortcut for the menu's Town rules page.
 		var town: City = cities[selected_city_index]
-		town.influence.enabled = not town.influence.enabled
-		town.set_hand_method_fallback(town.influence.enabled)
-		town.social.set_enabled(town.influence.enabled)
-		print("Influence and household social prototypes ", "on" if town.influence.enabled else "off", " for ", town.name)
+		set_families_lead(town, not town.influence.enabled)
 	elif is_letter_key(keycode, physical_keycode, KEY_L):
 		show_household_roster = not show_household_roster
 	else:
@@ -2476,7 +2486,7 @@ func draw_militia_button(font: Font, font_size: int, city: City, x: float, y: fl
 	draw_city_action_button(font, font_size, "Call the militia (%d families leave work)" % EconomyBalance.MILITIA_FAMILIES, x, y + 4.0, width, {"action": "call_militia"}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
 	return y + 26.0
 
-# Influence prototype (TownInfluence; only with --influence): what the community asks for, the
+# Influence prototype (TownInfluence; on while families lead): what the community asks for, the
 # stores rule, and how families on hand work are expected to answer a call for better work.
 func draw_influence_section(font: Font, font_size: int, city: City, x: float, y: float) -> float:
 	if not city.influence.enabled:
@@ -2534,7 +2544,7 @@ func draw_household_roster(font: Font, font_size: int) -> void:
 	if not show_household_roster or selected_city_index < 0 or selected_city_index >= cities.size():
 		return
 	var city: City = cities[selected_city_index]
-	var lines: Array[String] = HouseholdRosterHelper.get_lines(city) if city.social.enabled else ["Press I to turn on the household social prototype for this town."]
+	var lines: Array[String] = HouseholdRosterHelper.get_lines(city) if city.social.enabled else ["This town runs under the classic rules. Families lead again from Esc > Town rules (or I)."]
 	var width: float = minf(760.0, get_viewport_rect().size.x - get_city_sidebar_rect().size.x - 40.0)
 	var rect: Rect2 = Rect2(Vector2(12.0, 52.0), Vector2(width, 30.0 + lines.size() * 17.0))
 	draw_rect(rect, Color(0.08, 0.09, 0.08, 0.9))
