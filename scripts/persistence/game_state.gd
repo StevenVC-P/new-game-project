@@ -162,6 +162,10 @@ static func restore_city(data: Dictionary) -> City:
 	SaveCodec.restore(city.settlement, data.get("settlement", {}))
 	SaveCodec.restore(city.influence, data.get("influence", {}))
 	SaveCodec.restore(city.social, data.get("social", {}))
+	# Saves from before the guiding wisdoms: the two expectations they add, and the gathering's
+	# earlier asks taken up as the town's wisdoms.
+	city.social.ensure_norms()
+	GuidingWisdom.adopt_earlier_asks(city)
 	# Saves from before errands were saved find their routes again (a month of slightly different wear).
 	city.errands.restore_saved(data.get("errands", {}))
 	var projects: Array[ConstructionProject] = []

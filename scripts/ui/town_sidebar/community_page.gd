@@ -1,8 +1,9 @@
 class_name SidebarCommunityPage
 extends RefCounted
 
-# How the player leads families who decide for themselves (docs/TOWN_UI.md): the one priority the
-# community puts first (CommunityPriority) and how families take it, the rule for the common stores, the customs it appeals to, and the rewards and
+# How the player leads families who decide for themselves (docs/TOWN_UI.md): the town's lasting
+# guiding wisdom (GuidingWisdom), the one priority the community puts first for now
+# (CommunityPriority) and how families take each, the rule for the common stores, the customs forming, the customs it appeals to, and the rewards and
 # honours it gives. Each control says what it asks and what the town has recorded since; none
 # promises what families will do, because they decide (TownInfluence, TownSocial).
 
@@ -29,11 +30,13 @@ static func build(context: Dictionary) -> Array:
 		blocks.append({"kind": "card", "title": "Classic rules", "lines": ["You assign work directly, and families make no choices of their own here."], "muted": ["Esc > Town rules (or I) lets families lead: they choose their work, and this page holds the appeals, store rules, and honours that guide them."]})
 		return blocks
 	blocks.append({"kind": "text", "text": "Families weigh what the community asks alongside their own reasons. Receptive families answer more readily; none is bound to.", "muted": true})
+	if city.social.enabled:
+		blocks.append_array(get_wisdom(city))
 	if city.influence.enabled:
 		blocks.append_array(get_priorities(city))
 		blocks.append_array(get_stores(city))
 	if city.social.enabled:
-		blocks.append_array(get_expectations(city))
+		blocks.append_array(get_customs(city))
 		blocks.append_array(get_recognition(city, int(context.get("focused_household_id", -1))))
 		blocks.append_array(get_gathering(city))
 	return blocks
@@ -118,15 +121,88 @@ static func get_stores(city: City) -> Array:
 		]},
 	]
 
-static func get_expectations(city: City) -> Array:
+# The town's guiding wisdom (GuidingWisdom): the leader's title and slots, each wisdom held with
+# what families have done about it and the qualities appearing, and the wisdoms that may still be
+# chosen. Nothing here promises an outcome: families decide, and what they come to value follows
+# from what they did.
+static func get_wisdom(city: City) -> Array:
 	var social: TownSocial = city.social
-	var blocks: Array = [{"kind": "heading", "text": "Social expectations"}]
-	for norm_id: String in [TownSocial.NORM_HELP, TownSocial.NORM_CLAIMS]:
+	var slots: int = GuidingWisdom.get_slots(city)
+	var title: String = GuidingWisdom.get_title(city)
+	var blocks: Array = [{"kind": "heading", "text": "Guiding wisdom", "note": "%s · %d of %d" % [title, social.wisdoms.size(), slots]}]
+	blocks.append({"kind": "text", "text": "What the community holds to over generations. Families answer it by their own lights: those who live by it, and those who go their own way, both come to value things through what they do.", "muted": true})
+	for wisdom: String in social.wisdoms:
+		blocks.append(get_wisdom_card(city, wisdom, true))
+		blocks.append(get_views_expander(city, wisdom))
+	var open: int = slots - social.wisdoms.size()
+	var others: Array = []
+	for wisdom: String in GuidingWisdom.ALL:
+		if not social.wisdoms.has(wisdom):
+			others.append(get_wisdom_card(city, wisdom, false, open > 0))
+	if open > 0:
+		blocks.append({"kind": "text", "text": "%d wisdom%s still to choose. A wisdom chosen stays." % [open, "" if open == 1 else "s"], "tone": SP.TONE_INFO})
+		blocks.append_array(others)
+	else:
+		if title == GuidingWisdom.EXPEDITION_LEADER:
+			blocks.append({"kind": "text", "text": "When the town becomes a village, its leader is an Elder and may hold a third.", "muted": true})
+		blocks.append({"kind": "expander", "id": "community_other_wisdoms", "title": "Other wisdoms", "blocks": others})
+	return blocks
+
+static func get_wisdom_card(city: City, wisdom: String, held: bool, choosable: bool = false) -> Dictionary:
+	var counts: Dictionary = {GuidingWisdom.SUPPORTS: 0, GuidingWisdom.INDIFFERENT: 0, GuidingWisdom.RESERVED: 0}
+	for household: Household in city.households:
+		counts[GuidingWisdom.get_view(household, wisdom)["stance"]] += 1
+	var muted: Array = ["%d support it, %d do not much mind, %d have reservations." % [counts[GuidingWisdom.SUPPORTS], counts[GuidingWisdom.INDIFFERENT], counts[GuidingWisdom.RESERVED]]]
+	var card: Dictionary = {"kind": "card", "title": GuidingWisdom.NAMES[wisdom], "lines": [GuidingWisdom.MEANINGS[wisdom]], "muted": muted}
+	if held:
+		card["tag"] = "held"
+		card["tone"] = SP.TONE_GOOD
+		var record: Dictionary = city.social.wisdom_record.get(wisdom, {})
+		muted.append("Families' choices it concerns: kept to it %d times, went their own way %d." % [int(record.get("followed", 0)), int(record.get("declined", 0))])
+		if int(record.get("lived", 0)) + int(record.get("own_way", 0)) > 0:
+			muted.append("Seasons families took a lesson from: living by it %d, going their own way %d." % [int(record.get("lived", 0)), int(record.get("own_way", 0))])
+		var growing: Array[String] = []
+		var counter: Array[String] = []
+		var qualities: Dictionary = GuidingWisdom.get_qualities(city, wisdom)
+		for value_id: String in qualities.keys():
+			var entry: Dictionary = qualities[value_id]
+			var words: String = "%s %d%s" % [HouseholdCharacter.get_value_name(value_id), int(entry["holders"]), " (+%d)" % int(entry["grown"]) if int(entry["grown"]) > 0 else ""]
+			(growing if (GuidingWisdom.QUALITIES[wisdom] as Array).has(value_id) else counter).append(words)
+		muted.append("Families holding what it tends to grow: " + ", ".join(growing) + "; and what resisting it tends to grow: " + ", ".join(counter) + ". (+n: grown since it was chosen)")
+	elif choosable:
+		card["buttons"] = [{"text": "Choose", "action": {"action": "choose_wisdom", "wisdom": wisdom}}]
+	return card
+
+static func get_views_expander(city: City, wisdom: String) -> Dictionary:
+	var lines: Array = []
+	for household: Household in city.households:
+		var view: Dictionary = GuidingWisdom.get_view(household, wisdom)
+		var reasons: Array = FamilyInitiative.get_reasons(view["terms"], view["stance"] != GuidingWisdom.RESERVED and float(view["score"]) > 0.0, 2)
+		var line: Dictionary = {"kind": "text", "text": "%s %s%s" % [city.get_household_label(household.id), view["stance"], ": " + "; ".join(reasons) if not reasons.is_empty() else ""], "muted": view["stance"] == GuidingWisdom.INDIFFERENT}
+		if view["stance"] == GuidingWisdom.RESERVED:
+			line["tone"] = SP.TONE_CAUTION
+		lines.append(line)
+	return {"kind": "expander", "id": "community_wisdom_" + wisdom, "title": "How families take it (%d)" % lines.size(), "blocks": lines}
+
+# The expectations as they are lived: how far families keep to each, which the town's wisdom asks
+# for. Read-only: the wisdom is what the community asks.
+static func get_customs(city: City) -> Array:
+	var social: TownSocial = city.social
+	var blocks: Array = [{"kind": "heading", "text": "Customs forming"}]
+	for norm_id: String in TownSocial.NORM_IDS:
 		var norm: Dictionary = social.norms[norm_id]
-		var promoted: bool = bool(norm["promoted"])
+		var asked_by: String = ""
+		for wisdom: String in social.wisdoms:
+			if GuidingWisdom.NORMS[wisdom] == norm_id:
+				asked_by = GuidingWisdom.NAMES[wisdom]
+		if asked_by == "" and int(norm["opportunities"]) == 0:
+			continue
 		var status: String = str(norm["status"])
 		var tone: String = SP.TONE_GOOD if status != TownSocial.STATUS_NONE else SP.TONE_NEUTRAL
-		blocks.append({"kind": "card", "title": TownSocial.NORM_NAMES[norm_id], "tone": tone, "tag": status, "lines": ["%s families to %s." % ["The community asks" if promoted else "Ask", TownSocial.NORM_ASKS[norm_id]]], "muted": ["Accepted by about %d%% of families' choices so far." % roundi(float(norm["acceptance"]) * 100.0)], "buttons": [{"text": "Asking" if promoted else "Ask", "toggle": true, "active": promoted, "action": {"action": "toggle_norm", "norm": norm_id}}]})
+		var muted: Array = ["Kept to in about %d%% of families' choices so far." % roundi(float(norm["acceptance"]) * 100.0)]
+		if asked_by != "":
+			muted.append("The town's wisdom asks it: " + asked_by + ".")
+		blocks.append({"kind": "card", "title": TownSocial.NORM_NAMES[norm_id], "tone": tone, "tag": status, "lines": ["Families " + str(TownSocial.NORM_PHRASES[norm_id]) + "."], "muted": muted})
 	var open: int = social.disputes.filter(func(d: Dictionary) -> bool: return not bool(d["settled"])).size()
 	if open > 0:
 		blocks.append({"kind": "text", "text": "Unsettled disputes over land: %d%s" % [open, "; families are looking for agreed rules" if social.dispute_pressure >= 2 else ""], "tone": SP.TONE_CAUTION})

@@ -249,8 +249,9 @@ static func get_attention(city: City, context: Dictionary = {}) -> Array[Diction
 
 	if city.social.enabled:
 		var open: int = city.social.disputes.filter(func(d: Dictionary) -> bool: return not bool(d["settled"])).size()
-		if open > 0 and city.social.dispute_pressure >= 2 and not bool(city.social.norms[TownSocial.NORM_CLAIMS]["promoted"]):
-			cards.append(make_card(35, SP.TONE_CAUTION, "Quarrels over land", ["%d disputes are unsettled, and families are looking for agreed rules." % open], [{"text": "Ask families to respect claims", "action": {"action": "toggle_norm", "norm": TownSocial.NORM_CLAIMS}}]))
+		if open > 0 and city.social.dispute_pressure >= 2 and not GuidingWisdom.is_active(city, GuidingWisdom.RESPECT):
+			var choosable: bool = GuidingWisdom.can_choose(city, GuidingWisdom.RESPECT)
+			cards.append(make_card(35, SP.TONE_CAUTION, "Quarrels over land", ["%d disputes are unsettled, and families are looking for agreed rules." % open], [{"text": "Wisdom: Respect What Others Build", "action": {"action": "show_tab", "tab": "community"}}] if choosable else []))
 
 	var needs: Dictionary = city.get_need_pressure_summary()
 	var clothing: Dictionary = needs.get(GoodsNeedBucketHelper.BUCKET_CLOTHING, {})

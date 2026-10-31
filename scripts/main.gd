@@ -1253,9 +1253,8 @@ func apply_city_action(option_data: Dictionary) -> void:
 		city.influence.set_priority(str(option_data["priority"]))
 	elif action == "set_store_rule":
 		city.influence.store_rule = str(option_data["rule"])
-	elif action == "toggle_norm":
-		var norm_id: String = str(option_data["norm"])
-		city.social.set_promoted(norm_id, not bool(city.social.norms[norm_id]["promoted"]))
+	elif action == "choose_wisdom":
+		GuidingWisdom.choose(city, str(option_data["wisdom"]))
 	elif action == "toggle_incentive":
 		city.social.incentive = not city.social.incentive
 	elif action == "honour_household":

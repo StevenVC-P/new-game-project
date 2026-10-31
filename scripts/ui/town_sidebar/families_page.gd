@@ -132,6 +132,12 @@ static func get_detail_lines(city: City, household: Household) -> Array:
 			var view: Dictionary = CommunityPriority.get_view(city, household, city.influence.priority)
 			var view_reasons: Array = FamilyInitiative.get_reasons(view["terms"], view["stance"] != CommunityPriority.OPPOSES and float(view["score"]) > 0.0)
 			lines.append("On %s first: %s%s" % [CommunityPriority.PHRASES[city.influence.priority], view["stance"], " (" + "; ".join(view_reasons) + ")" if not view_reasons.is_empty() else ""])
+	if city.social.enabled and not city.social.wisdoms.is_empty():
+		var takes: Array[String] = []
+		for wisdom: String in city.social.wisdoms:
+			var view: Dictionary = GuidingWisdom.get_view(household, wisdom)
+			takes.append("%s %s" % [view["stance"], GuidingWisdom.NAMES[wisdom]])
+		lines.append("The town's wisdom: it " + "; ".join(takes))
 	lines.append_array(HouseholdRosterHelper.get_card_lines(city, household))
 	var defining: Array[String] = []
 	for value_id: String in city.get_household_defining_values(household):

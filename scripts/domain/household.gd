@@ -78,6 +78,10 @@ var home_site_day: int = -1
 # What kept it from building then ("" when it chose a site); whether that still holds is
 # FamilyDevelopment.is_home_site_blocked.
 var home_site_obstacle: String = ""
+# Its conduct toward each of the town's guiding wisdoms since it last drew a lesson from it
+# (wisdom -> [followed, declined]), and when that was (GuidingWisdom.review).
+var wisdom_conduct: Dictionary = {}
+var wisdom_lesson_day: Dictionary = {}
 
 # The household's character and social life (docs/HOUSEHOLD_SOCIAL_MODEL.md; HouseholdCharacter,
 # TownSocial). Empty until the social model or influence prototype gives the household one.
