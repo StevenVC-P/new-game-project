@@ -24,8 +24,10 @@ const CITY_MAP_WIDTH: int = 64
 const CITY_MAP_HEIGHT: int = 44
 const TOP_BAR_HEIGHT: int = 42
 const CITY_SIDEBAR_MARGIN: int = VisualStyle.PANEL_MARGIN
-const CITY_SIDEBAR_WIDTH: int = 300
-const CITY_SIDEBAR_PADDING: int = VisualStyle.SIDEBAR_PADDING
+# The town sidebar is a fifth of the window, kept between these widths (about 384 at 1920).
+const CITY_SIDEBAR_MIN_WIDTH: float = 320.0
+const CITY_SIDEBAR_MAX_WIDTH: float = 400.0
+const CITY_SIDEBAR_WINDOW_SHARE: float = 0.2
 const BUILDING_HOUSE: String = "house"
 const BUILDING_FARM: String = "farm"
 const BUILDING_WOODCUTTER: String = "woodcutter"
@@ -66,9 +68,8 @@ var roads: Array[Array] = []
 var trade_routes: Array[TradeRoute] = []
 var top_bar_action_options: Array[Dictionary] = []
 var region_action_options: Array[Dictionary] = []
-var city_action_options: Array[Dictionary] = []
-# The family roster over the town view (L; household social prototype).
-var show_household_roster: bool = false
+# The town view's sidebar (TownSidebar): overview, families, planning, community.
+var town_sidebar: TownSidebar = null
 # Whether a top bar status chip's detail was drawn last frame (redraw when the mouse leaves it).
 var top_bar_tooltip_shown: bool = false
 var build_menu_options: Array[Dictionary] = []
@@ -160,6 +161,7 @@ func _ready():
 	rng.randomize()
 	world_calendar.month_changed.connect(on_calendar_month_changed)
 	world_calendar.season_changed.connect(on_calendar_season_changed)
+	_ensure_town_sidebar()
 	_ensure_household_debug_inspector()
 	_ensure_region_map_view()
 	_ensure_town_map_view()
@@ -196,11 +198,67 @@ func _ensure_town_map_view() -> void:
 	city_building_overlay.screen_rect_of_building = func(building: Building) -> Rect2: return town_map_view.tile_rect_to_screen(building.tile, building.size)
 	city_building_overlay.screen_rect_of_footprint = func(tile_pos: Vector2i, size: Vector2i) -> Rect2: return town_map_view.tile_rect_to_screen(tile_pos, size)
 
+func _ensure_town_sidebar() -> void:
+	if town_sidebar != null:
+		return
+	town_sidebar = TownSidebar.new()
+	town_sidebar.visible = false
+	add_child(town_sidebar)
+
 # The town view: the sidebar docked right under the top bar, the town map filling the rest.
 func get_city_sidebar_rect() -> Rect2:
 	var viewport_size: Vector2 = get_viewport_rect().size
-	var x: float = maxf(viewport_size.x - CITY_SIDEBAR_WIDTH - CITY_SIDEBAR_MARGIN, CITY_SIDEBAR_MARGIN)
-	return Rect2(Vector2(x, TOP_BAR_HEIGHT), Vector2(CITY_SIDEBAR_WIDTH, maxf(viewport_size.y - TOP_BAR_HEIGHT - CITY_SIDEBAR_MARGIN, 200.0)))
+	var width: float = clampf(roundf(viewport_size.x * CITY_SIDEBAR_WINDOW_SHARE), CITY_SIDEBAR_MIN_WIDTH, CITY_SIDEBAR_MAX_WIDTH)
+	var x: float = maxf(viewport_size.x - width, 0.0)
+	return Rect2(Vector2(x, TOP_BAR_HEIGHT), Vector2(width, maxf(viewport_size.y - TOP_BAR_HEIGHT, 200.0)))
+
+# Keeps the sidebar in step with the town view: its place on screen, the town, what is selected on
+# the map, and the tool in hand (the footer says what the tool would do where the cursor is).
+func sync_town_sidebar() -> void:
+	var shown: bool = current_view == VIEW_CITY and selected_city_index >= 0 and selected_city_index < cities.size()
+	if town_sidebar.visible != shown:
+		town_sidebar.visible = shown
+	if not shown:
+		return
+	var rect: Rect2 = get_city_sidebar_rect()
+	town_sidebar.position = rect.position
+	town_sidebar.size = rect.size
+	var city: City = cities[selected_city_index]
+	var resident: Household = get_inspected_household()
+	var footer: Array = []
+	if is_placing_building:
+		var message: String = get_placement_status_message()
+		var tone: String = SidebarPainter.TONE_NEUTRAL
+		if is_placement_ok_message(message):
+			tone = SidebarPainter.TONE_CAUTION if message.ends_with("(waits for materials)") else SidebarPainter.TONE_GOOD
+		elif message != "Move over the city map to place.":
+			tone = SidebarPainter.TONE_ALERT
+		var cost: Dictionary = building_placement.get_building_cost(selected_building_type)
+		footer = TownSidebar.make_tool_footer(get_building_display_name(selected_building_type), SidebarPlanningPage.cost_text(cost) if not cost.is_empty() else "", message, tone)
+	elif is_inside_city_map(city_hovered_tile.x, city_hovered_tile.y):
+		footer = [{"kind": "status", "label": "Ground", "value": TownSidebar.describe_ground(city, city_hovered_tile), "tone": SidebarPainter.TONE_NEUTRAL}]
+	town_sidebar.update({"city": city, "map_household_id": resident.id if resident != null else -1, "tool": selected_building_type, "placing": is_placing_building}, footer)
+
+func show_sidebar_tab(tab: String) -> void:
+	town_sidebar.show_tab(tab)
+	sync_town_sidebar()
+
+# Selects a family's home on the map (its card opens there and its details in the sidebar).
+func select_household(household: Household, focus_camera: bool = false) -> void:
+	if selected_city_index < 0 or selected_city_index >= cities.size():
+		return
+	var city: City = cities[selected_city_index]
+	clear_selected_household()
+	town_sidebar.focus_household(household.id)
+	var home: int = household.residence_building_id
+	if home < 0 or home >= city.buildings.size() or not city.buildings[home].is_house():
+		return
+	is_placing_building = false
+	city_building_overlay.inspected_building_index = home
+	city_building_overlay.selected_house_building_index = home
+	if focus_camera and town_map_view != null:
+		var building: Building = city.buildings[home]
+		town_map_view.focus_on((Vector2(building.tile) + Vector2(building.size) * 0.5) * TownMapStyle.TILE, maxf(town_map_view.zoom, 3.0))
 
 func get_town_map_screen_rect() -> Rect2:
 	var viewport_size: Vector2 = get_viewport_rect().size
@@ -664,6 +722,8 @@ func _process(_delta: float):
 	if town_map_view != null:
 		town_map_view.set_shown(current_view == VIEW_CITY)
 		town_map_view.set_screen_rect(get_town_map_screen_rect())
+	if town_sidebar != null:
+		sync_town_sidebar()
 	if terrain_build_task >= 0 and WorkerThreadPool.is_task_completed(terrain_build_task):
 		# The terrain finished building in the background: ready the regional view now, while the
 		# atlas is shown, rather than on the first zoom into it.
@@ -753,6 +813,14 @@ func _input(event: InputEvent):
 		if current_view == VIEW_CITY and is_town_map_input(local_mouse_pos) and town_map_view.handle_mouse_event(mouse_event):
 			queue_redraw()
 			return
+		# The sidebar takes clicks and the wheel over itself; what a click asks of the town comes back.
+		if current_view == VIEW_CITY and town_sidebar != null and town_sidebar.visible:
+			var sidebar_action: Dictionary = town_sidebar.handle_mouse_button(mouse_event, local_mouse_pos)
+			if not sidebar_action.is_empty():
+				apply_city_action(sidebar_action)
+				get_viewport().set_input_as_handled()
+				queue_redraw()
+				return
 
 		if not mouse_event.pressed:
 			return
@@ -787,14 +855,9 @@ func _input(event: InputEvent):
 		elif current_view == VIEW_CITY:
 			if try_handle_build_menu_click(local_mouse_pos):
 				queue_redraw()
-			elif try_handle_city_action_click(local_mouse_pos):
-				queue_redraw()
 			elif try_handle_building_action_click(local_mouse_pos):
 				queue_redraw()
 			elif is_inside_city_sidebar(local_mouse_pos):
-				if city_building_overlay.has_selection():
-					clear_selected_household()
-					queue_redraw()
 				return
 			else:
 				if not try_handle_building_click_at_tile(city_hovered_tile, mouse_event.shift_pressed):
@@ -810,6 +873,8 @@ func _input(event: InputEvent):
 		elif current_view == VIEW_CITY and town_map_view != null and town_map_view.handle_gesture(event):
 			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion:
+		if current_view == VIEW_CITY and town_sidebar != null and town_sidebar.visible:
+			town_sidebar.handle_mouse_motion(get_local_mouse_position())
 		# Status chips in the top bar show their detail while hovered.
 		if current_view == VIEW_CITY and (get_local_mouse_position().y < TOP_BAR_HEIGHT or top_bar_tooltip_shown):
 			queue_redraw()
@@ -1168,47 +1233,45 @@ func apply_region_action(option_data: Dictionary):
 	else:
 		apply_time_control_action(action)
 
-func try_handle_city_action_click(mouse_pos: Vector2) -> bool:
-	for option_data: Dictionary in city_action_options:
-		var option_rect: Rect2 = option_data["rect"] as Rect2
-		if not option_rect.has_point(mouse_pos):
-			continue
-
-		var action: String = option_data["action"] as String
-		if action == "trade_lot":
-			if selected_city_index >= 0 and selected_city_index < cities.size():
-				cities[selected_city_index].trade.accept_lot(int(option_data["lot"]))
-			queue_redraw()
-		elif action == "call_militia":
-			if selected_city_index >= 0 and selected_city_index < cities.size():
-				cities[selected_city_index].defense.call_militia()
-			queue_redraw()
-		elif action == "toggle_encourage" or action == "toggle_store_rule":
-			if selected_city_index >= 0 and selected_city_index < cities.size():
-				var influence: TownInfluence = cities[selected_city_index].influence
-				if action == "toggle_encourage":
-					influence.toggle_encouraged(str(option_data["activity"]))
-				else:
-					influence.store_rule = TownInfluence.RULE_OPEN if influence.store_rule == TownInfluence.RULE_PRIORITIES else TownInfluence.RULE_PRIORITIES
-			queue_redraw()
-		elif action == "toggle_norm" or action == "toggle_incentive" or action == "honour_household":
-			if selected_city_index >= 0 and selected_city_index < cities.size():
-				var social: TownSocial = cities[selected_city_index].social
-				if action == "toggle_norm":
-					var norm_id: String = str(option_data["norm"])
-					social.set_promoted(norm_id, not bool(social.norms[norm_id]["promoted"]))
-				elif action == "toggle_incentive":
-					social.incentive = not social.incentive
-				else:
-					var honoured: Household = cities[selected_city_index].get_household_by_id(int(option_data["household"]))
-					if honoured != null:
-						social.recognize(honoured, str(option_data.get("category", TownSocial.RECOGNITION_SERVICE)))
-			queue_redraw()
+# What a click in the sidebar asks of the town (TownSidebar returns it; its own page and section
+# changes come back as "").
+func apply_city_action(option_data: Dictionary) -> void:
+	var action: String = str(option_data.get("action", ""))
+	if action == "" or selected_city_index < 0 or selected_city_index >= cities.size():
+		return
+	var city: City = cities[selected_city_index]
+	if action == "trade_lot":
+		city.trade.accept_lot(int(option_data["lot"]))
+	elif action == "call_militia":
+		city.defense.call_militia()
+	elif action == "toggle_encourage":
+		city.influence.toggle_encouraged(str(option_data["activity"]))
+	elif action == "set_store_rule":
+		city.influence.store_rule = str(option_data["rule"])
+	elif action == "toggle_norm":
+		var norm_id: String = str(option_data["norm"])
+		city.social.set_promoted(norm_id, not bool(city.social.norms[norm_id]["promoted"]))
+	elif action == "toggle_incentive":
+		city.social.incentive = not city.social.incentive
+	elif action == "honour_household":
+		var honoured: Household = city.get_household_by_id(int(option_data["household"]))
+		if honoured != null:
+			city.social.recognize(honoured, str(option_data.get("category", TownSocial.RECOGNITION_SERVICE)))
+	elif action == "select_tool":
+		select_building_type(str(option_data["tool"]))
+	elif action == "stop_placing":
+		is_placing_building = false
+		block_start_tile = Vector2i(-1, -1)
+		road_start_tile = Vector2i(-1, -1)
+	elif action == "open_build_menu":
+		is_build_menu_open = true
+	elif action == "select_household":
+		var household: Household = city.get_household_by_id(int(option_data["household"]))
+		if household == null:
+			clear_selected_household()
 		else:
-			apply_time_control_action(action)
-		return true
-
-	return false
+			select_household(household, bool(option_data.get("focus_camera", false)))
+	queue_redraw()
 
 func try_handle_build_menu_click(mouse_pos: Vector2) -> bool:
 	if not is_build_menu_open:
@@ -1430,7 +1493,10 @@ func handle_building_selection_key_event(key_event: InputEventKey) -> bool:
 		var town: City = cities[selected_city_index]
 		set_families_lead(town, not town.influence.enabled)
 	elif is_letter_key(keycode, physical_keycode, KEY_L):
-		show_household_roster = not show_household_roster
+		# The families page, and back to the overview.
+		town_sidebar.show_tab(TownSidebar.TAB_OVERVIEW if town_sidebar.tab == TownSidebar.TAB_FAMILIES else TownSidebar.TAB_FAMILIES)
+	elif keycode == KEY_TAB or physical_keycode == KEY_TAB:
+		town_sidebar.cycle_tab(-1 if key_event.shift_pressed else 1)
 	else:
 		return false
 
@@ -1801,23 +1867,32 @@ func draw_top_bar():
 		x = draw_top_bar_button(font, font_size, "World", x, y, 78.0, {"action": "open_world_map"}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
 		x += 14.0
 
+	# Groups, divided by thin rules: where (the town and its stage), when (the date and the clock),
+	# and the town's status chips. Each takes the room its text needs, so the chips get the rest.
 	var in_town: bool = current_view == VIEW_CITY and selected_city_index >= 0 and selected_city_index < cities.size()
-	draw_string(font, Vector2(x, y), get_top_bar_title(), HORIZONTAL_ALIGNMENT_LEFT, 230.0, title_size, VisualStyle.COLOR_UI_TITLE)
-	x += 250.0
-	draw_string(font, Vector2(x, y), world_calendar.get_formatted_date(), HORIZONTAL_ALIGNMENT_LEFT, 330.0, font_size, VisualStyle.COLOR_POPULATION_LABOR)
-	# In a town the date gives up some room to the town's status chips.
-	x += 240.0 if in_town else 350.0
-	draw_string(font, Vector2(x, y), "Speed: " + simulation_clock.get_speed_label(), HORIZONTAL_ALIGNMENT_LEFT, 105.0, font_size, VisualStyle.COLOR_POPULATION_LABOR)
-	x += 118.0
+	var title: String = get_top_bar_title()
+	draw_string(font, Vector2(x, y), title, HORIZONTAL_ALIGNMENT_LEFT, 280.0, title_size, VisualStyle.COLOR_UI_TITLE)
+	x += minf(280.0, font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1.0, title_size).x) + 14.0
+	x = draw_top_bar_divider(x)
+	var date: String = world_calendar.get_formatted_date()
+	draw_string(font, Vector2(x, y), date, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size, VisualStyle.COLOR_POPULATION_LABOR)
+	x += font.get_string_size(date, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x + 12.0
 
-	x = draw_top_bar_button(font, font_size, "Pause", x, y, 60.0, {"action": "toggle_pause"}, get_time_control_color("Paused"))
-	x = draw_top_bar_button(font, font_size, "1x", x, y, 42.0, {"action": "speed_1x"}, get_time_control_color("1x"))
-	x = draw_top_bar_button(font, font_size, "3x", x, y, 42.0, {"action": "speed_3x"}, get_time_control_color("3x"))
-	x = draw_top_bar_button(font, font_size, "10x", x, y, 48.0, {"action": "speed_10x"}, get_time_control_color("10x"))
+	# The active button is the clock's state, so no separate speed label repeats it.
+	var paused: bool = simulation_clock.get_speed_label() == "Paused"
+	x = draw_top_bar_button(font, font_size, "Paused" if paused else "Pause", x, y, 66.0, {"action": "toggle_pause"}, get_time_control_color("Paused"))
+	x = draw_top_bar_button(font, font_size, "1x", x, y, 40.0, {"action": "speed_1x"}, get_time_control_color("1x"))
+	x = draw_top_bar_button(font, font_size, "3x", x, y, 40.0, {"action": "speed_3x"}, get_time_control_color("3x"))
+	x = draw_top_bar_button(font, font_size, "10x", x, y, 46.0, {"action": "speed_10x"}, get_time_control_color("10x"))
 	draw_top_bar_button(font, font_size, "Menu", get_viewport_rect().size.x - 78.0, y, 66.0, {"action": "open_menu"}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
 	top_bar_tooltip_shown = false
 	if in_town:
-		draw_town_status_chips(font, font_size, cities[selected_city_index], x + 12.0, y, get_viewport_rect().size.x - 90.0)
+		x = draw_top_bar_divider(x + 2.0)
+		draw_town_status_chips(font, font_size, cities[selected_city_index], x, y, get_viewport_rect().size.x - 90.0)
+
+func draw_top_bar_divider(x: float) -> float:
+	draw_rect(Rect2(Vector2(x, 9.0), Vector2(1.0, TOP_BAR_HEIGHT - 18.0)), VisualStyle.COLOR_UI_PANEL_BORDER)
+	return x + 12.0
 
 # The town's status at a glance (TownStatusBar): people, free homes, labor, and alerts while they
 # matter, with detail on hover.
@@ -1859,10 +1934,7 @@ func draw_city_view():
 	var font: Font = ThemeDB.fallback_font
 	var font_size: int = 14
 
-	# The town itself is drawn by town_map_view, under these panels.
-	draw_city_sidebar(font, font_size)
-	draw_household_roster(font, font_size - 1)
-
+	# The town itself is drawn by town_map_view, and the sidebar by town_sidebar, under these panels.
 	if selected_city_index < 0 or selected_city_index >= cities.size():
 		draw_string(font, Vector2(24, 82), "No city map selected.", HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size, VisualStyle.COLOR_UI_TEXT)
 		draw_top_bar()
@@ -1890,106 +1962,6 @@ func get_placement_status_message() -> String:
 
 func is_placement_ok_message(message: String) -> bool:
 	return message.begins_with("Valid placement") or message.begins_with("On a residential plot")
-
-func draw_city_sidebar(font: Font, font_size: int):
-	city_action_options.clear()
-
-	var sidebar_rect: Rect2 = get_city_sidebar_rect()
-	var sidebar_pos: Vector2 = sidebar_rect.position
-	var text_x: float = sidebar_pos.x + CITY_SIDEBAR_PADDING
-	var y: float = sidebar_pos.y + 18.0
-	var title_size: int = 16
-
-	draw_rect(sidebar_rect, VisualStyle.COLOR_UI_PANEL_BACKGROUND)
-	draw_rect(sidebar_rect, VisualStyle.COLOR_UI_PANEL_BORDER, false, VisualStyle.PANEL_BORDER_WIDTH)
-	draw_string(font, Vector2(text_x, y), "City Overview", HORIZONTAL_ALIGNMENT_LEFT, -1.0, title_size, VisualStyle.COLOR_UI_SECTION_HEADER)
-	y += 22.0
-
-	if selected_city_index < 0 or selected_city_index >= cities.size():
-		return
-
-	var city: City = cities[selected_city_index]
-	var resources: Dictionary = city.resources
-	var placement_status: String = get_placement_status_message()
-	var pressure_summary: Dictionary = city.get_pressure_summary()
-	var need_pressure_summary: Dictionary = city.get_need_pressure_summary()
-	var placement_color: Color = VisualStyle.COLOR_MUTED
-	if is_placement_ok_message(placement_status):
-		placement_color = VisualStyle.COLOR_POSITIVE
-	elif placement_status != "Move over the city map to place." and placement_status != "Placement off":
-		placement_color = VisualStyle.COLOR_WARNING
-
-	y = draw_sidebar_section_title(font, "Settlement", text_x, y)
-	for settlement_line: String in city.settlement.get_display_lines(false):
-		y = draw_sidebar_line(font, font_size, settlement_line, text_x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
-	y += 4.0
-
-	y = draw_sidebar_section_title(font, "City Health", text_x, y)
-	y = draw_pressure_row(font, font_size, "Food", pressure_summary["food"] as Dictionary, text_x, y)
-	y = draw_pressure_row(font, font_size, "Shelter", pressure_summary["shelter"] as Dictionary, text_x, y)
-	y = draw_pressure_row(font, font_size, "Tools", pressure_summary["tools"] as Dictionary, text_x, y)
-	y = draw_pressure_row(font, font_size, "Maintenance", pressure_summary["maintenance"] as Dictionary, text_x, y)
-	y += 4.0
-
-	y = draw_sidebar_section_title(font, "Need Pressure", text_x, y)
-	y = draw_need_pressure_row(font, font_size, need_pressure_summary["food"] as Dictionary, text_x, y)
-	y = draw_need_pressure_row(font, font_size, need_pressure_summary["household_goods"] as Dictionary, text_x, y)
-	y = draw_need_pressure_row(font, font_size, need_pressure_summary["clothing"] as Dictionary, text_x, y)
-	y = draw_need_pressure_row(font, font_size, need_pressure_summary["tools"] as Dictionary, text_x, y)
-	y = draw_need_pressure_row(font, font_size, need_pressure_summary["construction_materials"] as Dictionary, text_x, y)
-	y = draw_need_pressure_row(font, font_size, need_pressure_summary["maintenance_materials"] as Dictionary, text_x, y)
-	y = draw_need_pressure_row(font, font_size, need_pressure_summary["civic_goods"] as Dictionary, text_x, y)
-	y += 4.0
-
-	y = draw_sidebar_section_title(font, "Action Hints", text_x, y)
-	var action_hint_lines: Array[String] = CityPressureHintHelper.get_hints(pressure_summary, resources, need_pressure_summary)
-	for action_hint: String in action_hint_lines:
-		y = draw_sidebar_line(font, font_size, action_hint, text_x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
-	y += 4.0
-
-	y = draw_sidebar_section_title(font, "Construction", text_x, y)
-	y = draw_sidebar_label_value(font, font_size, "Sites", ConstructionDisplayHelper.get_sidebar_summary(city), text_x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
-	for construction_line: String in ConstructionDisplayHelper.get_sidebar_lines(city):
-		y = draw_sidebar_line(font, font_size, construction_line, text_x, y, VisualStyle.COLOR_MUTED)
-	y += 4.0
-	y = draw_trader_section(font, font_size, city, text_x, y)
-	y = draw_militia_button(font, font_size, city, text_x, y)
-	y = draw_influence_section(font, font_size, city, text_x, y)
-
-	y = draw_sidebar_section_title(font, "Resources", text_x, y)
-	y = draw_sidebar_label_value(font, font_size, "Food", str(resources["food"]) + "  use " + str(resources["food_consumption_rate"]) + "/tick", text_x, y, VisualStyle.COLOR_RESOURCE_FOOD)
-	y = draw_sidebar_label_value(font, font_size, "Wood", str(resources["wood"]), text_x, y, VisualStyle.COLOR_RESOURCE_WOOD)
-	y = draw_sidebar_label_value(font, font_size, "Tools", str(resources["tools"]), text_x, y, VisualStyle.COLOR_RESOURCE_TOOLS)
-	y += 4.0
-
-	y = draw_sidebar_section_title(font, "Population", text_x, y)
-	y = draw_sidebar_label_value(font, font_size, "Shelter", str(resources["housing_capacity"]) + " total", text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
-	y = draw_sidebar_label_value(font, font_size, "Housed", str(resources["housed_population"]) + " / " + str(resources["house_shelter_capacity"]), text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
-	y = draw_sidebar_label_value(font, font_size, "Temporary", str(resources["temporary_sheltered_population"]) + " / " + str(resources["temporary_shelter_capacity"]), text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
-	if int(resources["unsheltered_population"]) > 0:
-		y = draw_sidebar_label_value(font, font_size, "Unsheltered", str(resources["unsheltered_population"]), text_x, y, VisualStyle.COLOR_WARNING)
-	y = draw_sidebar_label_value(font, font_size, "Newcomers", HouseholdMigration.get_arrival_blocker_text(HouseholdMigration.get_arrival_blocker(city)), text_x, y, VisualStyle.COLOR_POPULATION_LABOR)
-	y += 4.0
-
-	y = draw_sidebar_section_title(font, "Selected Object", text_x, y)
-	y = draw_selected_object_summary(font, font_size, city, text_x, y)
-	y += 4.0
-
-	y = draw_sidebar_section_title(font, "Build Controls", text_x, y)
-	if is_placing_building:
-		y = draw_sidebar_label_value(font, font_size, "Building", get_building_display_name(selected_building_type), text_x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
-		y = draw_sidebar_label_value(font, font_size, "Cost", building_placement.get_cost_text(building_placement.get_building_cost(selected_building_type)), text_x, y, VisualStyle.COLOR_MUTED)
-	else:
-		y = draw_sidebar_label_value(font, font_size, "Building", "none", text_x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
-	# The key list is long; when a selection fills the panel it shrinks to one line.
-	var key_lines: Array[String] = ["1 house, 2 farm, 3 woodcutter", "4 toolmaker, 5 quarry, 6 stonecutter", "7 brickworks, 8 lime, 9 mortar", "0 mason, Q sculptor, W carver", "E tileworks, R paver yard", "Y fisher's hut, U hunter's lodge", "O watch post, M call the militia", "H herder's fold (wool for clothing)", "T storehouse, P home plot, G road", "C clear woods, F till land (click both corners)"]
-	if y + (key_lines.size() + 4) * 15.0 > sidebar_rect.end.y:
-		key_lines = ["Keys 1-0, Q-R, T choose a building", "P plot, G road, C clear, F till"]
-	for key_line: String in key_lines:
-		y = draw_sidebar_line(font, font_size, key_line, text_x, y, VisualStyle.COLOR_MUTED)
-	y = draw_sidebar_line(font, font_size, "B: build menu, Right click/Esc: clear", text_x, y, VisualStyle.COLOR_MUTED)
-	y += 4.0
-	draw_sidebar_line(font, font_size, placement_status, text_x, y, placement_color)
 
 # Tall enough for the whole catalog: a header, each category's label, and a row per entry.
 func get_build_menu_rect() -> Rect2:
@@ -2040,19 +2012,6 @@ func draw_build_menu(font: Font, font_size: int):
 		draw_string(font, Vector2(text_x + 5.0, y), label, HORIZONTAL_ALIGNMENT_LEFT, menu_rect.size.x - 34.0, font_size, label_color)
 		y += 22.0
 
-func draw_sidebar_section_title(font: Font, text: String, x: float, y: float) -> float:
-	draw_string(font, Vector2(x, y), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 15, VisualStyle.COLOR_UI_SECTION_HEADER)
-	return y + 17.0
-
-func draw_sidebar_line(font: Font, font_size: int, text: String, x: float, y: float, color: Color) -> float:
-	draw_string(font, Vector2(x, y), text, HORIZONTAL_ALIGNMENT_LEFT, CITY_SIDEBAR_WIDTH - CITY_SIDEBAR_PADDING * 2, font_size, color)
-	return y + 15.0
-
-func draw_sidebar_label_value(font: Font, font_size: int, label: String, value: String, x: float, y: float, color: Color) -> float:
-	draw_string(font, Vector2(x, y), label + ":", HORIZONTAL_ALIGNMENT_LEFT, 86.0, font_size, VisualStyle.COLOR_MUTED)
-	draw_string(font, Vector2(x + 88.0, y), value, HORIZONTAL_ALIGNMENT_LEFT, CITY_SIDEBAR_WIDTH - CITY_SIDEBAR_PADDING * 2 - 88.0, font_size, color)
-	return y + 15.0
-
 func get_building_display_name(building_type: String) -> String:
 	if BuildingTiers.is_tier0(building_type) or BuildingTiers.DISPLAY_NAMES.has(building_type):
 		return BuildingTiers.get_display_name(building_type)
@@ -2089,159 +2048,11 @@ func get_building_display_name(building_type: String) -> String:
 
 	return building_type
 
-func draw_pressure_row(font: Font, font_size: int, label: String, pressure: Dictionary, x: float, y: float) -> float:
-	var status: String = pressure["status"] as String
-	var severity: String = pressure["severity"] as String
-	var detail: String = pressure["detail"] as String
-	y = draw_sidebar_label_value(font, font_size, label, status, x, y, get_pressure_color(severity))
-	if not detail.is_empty():
-		y = draw_sidebar_detail_line(font, font_size, detail, x + 12.0, y - 1.0)
-
-	return y
-
-func draw_need_pressure_row(font: Font, font_size: int, need_pressure: Dictionary, x: float, y: float) -> float:
-	var label: String = get_need_pressure_display_label(need_pressure)
-	var status: String = str(need_pressure.get("status", "not_implemented"))
-	var severity: String = str(need_pressure.get("severity", "neutral"))
-	var available: int = int(need_pressure.get("available", 0))
-	var demand: int = int(need_pressure.get("demand", 0))
-	var active: bool = bool(need_pressure.get("active", false))
-
-	if active:
-		y = draw_sidebar_line(font, font_size, label + ": " + format_need_status_label(status), x, y, get_pressure_color(severity))
-		return draw_sidebar_detail_line(font, font_size, str(available) + " available / " + str(demand) + " demand", x + 12.0, y - 1.0)
-
-	var value_text: String = str(available) + " available, not active"
-	return draw_sidebar_label_value(font, font_size, label, value_text, x, y, get_pressure_color(severity))
-
-func get_need_pressure_display_label(need_pressure: Dictionary) -> String:
-	var bucket: String = str(need_pressure.get("bucket", ""))
-	var active: bool = bool(need_pressure.get("active", false))
-	if active:
-		return str(need_pressure.get("display_name", "Need"))
-	if bucket == "construction_materials":
-		return "Construct."
-	if bucket == "maintenance_materials":
-		return "Maint."
-	if bucket == "civic_goods":
-		return "Civic"
-
-	return str(need_pressure.get("display_name", "Need"))
-
-func format_need_status_label(status: String) -> String:
-	var words: PackedStringArray = status.replace("_", " ").split(" ")
-	for index in range(words.size()):
-		if words[index].length() > 0:
-			words[index] = words[index].substr(0, 1).to_upper() + words[index].substr(1).to_lower()
-
-	return " ".join(words)
-
-func get_pressure_color(severity: String) -> Color:
-	if severity == "positive":
-		return VisualStyle.COLOR_POSITIVE
-	if severity == "warning":
-		return VisualStyle.COLOR_MAINTENANCE_WARNING
-	if severity == "danger":
-		return VisualStyle.COLOR_WARNING
-
-	return VisualStyle.COLOR_UI_TEXT_NORMAL
-
-func draw_sidebar_detail_line(font: Font, font_size: int, text: String, x: float, y: float) -> float:
-	draw_string(font, Vector2(x, y), text, HORIZONTAL_ALIGNMENT_LEFT, CITY_SIDEBAR_WIDTH - CITY_SIDEBAR_PADDING * 2 - 12.0, max(10, font_size - 2), VisualStyle.COLOR_MUTED)
-	return y + 12.0
-
 func get_house_preference_count_text(city: City) -> String:
 	var counts: Dictionary = city.get_household_counts_by_preference()
 	var agrarian_houses: int = int(counts[WORK_PREF_AGRARIAN])
 	var industrial_houses: int = int(counts[WORK_PREF_INDUSTRIAL])
 	return str(agrarian_houses) + "/" + str(industrial_houses)
-
-func draw_selected_object_summary(font: Font, font_size: int, city: City, x: float, y: float) -> float:
-	var building_index: int = city_building_overlay.inspected_building_index
-	var project: ConstructionProject = city.construction.get_project(city_building_overlay.inspected_project_id)
-	if project != null:
-		y = draw_sidebar_label_value(font, font_size, "Site", ConstructionDisplayHelper.get_project_title(city, project), x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
-		return draw_sidebar_label_value(font, font_size, "Status", city.construction.get_status_text(project), x, y, VisualStyle.COLOR_MUTED)
-	if city_building_overlay.inspected_plot_id >= 0:
-		return draw_sidebar_label_value(font, font_size, "Plot", "residential", x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
-	if building_index < 0 or building_index >= city.buildings.size():
-		return draw_sidebar_line(font, font_size, "None selected.", x, y, VisualStyle.COLOR_MUTED)
-
-	var building: Building = city.buildings[building_index]
-	y = draw_sidebar_label_value(font, font_size, "Type", city_building_overlay.get_building_label(city, building_index), x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
-
-	if building.is_house():
-		var household: Household = city.get_household_for_building_id(building_index)
-		if household == null:
-			y = draw_sidebar_label_value(font, font_size, "Resident", "empty", x, y, VisualStyle.COLOR_MUTED)
-		else:
-			y = draw_sidebar_label_value(font, font_size, "Resident", city.get_household_label(household.id), x, y, VisualStyle.COLOR_POPULATION_LABOR)
-			if household.has_values():
-				y = draw_sidebar_label_value(font, font_size, "Calling", get_household_calling_text(household), x, y, VisualStyle.get_preference_color(household.preference))
-				y = draw_sidebar_label_value(font, font_size, "Defining", get_household_defining_text(city, household), x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
-				if HouseholdMigration.is_considering_departure(household):
-					y = draw_sidebar_label_value(font, font_size, "Hardship", "thinking of leaving", x, y, VisualStyle.COLOR_WARNING)
-			else:
-				y = draw_sidebar_label_value(font, font_size, "Preference", household.preference, x, y, VisualStyle.get_preference_color(household.preference))
-	else:
-		y = draw_sidebar_label_value(font, font_size, "Worker", get_selected_building_worker_summary(city, building), x, y, VisualStyle.COLOR_POPULATION_LABOR)
-		y = draw_sidebar_label_value(font, font_size, "Upkeep", str(building.maintenance_level) + "%", x, y, get_maintenance_summary_color(building))
-	# Display selected building action hints
-	var selected_building_hint_lines := SelectedBuildingActionHintHelper.get_hints(building, city)
-	if selected_building_hint_lines.size() > 0:
-		y = draw_sidebar_section_title(font, "Selected Building Hints", x, y)
-		for hint_text in selected_building_hint_lines:
-			y = draw_sidebar_line(font, font_size, hint_text, x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
-	var household_link_lines: Array[String] = HouseholdHomeWorkLinkHelper.get_links(city, building_index)
-	if household_link_lines.size() > 0:
-		y = draw_sidebar_section_title(font, "Household Links", x, y)
-		for household_link_text: String in household_link_lines:
-			y = draw_sidebar_line(font, font_size, household_link_text, x, y, VisualStyle.COLOR_UI_TEXT_NORMAL)
-
-	return y
-
-func get_household_calling_text(household: Household) -> String:
-	var names: Array[String] = []
-	for calling in household.values.get(CultureValues.CATEGORY_CALLING, []):
-		names.append(CultureValues.get_display_name(calling))
-	return ", ".join(names)
-
-func get_household_defining_text(city: City, household: Household) -> String:
-	var names: Array[String] = []
-	for value_id: String in city.get_household_defining_values(household):
-		names.append(CultureValues.get_display_name(value_id))
-	return ", ".join(names)
-
-func get_selected_building_worker_summary(city: City, building: Building) -> String:
-	if building.assigned_workers <= 0:
-		return "unassigned"
-
-	var household: Household = city.get_household_by_id(building.assigned_household_id)
-	if household == null:
-		return "starter neutral"
-
-	return city.get_household_label(household.id) + " (" + household.preference + ")"
-
-func get_maintenance_summary_color(building: Building) -> Color:
-	if not building.receives_maintenance:
-		return VisualStyle.COLOR_MAINTENANCE_DISABLED
-	if building.maintenance_level < 50:
-		return VisualStyle.COLOR_MAINTENANCE_BAD
-	if building.maintenance_level < 75:
-		return VisualStyle.COLOR_MAINTENANCE_WARNING
-
-	return VisualStyle.COLOR_MAINTENANCE_GOOD
-
-func draw_house_preference_counts(font: Font, font_size: int, x: float, y: float) -> float:
-	if selected_city_index < 0 or selected_city_index >= cities.size():
-		return y
-
-	var counts: Dictionary = cities[selected_city_index].get_household_counts_by_preference()
-	var agrarian_houses: int = int(counts[WORK_PREF_AGRARIAN])
-	var industrial_houses: int = int(counts[WORK_PREF_INDUSTRIAL])
-
-	y = draw_sidebar_line(font, font_size, "Household prefs: A " + str(agrarian_houses) + " / I " + str(industrial_houses), x, y, VisualStyle.COLOR_POPULATION_LABOR)
-	return y
 
 func draw_building_overlay(font: Font, font_size: int):
 	if selected_city_index < 0 or selected_city_index >= cities.size():
@@ -2249,18 +2060,6 @@ func draw_building_overlay(font: Font, font_size: int):
 	var city: City = cities[selected_city_index]
 	city_building_overlay.bounds = get_town_map_screen_rect()
 	city_building_overlay.draw(self, font, font_size, city)
-
-func count_maintenance_needed_buildings(city_index: int) -> int:
-	var count: int = 0
-	if city_index < 0 or city_index >= cities.size():
-		return count
-
-	var buildings: Array = cities[city_index].buildings
-	for building: Building in buildings:
-		if building.is_production_building() and building.maintenance_level < 100:
-			count += 1
-
-	return count
 
 func get_selected_city_name() -> String:
 	if selected_city_index < 0 or selected_city_index >= cities.size():
@@ -2407,15 +2206,6 @@ func draw_time_control_options(font: Font, font_size: int, x: float, y: float, w
 	y = draw_region_action_option(font, font_size, "10x", x, y, width, {"action": "speed_10x"}, get_time_control_color("10x"))
 	return y
 
-func draw_city_time_control_options(font: Font, font_size: int, x: float, y: float, width: float) -> float:
-	var gap: float = 5.0
-	var button_width: float = (width - gap * 3.0) / 4.0
-	draw_city_action_button(font, font_size, "Pause", x, y, button_width, {"action": "toggle_pause"}, get_time_control_color("Paused"))
-	draw_city_action_button(font, font_size, "1x", x + (button_width + gap), y, button_width, {"action": "speed_1x"}, get_time_control_color("1x"))
-	draw_city_action_button(font, font_size, "3x", x + (button_width + gap) * 2.0, y, button_width, {"action": "speed_3x"}, get_time_control_color("3x"))
-	draw_city_action_button(font, font_size, "10x", x + (button_width + gap) * 3.0, y, button_width, {"action": "speed_10x"}, get_time_control_color("10x"))
-	return y + 21.0
-
 func get_time_control_color(label: String) -> Color:
 	if simulation_clock.get_speed_label() == label:
 		return VisualStyle.COLOR_UI_BUTTON_ACTIVE
@@ -2436,124 +2226,6 @@ func draw_region_action_option(font: Font, font_size: int, text: String, x: floa
 	draw_rect(option_rect, VisualStyle.COLOR_UI_OPTION_BORDER, false, VisualStyle.OPTION_BORDER_WIDTH)
 	draw_string(font, Vector2(x, y), text, HORIZONTAL_ALIGNMENT_LEFT, width, font_size, VisualStyle.COLOR_UI_TEXT)
 	return y + 21.0
-
-func draw_city_action_option(font: Font, font_size: int, text: String, x: float, y: float, width: float, option_data: Dictionary, color: Color) -> float:
-	var option_rect: Rect2 = Rect2(Vector2(x - 4.0, y - 13.0), Vector2(width + 8.0, 18.0))
-	var stored_option: Dictionary = option_data.duplicate()
-	stored_option["rect"] = option_rect
-	city_action_options.append(stored_option)
-
-	draw_rect(option_rect, color)
-	draw_rect(option_rect, VisualStyle.COLOR_UI_OPTION_BORDER, false, VisualStyle.OPTION_BORDER_WIDTH)
-	draw_string(font, Vector2(x, y), text, HORIZONTAL_ALIGNMENT_LEFT, width, font_size, VisualStyle.COLOR_UI_TEXT)
-	return y + 21.0
-
-func draw_city_action_button(font: Font, font_size: int, text: String, x: float, y: float, width: float, option_data: Dictionary, color: Color):
-	var option_rect: Rect2 = Rect2(Vector2(x, y - 13.0), Vector2(width, 18.0))
-	var stored_option: Dictionary = option_data.duplicate()
-	stored_option["rect"] = option_rect
-	city_action_options.append(stored_option)
-
-	draw_rect(option_rect, color)
-	draw_rect(option_rect, VisualStyle.COLOR_UI_OPTION_BORDER, false, VisualStyle.OPTION_BORDER_WIDTH)
-	draw_string(font, Vector2(x + 5.0, y), text, HORIZONTAL_ALIGNMENT_LEFT, width - 10.0, font_size, VisualStyle.COLOR_UI_TEXT)
-
-# The trader in town (TownTrade): its prices in grain and the lots the player can take, one click
-# each.
-func draw_trader_section(font: Font, font_size: int, city: City, x: float, y: float) -> float:
-	if not city.trade.is_trader_here():
-		return y
-	var width: float = get_city_sidebar_rect().size.x - CITY_SIDEBAR_PADDING * 2.0
-	y = draw_sidebar_section_title(font, "Trader", x, y)
-	for price_line: String in city.trade.get_price_lines():
-		y = draw_sidebar_line(font, font_size, price_line, x, y, VisualStyle.COLOR_MUTED)
-	var lots: Array[Dictionary] = city.trade.get_lots()
-	if lots.is_empty():
-		y = draw_sidebar_line(font, font_size, "Nothing the town holds is wanted.", x, y, VisualStyle.COLOR_MUTED)
-	for index in range(lots.size()):
-		draw_city_action_button(font, font_size, "Give " + TownTrade.describe_lot(lots[index]), x, y + 4.0, width, {"action": "trade_lot", "lot": index}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
-		y += 22.0
-	if city.trade.last_trade_text != "":
-		y = draw_sidebar_line(font, font_size, "Last trade: " + city.trade.last_trade_text, x, y + 4.0, VisualStyle.COLOR_MUTED)
-	return y + 4.0
-
-# While bandits are on the road and no militia is called: the call-up (TownDefense), at the cost of
-# the called families' work.
-func draw_militia_button(font: Font, font_size: int, city: City, x: float, y: float) -> float:
-	if not city.defense.is_band_coming() or not city.defense.called_household_ids.is_empty():
-		return y
-	var width: float = get_city_sidebar_rect().size.x - CITY_SIDEBAR_PADDING * 2.0
-	draw_city_action_button(font, font_size, "Call the militia (%d families leave work)" % EconomyBalance.MILITIA_FAMILIES, x, y + 4.0, width, {"action": "call_militia"}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
-	return y + 26.0
-
-# Influence prototype (TownInfluence; on while families lead): what the community asks for, the
-# stores rule, and how families on hand work are expected to answer a call for better work.
-func draw_influence_section(font: Font, font_size: int, city: City, x: float, y: float) -> float:
-	if not city.influence.enabled:
-		return y
-	var width: float = get_city_sidebar_rect().size.x - CITY_SIDEBAR_PADDING * 2.0
-	var half: float = (width - 4.0) * 0.5
-	y = draw_sidebar_section_title(font, "Influence (prototype)", x, y)
-	for line: String in city.influence.get_sidebar_lines():
-		y = draw_sidebar_line(font, font_size, line, x, y, VisualStyle.COLOR_MUTED)
-	for row in range(2):
-		for column in range(2):
-			var activity: String = TownInfluence.ACTIVITIES[row * 2 + column]
-			var on: bool = city.influence.is_encouraged(activity)
-			draw_city_action_button(font, font_size, ("Asked: " if on else "Ask: ") + TownInfluence.get_activity_name(activity), x + column * (half + 4.0), y + 4.0, half, {"action": "toggle_encourage", "activity": activity}, VisualStyle.COLOR_UI_BUTTON_ACTIVE if on else VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
-		y += 22.0
-	draw_city_action_button(font, font_size, "Stores: " + ("priorities first (click: open)" if city.influence.store_rule == TownInfluence.RULE_PRIORITIES else "open (click: priorities first)"), x, y + 4.0, width, {"action": "toggle_store_rule"}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
-	y += 26.0
-	var shown: int = 0
-	for household: Household in city.households:
-		var outlook: Dictionary = FamilyInitiative.predict_improvement(city, household, true)
-		if str(outlook["outlook"]) == "" or shown >= 4:
-			continue
-		y = draw_sidebar_line(font, font_size, "%s, if asked for better work: %s" % [city.get_household_label(household.id), outlook["outlook"]], x, y, VisualStyle.COLOR_MUTED)
-		shown += 1
-	y = draw_social_controls(font, font_size, city, x, y, width, half)
-	return draw_sidebar_line(font, font_size, "K: mark ground for work, L: families", x, y, VisualStyle.COLOR_MUTED)
-
-# Household social prototype (TownSocial): the two norms the community can ask for and how far the
-# town follows them, the reward for helping, and honouring the selected family.
-func draw_social_controls(font: Font, font_size: int, city: City, x: float, y: float, width: float, half: float) -> float:
-	if not city.social.enabled:
-		return y
-	for line: String in city.social.get_sidebar_lines():
-		y = draw_sidebar_line(font, font_size, line, x, y, VisualStyle.COLOR_MUTED)
-	var norm_ids: Array[String] = [TownSocial.NORM_HELP, TownSocial.NORM_CLAIMS]
-	for column in range(2):
-		var on: bool = bool(city.social.norms[norm_ids[column]]["promoted"])
-		draw_city_action_button(font, font_size, ("Asked: " if on else "Ask: ") + ("helping" if column == 0 else "claims"), x + column * (half + 4.0), y + 4.0, half, {"action": "toggle_norm", "norm": norm_ids[column]}, VisualStyle.COLOR_UI_BUTTON_ACTIVE if on else VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
-	y += 22.0
-	draw_city_action_button(font, font_size, "Reward help: " + ("on" if city.social.incentive else "off"), x, y + 4.0, half, {"action": "toggle_incentive"}, VisualStyle.COLOR_UI_BUTTON_ACTIVE if city.social.incentive else VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
-	y += 26.0
-	# Honouring the selected family, for one of the four kinds of contribution.
-	var selected: Household = get_inspected_household()
-	if selected != null:
-		y = draw_sidebar_line(font, font_size, "Honour %s for:" % city.get_household_label(selected.id), x, y, VisualStyle.COLOR_MUTED)
-		var quarter: float = (width - 12.0) * 0.25
-		var labels: Array[String] = ["Service", "Holding", "Craft", "Peace"]
-		for column in range(4):
-			draw_city_action_button(font, font_size, labels[column], x + column * (quarter + 4.0), y, quarter, {"action": "honour_household", "household": selected.id, "category": TownSocial.RECOGNITIONS[column]}, VisualStyle.COLOR_UI_BUTTON_BACKGROUND)
-		y += 26.0
-	return y
-
-# The family roster (L), over the left of the town view: one line a family (HouseholdRosterHelper).
-func draw_household_roster(font: Font, font_size: int) -> void:
-	if not show_household_roster or selected_city_index < 0 or selected_city_index >= cities.size():
-		return
-	var city: City = cities[selected_city_index]
-	var lines: Array[String] = HouseholdRosterHelper.get_lines(city) if city.social.enabled else ["This town runs under the classic rules. Families lead again from Esc > Town rules (or I)."]
-	var width: float = minf(760.0, get_viewport_rect().size.x - get_city_sidebar_rect().size.x - 40.0)
-	var rect: Rect2 = Rect2(Vector2(12.0, 52.0), Vector2(width, 30.0 + lines.size() * 17.0))
-	draw_rect(rect, Color(0.08, 0.09, 0.08, 0.9))
-	draw_rect(rect, VisualStyle.COLOR_UI_OPTION_BORDER, false, 1.0)
-	var y: float = rect.position.y + 20.0
-	draw_string(font, Vector2(rect.position.x + 10.0, y), "Families (L to close)", HORIZONTAL_ALIGNMENT_LEFT, width - 20.0, font_size + 1, VisualStyle.COLOR_UI_TITLE)
-	for line: String in lines:
-		y += 17.0
-		draw_string(font, Vector2(rect.position.x + 10.0, y), line, HORIZONTAL_ALIGNMENT_LEFT, width - 20.0, font_size, VisualStyle.COLOR_UI_TEXT_NORMAL)
 
 func draw_sidebar_like_line(font: Font, font_size: int, text: String, x: float, y: float, width: float, color: Color) -> float:
 	draw_string(font, Vector2(x, y), text, HORIZONTAL_ALIGNMENT_LEFT, width, font_size, color)

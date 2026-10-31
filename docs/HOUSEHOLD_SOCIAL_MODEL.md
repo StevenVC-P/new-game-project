@@ -200,7 +200,7 @@ Branch `feature/household-social-prototype`, 2026-10-28. On by default since 202
 | Weekly and monthly passes, norms, trust, standing, recognition, grants, incentive, neighbour grid | `TownSocial` (`city.social`) |
 | Improvement weighing risk of acting against risk of waiting | `FamilyInitiative.get_improve_desire` |
 | Trampling by household; shortage hardship moved by sharing; voluntary spare time | `TownLogistics`, `HouseholdMigration`, `TownConstruction` |
-| Roster (L), the house card's Family section, sidebar norm appeals, help reward, honour | `HouseholdRosterHelper`, `CityBuildingOverlay`, `main.gd` |
+| The sidebar's Families page (L; was the roster) with each family's card, and its Community page: norm appeals, help reward, honour (`docs/TOWN_UI.md`) | `HouseholdRosterHelper`, `SidebarFamiliesPage`, `SidebarCommunityPage` |
 
 ### The directive's ten demonstrations
 

@@ -333,10 +333,10 @@ func capture_game_flow() -> void:
 		main.city_building_overlay.selected_house_building_index = richest
 	main.queue_redraw()
 	await shot("game_social_card")
-	main.show_household_roster = true
-	main.queue_redraw()
+	# The families page (L), which replaced the roster overlay.
+	main.show_sidebar_tab(TownSidebar.TAB_FAMILIES)
 	await shot("game_roster")
-	main.show_household_roster = false
+	main.show_sidebar_tab(TownSidebar.TAB_OVERVIEW)
 	main.clear_selected_household()
 	main.regional_terrain.wait_for_tasks()
 	main.queue_free()
