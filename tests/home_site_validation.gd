@@ -25,6 +25,7 @@ func run_all() -> void:
 	test_sites_never_overlap()
 	test_explanations_follow_the_terms()
 	test_rough_ranking_matches_the_terms()
+	test_starting_land()
 	test_saved_with_the_town()
 
 	if failure_count > 0:
@@ -211,6 +212,20 @@ func test_rough_ranking_matches_the_terms() -> void:
 			distance_terms += float(term["weight"]) if HomeSites.DISTANCE_FACTORS.has(term["factor"]) else 0.0
 		worst = maxf(worst, absf(distance_terms - HomeSites.get_rough_score(city, tile, context)))
 	_check(not (context["friends"] as Array).is_empty() and not (context["kin"] as Array).is_empty() and worst < 0.001, "the distance ranking equals the distance terms (largest gap %.4f)" % worst)
+
+# A new town's modest starting land holds every founding family and a little more, beside the
+# stockpile without covering it, and the founders can build on it.
+func test_starting_land() -> void:
+	var city: City = make_city()
+	var room: int = HomeSites.set_aside_starting_land(city)
+	var land: int = HomeSites.count_land(city)
+	_check(room >= EconomyBalance.FOUNDING_FAMILIES + HomeSites.STARTING_SPARE and land <= 49, "starting land holds every founding family and two more (%d spots on %d tiles), and stays modest" % [room, land])
+	var heart: Vector2i = TownLogistics.center_tile(city.logistics.stockpile_tile, TownLogistics.STOCKPILE_SIZE)
+	_check(HomeSites.get_land(city, heart) == HomeSites.LAND_NONE, "it lies beside the stockpile, not on it")
+	FamilyDevelopment.advance(city)
+	FamilyDevelopment.advance(city)
+	var homes: Array = city.construction.projects.filter(func(p: ConstructionProject) -> bool: return p.is_home())
+	_check(homes.size() >= 4 and homes.all(func(p: ConstructionProject) -> bool: return HomeSites.get_land(city, p.tile) != HomeSites.LAND_NONE), "founders build their homes on it")
 
 func test_saved_with_the_town() -> void:
 	var city: City = make_city()

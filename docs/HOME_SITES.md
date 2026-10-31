@@ -10,6 +10,8 @@ Code: `scripts/domain/home_sites.gd` (`HomeSites`), called from `FamilyDevelopme
 - **Residential land** (new): broad areas marked on the town map (`HomeSites.mark(city, from, to, level)`, stored on each tile as `residential`, so saves carry it). Two levels: **permitted** and **preferred**. Marking a block again at the same level clears it.
 - **Nothing set aside, nothing built.** A family never builds outside plots and residential land; with none, or none left that can hold a home, it builds nothing and records why ("Household 3 cannot build a home: no land is set aside for homes"). The town's counter of families waiting for land (`families_without_plot`) still counts it.
 
+- **Starting land** (`set_aside_starting_land`): a modest block a few tiles off the stockpile, on its roomiest side, the smallest of 5x5, 7x7 or 9x9 holding every founding family and two more. A passive player has it; it is not an optimized layout (owner, 2026-10-31). The comparisons use it; the game should set it aside at founding when the Planning tool lands (a one-line call where `main.gd` founds a town under families-lead rules).
+
 There is no game control for residential land yet: the Planning tab is on the unmerged town UI branch, so the tool is a domain call for now (see Integration).
 
 ## Feasibility, Then Preference
@@ -74,10 +76,16 @@ Hazards do not reach homes yet: high water affects fields and wolves affect camp
 - **Community tab:** none needed. Preferred land is persuasion, but it is a place on the map; it belongs with Planning.
 - **Community Priorities branch:** that branch currently lets families with no plot build anywhere near their work (commit `ff611b9`, made when laying out the town was taken out of play). This feature replaces that rule; merging both needs that change dropped from the priorities branch, and its comparison rerun with residential land set aside.
 
-## Decisions for the Owner
+## Owner Decisions (2026-10-31)
 
-1. **Is residential land part of play now?** The 2026-10-31 instruction took laying out the town out of play; this brief makes land planning a strategic choice. Residential land and preferred land are planning tools: confirm they are in play, and whether plots stay.
-2. **What should the comparisons assume?** With no land set aside, families cannot build, by design. Every evaluation needs a rule for what land a passive player sets aside.
-3. **Should homes face hazards?** Floods and wolves reach fields and camps only.
-4. **Preferred land's strength** reuses the ask weight (2.0 × receptiveness): enough to sway a deferential family over two tiles of extra walk, not a self-governing one.
-5. **Does a family ever move?** A family chooses its site once, when it builds; it never relocates.
+1. Residential land is part of play: the player designates broad areas, families choose their sites.
+2. Plots stay, as an optional targeted tool; they are not needed for every home under families-lead rules.
+3. Passive play gets a modest, reasonably placed starting area (above): inaction is not fatal for want of land.
+4. Homes face hazards only where they exist and have real consequences; none reach homes yet, and none are added here.
+5. Comparisons should give layouts equal housing capacity at the same time, and test preferred land against families' own preference (`home_site_check`: compact, dispersed, poor, far only, preferred far, each 24 spots from the first day).
+
+## Still Open
+
+- **Preferred land's strength** reuses the ask weight (2.0 × receptiveness).
+- **Does a family ever move?** A family chooses its site once, when it builds; it never relocates.
+- **Starting land in the game** needs the founding call in `main.gd` (above), best made with the Planning tool.

@@ -77,6 +77,50 @@ static func count_land(city: City) -> int:
 			count += 1 if int(data.get(RESIDENTIAL_KEY, LAND_NONE)) != LAND_NONE else 0
 	return count
 
+# Spots on residential land a home could stand on now.
+static func count_room(city: City) -> int:
+	var count: int = 0
+	var map_size: Vector2i = city.logistics.map_size()
+	for y in range(map_size.y):
+		for x in range(map_size.x):
+			var tile: Vector2i = Vector2i(x, y)
+			if get_land(city, tile) != LAND_NONE and city.construction.validate(Building.BUILDING_HOUSE, tile)["is_valid"] == true:
+				count += 1
+	return count
+
+# A new town's modest starting residential land (owner, 2026-10-31: doing nothing must not be fatal
+# for want of land, nor should it get an optimized layout): a square block a few tiles off the
+# stockpile, on whichever side (north, east, south, west, in that order on ties) has most room,
+# the smallest of STARTING_SIDES that holds a home for every founding family and STARTING_SPARE more.
+const STARTING_SIDES: Array[int] = [5, 7, 9]
+const STARTING_GAP: int = 2
+const STARTING_SPARE: int = 2
+
+static func set_aside_starting_land(city: City) -> int:
+	city.logistics.ensure_ready()
+	var heart: Vector2i = TownLogistics.center_tile(city.logistics.stockpile_tile, TownLogistics.STOCKPILE_SIZE)
+	var wanted: int = EconomyBalance.FOUNDING_FAMILIES + STARTING_SPARE
+	var best_corner: Vector2i = Vector2i(-1, -1)
+	var best_side: int = 0
+	for side: int in STARTING_SIDES:
+		var best_room: int = -1
+		for direction: Vector2i in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
+			var middle: Vector2i = heart + direction * (STARTING_GAP + side / 2 + 2)
+			var corner: Vector2i = middle - Vector2i(side / 2, side / 2)
+			var room: int = 0
+			for y in range(corner.y, corner.y + side):
+				for x in range(corner.x, corner.x + side):
+					if city.construction.is_inside(Vector2i(x, y)) and city.construction.validate(Building.BUILDING_HOUSE, Vector2i(x, y))["is_valid"] == true:
+						room += 1
+			if room > best_room:
+				best_room = room
+				best_corner = corner
+				best_side = side
+		if best_room >= wanted:
+			break
+	mark(city, best_corner, best_corner + Vector2i(best_side - 1, best_side - 1), LAND_PERMITTED)
+	return count_room(city)
+
 # --- Choosing a site -----------------------------------------------------------------------------
 
 # A family's choice of site for a home of `home_type`: {"tile", "terms", "note"} with tile (-1, -1)
