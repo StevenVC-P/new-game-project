@@ -1,81 +1,74 @@
 extends SceneTree
 
-# Priority check (community priorities prototype, step 1): can the player's choices materially
-# improve or damage a settlement through the simulation's own mechanics? The same towns, seeds and
-# starting conditions under player strategies that use only the controls the player has today,
-# each choice mapped to the nearest existing levers (no new behaviour):
-#
-# - food:        ask for food work; the stores go to the community's priorities first
-# - housing:     keep four homes' worth of plots set aside instead of two; the stores go to the
-#                priorities first with nothing asked, so families' improvements wait and wood stays
-#                for homes (there is no housing ask today)
-# - investment:  ask for better work and for tools
-# - cooperation: ask families to help neighbours in need; first claim on the stores for helpers
+# Priority check (docs/COMMUNITY_PRIORITIES.md): can the player's choices materially improve or
+# damage a settlement through the simulation's own mechanics? The same towns, seeds and starting
+# conditions under player strategies that use the community's one priority (CommunityPriority) and,
+# separately, the stores rule, so persuasion and resource restriction can be told apart.
+# (Step 1, before the priority existed, mapped each choice to the old asks: commit 8fd8b39.)
 #
 # Strategies, by kind:
 # - passive:     none (plots and public works only, as every strategy does);
-# - fixed:       one priority held all game (reasonable, some of them risky);
-# - informed:    a priority for the season and the town's state, at most two changes in any 90 days
-#                so the gathering never looks fickle (TownSocial.review_month);
-# - uninformed:  changes on exactly the days the informed strategy changed on the same town, to a
-#                priority picked without regard to the town, so the number and timing of policy
-#                changes are the same and the trust penalty for changing cannot explain a difference;
+# - fixed:       one priority held all game, with the stores open, and with the stores kept for the
+#                priority first ("_pf"); some are reasonable, some risky, and the warnings say which;
+# - informed:    "preview" reads the families' views and the warnings, as the Community tab will
+#                show them: the priority the town backs most, the stores kept for it only when that
+#                warns of nothing more than leaving them open; "seasonal" is step 1's informed rules
+#                (food before winter, homes while founders lack them, investment when stores are
+#                comfortable) with the stores open. Both change at most twice in any 90 days;
+# - uninformed:  changes on exactly the days the preview strategy changed on the same town, to a
+#                priority and a stores rule picked without regard to the town, so the number and
+#                timing of policy changes are the same;
 # - poor:        fickle (a new priority picked without regard every month: the trust penalty is in
 #                play) and wrong-headed (investment in autumn and winter, cooperation in spring and
-#                summer, never food, the informed strategy's change limit);
-# - destructive: no plots (never set land aside for homes), squander (commission a storehouse
-#                whenever the stores hold the wood), sell food (road out, sell every lot of food the
-#                trader takes), unfair honours (the existing approach: honour and favour the family
-#                that has given least); trade (road out, sensible lots) is the control for sell food.
+#                summer, never food);
+# - destructive: no plots (never set land aside for homes) and squander (commission a storehouse
+#                whenever the stores hold the wood). Selling food and unfair honours had no teeth in
+#                step 1 and are not repeated.
 #
 # Three conditions, reported separately: ordinary sites; the same sites with most of the stores lost
 # as the first winter begins (a test-only stressor, StandInPlayer "hard_winter"); and naturally
 # difficult sites, with no artificial stress: from a wider pool, those where the map luck check's
 # classic player does worst (pick_difficult_sites).
 #
-# The informed and wrong-headed rules were written before any result was seen and are not tuned to
-# them. Every strategy also sets plots aside and plans the public works as the stand-in does.
+# The informed, uninformed and wrong-headed rules were written before this step's results were seen
+# and are not tuned to them. Every strategy also sets plots aside and plans the public works as the
+# stand-in does.
 # Run: <godot> --headless --path . --script res://tests/sim/priority_check.gd > priority.log; filter
 # for [PRI] (write to a file: a shell pipe stalls Godot on Windows).
-# "-- --years=N --sites=N --conditions=ordinary,stressed,difficult --strategies=none,informed"
+# "-- --years=N --sites=N --conditions=ordinary,stressed,difficult --strategies=none,preview"
 
 const TownBuildingCheck = preload("res://tests/sim/town_building_check.gd")
 const StandInPlayerScript = preload("res://tests/sim/stand_in_player.gd")
 
 const BASE: Dictionary = {"planned": true, "hand_method": true, "families_develop": true, "homes_on_plots": true, "social": true, "land_food": false, "never": ["herder", "fisher", "hunter"]}
-
-const PRIORITY_NONE: String = "none"
-const PRIORITY_FOOD: String = "food"
-const PRIORITY_HOUSING: String = "housing"
-const PRIORITY_INVESTMENT: String = "investment"
-const PRIORITY_COOPERATION: String = "cooperation"
-const PRIORITIES: Array[String] = [PRIORITY_FOOD, PRIORITY_HOUSING, PRIORITY_INVESTMENT, PRIORITY_COOPERATION]
+const OPEN: String = TownInfluence.RULE_OPEN
+const FIRST: String = TownInfluence.RULE_PRIORITIES
 
 const STRATEGIES: Array = [
 	{"name": "none", "kind": "passive"},
-	{"name": "food", "kind": "fixed", "priority": PRIORITY_FOOD},
-	{"name": "housing", "kind": "fixed", "priority": PRIORITY_HOUSING},
-	{"name": "investment", "kind": "fixed", "priority": PRIORITY_INVESTMENT},
-	{"name": "cooperation", "kind": "fixed", "priority": PRIORITY_COOPERATION},
-	{"name": "informed", "kind": "informed"},
+	{"name": "food", "kind": "fixed", "priority": CommunityPriority.FOOD, "rule": OPEN},
+	{"name": "housing", "kind": "fixed", "priority": CommunityPriority.HOUSING, "rule": OPEN},
+	{"name": "investment", "kind": "fixed", "priority": CommunityPriority.INVESTMENT, "rule": OPEN},
+	{"name": "cooperation", "kind": "fixed", "priority": CommunityPriority.COOPERATION, "rule": OPEN},
+	{"name": "food_pf", "kind": "fixed", "priority": CommunityPriority.FOOD, "rule": FIRST},
+	{"name": "housing_pf", "kind": "fixed", "priority": CommunityPriority.HOUSING, "rule": FIRST},
+	{"name": "investment_pf", "kind": "fixed", "priority": CommunityPriority.INVESTMENT, "rule": FIRST},
+	{"name": "cooperation_pf", "kind": "fixed", "priority": CommunityPriority.COOPERATION, "rule": FIRST},
+	{"name": "preview", "kind": "informed"},
+	{"name": "seasonal", "kind": "informed"},
 	{"name": "uninformed", "kind": "uninformed"},
 	{"name": "fickle", "kind": "poor"},
 	{"name": "wrong_headed", "kind": "poor"},
-	{"name": "trade", "kind": "control", "trades": true},
 	{"name": "no_plots", "kind": "destructive"},
 	{"name": "squander", "kind": "destructive"},
-	{"name": "sell_food", "kind": "destructive", "trades": true},
-	{"name": "unfair", "kind": "destructive", "unfair": true},
-	# The housing priority's two levers apart: four homes' worth of plots ahead with the stores open;
-	# and the stores kept for the priorities with nothing asked (every improvement waits).
-	{"name": "plots_ahead", "kind": "lever"},
-	{"name": "stores_closed", "kind": "lever"},
 ]
 
 const DECIDE_DAYS: int = 30
 # A careful player never changes the community's priority more often than this in any 90 days
 # (TownSocial.MANY_CHANGES is when families start to lose trust).
 const MAX_CHANGES_IN_WINDOW: int = TownSocial.MANY_CHANGES - 1
+# The preview strategy changes priority only for one the town backs this much more.
+const BACKING_MARGIN: float = 0.1
 const SQUANDER_DAYS: int = 10
 # Difficult sites: drawn from this many regions (two sites each), the hardest this many kept.
 const DIFFICULT_POOL_REGIONS: int = 30
@@ -83,20 +76,21 @@ const REFERENCE_DAYS: int = 720
 
 # One strategy playing one town: what it decides each day and what it saw.
 class Plan extends RefCounted:
+	var strategy: Dictionary
 	var name: String
-	var scenario: Dictionary
-	var current: String = PRIORITY_NONE
+	var current: String = CommunityPriority.NONE
+	var current_rule: String = OPEN
 	var change_days: Array[int] = []
 	var replay_days: Array = []
+	var days_on: Dictionary = {}
 	var shortage_days: int = 0
 	var first_winter_low: float = INF
 	var food_after_first_winter: int = -1
-	var lots_of_food_sold: int = 0
 	var storehouses_commissioned: int = 0
 
-	func _init(strategy_name: String, scenario_ref: Dictionary, replay: Array = []) -> void:
-		name = strategy_name
-		scenario = scenario_ref
+	func _init(strategy_ref: Dictionary, replay: Array = []) -> void:
+		strategy = strategy_ref
+		name = strategy["name"]
 		replay_days = replay
 
 	func each_day(city: City, day: int, player) -> void:
@@ -107,115 +101,94 @@ class Plan extends RefCounted:
 			first_winter_low = minf(first_winter_low, food_days)
 		if day == 359:
 			food_after_first_winter = int(city.resources["food"])
+		match str(strategy["kind"]):
+			"fixed":
+				if day == 0:
+					set_policy(city, strategy["priority"], strategy["rule"], day)
 		match name:
-			"food", "housing", "investment", "cooperation":
-				if day == 0:
-					set_priority(city, name, day)
-			"informed":
+			"preview":
 				if day % DECIDE_DAYS == 0:
-					change_if_allowed(city, informed_choice(city, day, player), day)
+					var chosen: String = choose_by_preview(city)
+					change_if_allowed(city, chosen, rule_by_warnings(city, chosen), day)
+			"seasonal":
+				if day % DECIDE_DAYS == 0:
+					change_if_allowed(city, choose_by_season(city, day, player), OPEN, day)
 			"uninformed":
-				if day == 0:
-					set_priority(city, pick_blindly(city, day), day)
-				elif replay_days.has(day):
-					set_priority(city, pick_blindly(city, day), day)
+				if day == 0 or replay_days.has(day):
+					set_policy(city, pick_blindly(city, day), FIRST if absi(hash([city.founding_seed, day, "rule"])) % 2 == 0 else OPEN, day)
 			"fickle":
 				if day % DECIDE_DAYS == 0:
-					set_priority(city, pick_blindly(city, day), day)
+					set_policy(city, pick_blindly(city, day), OPEN, day)
 			"wrong_headed":
 				if day % DECIDE_DAYS == 0:
-					change_if_allowed(city, PRIORITY_INVESTMENT if day % 360 >= 180 else PRIORITY_COOPERATION, day)
-			"plots_ahead":
-				scenario["plots_ahead"] = 4
-			"stores_closed":
-				city.influence.store_rule = TownInfluence.RULE_PRIORITIES
-			"trade":
-				player.trade(city, day)
-				player.defend(city, day)
-			"sell_food":
-				sell_food(city, day, player)
-				player.defend(city, day)
+					change_if_allowed(city, CommunityPriority.INVESTMENT if day % 360 >= 180 else CommunityPriority.COOPERATION, OPEN, day)
 			"squander":
 				if day % SQUANDER_DAYS == 0 and city.construction.can_supply(EconomyBalance.get_build_cost("storehouse")):
 					var spot: Vector2i = player.find_spot(city, "storehouse")
 					if spot.x >= 0 and city.construction.request_building("storehouse", spot) != null:
 						storehouses_commissioned += 1
+		var key: String = current if current != CommunityPriority.NONE else "none"
+		days_on[key] = int(days_on.get(key, 0)) + 1
 
-	# Written before any result was seen: food when the town is short or autumn is near with less
-	# than half a year in store; homes while founders are still without one; better work when the
-	# stores are comfortable and winter is not close; otherwise keep the current priority.
-	func informed_choice(city: City, day: int, player) -> String:
+	# Written before this step's results: the priority the town backs most (CommunityPriority.get_backing),
+	# changing only for one backed clearly more than the current one.
+	func choose_by_preview(city: City) -> String:
+		var best: String = current
+		var best_backing: float = CommunityPriority.get_backing(city, current) + BACKING_MARGIN if current != CommunityPriority.NONE else 0.5
+		for priority: String in CommunityPriority.ALL:
+			var backing: float = CommunityPriority.get_backing(city, priority)
+			if backing > best_backing:
+				best = priority
+				best_backing = backing
+		return best
+
+	# The stores kept for the priority only when that warns of nothing beyond leaving them open.
+	func rule_by_warnings(city: City, priority: String) -> String:
+		if priority == CommunityPriority.NONE:
+			return OPEN
+		return FIRST if CommunityPriority.get_warnings(city, priority, FIRST).size() <= CommunityPriority.get_warnings(city, priority, OPEN).size() else OPEN
+
+	# Step 1's informed rules: food when the town is short or autumn is near with less than half a
+	# year in store; homes while founders are still without one; better work when the stores are
+	# comfortable and winter is not close; otherwise keep the current priority.
+	func choose_by_season(city: City, day: int, player) -> String:
 		var of_year: int = day % 360
 		var food_days: float = FamilyInitiative.get_food_days(city)
 		if food_days < 60.0 or FamilyInitiative.get_food_ratio(city) < 1.0:
-			return PRIORITY_FOOD
+			return CommunityPriority.FOOD
 		if of_year >= 150 and of_year < 300 and food_days < 150.0:
-			return PRIORITY_FOOD
+			return CommunityPriority.FOOD
 		if not player.founders_housed(city):
-			return PRIORITY_HOUSING
+			return CommunityPriority.HOUSING
 		var reserve: Dictionary = city.influence.get_protected_reserve()
 		if of_year < 210 and int(city.resources["wood"]) >= 30 and int(city.resources["tools"]) >= int(reserve["tools"]) + 3:
-			return PRIORITY_INVESTMENT
+			return CommunityPriority.INVESTMENT
 		return current
 
 	# A priority picked without regard to the town (but never the one already set), the same on
 	# every run of the same town.
 	func pick_blindly(city: City, day: int) -> String:
-		var others: Array = PRIORITIES.filter(func(p: String) -> bool: return p != current)
+		var others: Array = CommunityPriority.ALL.filter(func(p: String) -> bool: return p != current)
 		return others[absi(hash([city.founding_seed, day, "blind"])) % others.size()]
 
-	func change_if_allowed(city: City, wanted: String, day: int) -> void:
-		if wanted == current:
+	func change_if_allowed(city: City, wanted: String, rule: String, day: int) -> void:
+		if wanted == current and rule == current_rule:
 			return
 		var recent: int = change_days.filter(func(d: int) -> bool: return day - d <= TownSocial.POLICY_WINDOW_DAYS).size()
 		if day > 0 and recent >= MAX_CHANGES_IN_WINDOW:
 			return
-		set_priority(city, wanted, day)
+		set_policy(city, wanted, rule, day)
 
-	# The priority's existing levers (see the top of the file). A change made before the gathering
-	# first meets is the town's starting policy, not a change.
-	func set_priority(city: City, priority: String, day: int) -> void:
-		if priority == current:
+	# A change made before the gathering first meets is the town's starting policy, not a change.
+	func set_policy(city: City, priority: String, rule: String, day: int) -> void:
+		if priority == current and rule == current_rule:
 			return
 		if day > 0:
 			change_days.append(day)
 		current = priority
-		var influence: TownInfluence = city.influence
-		influence.encouraged.clear()
-		influence.store_rule = TownInfluence.RULE_OPEN
-		city.social.set_promoted(TownSocial.NORM_HELP, false)
-		city.social.incentive = false
-		scenario["plots_ahead"] = 2
-		match priority:
-			PRIORITY_FOOD:
-				influence.set_encouraged(TownInfluence.ACTIVITY_FOOD, true)
-				influence.store_rule = TownInfluence.RULE_PRIORITIES
-			PRIORITY_HOUSING:
-				influence.store_rule = TownInfluence.RULE_PRIORITIES
-				scenario["plots_ahead"] = 4
-			PRIORITY_INVESTMENT:
-				influence.set_encouraged(TownInfluence.ACTIVITY_IMPROVE, true)
-				influence.set_encouraged(TownInfluence.ACTIVITY_TOOLS, true)
-			PRIORITY_COOPERATION:
-				city.social.set_promoted(TownSocial.NORM_HELP, true)
-				city.social.incentive = true
-
-	# A road out once there is wood for it, then every lot of food the trader will take.
-	func sell_food(city: City, day: int, player) -> void:
-		if day % DECIDE_DAYS == 0 and city.trade.get_link() == TownTrade.LINK_NONE and int(city.resources["wood"]) >= player.ROAD_OUT_WOOD and not city.construction.projects.any(func(p: ConstructionProject) -> bool: return p.kind == ConstructionProject.KIND_ROAD):
-			player.build_road_out(city)
-		if not city.trade.is_trader_here():
-			return
-		while true:
-			var lots: Array[Dictionary] = city.trade.get_lots()
-			var chosen: int = -1
-			for index in range(lots.size()):
-				if lots[index]["give"] == "food":
-					chosen = index
-					break
-			if chosen < 0 or not city.trade.accept_lot(chosen):
-				return
-			lots_of_food_sold += 1
+		current_rule = rule
+		city.influence.set_priority(priority)
+		city.influence.store_rule = rule
 
 func _init() -> void:
 	call_deferred("run")
@@ -246,8 +219,8 @@ func run() -> void:
 		var informed_changes: Array = []
 		for strategy: Dictionary in STRATEGIES:
 			var name: String = strategy["name"]
-			# The uninformed strategy needs the informed one's change days on each town.
-			if not only.is_empty() and not only.has(name) and not (name == "informed" and only.has("uninformed")):
+			# The uninformed strategy needs the preview strategy's change days on each town.
+			if not only.is_empty() and not only.has(name) and not (name == "preview" and only.has("uninformed")):
 				continue
 			var started: int = Time.get_ticks_msec()
 			var results: Array[Dictionary] = []
@@ -255,7 +228,7 @@ func run() -> void:
 				var replay: Array = informed_changes[index] if name == "uninformed" and index < informed_changes.size() else []
 				var result: Dictionary = play(sites[index], strategy, stress, years, replay)
 				results.append(result)
-				if name == "informed":
+				if name == "preview":
 					informed_changes.append(result["change_days"])
 			by_strategy[name] = results
 			if only.is_empty() or only.has(name):
@@ -269,10 +242,9 @@ func play(site: Dictionary, strategy: Dictionary, stress: bool, years: int, repl
 	city.local_map = (site["map"] as Array).duplicate(true)
 	var scenario: Dictionary = BASE.duplicate(true)
 	scenario["hard_winter"] = stress
-	scenario["unfair"] = strategy.get("unfair", false)
 	if strategy["name"] == "no_plots":
 		(scenario["never"] as Array).append(Building.BUILDING_HOUSE)
-	var plan: Plan = Plan.new(strategy["name"], scenario, replay)
+	var plan: Plan = Plan.new(strategy, replay)
 	scenario["each_day"] = Callable(plan, "each_day")
 	var player = StandInPlayerScript.new()
 	var result: Dictionary = player.play(city, scenario, years * Calendar.DAYS_PER_YEAR)
@@ -288,8 +260,15 @@ func play(site: Dictionary, strategy: Dictionary, stress: bool, years: int, repl
 	result["trust"] = float(social.get("trust", 0.0))
 	result["help_rate"] = float(social.get("help_rate", 0.0))
 	result["trust_fickle"] = float((social.get("trust_by_source", {}) as Dictionary).get("decisions keep changing", 0.0)) / maxf(1.0, float(social.get("households", 1)))
-	result["lots_of_food_sold"] = plan.lots_of_food_sold
 	result["storehouses_commissioned"] = plan.storehouses_commissioned
+	result["long_day_weeks"] = int(social.get("long_day_weeks", 0))
+	result["days_on"] = plan.days_on
+	# Decisions the priority tipped (CommunityPriority.record_swayed), by decision.
+	for decision: String in ["improve", "help", "long_days"]:
+		result["swayed_" + decision] = 0
+	for key: String in city.influence.swayed.keys():
+		var decision: String = key.get_slice(":", 1)
+		result["swayed_" + decision] = int(result.get("swayed_" + decision, 0)) + int(city.influence.swayed[key])
 	result["site_seed"] = int(site["seed"])
 	return result
 
@@ -300,8 +279,12 @@ func summarize(strategy: Dictionary, results: Array[Dictionary], baseline: Array
 	var totals: Dictionary = {}
 	for result: Dictionary in results:
 		made_it += 1 if result["off_the_ground"] else 0
-		for key: String in ["population", "households", "departed", "shortage_days", "first_winter_low", "food_after_first_winter", "improvements_by_families", "held_back_by_stores", "trust", "trust_fickle", "help_rate", "changes", "wood", "tools", "lots_of_food_sold", "storehouses_commissioned"]:
+		for key: String in ["population", "households", "departed", "shortage_days", "first_winter_low", "food_after_first_winter", "improvements_by_families", "held_back_by_stores", "trust", "trust_fickle", "help_rate", "changes", "wood", "tools", "storehouses_commissioned", "long_day_weeks", "swayed_improve", "swayed_help", "swayed_long_days"]:
 			totals[key] = float(totals.get(key, 0.0)) + float(result[key])
+	var days_on: Dictionary = {}
+	for result: Dictionary in results:
+		for priority: String in (result["days_on"] as Dictionary).keys():
+			days_on[priority] = int(days_on.get(priority, 0)) + int(result["days_on"][priority])
 	var avg: Callable = func(key: String) -> float: return float(totals.get(key, 0.0)) / n
 	var reasons: Dictionary = {}
 	for result: Dictionary in results:
@@ -318,6 +301,14 @@ func summarize(strategy: Dictionary, results: Array[Dictionary], baseline: Array
 	_report("%-12s %-11s food: shortage days %.0f, first winter's low %.0f days, store after it %.0f | improved %.1f, held back %.1f | trust %+.2f (from changing %+.2f) | helped %.0f%% | policy changes %.1f | end wood %.0f, tools %.0f%s" % [
 		name, "", avg.call("shortage_days"), avg.call("first_winter_low"), avg.call("food_after_first_winter"), avg.call("improvements_by_families"), avg.call("held_back_by_stores"),
 		avg.call("trust"), avg.call("trust_fickle"), avg.call("help_rate") * 100.0, avg.call("changes"), avg.call("wood"), avg.call("tools"), extras(name, avg)])
+	var all_days: float = 0.0
+	for priority: String in days_on.keys():
+		all_days += float(days_on[priority])
+	var shares: Array[String] = []
+	for priority: String in days_on.keys():
+		shares.append("%s %.0f%%" % [priority, 100.0 * float(days_on[priority]) / maxf(1.0, all_days)])
+	_report("%-12s %-11s decisions the priority tipped: improvements %.1f, help-weeks %.1f, long-day weeks %.1f (of %.1f) | time on each priority: %s" % [
+		name, "", avg.call("swayed_improve"), avg.call("swayed_help"), avg.call("swayed_long_days"), avg.call("long_day_weeks"), ", ".join(shares)])
 	if baseline.is_empty() or name == "none":
 		return
 	var better: int = 0
@@ -336,8 +327,6 @@ func summarize(strategy: Dictionary, results: Array[Dictionary], baseline: Array
 
 func extras(name: String, avg: Callable) -> String:
 	match name:
-		"sell_food":
-			return " | lots of food sold %.1f" % avg.call("lots_of_food_sold")
 		"squander":
 			return " | storehouses commissioned %.1f" % avg.call("storehouses_commissioned")
 	return ""

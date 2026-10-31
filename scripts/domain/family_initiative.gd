@@ -211,7 +211,8 @@ static func consider_improving(city: City, household: Household, holding: Buildi
 	var proper: String = BuildingTiers.get_upgrade_type(holding.type)
 	var desire: Dictionary = get_improve_desire(city, household, proper)
 	var name: String = describe_type(holding.type, false)
-	if float(desire["score"]) + get_noise(city, household, "improve") < IMPROVE_THRESHOLD:
+	var score: float = float(desire["score"]) + get_noise(city, household, "improve")
+	if score < IMPROVE_THRESHOLD:
 		note(city, household, "Keeps to hand work at its %s (%s)" % [name, "; ".join(get_reasons(desire["terms"], false))])
 		return null
 	var block: String = city.influence.get_funding_block(EconomyBalance.get_build_cost(proper), [get_activity(proper), TownInfluence.ACTIVITY_IMPROVE] as Array[String], household)
@@ -225,6 +226,8 @@ static func consider_improving(city: City, household: Household, holding: Buildi
 		return null
 	use_first_claim(city, household, project)
 	city.influence.improvements_started += 1
+	if CommunityPriority.is_swayed(score, float(desire["appeal"]), IMPROVE_THRESHOLD):
+		CommunityPriority.record_swayed(city, household, "improve")
 	if household.improve_decision_day < 0:
 		household.improve_decision_day = city.construction.day
 	note(city, household, "Improving its %s into %s (%s)" % [name, describe_type(proper), "; ".join(get_reasons(desire["terms"], true))])
@@ -295,7 +298,10 @@ static func get_improve_desire(city: City, household: Household, proper_type: St
 		add(terms, minf(3.0, 0.75 * int(seen["paying"])) * example_weight, "its neighbours' improved work is paying")
 	if int(seen["idle"]) > 0:
 		add(terms, -minf(2.0, float(seen["idle"])) * example_weight, "its neighbours' improved work stands short of tools")
-	add_encouragement(city, household, TownInfluence.ACTIVITY_IMPROVE, terms, "the gathering asks for better work")
+	var appeal: float = add_encouragement(city, household, TownInfluence.ACTIVITY_IMPROVE, terms, "the gathering asks for better work")
+	# A priority for this trade's output (food) asks for its improvement too, once.
+	if appeal == 0.0:
+		appeal = add_encouragement(city, household, get_activity(proper_type), terms, "the gathering asks for " + TownInfluence.get_activity_name(get_activity(proper_type)))
 	# A deserved honour for a holding or a craft it admires (TownSocial.judge_recognition).
 	if household.inspired_until >= city.construction.day and household.inspired_by_household >= 0:
 		var whose: String = city.get_household_label(household.inspired_by_household)
@@ -303,7 +309,7 @@ static func get_improve_desire(city: City, household: Household, proper_type: St
 			add(terms, 0.75, "it would match %s's honoured holding" % whose)
 		elif household.inspired_by == TownSocial.RECOGNITION_CRAFT:
 			add(terms, 0.5, "it would equal %s's honoured craft" % whose)
-	return {"score": sum(terms), "terms": terms}
+	return {"score": sum(terms), "terms": terms, "appeal": appeal}
 
 # How dangerous it is for the town to go on without more of an activity's output, 0 to 1.5.
 static func get_waiting_risk(city: City, activity: String) -> float:
@@ -359,11 +365,15 @@ static func predict_improvement(city: City, household: Household, encouraged: bo
 
 # How receptive a family is to the community's appeals. This is persuasion, not obedience: a
 # self-governing family weighs its own judgment more, and nothing here costs trust.
-static func add_encouragement(city: City, household: Household, activity: String, terms: Array, reason: String) -> void:
+# The asks come from the community's priority (CommunityPriority), a directing request; what the
+# town backs pulls too. Returns the weight added.
+static func add_encouragement(city: City, household: Household, activity: String, terms: Array, reason: String) -> float:
 	if not city.influence.is_encouraged(activity):
-		return
-	var receptive: Dictionary = get_receptiveness(household, city)
-	add(terms, ENCOURAGE_WEIGHT * float(receptive["factor"]), reason + str(receptive["note"]))
+		return 0.0
+	var receptive: Dictionary = get_receptiveness(household, city, CommunityPriority.KIND_DIRECTING)
+	var weight: float = ENCOURAGE_WEIGHT * float(receptive["factor"])
+	add(terms, weight, reason + str(receptive["note"]))
+	return weight + CommunityPriority.add_backing(city, household, terms)
 
 # How readily a family heeds the gathering's appeals, {"factor", "note"}. Before there are
 # institutions, the community's decisions come from informal gatherings of its households (owner
@@ -371,7 +381,12 @@ static func add_encouragement(city: City, household: Household, activity: String
 # Deference and trust make a family readier, self-government less; communal labor and solitary work
 # nudge it; and an appeal carries more weight when the families it respects most stand behind it,
 # less when they are families it is at odds with (TownSocial.get_respected_voices).
-static func get_receptiveness(household: Household, city: City = null) -> Dictionary:
+#
+# The kind of request matters (CommunityPriority): a self-governing family resists being directed
+# in its own work, but time given freely is its own choice, so that request is spared the
+# self-governing pull; communal labor and solitary work bear on giving time together, not on
+# a family's own work. With no kind given (the norms' appeals), every term applies as before.
+static func get_receptiveness(household: Household, city: City = null, kind: String = "") -> Dictionary:
 	var factor: float = 1.0
 	var note_text: String = ""
 	var deference: int = HouseholdCharacter.get_strength(household, "deferential")
@@ -379,13 +394,14 @@ static func get_receptiveness(household: Household, city: City = null) -> Dictio
 	if deference > 0:
 		factor += 0.25 * deference
 		note_text = ", and it heeds the gathering"
-	elif self_rule > 0:
+	elif self_rule > 0 and kind != CommunityPriority.KIND_VOLUNTARY:
 		factor -= 0.2 * self_rule
 		note_text = ", though it judges for itself"
 	factor += 0.15 * household.trust
 	if household.trust <= -2:
 		note_text += ", though it distrusts the gathering"
-	factor += 0.25 * signf(HouseholdCharacter.get_strength(household, "communal_labor") - HouseholdCharacter.get_strength(household, "solitary"))
+	if kind != CommunityPriority.KIND_DIRECTING:
+		factor += 0.25 * signf(HouseholdCharacter.get_strength(household, "communal_labor") - HouseholdCharacter.get_strength(household, "solitary"))
 	if city != null and city.social.enabled:
 		var voices: float = 0.0
 		for voice: Household in city.social.get_respected_voices():
