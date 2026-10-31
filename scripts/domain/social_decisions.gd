@@ -54,7 +54,8 @@ static func get_help_desire(city: City, household: Household, project: Construct
 	if city.social.incentive:
 		add(terms, INCENTIVE_WEIGHT + 0.25 * maxi(0, axis(household, HouseholdCharacter.AMBITION)), "the gathering gives first claim on the stores to families who help")
 	add_inspiration(city, household, TownSocial.RECOGNITION_SERVICE, terms, 0.5, "helping is honoured here")
-	return {"score": sum(terms), "terms": terms}
+	var appeal: float = CommunityPriority.add_help_appeal(city, household, project, terms)
+	return {"score": sum(terms), "terms": terms, "appeal": appeal}
 
 # How strongly a household feels bound to help kin: always a strong pull, stronger for close-knit
 # and clannish families and toward the household it came from when it reveres its elders, weaker
@@ -108,7 +109,8 @@ static func get_hours_desire(city: City, household: Household, project: Construc
 	if household.long_weeks_this_month >= 2:
 		add(terms, -0.75 * (household.long_weeks_this_month - 1), "it is weary")
 	add_own_security(city, household, terms, "it cannot afford to wear itself out")
-	return {"score": sum(terms), "terms": terms}
+	var appeal: float = CommunityPriority.add_hours_appeal(city, household, project, terms)
+	return {"score": sum(terms), "terms": terms, "appeal": appeal}
 
 # --- Sharing in a shortage ------------------------------------------------------------------------
 

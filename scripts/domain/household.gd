@@ -72,6 +72,9 @@ var fulfilled_ambitions: int = 0
 var initiative_note: String = ""
 var initiative_day: int = -1
 var improve_decision_day: int = -1
+# Why the family chose its home's site, or what kept it from building (HomeSites), and when.
+var home_site_note: String = ""
+var home_site_day: int = -1
 
 # The household's character and social life (docs/HOUSEHOLD_SOCIAL_MODEL.md; HouseholdCharacter,
 # TownSocial). Empty until the social model or influence prototype gives the household one.
