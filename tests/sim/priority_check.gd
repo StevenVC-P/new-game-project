@@ -7,7 +7,11 @@ extends SceneTree
 # (Step 1, before the priority existed, mapped each choice to the old asks: commit 8fd8b39.)
 #
 # Strategies, by kind:
-# - passive:     none (plots and public works only, as every strategy does);
+# Only community choices are play for now (owner, 2026-10-31): the player sets no plots, places
+# nothing, and plans no public works; families choose their own home sites
+# (FamilyDevelopment.choose_own_site) and open and improve their own work.
+#
+# - passive:     none;
 # - fixed:       one priority held all game, with the stores open, and with the stores kept for the
 #                priority first ("_pf"); some are reasonable, some risky, and the warnings say which;
 # - informed:    "preview" reads the families' views and the warnings, as the Community tab will
@@ -21,9 +25,9 @@ extends SceneTree
 # - poor:        fickle (a new priority picked without regard every month: the trust penalty is in
 #                play) and wrong-headed (investment in autumn and winter, cooperation in spring and
 #                summer, never food);
-# - destructive: no plots (never set land aside for homes) and squander (commission a storehouse
-#                whenever the stores hold the wood). Selling food and unfair honours had no teeth in
-#                step 1 and are not repeated.
+# - destructive: starve (the stores kept for the priorities with none set, so no family's
+#                improvement is funded) and unfair honours (every few months, honour and favour the
+#                family that has given least). Selling food had no teeth in step 1 and is not repeated.
 #
 # Three conditions, reported separately: ordinary sites; the same sites with most of the stores lost
 # as the first winter begins (a test-only stressor, StandInPlayer "hard_winter"); and naturally
@@ -31,8 +35,7 @@ extends SceneTree
 # classic player does worst (pick_difficult_sites).
 #
 # The informed, uninformed and wrong-headed rules were written before this step's results were seen
-# and are not tuned to them. Every strategy also sets plots aside and plans the public works as the
-# stand-in does.
+# and are not tuned to them.
 # Run: <godot> --headless --path . --script res://tests/sim/priority_check.gd > priority.log; filter
 # for [PRI] (write to a file: a shell pipe stalls Godot on Windows).
 # "-- --years=N --sites=N --conditions=ordinary,stressed,difficult --strategies=none,preview"
@@ -40,7 +43,8 @@ extends SceneTree
 const TownBuildingCheck = preload("res://tests/sim/town_building_check.gd")
 const StandInPlayerScript = preload("res://tests/sim/stand_in_player.gd")
 
-const BASE: Dictionary = {"planned": true, "hand_method": true, "families_develop": true, "homes_on_plots": true, "social": true, "land_food": false, "never": ["herder", "fisher", "hunter"]}
+# The stand-in player builds nothing: "house" is never planned (no plots), and nothing is "planned".
+const BASE: Dictionary = {"hand_method": true, "families_develop": true, "homes_on_plots": true, "social": true, "land_food": false, "never": ["herder", "fisher", "hunter", "house"]}
 const OPEN: String = TownInfluence.RULE_OPEN
 const FIRST: String = TownInfluence.RULE_PRIORITIES
 
@@ -59,8 +63,8 @@ const STRATEGIES: Array = [
 	{"name": "uninformed", "kind": "uninformed"},
 	{"name": "fickle", "kind": "poor"},
 	{"name": "wrong_headed", "kind": "poor"},
-	{"name": "no_plots", "kind": "destructive"},
-	{"name": "squander", "kind": "destructive"},
+	{"name": "starve", "kind": "destructive", "priority": CommunityPriority.NONE, "rule": FIRST},
+	{"name": "unfair", "kind": "destructive", "unfair": true},
 ]
 
 const DECIDE_DAYS: int = 30
@@ -69,7 +73,6 @@ const DECIDE_DAYS: int = 30
 const MAX_CHANGES_IN_WINDOW: int = TownSocial.MANY_CHANGES - 1
 # The preview strategy changes priority only for one the town backs this much more.
 const BACKING_MARGIN: float = 0.1
-const SQUANDER_DAYS: int = 10
 # Difficult sites: drawn from this many regions (two sites each), the hardest this many kept.
 const DIFFICULT_POOL_REGIONS: int = 30
 const REFERENCE_DAYS: int = 720
@@ -86,7 +89,6 @@ class Plan extends RefCounted:
 	var shortage_days: int = 0
 	var first_winter_low: float = INF
 	var food_after_first_winter: int = -1
-	var storehouses_commissioned: int = 0
 
 	func _init(strategy_ref: Dictionary, replay: Array = []) -> void:
 		strategy = strategy_ref
@@ -101,10 +103,8 @@ class Plan extends RefCounted:
 			first_winter_low = minf(first_winter_low, food_days)
 		if day == 359:
 			food_after_first_winter = int(city.resources["food"])
-		match str(strategy["kind"]):
-			"fixed":
-				if day == 0:
-					set_policy(city, strategy["priority"], strategy["rule"], day)
+		if strategy.has("rule") and day == 0:
+			set_policy(city, strategy["priority"], strategy["rule"], day)
 		match name:
 			"preview":
 				if day % DECIDE_DAYS == 0:
@@ -122,11 +122,6 @@ class Plan extends RefCounted:
 			"wrong_headed":
 				if day % DECIDE_DAYS == 0:
 					change_if_allowed(city, CommunityPriority.INVESTMENT if day % 360 >= 180 else CommunityPriority.COOPERATION, OPEN, day)
-			"squander":
-				if day % SQUANDER_DAYS == 0 and city.construction.can_supply(EconomyBalance.get_build_cost("storehouse")):
-					var spot: Vector2i = player.find_spot(city, "storehouse")
-					if spot.x >= 0 and city.construction.request_building("storehouse", spot) != null:
-						storehouses_commissioned += 1
 		var key: String = current if current != CommunityPriority.NONE else "none"
 		days_on[key] = int(days_on.get(key, 0)) + 1
 
@@ -242,8 +237,7 @@ func play(site: Dictionary, strategy: Dictionary, stress: bool, years: int, repl
 	city.local_map = (site["map"] as Array).duplicate(true)
 	var scenario: Dictionary = BASE.duplicate(true)
 	scenario["hard_winter"] = stress
-	if strategy["name"] == "no_plots":
-		(scenario["never"] as Array).append(Building.BUILDING_HOUSE)
+	scenario["unfair"] = strategy.get("unfair", false)
 	var plan: Plan = Plan.new(strategy, replay)
 	scenario["each_day"] = Callable(plan, "each_day")
 	var player = StandInPlayerScript.new()
@@ -260,7 +254,6 @@ func play(site: Dictionary, strategy: Dictionary, stress: bool, years: int, repl
 	result["trust"] = float(social.get("trust", 0.0))
 	result["help_rate"] = float(social.get("help_rate", 0.0))
 	result["trust_fickle"] = float((social.get("trust_by_source", {}) as Dictionary).get("decisions keep changing", 0.0)) / maxf(1.0, float(social.get("households", 1)))
-	result["storehouses_commissioned"] = plan.storehouses_commissioned
 	result["long_day_weeks"] = int(social.get("long_day_weeks", 0))
 	result["days_on"] = plan.days_on
 	# Decisions the priority tipped (CommunityPriority.record_swayed), by decision.
@@ -279,7 +272,7 @@ func summarize(strategy: Dictionary, results: Array[Dictionary], baseline: Array
 	var totals: Dictionary = {}
 	for result: Dictionary in results:
 		made_it += 1 if result["off_the_ground"] else 0
-		for key: String in ["population", "households", "departed", "shortage_days", "first_winter_low", "food_after_first_winter", "improvements_by_families", "held_back_by_stores", "trust", "trust_fickle", "help_rate", "changes", "wood", "tools", "storehouses_commissioned", "long_day_weeks", "swayed_improve", "swayed_help", "swayed_long_days"]:
+		for key: String in ["population", "households", "departed", "shortage_days", "first_winter_low", "food_after_first_winter", "improvements_by_families", "held_back_by_stores", "trust", "trust_fickle", "help_rate", "changes", "wood", "tools", "long_day_weeks", "swayed_improve", "swayed_help", "swayed_long_days"]:
 			totals[key] = float(totals.get(key, 0.0)) + float(result[key])
 	var days_on: Dictionary = {}
 	for result: Dictionary in results:
@@ -298,9 +291,9 @@ func summarize(strategy: Dictionary, results: Array[Dictionary], baseline: Array
 		median_day(results, "hamlet_day"), median_day(results, "village_day"), median_day(results, "founders_housed_day")])
 	if not reason_words.is_empty():
 		_report("%-12s %-11s towns short of the mark, why: %s" % [name, "", ", ".join(reason_words)])
-	_report("%-12s %-11s food: shortage days %.0f, first winter's low %.0f days, store after it %.0f | improved %.1f, held back %.1f | trust %+.2f (from changing %+.2f) | helped %.0f%% | policy changes %.1f | end wood %.0f, tools %.0f%s" % [
+	_report("%-12s %-11s food: shortage days %.0f, first winter's low %.0f days, store after it %.0f | improved %.1f, held back %.1f | trust %+.2f (from changing %+.2f) | helped %.0f%% | policy changes %.1f | end wood %.0f, tools %.0f" % [
 		name, "", avg.call("shortage_days"), avg.call("first_winter_low"), avg.call("food_after_first_winter"), avg.call("improvements_by_families"), avg.call("held_back_by_stores"),
-		avg.call("trust"), avg.call("trust_fickle"), avg.call("help_rate") * 100.0, avg.call("changes"), avg.call("wood"), avg.call("tools"), extras(name, avg)])
+		avg.call("trust"), avg.call("trust_fickle"), avg.call("help_rate") * 100.0, avg.call("changes"), avg.call("wood"), avg.call("tools")])
 	var all_days: float = 0.0
 	for priority: String in days_on.keys():
 		all_days += float(days_on[priority])
@@ -324,12 +317,6 @@ func summarize(strategy: Dictionary, results: Array[Dictionary], baseline: Array
 		lost += 1 if bool(baseline[index]["off_the_ground"]) and not bool(results[index]["off_the_ground"]) else 0
 		saved += 1 if not bool(baseline[index]["off_the_ground"]) and bool(results[index]["off_the_ground"]) else 0
 	_report("%-12s %-11s against none, town by town: people %+.1f on average, 5+ more in %d towns, 5+ fewer in %d | towns lost %d, saved %d" % [name, "", delta / n, better, worse, lost, saved])
-
-func extras(name: String, avg: Callable) -> String:
-	match name:
-		"squander":
-			return " | storehouses commissioned %.1f" % avg.call("storehouses_commissioned")
-	return ""
 
 # The median day a milestone was reached among the towns that reached it, and how many did.
 func median_day(results: Array[Dictionary], key: String) -> String:

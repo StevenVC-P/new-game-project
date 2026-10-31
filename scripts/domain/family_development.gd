@@ -7,7 +7,8 @@ extends RefCounted
 #
 # - a family in a hut upgrades it in place to a house, when the stores can spare the materials;
 # - a family without a home claims one of the residential plots the player designated and
-#   builds a house there, or a hut when the stores cannot spare a house's materials;
+#   builds a house there, or a hut when the stores cannot spare a house's materials; where
+#   families lead and no plot is open, it chooses a site of its own near its work;
 # - when the town has no empty home, a family with a grown child ready to marry builds one on a
 #   plot for the new family (a marriage needs a home), Leave the Nest families first.
 #
@@ -26,6 +27,8 @@ const STORE_RESERVE: Dictionary = {"wood": 10}
 # How much each tile of a plot's distance from the town's heart weighs against a tile of walk to
 # work: Town-Loving families pay to live closer, Open Country families walk farther for space.
 const HEART_PULL: float = 1.5
+# How far from its work a family looks for a site of its own for a home, in tiles.
+const OWN_SITE_RADIUS: int = 12
 
 static func advance(city: City) -> Array[ConstructionProject]:
 	var started: Array[ConstructionProject] = []
@@ -93,30 +96,76 @@ static func wants_better_home(household: Household) -> bool:
 
 # Claims the best open plot and starts a home on it, for the family itself or (for_itself false)
 # for whichever family needs it when it stands; null when there is no plot to claim.
+# Where families lead (TownInfluence.enabled), a family finding no open plot chooses its own site
+# (owner, 2026-10-31: laying out the town is not part of play for now).
 static func claim_plot(city: City, household: Household, for_itself: bool = true) -> ConstructionProject:
-	var plot: Variant = choose_plot(city, household)
-	if plot == null:
-		return null
 	var home_type: String = "hut"
 	if not CultureValues.has_value(household.values, "simple_living") and city.construction.can_supply(EconomyBalance.get_build_cost(Building.BUILDING_HOUSE), STORE_RESERVE):
 		home_type = Building.BUILDING_HOUSE
-	return city.construction.request_building(home_type, plot["tile"], ConstructionProject.REQUESTED_BY_HOUSEHOLD, household.id, household.id if for_itself else -1)
+	var tile: Vector2i = Vector2i(-1, -1)
+	var plot: Variant = choose_plot(city, household)
+	if plot != null:
+		tile = plot["tile"]
+	elif city.influence.enabled:
+		tile = choose_own_site(city, household, home_type)
+	if tile.x < 0:
+		return null
+	return city.construction.request_building(home_type, tile, ConstructionProject.REQUESTED_BY_HOUSEHOLD, household.id, household.id if for_itself else -1)
+
+# Where a family would build a home of its own choosing: by the same measure as choose_plot (the
+# walk to its work, or to the stockpile, pulled toward or away from the heart by its values),
+# among the valid spots nearest its work.
+static func choose_own_site(city: City, household: Household, home_type: String) -> Vector2i:
+	var logistics: TownLogistics = city.logistics
+	logistics.ensure_ready()
+	var work_tile: Vector2i = get_work_tile(city, household)
+	var size: Vector2i = city.construction.get_size(home_type)
+	var heart: Vector2 = Vector2(logistics.map_size()) * 0.5
+	var pull: float = get_heart_pull(household)
+	var best: Vector2i = Vector2i(-1, -1)
+	var best_score: float = INF
+	for radius in range(1, OWN_SITE_RADIUS + 1):
+		for y in range(work_tile.y - radius, work_tile.y + radius + 1):
+			for x in range(work_tile.x - radius, work_tile.x + radius + 1):
+				if maxi(absi(x - work_tile.x), absi(y - work_tile.y)) != radius:
+					continue
+				var origin: Vector2i = Vector2i(x, y)
+				if city.construction.validate(home_type, origin)["is_valid"] != true:
+					continue
+				var home_tile: Vector2i = TownLogistics.center_tile(origin, size)
+				var score: float = logistics.effort_between(home_tile, work_tile)
+				if is_inf(score):
+					continue
+				score += pull * Vector2(home_tile).distance_to(heart)
+				if score < best_score:
+					best = origin
+					best_score = score
+		# The nearest ring with a valid spot decides; farther rings only walk farther.
+		if best.x >= 0:
+			return best
+	return best
+
+static func get_work_tile(city: City, household: Household) -> Vector2i:
+	if not household.assigned_building_ids.is_empty():
+		var workplace: Building = city.buildings[household.assigned_building_ids[0]]
+		return TownLogistics.center_tile(workplace.tile, workplace.size)
+	return city.logistics.stockpile_tile
+
+static func get_heart_pull(household: Household) -> float:
+	if CultureValues.has_value(household.values, "town_loving"):
+		return HEART_PULL
+	if CultureValues.has_value(household.values, "open_country"):
+		return -HEART_PULL
+	return 0.0
 
 # The open plot a family likes best: the shortest walk to its work (or to the stockpile when it
 # has none), pulled toward or away from the town's heart by its Home and Place values.
 static func choose_plot(city: City, household: Household) -> Variant:
 	var logistics: TownLogistics = city.logistics
 	logistics.ensure_ready()
-	var work_tile: Vector2i = logistics.stockpile_tile
-	if not household.assigned_building_ids.is_empty():
-		var workplace: Building = city.buildings[household.assigned_building_ids[0]]
-		work_tile = TownLogistics.center_tile(workplace.tile, workplace.size)
+	var work_tile: Vector2i = get_work_tile(city, household)
 	var heart: Vector2 = Vector2(logistics.map_size()) * 0.5
-	var pull: float = 0.0
-	if CultureValues.has_value(household.values, "town_loving"):
-		pull = HEART_PULL
-	elif CultureValues.has_value(household.values, "open_country"):
-		pull = -HEART_PULL
+	var pull: float = get_heart_pull(household)
 	var best: Variant = null
 	var best_score: float = INF
 	for plot: Dictionary in city.construction.get_open_plots():

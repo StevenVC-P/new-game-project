@@ -23,6 +23,7 @@ func run_all() -> void:
 	test_homes_first_for_builders()
 	test_warnings()
 	test_responses_and_sway_are_recorded()
+	test_families_choose_own_home_sites()
 	test_saved_with_the_town()
 
 	if failure_count > 0:
@@ -209,6 +210,26 @@ func test_responses_and_sway_are_recorded() -> void:
 	CommunityPriority.record_swayed(city, household, "long_days", "It worked long days on a home because the gathering put homes first")
 	_check(int(city.influence.swayed.get("housing:long_days", 0)) == 2, "every swayed decision is counted")
 	_check(household.memories.filter(func(m: Dictionary) -> bool: return m["kind"] == "priority").size() == 1, "and the family remembers the sacrifice once, not every week")
+
+# Laying out the town is not part of play for now (owner, 2026-10-31): where families lead, a family
+# with no plot to claim chooses its own home site near its work; a plot, when there is one, comes first.
+func test_families_choose_own_home_sites() -> void:
+	var classic: City = ConstructionTest.make_city()
+	FamilyDevelopment.advance(classic)
+	_check(classic.construction.projects.filter(func(p: ConstructionProject) -> bool: return p.is_home()).is_empty(), "under the classic rules, families without plots start no homes")
+	var city: City = social_city()
+	var worker: Household = city.households[0]
+	var camp: Building = give_holding(city, worker, "gatherer_camp", Vector2i(10, 30))
+	var started: Array[ConstructionProject] = FamilyDevelopment.advance(city)
+	var own: Array = started.filter(func(p: ConstructionProject) -> bool: return p.is_home() and p.claimant_household_id == worker.id)
+	_check(not own.is_empty() and (own[0] as ConstructionProject).plot_id < 0, "where families lead, a family with no plot chooses a site of its own")
+	if not own.is_empty():
+		var near: float = Vector2((own[0] as ConstructionProject).tile).distance_to(Vector2(TownLogistics.center_tile(camp.tile, camp.size)))
+		_check(near <= FamilyDevelopment.OWN_SITE_RADIUS + 1, "near its work (%.1f tiles)" % near)
+	var planned: City = social_city()
+	var plot_id: int = planned.construction.designate_plot(Vector2i(30, 30))
+	FamilyDevelopment.advance(planned)
+	_check(plot_id >= 0 and planned.construction.projects.any(func(p: ConstructionProject) -> bool: return p.plot_id == plot_id), "an open plot is still claimed first")
 
 func test_saved_with_the_town() -> void:
 	var city: City = social_city()

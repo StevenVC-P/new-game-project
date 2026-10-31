@@ -12,7 +12,33 @@ The owner's brief (2026-10-30): founding families each judge what the community 
 6. Test deliberately destructive strategies with the player's real controls, distinct from reasonable but risky ones; control for the number of policy changes when comparing informed and uninformed play.
 7. Step 1 only (harness and existing-lever comparison) before new behaviour. No changes to survival difficulty or production formulas.
 
-## Step 1: Existing Levers (`tests/sim/priority_check.gd`)
+### Step 2 decisions (owner, 2026-10-31)
+
+1. Housing is approved: tied to families' weekly building and helping decisions, with home sites first for communal materials; families keep their autonomy.
+2. No automatic protection against bad economic choices: clear warnings instead. The priority stays separate from the stores rule, so the player chooses whether to enforce a restriction.
+3. Trust's gameplay effects stay as they are for now; households' experiences and trust changes keep being recorded.
+4. Test every priority under both stores rules, to tell persuasion from restriction. Keep comparing passive, informed, uninformed and destructive play, and measure whether informed guidance beats doing nothing. Bad decisions must still be able to ruin a town. No rebalancing of production or survival.
+
+## Step 2: The Priority (`CommunityPriority`)
+
+`TownInfluence.priority` holds one of food, housing, investment, cooperation, or none; `set_priority` sets the asks it makes (`encouraged`) and records every family's view. `store_rule` is untouched by it. Every effect is an added, explained term in a decision families already make, with an existing weight:
+
+| Priority | Decisions it enters | Weight reused |
+|---|---|---|
+| Food | improving food work; taking up food work (newcomers) | the ask weight (2.0 × receptiveness) |
+| Housing | helping on a home site; working long days on one; home sites first in the day's builders and the materials they carry | the norm appeal (1.5 × receptiveness); a promise of help (0.5) for long days |
+| Investment | improving any hand work; taking up tool work | the ask weight |
+| Cooperation | helping on any neighbour's or the town's site | the norm appeal |
+
+- **Receptiveness by request** (`FamilyInitiative.get_receptiveness(..., kind)`): food, housing and investment direct a family's own work, so self-government weighs against them and communal or solitary leanings do not count; cooperation asks for time freely given, so self-government does not count against it and communal or solitary leanings do. The norms' appeals pass no kind and are unchanged.
+- **Families' views** (`get_view`, `get_views`): each family supports, does not much mind, or opposes each priority, from its home, security, work, temperament, convictions and trust, in its own words. This is the preview's data.
+- **The town's backing** (`get_backing`): supporters 1, the indifferent a half, opponents nothing; respected voices count double. It pulls on every decision the priority enters exactly as a norm's acceptance does (`(backing - 0.5) × 2 × (1 + 0.25 × sociability)`). There is no vote: the player's priority stands whatever the town backs.
+- **Warnings** (`get_warnings(priority, store_rule)`): which improvements the stores will not fund and what that risks (food grown by hand, no toolmaker with tools running down), no plots for unhoused families, the hardship of long days, investment spent before winter, the cost of time given to others. They never prevent anything.
+- **Recorded responses:** every family's stance and reasons when a priority is set (`responses`, last 60); every decision the priority tipped over the line (`swayed`, by priority and decision); a memory, at most once a season, when a family worked long days on a home or gave its spare time because of the priority. No new trust consequences.
+- **Saves:** the new fields are domain fields and save with the town (tested).
+- **Interface:** `main.gd` still shows the old four ask buttons on `develop`; they now sit beside the priority until the Community tab replaces them (step 3).
+
+## Step 1: Existing Levers (`tests/sim/priority_check.gd` at commit 8fd8b39)
 
 Each priority is mapped to today's nearest controls: **food** = ask for food work, stores to priorities first; **housing** = four homes' worth of plots ahead instead of two, stores to priorities first with nothing asked; **investment** = ask for better work and tools; **cooperation** = promote helping neighbours, first claim for helpers. Strategy rules (informed, wrong-headed) were written before any result and not tuned. The uninformed strategy changes on exactly the days the informed one changed on the same town, so change counts match (both stay under the trust penalty); "fickle" changes monthly and meets it. Difficult sites: of 48 others, the 12 where the map luck check's classic player did worst (4 of them failed); a different policy's runs, so selection shares no noise with these. Same towns and seeds throughout; two identical runs gave identical output.
 
