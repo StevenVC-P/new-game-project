@@ -40,7 +40,7 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # only (passive, each priority under both stores rules, informed, uninformed with matched policy changes, poor,
 # destructive) on ordinary towns, the same towns with the first winter's stores lost, and naturally difficult sites
 # (write to a file, filter for [PRI]; about an hour a condition: run one per process with "-- --conditions=ordinary"
-# etc.; also "--years=N --sites=N --strategies=a,b")
+# etc.; also "--years=N --sites=N --strategies=a,b --layout=compact" for the residential land towns start with)
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/community_priority_validation.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/priority_check.gd > priority.log
 

@@ -54,19 +54,25 @@ No new bonus or penalty was added. A home's site already matters through:
 
 Hazards do not reach homes yet: high water affects fields and wolves affect camps. Cautious families' aversion is a preference only; if homes should flood, that is a new mechanic for the owner to decide.
 
-**Comparison** (`home_site_check`, 12 real town maps, 3 years, same seeds, families leading; 2026-10-31):
+**First comparison** (2026-10-31, unequal capacity: compact had 81 tiles, dispersed 64, poor 36): compact 41.5 people, dispersed 39.8, poor 29.1, plots 36.0. Owner review: compact may have won on housing available sooner, not on geography. Superseded by:
 
-| Land set aside | Towns off the ground | People | Founders housed (median day) | Homes families built | Travel, share of the day | Site-days waiting for a builder |
+**Equal-capacity comparison** (`home_site_check`, 12 real town maps, 3 years, same seeds, families leading; every layout but plots offers about 24 spots a home can stand on from the first day; `tests/sim/residential_layouts.gd`):
+
+| Land set aside | Towns off the ground | People | Founders housed (median day) | Travel, share of the day | Families blocked at the end | Residential tiles under other buildings |
 |---|---|---|---|---|---|---|
-| Plots (stand-in, two ahead) | 11/12 | 36.0 | 160 (10/12) | 31.8 | 4.5% | 431 |
-| Compact (81 tiles around the stockpile) | 11/12 | **41.5** | **95** (11/12) | **36.9** | 4.6% | **389** |
-| Dispersed (four 4x4 blocks, 12 tiles out) | 10/12 | 39.8 | 94 (9/12) | 33.5 | 7.2% | 432 |
-| Preferred (dispersed, nearest block preferred) | 10/12 | 39.3 | 94 (9/12) | 32.9 | 6.9% | 440 |
-| Poor (6x6 in the far corner) | **8/12** | **29.1** | 108 (8/12) | 27.8 | **10.6%** | 424 |
+| Starting land (passive) | 11/12 | 39.9 | 97 | 5.1% | 0.3 | 6.2 |
+| Plots (stand-in, two ahead; reference) | 11/12 | 36.0 | 160 | 4.5% | 0.6 | – |
+| Compact, around the stockpile | 9/12 | **28.7** | 107 | 4.4% | **2.2** | **14.1** |
+| Dispersed, four blocks 12 tiles out | 10/12 | 38.8 | 94 | 6.8% | 0.3 | 0.8 |
+| Poor, the far corner | 9/12 | 33.3 | 94 | **11.4%** | 0.8 | 2.9 |
+| Far only, 12 tiles out on the roomiest side | 11/12 | 41.2 | 96 | 6.3% | 0.0 | 2.6 |
+| Preferred far (compact permitted + far preferred, 47 spots) | 11/12 | 41.0 | 96 | 4.9% | 0.0 | – |
 
-- Land planning matters through existing mechanics alone: poorly placed land more than doubles the day lost to travel and loses three more towns than compact land; compact land houses founders two months sooner than plots set two at a time.
-- Compact beats dispersed on these maps because the stand-in towns' work clusters near the stockpile (families open work near their homes and the heart); dispersed land costs travel without a matching gain here. No map in this set rewards spreading out (for example, scattered fields or woods far apart); that is what a dispersed town would need to pay off.
-- Preferring the nearest dispersed block changed little (39.3 against 39.8): founders choose before many homes stand, and the nearest block is already near their work.
+- **Geography, not timing, decides at equal capacity, but not the way the first comparison suggested.** With the same capacity from the first day, founders are housed at the same time everywhere (day 94-107); the differences come from where the land is. Poor land costs the most travel (11.4% of the day) and loses towns; land well out from the centre does as well as anything.
+- **Unintended interaction: residential land is permitted, not reserved.** Families open workplaces and fields wherever the land allows, residential land included. Compact land around the stockpile, the ground families want for work too, loses 14 of its 24 tiles to other buildings; families run out of room (2.2 a town left unable to build) and towns shrink. Land away from the centre keeps its room. So the "obvious" good layout is the worst one today. Whether designated land should be kept for homes is an owner decision; nothing was changed.
+- **Plots, set two at a time, house founders two months later** (day 160) than any land set aside at once: the first comparison's compact advantage was mostly that.
+- **Preferred land does not measurably persuade.** With compact land permitted and a far block preferred, 41% of deferential families, 41% of others and 50% of self-governing families ended on the preferred land: no difference by temperament. Families settle where room is left: the near land fills (and is eaten by work), and the rest go to the far block whatever its label. The preferred term (2.0 × receptiveness) is worth two to five tiles of walk; the far block is twelve tiles farther from work.
+- **Families' values shape individual sites** (`tests/home_site_validation.gd`: kin, solitude, callings, caution, the heart), but at town scale the differences are swamped by room and distance to work.
 
 ## Integration
 
