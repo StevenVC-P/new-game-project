@@ -33,8 +33,18 @@ var city: City:
 		return _city_ref.get_ref() as City
 # Families take up and improve their own work (FamilyInitiative).
 var enabled: bool = false
+# The community's one primary priority (CommunityPriority); it sets `encouraged`, the asks it makes
+# of families' own work. The stores rule is separate: the player chooses whether to enforce it.
+var priority: String = ""
 var encouraged: Array[String] = []
 var store_rule: String = RULE_OPEN
+# The town's backing of its priority, worked out once a week (CommunityPriority.get_town_backing).
+var backing: float = 0.5
+var backing_week: int = -1
+var backing_priority: String = ""
+# Decisions the priority tipped, by "priority:decision", and each family's view when it was set.
+var swayed: Dictionary = {}
+var responses: Array = []
 # Tiles marked as work ground; with none marked, families open workplaces anywhere the land allows.
 var work_ground_tiles: int = 0
 # For balance tools and the sidebar: what families did on their own.
@@ -60,6 +70,14 @@ func set_encouraged(activity: String, on: bool) -> void:
 
 func toggle_encouraged(activity: String) -> void:
 	set_encouraged(activity, not is_encouraged(activity))
+
+# Sets the community's priority and the asks it makes; each family's view of it is recorded.
+func set_priority(new_priority: String) -> void:
+	if new_priority == priority:
+		return
+	priority = new_priority
+	encouraged.assign(CommunityPriority.ACTIVITIES.get(new_priority, []))
+	CommunityPriority.record_responses(city)
 
 # What the stores always keep back from families' own projects: wood for the town's homes and
 # workshops, and tools for the upkeep of every proper workplace for a while, so families investing

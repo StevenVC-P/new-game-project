@@ -369,6 +369,8 @@ func choose_help(household: Household) -> void:
 		if passed_over != null:
 			torn = ", though it would also have helped %s" % describe_project(passed_over, get_project_owner(passed_over))
 		note(household, "Helping %s (%s)%s" % [describe_project(best, target), "; ".join(FamilyInitiative.get_reasons(best_desire["terms"], true)), torn])
+		if CommunityPriority.is_swayed(best_score, float(best_desire.get("appeal", 0.0)), SocialDecisions.HELP_THRESHOLD):
+			CommunityPriority.record_swayed(city, household, "help", "It gave its spare time to %s because the gathering put %s first" % [describe_project(best, target), CommunityPriority.PHRASES[city.influence.priority]])
 	else:
 		spare_weeks_unused += 1
 		spare_weeks_no_site += 1 if declined_project == null else 0
@@ -417,6 +419,8 @@ func choose_hours(household: Household) -> void:
 		household.long_weeks_this_month += 1
 		long_day_weeks += 1
 		household.hours_note = "Works long days (%s)" % "; ".join(FamilyInitiative.get_reasons(desire["terms"], true))
+		if CommunityPriority.is_swayed(score, float(desire.get("appeal", 0.0)), LONG_DAYS_THRESHOLD):
+			CommunityPriority.record_swayed(city, household, "long_days", "It worked long days on a home because the gathering put homes first")
 	else:
 		household.hours_note = "Keeps its usual hours (%s)" % "; ".join(FamilyInitiative.get_reasons(desire["terms"], false))
 
@@ -1065,7 +1069,7 @@ func record_policy() -> void:
 		promoted.append(bool(norms[norm_id]["promoted"]))
 	var encouraged: Array = city.influence.encouraged.duplicate()
 	encouraged.sort()
-	var signature: Array = [encouraged, city.influence.store_rule, promoted, incentive]
+	var signature: Array = [city.influence.priority, encouraged, city.influence.store_rule, promoted, incentive]
 	if not policy_signature.is_empty() and signature != policy_signature:
 		policy_change_days.append(city.construction.day)
 	policy_signature = signature
@@ -1082,7 +1086,7 @@ func review_month() -> void:
 	if not enabled:
 		return
 	var changes: int = get_recent_policy_changes()
-	var decided: bool = not city.influence.encouraged.is_empty() or city.influence.store_rule != TownInfluence.RULE_OPEN or incentive or bool(norms[NORM_HELP]["promoted"]) or bool(norms[NORM_CLAIMS]["promoted"])
+	var decided: bool = city.influence.priority != "" or not city.influence.encouraged.is_empty() or city.influence.store_rule != TownInfluence.RULE_OPEN or incentive or bool(norms[NORM_HELP]["promoted"]) or bool(norms[NORM_CLAIMS]["promoted"])
 	for household: Household in city.households:
 		var order: int = get_order_regard(household)
 		if changes >= MANY_CHANGES:

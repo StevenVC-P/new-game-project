@@ -449,6 +449,17 @@ func advance_day() -> void:
 	for project: ConstructionProject in projects:
 		if can_progress(project):
 			workable.append(project)
+	# With homes the community's priority, home sites come first for builders and the materials
+	# they carry from the stores (CommunityPriority); otherwise the queue's own order.
+	if city.influence.priority == CommunityPriority.HOUSING:
+		var homes_first: Array[ConstructionProject] = []
+		for project: ConstructionProject in workable:
+			if project.is_home():
+				homes_first.append(project)
+		for project: ConstructionProject in workable:
+			if not project.is_home():
+				homes_first.append(project)
+		workable = homes_first
 	if hungry_day:
 		for project: ConstructionProject in workable:
 			project.blocked_reason = "builders hungry today"
