@@ -87,10 +87,21 @@ func validate(building_type: String, origin: Vector2i) -> Dictionary:
 		if not is_roadable(origin):
 			return placement.make_result(false, "Roads need open ground", footprint)
 		return placement.make_result(true, "Valid placement", footprint)
-	if BuildingTiers.get_base_type(building_type) == Building.BUILDING_HOUSE and get_open_plot_at(origin) != null:
+	var is_home: bool = BuildingTiers.get_base_type(building_type) == Building.BUILDING_HOUSE
+	if is_home and get_open_plot_at(origin) != null:
 		return placement.make_result(true, "On a residential plot", footprint)
+	# Residential land is reserved for homes (owner, 2026-10-31): no new workplace may take it, so
+	# the room the player set aside stays room for homes. What already stands there is left alone.
+	if not is_home and building_type != PLOT and is_on_residential_land(footprint):
+		return placement.make_result(false, "That land is set aside for homes", footprint)
 	var rule_type: String = Building.BUILDING_HOUSE if building_type == PLOT else building_type
 	return placement.validate(city, city.local_map, rule_type, origin, false)
+
+func is_on_residential_land(footprint: Array[Vector2i]) -> bool:
+	for tile: Vector2i in footprint:
+		if is_inside(tile) and HomeSites.get_land(city, tile) != HomeSites.LAND_NONE:
+			return true
+	return false
 
 # Plans a new building. Returns the project, or null when the land does not allow it.
 func request_building(building_type: String, origin: Vector2i, requested_by: String = ConstructionProject.REQUESTED_BY_PLAYER, requester_household_id: int = -1, claimant_household_id: int = -1) -> ConstructionProject:

@@ -26,6 +26,7 @@ func run_all() -> void:
 	test_explanations_follow_the_terms()
 	test_rough_ranking_matches_the_terms()
 	test_starting_land()
+	test_land_is_reserved_for_homes()
 	test_saved_with_the_town()
 
 	if failure_count > 0:
@@ -226,6 +227,41 @@ func test_starting_land() -> void:
 	FamilyDevelopment.advance(city)
 	var homes: Array = city.construction.projects.filter(func(p: ConstructionProject) -> bool: return p.is_home())
 	_check(homes.size() >= 4 and homes.all(func(p: ConstructionProject) -> bool: return HomeSites.get_land(city, p.tile) != HomeSites.LAND_NONE), "founders build their homes on it")
+
+# 10. Residential land, plain or preferred, is reserved for homes: no workplace is planned on it,
+# by a family or the player, so it never eats the room for homes. What already stands there stays.
+func test_land_is_reserved_for_homes() -> void:
+	var city: City = make_city()
+	var camp_size: Vector2i = city.construction.get_size("gatherer_camp")
+	var camp: Vector2i = Vector2i(-1, -1)
+	# Camps need trees near; the first open spot with a margin of open ground below it for the land.
+	for y in range(1, 30):
+		for x in range(1, 60):
+			if camp.x < 0 and city.construction.validate("gatherer_camp", Vector2i(x, y))["is_valid"] == true and city.construction.validate("hut", Vector2i(x, y + 2))["is_valid"] == true and city.construction.validate("hut", Vector2i(x - 1, y - 1))["is_valid"] == true:
+				camp = Vector2i(x, y)
+	_check(camp.x >= 0, "the test town has open ground for a workplace")
+	HomeSites.mark(city, camp, camp + camp_size - Vector2i.ONE, HomeSites.LAND_PERMITTED)
+	HomeSites.mark(city, camp + Vector2i(0, camp_size.y), camp + Vector2i(camp_size.x - 1, camp_size.y + 2), HomeSites.LAND_PREFERRED)
+	var open_room: int = HomeSites.count_room(city)
+	for origin: Vector2i in [camp, camp + Vector2i(0, camp_size.y), camp - Vector2i(1, 1)]:
+		_check(city.construction.validate("gatherer_camp", origin)["is_valid"] != true, "a workplace touching residential land at %s cannot be planned" % origin)
+	_check(city.construction.request_building("gatherer_camp", camp) == null, "nor is it, when the player asks")
+	_check(city.construction.validate(Building.BUILDING_HOUSE, camp)["is_valid"] == true and city.construction.validate("hut", camp + Vector2i(0, camp_size.y))["is_valid"] == true, "homes and huts still can, on either kind of land")
+	_check(city.construction.validate(TownConstruction.PLOT, camp)["is_valid"] == true, "and plots, which are for homes")
+	_check(HomeSites.count_room(city) == open_room, "asking took none of the room for homes (%d spots)" % open_room)
+	HomeSites.mark(city, camp, camp + camp_size + Vector2i(0, 2), HomeSites.LAND_NONE)
+	_check(city.construction.validate("gatherer_camp", camp)["is_valid"] == true, "with the land cleared, the same workplace can be planned there")
+	# Land set aside over a standing workplace leaves it standing.
+	var standing: Building = give_work(city, city.households[0], Vector2i(44, 40))
+	var buildings: int = city.buildings.size()
+	HomeSites.mark(city, Vector2i(42, 38), Vector2i(48, 44), HomeSites.LAND_PERMITTED)
+	_check(city.buildings.size() == buildings and city.buildings.has(standing) and city.households[0].assigned_building_ids.has(standing.id), "a workplace standing on land later set aside for homes stays, worked as before")
+	# Families opening work with land set aside all around them go past it.
+	var ringed: City = make_city()
+	HomeSites.mark(ringed, Vector2i(10, 10), Vector2i(50, 45), HomeSites.LAND_PERMITTED)
+	for household: Household in ringed.households:
+		var site: Vector2i = FamilyInitiative.choose_site(ringed, household, "gatherer_camp")
+		_check(site.x >= 0 and not ringed.construction.is_on_residential_land(TownLogistics.footprint(site, camp_size)), "family %d opens its work off the residential land (at %s)" % [household.id, site])
 
 func test_saved_with_the_town() -> void:
 	var city: City = make_city()
