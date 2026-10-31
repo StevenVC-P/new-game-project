@@ -38,6 +38,32 @@ The owner's brief (2026-10-30): founding families each judge what the community 
 - **Saves:** the new fields are domain fields and save with the town (tested).
 - **Interface:** `main.gd` still shows the old four ask buttons on `develop`; they now sit beside the priority until the Community tab replaces them (step 3).
 
+### Step 2 results (commit ff611b9; 12 towns, 3 years)
+
+Community choices only: no plots, no placed buildings, no public works; families chose their own home sites anywhere near their work (the rule of ff611b9; `docs/HOME_SITES.md` on `feature/home-site-selection` would replace it with land the player sets aside, so these numbers need a rerun on that rule). People at the end, towns off the ground, and against "none" town by town.
+
+| Strategy | Ordinary | First winter's stores lost | Difficult sites |
+|---|---|---|---|
+| none | 44.3, 11/12 | 42.0, 11/12 | 21.9, 6/12 |
+| food (open / priorities first) | 25.7, 6/12 (−18.6) / 24.3, 6/12 | 24.2, 6/12 / 22.8, 6/12 | 25.3, 6/12 (+3.3) / 24.6, 6/12 |
+| housing (open) | 43.8, 11/12 (−0.4) | 42.2, 11/12 | 25.2, 8/12 (+3.3, saved 2) |
+| investment (open = priorities first) | 40.6, **12/12** (−3.7) | 40.7, **12/12** | **31.4, 9/12 (+9.5, saved 3)** |
+| cooperation (open) | **47.4**, 11/12 (+3.2) | **44.8**, 11/12 (+2.8) | 27.5, 9/12 (+5.6, saved 3) |
+| housing or cooperation, priorities first | 0.8–1.8, **0/12** | 2.2–2.3, **0/12** | 0.0, **0/12** |
+| informed: preview / seasonal | 29.2 / 30.2, 7/12 | 24.8 / 24.3, 6/12 | 24.8, 6/12 / 25.8, 7/12 |
+| uninformed (matched changes) | 30.2, 9/12 | 29.4, 8/12 | 32.8, 9/12 (+10.9) |
+| fickle | 40.3, 11/12 | 38.9, 11/12 | 30.1, 8/12 |
+| wrong-headed | 46.0, 11/12 (+1.8) | 44.7, 11/12 | 27.3, 9/12 |
+| starve (destructive) | 1.4, **0/12** | 0.6, **0/12** | 0.3, **0/12** |
+| unfair honours (destructive) | 41.6, 11/12 | 39.4, 11/12 | 23.7, 7/12 |
+
+- **Player choices now move outcomes both ways through real mechanics.** Restricting the stores ruins every town (warned); the food priority loses five towns in twelve; on difficult sites, investment, cooperation and housing each save two or three towns that doing nothing loses.
+- **Guidance helps where the land is hard, not where it is easy.** On ordinary sites passive play is close to the best (only cooperation beats it, by 3 people); on difficult sites every reasonable priority beats it, investment by 9.5 people and three towns.
+- **Informed play does not yet beat doing nothing on ordinary sites.** Both informed strategies spend most of their time on food, because families short of food back it; following the families walks into the food trap. Uninformed play with the same number of changes does as well or better. The informed rules were not tuned to these results.
+- **The food trap is a real chain, amplified by the town's backing.** Set from the founding, the food ask steers founders' first choice of work away from tools; seven of twelve towns run out of tools. Every family backs food at the founding (stores are only weeks deep), so the backing pull doubles the ask. With the backing pull switched off (a diagnostic run, not kept), food keeps 9/12 towns and 37.3 people, still below none (tools out in 4). No warning covers it under open stores: the warnings speak of tools only when the stores are kept for priorities.
+- **Trust still costs little:** fickle play loses 3–4 people on ordinary sites and gains on difficult ones.
+- **Future balance issue (outside this prototype, owner 2026-10-31):** towns end with 5,000–9,000 wood and hundreds of tools; materials stop being scarce after the first year.
+
 ## Step 1: Existing Levers (`tests/sim/priority_check.gd` at commit 8fd8b39)
 
 Each priority is mapped to today's nearest controls: **food** = ask for food work, stores to priorities first; **housing** = four homes' worth of plots ahead instead of two, stores to priorities first with nothing asked; **investment** = ask for better work and tools; **cooperation** = promote helping neighbours, first claim for helpers. Strategy rules (informed, wrong-headed) were written before any result and not tuned. The uninformed strategy changes on exactly the days the informed one changed on the same town, so change counts match (both stay under the trust penalty); "fickle" changes monthly and meets it. Difficult sites: of 48 others, the 12 where the map luck check's classic player did worst (4 of them failed); a different policy's runs, so selection shares no noise with these. Same towns and seeds throughout; two identical runs gave identical output.
