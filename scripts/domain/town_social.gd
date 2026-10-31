@@ -439,7 +439,7 @@ func choose_hours(household: Household) -> void:
 	household.long_days = score >= LONG_DAYS_THRESHOLD
 	# Take Pride in Your Work asks it to put its effort into its own work.
 	if own:
-		GuidingWisdom.record(city, household, GuidingWisdom.PRIDE, household.long_days)
+		GuidingWisdom.record_if_at_stake(city, household, GuidingWisdom.PRIDE, household.long_days, score, LONG_DAYS_THRESHOLD, float(desire["pride"]))
 	if household.long_days:
 		household.long_weeks_this_month += 1
 		long_day_weeks += 1

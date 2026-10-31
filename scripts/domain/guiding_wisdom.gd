@@ -130,6 +130,14 @@ static func record(city: City, household: Household, wisdom: String, followed: b
 	if wisdom == PREPARE or wisdom == PRIDE:
 		city.social.observe_norm(NORMS[wisdom], followed)
 
+# For decisions families take up again every week (improving their work, their hours): the choice
+# counts only when the wisdom was at stake, its appeal enough to have tipped it either way. A family
+# far from improving that keeps to hand work again has not kept something back; one that came close
+# and held off has.
+static func record_if_at_stake(city: City, household: Household, wisdom: String, followed: bool, score: float, threshold: float, appeal: float) -> void:
+	if appeal != 0.0 and absf(score - threshold) <= absf(appeal):
+		record(city, household, wisdom, followed)
+
 # Monthly (TownSocial.review_month): each family's conduct toward each held wisdom, once there is
 # enough of it and a season has passed since the last, becomes an experience it draws lessons from.
 static func review(city: City) -> void:

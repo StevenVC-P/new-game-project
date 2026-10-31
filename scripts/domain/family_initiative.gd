@@ -220,9 +220,9 @@ static func consider_improving(city: City, household: Household, holding: Buildi
 	var score: float = float(desire["score"]) + get_noise(city, household, "improve")
 	var hard_times: bool = GuidingWisdom.are_hard_times_near(city)
 	if score < IMPROVE_THRESHOLD:
-		GuidingWisdom.record(city, household, GuidingWisdom.PRIDE, false)
+		GuidingWisdom.record_if_at_stake(city, household, GuidingWisdom.PRIDE, false, score, IMPROVE_THRESHOLD, float(desire["pride"]))
 		if hard_times:
-			GuidingWisdom.record(city, household, GuidingWisdom.PREPARE, true)
+			GuidingWisdom.record_if_at_stake(city, household, GuidingWisdom.PREPARE, true, score, IMPROVE_THRESHOLD, float(desire["prepare"]))
 		note(city, household, "Keeps to hand work at its %s (%s)" % [name, "; ".join(get_reasons(desire["terms"], false))])
 		return null
 	var block: String = city.influence.get_funding_block(EconomyBalance.get_build_cost(proper), [get_activity(proper), TownInfluence.ACTIVITY_IMPROVE] as Array[String], household)
@@ -236,9 +236,9 @@ static func consider_improving(city: City, household: Household, holding: Buildi
 		return null
 	use_first_claim(city, household, project)
 	city.influence.improvements_started += 1
-	GuidingWisdom.record(city, household, GuidingWisdom.PRIDE, true)
+	GuidingWisdom.record_if_at_stake(city, household, GuidingWisdom.PRIDE, true, score, IMPROVE_THRESHOLD, float(desire["pride"]))
 	if hard_times:
-		GuidingWisdom.record(city, household, GuidingWisdom.PREPARE, false)
+		GuidingWisdom.record_if_at_stake(city, household, GuidingWisdom.PREPARE, false, score, IMPROVE_THRESHOLD, float(desire["prepare"]))
 	if CommunityPriority.is_swayed(score, float(desire["appeal"]), IMPROVE_THRESHOLD):
 		CommunityPriority.record_swayed(city, household, "improve")
 	if household.improve_decision_day < 0:
@@ -313,9 +313,8 @@ static func get_improve_desire(city: City, household: Household, proper_type: St
 		add(terms, -minf(2.0, float(seen["idle"])) * example_weight, "its neighbours' improved work stands short of tools")
 	# Guiding wisdom (the town's lasting expectations, apart from its priority): doing work well asks
 	# for it; keeping something back asks to hold off as hard times near.
-	GuidingWisdom.add_appeal(city, household, GuidingWisdom.PRIDE, terms)
-	if GuidingWisdom.are_hard_times_near(city):
-		GuidingWisdom.add_appeal(city, household, GuidingWisdom.PREPARE, terms, -1.0)
+	var pride: float = GuidingWisdom.add_appeal(city, household, GuidingWisdom.PRIDE, terms)
+	var prepare: float = GuidingWisdom.add_appeal(city, household, GuidingWisdom.PREPARE, terms, -1.0) if GuidingWisdom.are_hard_times_near(city) else 0.0
 	var appeal: float = add_encouragement(city, household, TownInfluence.ACTIVITY_IMPROVE, terms, "the gathering asks for better work")
 	# A priority for this trade's output (food) asks for its improvement too, once.
 	if appeal == 0.0:
@@ -327,7 +326,7 @@ static func get_improve_desire(city: City, household: Household, proper_type: St
 			add(terms, 0.75, "it would match %s's honoured holding" % whose)
 		elif household.inspired_by == TownSocial.RECOGNITION_CRAFT:
 			add(terms, 0.5, "it would equal %s's honoured craft" % whose)
-	return {"score": sum(terms), "terms": terms, "appeal": appeal}
+	return {"score": sum(terms), "terms": terms, "appeal": appeal, "pride": pride, "prepare": prepare}
 
 # How dangerous it is for the town to go on without more of an activity's output, 0 to 1.5.
 static func get_waiting_risk(city: City, activity: String) -> float:

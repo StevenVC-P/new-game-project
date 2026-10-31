@@ -109,10 +109,9 @@ static func get_hours_desire(city: City, household: Household, project: Construc
 	if household.long_weeks_this_month >= 2:
 		add(terms, -0.75 * (household.long_weeks_this_month - 1), "it is weary")
 	add_own_security(city, household, terms, "it cannot afford to wear itself out")
-	if own:
-		GuidingWisdom.add_appeal(city, household, GuidingWisdom.PRIDE, terms)
+	var pride: float = GuidingWisdom.add_appeal(city, household, GuidingWisdom.PRIDE, terms) if own else 0.0
 	var appeal: float = CommunityPriority.add_hours_appeal(city, household, project, terms)
-	return {"score": sum(terms), "terms": terms, "appeal": appeal}
+	return {"score": sum(terms), "terms": terms, "appeal": appeal, "pride": pride}
 
 # --- Sharing in a shortage ------------------------------------------------------------------------
 
