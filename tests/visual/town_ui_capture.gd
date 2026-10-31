@@ -44,6 +44,12 @@ func run() -> void:
 	main.found_player_city_at_pending_site()
 	main.simulation_clock.is_paused = true
 	await shot("founded_overview")
+	# The Expedition Leader chooses the town's guiding wisdom: two of four, kept.
+	main.show_sidebar_tab("community")
+	await shot("founded_wisdom_choice")
+	main.apply_city_action({"action": "choose_wisdom", "wisdom": GuidingWisdom.ENDURE})
+	main.apply_city_action({"action": "choose_wisdom", "wisdom": GuidingWisdom.PREPARE})
+	main.show_sidebar_tab("overview")
 
 	# The player clears the starting land: a month on, families say they cannot build, and the
 	# Overview asks for land. Then the land is set aside again and the town grows on.
@@ -80,6 +86,10 @@ func run() -> void:
 	for tab: String in ["families", "planning", "community"]:
 		main.show_sidebar_tab(tab)
 		await shot("grown_" + tab)
+	main.town_sidebar.expanded["community_wisdom_" + GuidingWisdom.ENDURE] = true
+	main.town_sidebar.scroll_to(0.0)
+	await shot("grown_wisdom")
+	main.town_sidebar.expanded["community_wisdom_" + GuidingWisdom.ENDURE] = false
 
 	# The community priority set, with the stores rule that makes its warnings bite: the town's
 	# backing, each family's stance and reasons, and the warnings.

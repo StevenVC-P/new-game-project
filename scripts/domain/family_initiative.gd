@@ -218,7 +218,7 @@ static func consider_improving(city: City, household: Household, holding: Buildi
 	var desire: Dictionary = get_improve_desire(city, household, proper)
 	var name: String = describe_type(holding.type, false)
 	var score: float = float(desire["score"]) + get_noise(city, household, "improve")
-	var hard_times: bool = GuidingWisdom.are_hard_times_near(city)
+	var hard_times: bool = GuidingWisdom.asks_to_hold_off(city, proper)
 	if score < IMPROVE_THRESHOLD:
 		GuidingWisdom.record_if_at_stake(city, household, GuidingWisdom.PRIDE, false, score, IMPROVE_THRESHOLD, float(desire["pride"]))
 		if hard_times:
@@ -314,7 +314,7 @@ static func get_improve_desire(city: City, household: Household, proper_type: St
 	# Guiding wisdom (the town's lasting expectations, apart from its priority): doing work well asks
 	# for it; keeping something back asks to hold off as hard times near.
 	var pride: float = GuidingWisdom.add_appeal(city, household, GuidingWisdom.PRIDE, terms)
-	var prepare: float = GuidingWisdom.add_appeal(city, household, GuidingWisdom.PREPARE, terms, -1.0) if GuidingWisdom.are_hard_times_near(city) else 0.0
+	var prepare: float = GuidingWisdom.add_appeal(city, household, GuidingWisdom.PREPARE, terms, -1.0) if GuidingWisdom.asks_to_hold_off(city, proper_type) else 0.0
 	var appeal: float = add_encouragement(city, household, TownInfluence.ACTIVITY_IMPROVE, terms, "the gathering asks for better work")
 	# A priority for this trade's output (food) asks for its improvement too, once.
 	if appeal == 0.0:

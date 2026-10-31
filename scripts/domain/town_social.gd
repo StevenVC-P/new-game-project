@@ -1125,7 +1125,7 @@ func review_month() -> void:
 	if not enabled:
 		return
 	var changes: int = get_recent_policy_changes()
-	var decided: bool = city.influence.priority != "" or not city.influence.encouraged.is_empty() or city.influence.store_rule != TownInfluence.RULE_OPEN or incentive or bool(norms[NORM_HELP]["promoted"]) or bool(norms[NORM_CLAIMS]["promoted"])
+	var decided: bool = city.influence.priority != "" or not city.influence.encouraged.is_empty() or city.influence.store_rule != TownInfluence.RULE_OPEN or incentive or bool(norms[NORM_HELP]["promoted"]) or bool(norms[NORM_CLAIMS]["promoted"]) or not wisdoms.is_empty()
 	for household: Household in city.households:
 		var order: int = get_order_regard(household)
 		if changes >= MANY_CHANGES:

@@ -44,6 +44,13 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/community_priority_validation.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/priority_check.gd > priority.log
 
+# Guiding wisdom (docs/GUIDING_WISDOM.md): leadership and fixed choices, no change without a wisdom, one expectation each,
+# conflicting wisdoms, conduct becoming experience, counter-qualities, a level a year, framed lessons, the page, saves;
+# then no wisdom against the six pairs and two priority stacks, six years with a year-3 snapshot (one condition and
+# strategy per process; "--prepare-difficult" caches the difficult sites first; filter for [WIS])
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/guiding_wisdom_validation.gd
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/wisdom_check.gd -- --conditions=ordinary --strategies=none,endure+respect > wis.log
+
 # Home sites (docs/HOME_SITES.md): families choosing their own sites on land set aside, preferred land, no land, no
 # overlap, explanations, starting land, land reserved from work, shared works among homes, preferred land between equal sites, explanations
 # that no longer hold; then starting land, plots, and equal-capacity compact, dispersed, poor, far and

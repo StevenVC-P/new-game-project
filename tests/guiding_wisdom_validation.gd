@@ -125,11 +125,15 @@ func test_conflicting_wisdoms_pull_both_ways() -> void:
 	GuidingWisdom.choose(other, GuidingWisdom.PREPARE)
 	GuidingWisdom.choose(other, GuidingWisdom.PRIDE)
 	var family: Household = other.households[0]
-	give_holding(other, family, Vector2i(28, 4), "forager_garden")
+	give_holding(other, family, Vector2i(28, 4), "gatherer_camp")
+	other.construction.day = 10
+	_check(not GuidingWisdom.asks_to_hold_off(other, "woodcutter"), "in spring, preparation does not ask families to hold off")
 	other.construction.day = Calendar.DAYS_PER_YEAR * 3 / 4
-	_check(GuidingWisdom.are_hard_times_near(other), "late in the year, hard times are near")
-	var improve: Array = FamilyInitiative.get_improve_desire(other, family, "farm")["terms"]
+	_check(GuidingWisdom.asks_to_hold_off(other, "woodcutter"), "late in the year it does")
+	var improve: Array = FamilyInitiative.get_improve_desire(other, family, "woodcutter")["terms"]
 	_check(has_reason(improve, "take pride", 1.0) and has_reason(improve, "keep something back", -1.0), "before winter, pride asks it to improve and preparation to wait: %s" % reasons(improve))
+	other.resources["food"] = 0
+	_check(not GuidingWisdom.asks_to_hold_off(other, "farm"), "but not to hold off growing more food while food is short")
 
 # 5. A family's conduct becomes its own experience once it has met the wisdom's choice a few times,
 # at most once a season; it draws lessons by its own lights.
