@@ -64,6 +64,55 @@ Community choices only: no plots, no placed buildings, no public works; families
 - **Trust still costs little:** fickle play loses 3–4 people on ordinary sites and gains on difficult ones.
 - **Future balance issue (outside this prototype, owner 2026-10-31):** towns end with 5,000–9,000 wood and hundreds of tools; materials stop being scarce after the first year.
 
+## Combined Evaluation (2026-10-31, branch `feature/combined-evaluation`)
+
+The agreed rules (owner, 2026-10-31): families choose their home sites on land set aside (`docs/HOME_SITES.md`), every town starting with the modest starting land; the town's backing pulls only on time given freely; the food priority warns of tools whatever the stores rule. 12 towns, 3 years, identical seeds; people at the end, towns off the ground, and town by town against "none". Differences of 3 people or less are within the spread between towns (each strategy is both better and worse than "none" in several towns).
+
+### Leadership (starting land)
+
+| Strategy | Ordinary | First winter's stores lost | Difficult sites |
+|---|---|---|---|
+| none | 39.9, 11/12 | 38.3, 11/12 | 20.8, 6/12 |
+| **tool-aware (informed)** | 40.7, 11/12 (+0.8) | 40.0, 11/12 (+1.7) | **35.3, 10/12 (+14.4, saved 4)** |
+| uninformed, matched to tool-aware's changes | 37.7, 11/12 (−2.3) | 35.3, 9/12 (−3.1, lost 2) | 35.6, 10/12 (+14.8, saved 4) |
+| cooperation | **44.6**, 11/12 (+4.7) | **42.9**, 11/12 (+4.6) | 25.5, 7/12 (+4.7) |
+| housing | 42.1, 11/12 (+2.2) | 40.9, 11/12 (+2.6) | 23.3, 8/12 (+2.5, saved 2) |
+| investment | 40.1, **12/12** | 40.6, **12/12** | 29.6, 9/12 (+8.8, saved 3) |
+| food | 34.8, 9/12 (−5.1) | 34.1, 9/12 (−4.3) | 24.1, 6/12 (+3.3) |
+| preview (follows the town's backing) | 38.2, 10/12 | 34.4, 9/12 | 27.7, 7/12 |
+| seasonal (step 1's rules) | 39.8, 10/12 | 37.8, 10/12 | 27.8, 7/12 |
+| wrong-headed | 42.5, 11/12 (+2.6) | 41.8, 11/12 (+3.5) | 25.3, 7/12 |
+| fickle | 39.4, 11/12 | 38.4, 11/12 | 32.2, 9/12 |
+| housing or cooperation, priorities first | 1.5–2.6, **0–1/12** | 1.6–2.2, **0/12** | 0.0, **0/12** |
+| starve (stores closed, no priority) | 1.4, **0/12** | 0.6, **0/12** | 0.3, **0/12** |
+| unfair honours | 38.0, 11/12 | 36.4, 11/12 | 22.7, 7/12 |
+
+The tool-aware strategy (written before its results; tools first while no one makes them, food only once someone does, homes when their sites wait for hands, otherwise cooperation) spent about half its time on food and half on cooperation. Without the backing pull on work, the food priority loses two towns, not five.
+
+### Planning and leadership together (ordinary sites)
+
+| Residential land | none | tool-aware | starve |
+|---|---|---|---|
+| Starting land | 39.9, 11/12 | 40.7, 11/12 | 1.4, 0/12 |
+| Compact (24 spots around the stockpile) | 28.7, 9/12 | 31.4, 10/12 | 2.0, 0/12 |
+| Poor (24 spots in the far corner) | 33.3, 9/12 | 28.8, 8/12 | 0.6, 0/12 |
+
+### The owner's five questions
+
+1. **Can bad planning and bad leadership each cause failure?** Leadership, yes: closing the stores to improvements ruins every town on every kind of site, and the food priority loses two towns in twelve. Planning, partly: badly placed land costs 6–11 people a town and two towns in twelve, but does not by itself wipe towns out (no land at all would, and is prevented by the starting land).
+2. **Can good planning and good leadership each improve outcomes?** Leadership: on ordinary sites only slightly (cooperation +4.7, within the spread; tool-aware +0.8); on difficult sites strongly (tool-aware +14.4 people and four towns saved; investment +8.8). Planning: no layout beat the modest starting land beyond the spread (far land 41.2 against 39.9); the layout that looks best, compact, is the worst because work takes its land (`docs/HOME_SITES.md`).
+3. **Do they reinforce each other?** Not measurably. Tool-aware leadership added 2.7 people on compact land and lost 4.5 on poor land.
+4. **Do family values make meaningful differences?** In individual decisions, yes (site choice, who answers an appeal, who resists being directed: tested). At town scale, no measurable difference: preferred land drew deferential and self-governing families alike.
+5. **Can an informed player consistently do better than a passive or uninformed one?** Better than uninformed on ordinary and stressed sites (+3.0 and +4.7 people, two towns kept that uninformed play lost), equal on difficult sites. Better than passive only on difficult sites; on ordinary sites the margin is within the spread. Not yet consistent.
+
+### What is demonstrated, what is not, and why
+
+- **Demonstrated:** player choices can ruin a town through real mechanics, and the warnings name the cause beforehand; on hard land, guidance of almost any reasonable kind saves towns doing nothing loses; informed play avoids the mistakes uninformed play makes.
+- **Not yet demonstrated:** that judgment beats sensible defaults on ordinary land, or that planning and leadership compound.
+- **Why skill shows so little on ordinary land:** families already weigh the town's food, wood and tools in their own decisions, so a sensible priority mostly repeats their reasoning; work is chosen once, in the first month, and never reconsidered (owner decision 1, still deferred), so the priority reaches only improvements, newcomers and spare time; materials stop being scarce after the first year (5,000–9,000 wood), so there is little to allocate; trust, the cost of poor leadership, only scales receptiveness.
+- **On difficult land almost anything helps** because passive towns there fail on tools and departures, and any priority that asks for tools, better work or help moves families who would otherwise not act; matched uninformed play does as well as informed, so this is the value of acting, not of judgment.
+- **Unintended interactions:** residential land is not reserved, so compact planning backfires; asking for food at the founding draws families away from tools (now warned of); the town's backing amplified private work choices (now removed).
+
 ## Step 1: Existing Levers (`tests/sim/priority_check.gd` at commit 8fd8b39)
 
 Each priority is mapped to today's nearest controls: **food** = ask for food work, stores to priorities first; **housing** = four homes' worth of plots ahead instead of two, stores to priorities first with nothing asked; **investment** = ask for better work and tools; **cooperation** = promote helping neighbours, first claim for helpers. Strategy rules (informed, wrong-headed) were written before any result and not tuned. The uninformed strategy changes on exactly the days the informed one changed on the same town, so change counts match (both stay under the trust penalty); "fickle" changes monthly and meets it. Difficult sites: of 48 others, the 12 where the map luck check's classic player did worst (4 of them failed); a different policy's runs, so selection shares no noise with these. Same towns and seeds throughout; two identical runs gave identical output.
