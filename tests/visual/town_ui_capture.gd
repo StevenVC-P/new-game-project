@@ -2,8 +2,8 @@ extends SceneTree
 
 # Screenshots of the town view's interface in the real game (docs/TOWN_UI.md): a town founded
 # through main.gd and grown by the stand-in player, then the sidebar's four tabs, a family's
-# details, a tool being placed, and the alerts that come and go, at 1920x1080 and at a small
-# laptop size. Needs a window (no --headless):
+# details, a tool being placed, the community priority, residential land, and the alerts that come
+# and go, at 1920x1080 and at a small laptop size. Needs a window (no --headless):
 #
 #   & (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/town_ui_capture.gd -- <output_dir>
 
@@ -45,7 +45,28 @@ func run() -> void:
 	main.simulation_clock.is_paused = true
 	await shot("founded_overview")
 
+	# The player clears the starting land: a month on, families say they cannot build, and the
+	# Overview asks for land. Then the land is set aside again and the town grows on.
 	var town: City = main.cities[main.selected_city_index]
+	var map_size: Vector2i = town.logistics.map_size()
+	main.select_building_type(HomeSites.TOOL_CLEAR)
+	main.city_hovered_tile = Vector2i.ZERO
+	main.place_block_corner(town)
+	main.city_hovered_tile = map_size - Vector2i.ONE
+	main.place_block_corner(town)
+	main.is_placing_building = false
+	for _day in range(35):
+		town.tick()
+	main.show_sidebar_tab("overview")
+	await shot("cannot_build_overview")
+	main.show_sidebar_tab("families")
+	await shot("cannot_build_families")
+	set_size(SIZES[1])
+	main.show_sidebar_tab("overview")
+	await shot("small_cannot_build")
+	set_size(SIZES[0])
+	HomeSites.set_aside_starting_land(town)
+	main.show_sidebar_tab("overview")
 	StandInPlayerScript.new().play(town, {}, 360)
 	for _day in range(30):
 		town.tick()
@@ -59,6 +80,30 @@ func run() -> void:
 	for tab: String in ["families", "planning", "community"]:
 		main.show_sidebar_tab(tab)
 		await shot("grown_" + tab)
+
+	# The community priority set, with the stores rule that makes its warnings bite: the town's
+	# backing, each family's stance and reasons, and the warnings.
+	main.apply_city_action({"action": "set_priority", "priority": CommunityPriority.HOUSING})
+	main.apply_city_action({"action": "set_store_rule", "rule": TownInfluence.RULE_PRIORITIES})
+	main.town_sidebar.expanded["community_views"] = true
+	main.show_sidebar_tab("community")
+	await shot("community_priority")
+	main.town_sidebar.scroll_to(100000.0)
+	await shot("community_priority_scrolled")
+	main.town_sidebar.scroll_to(0.0)
+	main.apply_city_action({"action": "set_store_rule", "rule": TownInfluence.RULE_OPEN})
+
+	# Residential land: the starting land, a preferred block beside it, and the tool in hand.
+	var heart: Vector2i = TownLogistics.center_tile(town.logistics.stockpile_tile, TownLogistics.STOCKPILE_SIZE)
+	main.select_building_type(HomeSites.TOOL_PREFERRED)
+	main.city_hovered_tile = heart + Vector2i(-12, -6)
+	main.place_block_corner(town)
+	main.city_hovered_tile = heart + Vector2i(-7, -2)
+	main.place_block_corner(town)
+	main.show_sidebar_tab("planning")
+	main.get_viewport().warp_mouse(main.get_town_map_screen_rect().get_center())
+	await shot("planning_residential")
+	main.is_placing_building = false
 
 	# A family selected on the map: its details open in the Families tab.
 	for index in range(town.buildings.size()):
@@ -109,6 +154,8 @@ func finish() -> void:
 	quit()
 
 func shot(shot_name: String) -> void:
+	# State changed here, not by a click on the panel, so the panel is told to rebuild.
+	main.town_sidebar.dirty = true
 	main.queue_redraw()
 	for _frame in range(4):
 		await process_frame

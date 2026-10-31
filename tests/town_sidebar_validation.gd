@@ -35,6 +35,7 @@ func run_all() -> void:
 	main.simulation_clock.is_paused = true
 	await _settle()
 	var city: City = main.cities[main.selected_city_index]
+	_check(city.influence.enabled and city.construction.starting_land_given and HomeSites.count_room(city) >= EconomyBalance.FOUNDING_FAMILIES, "a town founded with families leading has its starting residential land (%d spots)" % HomeSites.count_room(city))
 
 	test_layout(main)
 	test_pages_build(main, city, "a new town")
@@ -46,6 +47,7 @@ func run_all() -> void:
 	test_attention_follows_state(city)
 	await test_tabs_and_keys(main)
 	await test_clicks(main, city)
+	await test_residential_land(main, city)
 	await test_family_focus(main, city)
 	await test_footer(main, city)
 	await test_scrolling(main)
@@ -91,10 +93,15 @@ func test_pages_change_nothing(main: Node2D, city: City) -> void:
 	city.influence.set_encouraged(TownInfluence.ACTIVITY_WOOD, true)
 	var resources: Dictionary = city.resources.duplicate(true)
 	var encouraged: Array[String] = city.influence.encouraged.duplicate()
+	city.influence.set_priority(CommunityPriority.HOUSING)
+	var backing_week: int = city.influence.backing_week
 	var notes: Array = city.households.map(func(h: Household) -> String: return h.initiative_note + h.social_note)
 	for tab: Dictionary in TownSidebar.TABS:
 		(tab["page"] as Script).call("build", {"city": city, "focused_household_id": city.households[0].id})
 	_check(city.resources == resources, "building pages leaves the stores as they were")
+	_check(city.influence.backing_week == backing_week, "building pages leaves the backing families act on as it was")
+	city.influence.set_priority(CommunityPriority.NONE)
+	city.influence.set_encouraged(TownInfluence.ACTIVITY_WOOD, true)
 	_check(city.influence.encouraged == encouraged, "building pages leaves the community's asks as they were")
 	_check(city.households.map(func(h: Household) -> String: return h.initiative_note + h.social_note) == notes, "building pages leaves families' notes as they were")
 	city.influence.set_encouraged(TownInfluence.ACTIVITY_WOOD, false)
@@ -138,13 +145,26 @@ func test_clicks(main: Node2D, city: City) -> void:
 	var sidebar: TownSidebar = main.town_sidebar
 	main.show_sidebar_tab(TownSidebar.TAB_COMMUNITY)
 	await _settle()
-	var asked: bool = city.influence.is_encouraged(TownInfluence.ACTIVITY_FOOD)
-	_check(await _click_action(main, func(a: Dictionary) -> bool: return a.get("action") == "toggle_encourage" and a.get("activity") == TownInfluence.ACTIVITY_FOOD), "the community page has an ask for food")
-	_check(city.influence.is_encouraged(TownInfluence.ACTIVITY_FOOD) != asked, "clicking the ask for food changes it")
+	sidebar.rebuild()
+	for priority: String in [CommunityPriority.NONE] + CommunityPriority.ALL:
+		_check(sidebar.prims.any(func(p: Dictionary) -> bool: return str(p["p"]) == "hit" and p["action"].get("action") == "set_priority" and p["action"].get("priority") == priority), "the community page offers %s" % CommunityPriority.get_display_name(priority))
+	_check(await _click_action(main, func(a: Dictionary) -> bool: return a.get("action") == "set_priority" and a.get("priority") == CommunityPriority.FOOD), "the community page has food security")
+	_check(city.influence.priority == CommunityPriority.FOOD and city.influence.is_encouraged(TownInfluence.ACTIVITY_FOOD), "clicking it puts food first, with its ask")
+	var food_page: Array = SidebarCommunityPage.build({"city": city})
+	_check(food_page.any(func(b: Dictionary) -> bool: return str(b.get("title", "")) == "How the town takes it" and str(b.get("tag", "")).begins_with("backed")), "the page shows the town's backing for it")
+	_check(food_page.any(func(b: Dictionary) -> bool: return str(b.get("id", "")) == "community_views" and (b["blocks"] as Array).size() == city.households.size()), "and each family's stance, with its reasons")
+	var warned: Array[String] = CommunityPriority.get_warnings(city, CommunityPriority.FOOD, city.influence.store_rule)
+	_check(warned.is_empty() or food_page.any(func(b: Dictionary) -> bool: return str(b.get("title", "")) == "Before you lean on it" and b["lines"] == warned), "and its warnings, as the town records them")
 	_check(await _click_action(main, func(a: Dictionary) -> bool: return a.get("action") == "set_store_rule" and a.get("rule") == TownInfluence.RULE_PRIORITIES), "the community page has the priorities rule")
-	_check(city.influence.store_rule == TownInfluence.RULE_PRIORITIES, "clicking 'priorities first' sets the stores rule")
+	_check(city.influence.store_rule == TownInfluence.RULE_PRIORITIES and city.influence.priority == CommunityPriority.FOOD, "clicking 'priorities first' sets the stores rule, and leaves the priority")
+	_check(await _click_action(main, func(a: Dictionary) -> bool: return a.get("action") == "set_priority" and a.get("priority") == CommunityPriority.NONE), "the community page has no priority")
+	_check(city.influence.priority == CommunityPriority.NONE and city.influence.encouraged.is_empty(), "clicking it withdraws the priority and its asks")
 	city.influence.store_rule = TownInfluence.RULE_OPEN
-	city.influence.set_encouraged(TownInfluence.ACTIVITY_FOOD, asked)
+	# A town saved under the four work asks keeps them, named, until a priority (or none) is chosen.
+	city.influence.set_encouraged(TownInfluence.ACTIVITY_WOOD, true)
+	_check(SidebarCommunityPage.build({"city": city}).any(func(b: Dictionary) -> bool: return str(b.get("text", "")).begins_with("Asks from before")), "asks from before the priority are named")
+	city.influence.set_priority(CommunityPriority.NONE)
+	_check(city.influence.encouraged.is_empty(), "and choosing no priority withdraws them")
 
 	main.show_sidebar_tab(TownSidebar.TAB_PLANNING)
 	await _settle()
@@ -229,6 +249,57 @@ func test_shortcuts(main: Node2D) -> void:
 		_check(main.is_placing_building and main.selected_building_type == tool, "key %s should pick up %s, got %s" % [key, tool, main.selected_building_type])
 	town.influence.enabled = influence_was
 	main.is_placing_building = false
+
+# Residential land in play: the Planning card's tools, marking and clearing a block on the map, the
+# ground under the cursor, and the Overview's card when families find nowhere to build.
+func test_residential_land(main: Node2D, city: City) -> void:
+	main.show_sidebar_tab(TownSidebar.TAB_PLANNING)
+	await _settle()
+	main.town_sidebar.rebuild()
+	for tool: String in HomeSites.TOOL_LEVELS.keys():
+		_check(main.town_sidebar.prims.any(func(p: Dictionary) -> bool: return str(p["p"]) == "hit" and p["action"].get("action") == "select_tool" and p["action"].get("tool") == tool), "the planning page offers %s" % HomeSites.TOOL_NAMES[tool])
+	_check(await _click_action(main, func(a: Dictionary) -> bool: return a.get("action") == "select_tool" and a.get("tool") == HomeSites.TOOL_PREFERRED), "the preferred land tool can be clicked")
+	_check(main.is_placing_building and main.selected_building_type == HomeSites.TOOL_PREFERRED, "clicking it picks up the tool")
+	# A 4x4 block of open ground, none of it set aside yet.
+	var corner: Vector2i = Vector2i(-1, -1)
+	var size: Vector2i = city.logistics.map_size()
+	for y in range(2, size.y - 6):
+		for x in range(2, size.x - 6):
+			if corner.x >= 0:
+				break
+			var open: bool = true
+			for dy in range(4):
+				for dx in range(4):
+					var tile: Vector2i = Vector2i(x + dx, y + dy)
+					open = open and HomeSites.get_land(city, tile) == HomeSites.LAND_NONE and city.construction.validate(Building.BUILDING_HOUSE, tile)["is_valid"] == true
+			if open:
+				corner = Vector2i(x, y)
+	_check(corner.x >= 0, "the grown town has open ground to set aside")
+	var room: int = HomeSites.count_room(city)
+	main.city_hovered_tile = corner
+	_check(main.get_placement_status_message().contains("corner"), "the footer says how to mark: %s" % main.get_placement_status_message())
+	main.place_block_corner(city)
+	main.city_hovered_tile = corner + Vector2i(3, 3)
+	main.place_block_corner(city)
+	_check(HomeSites.count_land(city, HomeSites.LAND_PREFERRED) == 16 and HomeSites.count_room(city) == room + 16, "two corners mark a block preferred, and it adds room for homes")
+	_check(TownSidebar.describe_ground(city, corner).contains("set aside for homes (preferred)"), "the ground under the cursor says so")
+	main.select_building_type(HomeSites.TOOL_CLEAR)
+	main.city_hovered_tile = corner
+	main.place_block_corner(city)
+	main.city_hovered_tile = corner + Vector2i(3, 3)
+	main.place_block_corner(city)
+	_check(HomeSites.count_land(city, HomeSites.LAND_PREFERRED) == 0 and HomeSites.count_room(city) == room, "the clear tool takes it back")
+	main.is_placing_building = false
+	var family: Household = city.households[0]
+	var note: String = family.home_site_note
+	var waiting: int = city.construction.families_without_plot
+	family.home_site_note = "%s cannot build a home: every spot set aside for homes is taken or cannot hold one" % city.get_household_label(family.id)
+	family.home_site_day = city.construction.day + 1
+	city.construction.families_without_plot = 1
+	var cards: Array = SidebarOverviewPage.get_attention(city).filter(func(card: Dictionary) -> bool: return (card["buttons"] as Array).any(func(b: Dictionary) -> bool: return b["action"].get("tool") == HomeSites.TOOL_LAND))
+	_check(cards.size() == 1 and (cards[0]["lines"] as Array).any(func(line: String) -> bool: return line.contains("every spot set aside for homes is taken")), "the overview says families cannot find a home site, and why")
+	family.home_site_note = note
+	city.construction.families_without_plot = waiting
 
 # Scrolls the hit for the first action `matches` accepts into view and clicks it.
 func _click_action(main: Node2D, matches: Callable) -> bool:

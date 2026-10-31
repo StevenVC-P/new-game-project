@@ -72,12 +72,27 @@ func toggle_encouraged(activity: String) -> void:
 	set_encouraged(activity, not is_encouraged(activity))
 
 # Sets the community's priority and the asks it makes; each family's view of it is recorded.
+# Setting the priority already set still replaces asks of other kinds: a town saved under the four
+# separate work asks keeps them until a priority (or none) is chosen.
 func set_priority(new_priority: String) -> void:
-	if new_priority == priority:
+	var asks: Array = CommunityPriority.ACTIVITIES.get(new_priority, [])
+	if new_priority == priority and encouraged.size() == asks.size() and asks.all(is_encouraged):
 		return
+	var changed: bool = new_priority != priority
 	priority = new_priority
-	encouraged.assign(CommunityPriority.ACTIVITIES.get(new_priority, []))
-	CommunityPriority.record_responses(city)
+	encouraged.assign(asks)
+	if changed:
+		CommunityPriority.record_responses(city)
+
+# Asks standing from before the community priority (a town saved under the four work asks) that
+# the current priority does not make.
+func get_earlier_asks() -> Array[String]:
+	var asks: Array = CommunityPriority.ACTIVITIES.get(priority, [])
+	var earlier: Array[String] = []
+	for activity: String in encouraged:
+		if not asks.has(activity):
+			earlier.append(activity)
+	return earlier
 
 # What the stores always keep back from families' own projects: wood for the town's homes and
 # workshops, and tools for the upkeep of every proper workplace for a while, so families investing

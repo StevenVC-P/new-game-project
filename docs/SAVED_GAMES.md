@@ -35,6 +35,8 @@ Saves live in `user://saves/` (on Windows `%APPDATA%\Godot\app_userdata\<project
 - **Writes are atomic.** A save is written to a temporary file and renamed over the old one, so a crash mid-write keeps the previous save.
 - **The domain's randomness needs no saving.** Every random roll in `City` and its helpers is seeded from a hash of the town and the moment (`founding_seed`, tile, household, month), so a loaded town rolls the same as the original would have. `main.gd`'s own `rng` only picks a new house's work preference and the founding seed, and is not saved.
 - **Format version.** `GameState.FORMAT` is written in every header; saves from a newer format are hidden from the list. Missing fields in an older save keep their defaults, and fields a newer build no longer has are ignored, so most additions need no version bump. Known losses so far: saves from before routes ran on the lines between tiles (2026-10-27) lose their worn paths, because wear moved from tiles to route cells (`TownLogistics.cell_wear`); the town is otherwise unchanged and wears new paths as it plays.
+- **Errand routes are saved** (`TownErrands.get_saved`, 2026-10-31). A family keeps an errand's route for up to a month; a loaded town that found fresh routes over today's paths wore different paths from the first day, which the round-trip test caught once families had homes in it. Older saves find their routes again (a month of slightly different wear).
+- **Older towns are given what new ones start with.** A town where families lead, saved before residential land existed, gets its starting land when loaded (`HomeSites.ensure_starting_land`, called from `GameState.restore`): without it, families who choose their own home sites could build nowhere. It is marked around whatever already stands, which stays; `TownConstruction.starting_land_given` records it, so land the player clears later stays cleared. A town saved under the four work asks keeps them until the player chooses a priority (`docs/COMMUNITY_PRIORITIES.md`, Step 3).
 
 ## Not Saved
 
@@ -51,7 +53,7 @@ Saves live in `user://saves/` (on Windows `%APPDATA%\Godot\app_userdata\<project
 
 ## Testing
 
-- `tests/save_game_validation.gd` (headless): exact round trip and identical play afterwards; a generated world saved while exploring; an atlas save; refusal of a save whose world cannot be rebuilt; the store (names, ordering, overwrite, delete, newer formats hidden); the app's menus (start, save, resume, leave, load).
+- `tests/save_game_validation.gd` (headless): exact round trip and identical play afterwards; an older save given its starting land around what stands, and a town whose land was cleared staying cleared; a generated world saved while exploring; an atlas save; refusal of a save whose world cannot be rebuilt; the store (names, ordering, overwrite, delete, newer formats hidden); the app's menus (start, save, resume, leave, load).
 - `tests/visual/menu_capture.gd` (needs a window): screenshots of the start menu, pause, save, and load pages, using its own save folder.
 
 ## Remaining Work And Limitations

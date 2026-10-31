@@ -36,6 +36,15 @@ const ROUTE_DAYS: int = 30
 func _init(owner: City) -> void:
 	_city_ref = weakref(owner)
 
+# The routes families keep, for saved games (GameState): a loaded town must walk the routes the
+# original kept, not find fresh ones over today's paths, or the two wear different paths. The banks
+# and woods are found again from the town map.
+func get_saved() -> Dictionary:
+	return _errands.duplicate(true)
+
+func restore_saved(saved: Dictionary) -> void:
+	_errands = saved.duplicate(true)
+
 func has_map() -> bool:
 	return not city.local_map.is_empty()
 

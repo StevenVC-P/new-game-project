@@ -87,7 +87,8 @@ var selected_city_index: int = -1
 var household_debug_inspector: Control = null
 var trade_menu: TradeMenu = TradeMenu.new()
 var selected_building_type: String = BUILDING_HOUSE
-var is_placing_building: bool = true
+# Nothing in hand until the player picks a tool: a stray click on the town must not plan a building.
+var is_placing_building: bool = false
 # First corner of a block being marked for clearing or tilling; (-1, -1) until the first click.
 var block_start_tile: Vector2i = Vector2i(-1, -1)
 # First end of a road being laid with the road tool; (-1, -1) until the first click.
@@ -1125,6 +1126,8 @@ func set_families_lead(town: City, on: bool) -> void:
 	town.influence.enabled = on
 	town.set_hand_method_fallback(on)
 	town.social.set_enabled(on)
+	if on:
+		HomeSites.ensure_starting_land(town)
 	queue_redraw()
 
 func found_player_city_at_pending_site() -> bool:
@@ -1143,6 +1146,8 @@ func found_player_city_at_pending_site() -> bool:
 		founded_city.local_map = pending_local_map
 	else:
 		configure_new_city_map(founded_city)
+	# Families lead: a modest block of land is set aside for their homes (HomeSites).
+	HomeSites.ensure_starting_land(founded_city)
 	clear_pending_founding_tile()
 	founded_city.trade.partner_name = get_nearest_neutral_town_name(founded_city)
 	generate_roads()
@@ -1244,8 +1249,8 @@ func apply_city_action(option_data: Dictionary) -> void:
 		city.trade.accept_lot(int(option_data["lot"]))
 	elif action == "call_militia":
 		city.defense.call_militia()
-	elif action == "toggle_encourage":
-		city.influence.toggle_encouraged(str(option_data["activity"]))
+	elif action == "set_priority":
+		city.influence.set_priority(str(option_data["priority"]))
 	elif action == "set_store_rule":
 		city.influence.store_rule = str(option_data["rule"])
 	elif action == "toggle_norm":
@@ -1488,6 +1493,8 @@ func handle_building_selection_key_event(key_event: InputEventKey) -> bool:
 		select_building_type(TownConstruction.ROAD)
 	elif is_letter_key(keycode, physical_keycode, KEY_K) and selected_city_index >= 0 and selected_city_index < cities.size() and cities[selected_city_index].influence.enabled:
 		select_building_type(TownInfluence.WORK_GROUND)
+	elif is_letter_key(keycode, physical_keycode, KEY_N):
+		select_building_type(HomeSites.TOOL_LAND)
 	elif is_letter_key(keycode, physical_keycode, KEY_I) and selected_city_index >= 0 and selected_city_index < cities.size():
 		# Shortcut for the menu's Town rules page.
 		var town: City = cities[selected_city_index]
@@ -1576,7 +1583,7 @@ func get_road_preview(city: City) -> Array[Vector2i]:
 
 # The clearing and tilling tools mark a block between two clicks.
 static func is_block_tool(building_type: String) -> bool:
-	return building_type == TownWoodland.CLEAR or building_type == TownFarmland.TILL or building_type == TownInfluence.WORK_GROUND
+	return building_type == TownWoodland.CLEAR or building_type == TownFarmland.TILL or building_type == TownInfluence.WORK_GROUND or HomeSites.TOOL_LEVELS.has(building_type)
 
 func place_block_corner(city: City) -> void:
 	if block_start_tile.x < 0:
@@ -1584,6 +1591,8 @@ func place_block_corner(city: City) -> void:
 		return
 	if selected_building_type == TownInfluence.WORK_GROUND:
 		city.influence.mark_work_ground(block_start_tile, city_hovered_tile)
+	elif HomeSites.TOOL_LEVELS.has(selected_building_type):
+		HomeSites.mark(city, block_start_tile, city_hovered_tile, int(HomeSites.TOOL_LEVELS[selected_building_type]))
 	elif selected_building_type == TownFarmland.TILL:
 		if city.farmland.mark_block(block_start_tile, city_hovered_tile) == 0:
 			print("No open ground to till there")
@@ -1687,6 +1696,14 @@ func get_block_result(city: City, origin: Vector2i) -> Dictionary:
 	var footprint: Array[Vector2i] = [origin]
 	if selected_building_type == TownInfluence.WORK_GROUND:
 		return building_placement.make_result(true, "Valid placement: click %s corner of the ground families may open work on (all marked: unmark)" % ("one" if block_start_tile.x < 0 else "the opposite"), footprint)
+	if HomeSites.TOOL_LEVELS.has(selected_building_type):
+		var corner: String = "one" if block_start_tile.x < 0 else "the opposite"
+		match selected_building_type:
+			HomeSites.TOOL_CLEAR:
+				return building_placement.make_result(true, "Valid placement: click %s corner of the land to stop setting aside for homes" % corner, footprint)
+			HomeSites.TOOL_PREFERRED:
+				return building_placement.make_result(true, "Valid placement: click %s corner of the land the community would rather families build on (all marked: unmark)" % corner, footprint)
+		return building_placement.make_result(true, "Valid placement: click %s corner of the land set aside for homes (all marked: unmark)" % corner, footprint)
 	if block_start_tile.x < 0:
 		return building_placement.make_result(true, "Valid placement: click one corner of the " + ("land to till" if selected_building_type == TownFarmland.TILL else "woods to clear"), footprint)
 	if selected_building_type == TownFarmland.TILL:
@@ -2043,6 +2060,8 @@ func get_building_display_name(building_type: String) -> String:
 		return "Tileworks"
 	if building_type == BUILDING_PAVER_YARD:
 		return "Paver Yard"
+	if HomeSites.TOOL_NAMES.has(building_type):
+		return HomeSites.TOOL_NAMES[building_type]
 	if building_type == BUILDING_STOREHOUSE or building_type == TownConstruction.ROAD or building_type == TownConstruction.PLOT or is_block_tool(building_type):
 		return BuildMenuHelper.get_display_name(building_type)
 

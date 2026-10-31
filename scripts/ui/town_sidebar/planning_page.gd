@@ -15,7 +15,7 @@ const TOOL_KEYS: Dictionary = {
 	"brickworks": "7", "lime_kiln": "8", "mortar_yard": "9", "mason_yard": "0", "sculptor": "Q",
 	"carver": "W", "tileworks": "E", "paver_yard": "R", "storehouse": "T", "fisher": "Y",
 	"hunter": "U", "watch_post": "O", "herder": "H", "plot": "P", "clear_woods": "C", "till_land": "F",
-	"road": "G", "work_ground": "K",
+	"road": "G", "work_ground": "K", "residential": "N",
 }
 const DESIGNATIONS: Array[String] = [TownConstruction.PLOT, TownInfluence.WORK_GROUND, TownWoodland.CLEAR, TownFarmland.TILL]
 const PROJECTS_SHOWN: int = 6
@@ -33,6 +33,8 @@ static func build(context: Dictionary) -> Array:
 		blocks.append({"kind": "text", "text": "Classic rules: you plan every building, and families build them.", "muted": true})
 
 	blocks.append({"kind": "heading", "text": "Designate", "note": "where things may go"})
+	if city.influence.enabled:
+		blocks.append(get_residential_card(city, tool if placing else ""))
 	for designation: String in DESIGNATIONS:
 		if designation == TownInfluence.WORK_GROUND and not city.influence.enabled:
 			continue
@@ -67,11 +69,30 @@ static func build(context: Dictionary) -> Array:
 	blocks.append_array(get_project_blocks(city))
 
 	var keys: Array = []
-	for line: String in ["1-0, Q-R, T, Y, U, O, H choose a building (B opens the catalog)", "P home plot, G road, C clear woods, F till land" + (", K work ground" if city.influence.enabled else ""), "Click the map to place; roads and areas take two clicks", "Esc or right click stops placing and clears a selection", "M calls the militia, L shows families, Tab changes page", "Space pauses; I switches the town's rules"]:
+	for line: String in ["1-0, Q-R, T, Y, U, O, H choose a building (B opens the catalog)", "P home plot, G road, C clear woods, F till land" + (", K work ground, N residential land" if city.influence.enabled else ""), "Click the map to place; roads and areas take two clicks", "Esc or right click stops placing and clears a selection", "M calls the militia, L shows families, Tab changes page", "Space pauses; I switches the town's rules"]:
 		keys.append({"kind": "text", "text": line, "muted": true})
 	blocks.append({"kind": "gap", "size": 6.0})
 	blocks.append({"kind": "expander", "id": "planning_keys", "title": "Keyboard shortcuts", "blocks": keys})
 	return blocks
+
+# Land set aside for homes (HomeSites): families choose their own sites on it, by what they value;
+# preferred land is the community's hope, which receptive families heed more. No workplace may be
+# opened on either.
+static func get_residential_card(city: City, tool: String) -> Dictionary:
+	var land: int = HomeSites.count_land(city)
+	var preferred: int = HomeSites.count_land(city, HomeSites.LAND_PREFERRED)
+	var muted: Array = []
+	if land == 0:
+		muted.append("None set aside: families cannot build homes except on plots.")
+	else:
+		muted.append("%d tiles set aside%s; room for %d more homes" % [land, " (%d preferred)" % preferred if preferred > 0 else "", HomeSites.count_room(city)])
+	var waiting: int = city.construction.families_without_plot
+	if waiting > 0:
+		muted.append("%d famil%s found nowhere to build last month" % [waiting, "y" if waiting == 1 else "ies"])
+	var buttons: Array = []
+	for id: String in [HomeSites.TOOL_LAND, HomeSites.TOOL_PREFERRED, HomeSites.TOOL_CLEAR]:
+		buttons.append({"text": ["Mark", "Prefer", "Clear"][buttons.size()], "toggle": true, "active": tool == id, "action": {"action": "select_tool", "tool": id}})
+	return {"kind": "card", "title": "Residential land", "tag": "key N", "lines": ["Families choose their own home sites here, by what they value. Preferred land is where the community would rather they build; receptive families heed it more, none is bound to. No workplace may be opened on it.", "Mark sets land aside, Prefer marks the community's preferred land, Clear takes it back: two corners each; the same block again unmarks it."], "muted": muted, "buttons": buttons, "columns": 3, "selected": HomeSites.TOOL_LEVELS.has(tool)}
 
 static func get_designation_card(city: City, designation: String, selected: bool) -> Dictionary:
 	var title: String = ""
@@ -80,7 +101,7 @@ static func get_designation_card(city: City, designation: String, selected: bool
 	match designation:
 		TownConstruction.PLOT:
 			title = "Home plots"
-			lines.append("Land set aside for a family home. Families build their own houses there.")
+			lines.append("An exact site for one family home, for when a home should go just there. Families still choose among the sites open to them." if city.influence.enabled else "Land set aside for a family home. Families build their own houses there.")
 			var waiting: int = city.construction.families_without_plot
 			var free: int = city.construction.plots.filter(func(plot: Dictionary) -> bool: return int(plot["project_id"]) < 0).size()
 			muted.append("%d plot%s free; %d famil%s waiting for one" % [free, "" if free == 1 else "s", waiting, "y" if waiting == 1 else "ies"])

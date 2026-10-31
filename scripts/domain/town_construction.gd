@@ -52,6 +52,8 @@ var builders_today: Array[int] = []
 var recent_completions: Array[Dictionary] = []
 # Families who wanted to build a home last month but found no open residential plot.
 var families_without_plot: int = 0
+# Whether the town has had its starting residential land (HomeSites.ensure_starting_land).
+var starting_land_given: bool = false
 # Bumped when a road is finished, so views redraw the ground.
 var roads_version: int = 0
 # Homes families asked for themselves and finished (FamilyDevelopment), for balance tools.

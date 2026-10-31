@@ -2,11 +2,15 @@
 
 Snapshot for whoever picks the project up next. Update it when a milestone closes; durable detail lives in the linked docs, not here.
 
-*Last updated: 2026-10-30, with the town interface redesign on its branch.*
+*Last updated: 2026-10-31, with Step 3 (community priority and residential land in the game) on its integration branch.*
 
 ## Current Objective
 
-**Town interface redesign (owner brief, 2026-10-30): `docs/TOWN_UI.md`, on `feature/town-ui-redesign` from `develop`, not merged: waits for the owner's review.** The sidebar is now four scrolling pages (Overview, Families, Planning, Community) built by `scripts/ui/town_sidebar/`; the top bar groups place, time, and status (food in days added); the house card on the map is short and the family's reasons open in the sidebar. No simulation code changed. L now opens the Families page instead of the roster overlay; Tab changes pages. Open for the owner: the judgment calls and missing simulation data listed in that doc.
+**Step 3, community priority and residential land in the playable interface (owner, 2026-10-31): branch `feature/step3-integration`, not merged: waits for the owner's review.** Built from `develop` with two unmerged branches merged in: `feature/combined-evaluation` (the evaluation harness and docs) and `feature/town-ui-redesign` (the sidebar the pages live in). On top: residential land reserved for homes (`docs/HOME_SITES.md`), the Community page's priority selector with families' views, backing and warnings (`docs/COMMUNITY_PRIORITIES.md`, Step 3), the Planning page's residential land tools (N), home-site explanations on Families and Overview, and starting land at founding, when families are given the lead, and for older saves (`docs/SAVED_GAMES.md`). Gameplay is community choices only (owner, 2026-10-31): families decide, the player persuades and sets land aside; laying out the town stays in the code. Next simulation milestone after review: families reconsidering their work when circumstances change (`docs/COMMUNITY_PRIORITIES.md`, decisions after the combined evaluation).
+
+**Community priorities and home sites (owner, 2026-10-31)** are merged into `develop` and `main` (the simulation; their interface is Step 3 above).
+
+**Town interface redesign (owner brief, 2026-10-30): `docs/TOWN_UI.md`, on `feature/town-ui-redesign` from `develop`, not merged by itself; included in the Step 3 branch.** The sidebar is now four scrolling pages (Overview, Families, Planning, Community) built by `scripts/ui/town_sidebar/`; the top bar groups place, time, and status (food in days added); the house card on the map is short and the family's reasons open in the sidebar. No simulation code changed. L now opens the Families page instead of the roster overlay; Tab changes pages. Open for the owner: the judgment calls and missing simulation data listed in that doc.
 
 **Locked into `main` (owner, 2026-10-28):** everything through milestone 6, the town status bar, and the playtest fixes (walker bends, paths meeting roads).
 
@@ -90,6 +94,7 @@ In rough priority order; details in each doc's "Remaining Work" section.
 
 - **Flaky test:** `tests/world_map_flow_validation.gd`, "wheel zoom on the regional map should keep the point under the cursor", failed 2 of 8 runs on the milestone 6 branch (drift 0.51 and 0.55 against a 0.5 limit) and 0 of 5 on `develop`. The zoom animates over the 30 frames the test waits, so a busy machine leaves it unfinished; nothing in milestones 1-6 touches the regional map. Not loosened here: worth a look (wait for the animation to end, not a frame count).
 
+- **Anything kept across days that steers play must be saved,** even if it looks like a cache: errand routes were kept a month and not saved, so loaded towns drifted (fixed 2026-10-31). `tests/save_game_validation.gd` only catches such state once the test town exercises it.
 - **Saves rebuild their planet from its seed.** Any change to `WorldGenerator` or `WorldFieldBuilder` output makes existing saves refuse to load (a world fingerprint catches it; `docs/SAVED_GAMES.md`). New `main.gd` state, object-valued domain fields, and caches need a line in `GameState`; `tests/save_game_validation.gd` catches a missed field in a town.
 - **The project's main scene is `scenes/app.tscn`.** It sets `auto_accept_quit` off so closing the window autosaves first, then quits.
 - **Generated worlds must stay deterministic per seed.** Draw only from the generator's own `rng`, iterate in a fixed order, and break sort ties by index; `tests/world_generator_validation.gd` builds a seed twice and compares. Tests that name places must set `main.use_authored_world` before adding `main` to the tree.

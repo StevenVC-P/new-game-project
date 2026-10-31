@@ -45,7 +45,7 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/priority_check.gd > priority.log
 
 # Home sites (docs/HOME_SITES.md): families choosing their own sites on land set aside, preferred land, no land, no
-# overlap, explanations, starting land; then starting land, plots, and equal-capacity compact, dispersed, poor, far and
+# overlap, explanations, starting land, land reserved from work; then starting land, plots, and equal-capacity compact, dispersed, poor, far and
 # preferred-far land on the same towns (write to a file, filter for [HOME]; "-- --years=N --sites=N --layouts=a,b")
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/home_site_validation.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/home_site_check.gd > homes.log
@@ -88,10 +88,16 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_map_view_validation.gd
 
 # Town sidebar (docs/TOWN_UI.md): layout, every page from a new and a grown town without changing it, attention from state,
-# tabs, wheel, buttons and family focus by real clicks, the footer, and every shortcut the Planning page lists
+# tabs, wheel, buttons and family focus by real clicks, the footer, every shortcut the Planning page lists, starting land at
+# founding, choosing and withdrawing the community priority, and marking and clearing residential land
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_sidebar_validation.gd
 
-# Town interface screenshots at 1920x1080 and 1366x768: each page, a family selected, a tool placed, alerts (needs a window)
+# Community play in the real game: founding with starting land and no tool in hand, marking preferred land by clicks on
+# the map, families building their own homes on it, choosing a priority, a family's reasons, answering a warning, save/load
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/community_play_validation.gd
+
+# Town interface screenshots at 1920x1080 and 1366x768: each page, a family selected, a tool placed, the community priority,
+# residential land, alerts, families finding nowhere to build (needs a window)
 & (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/town_ui_capture.gd -- <output_dir>
 
 # What town maps hold over 160 real sites, and generation time (filter for [TOWN]); the survey's thresholds come from it

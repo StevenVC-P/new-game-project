@@ -59,6 +59,8 @@ static func get_card(city: City, household: Household, focused: bool) -> Diction
 	var calling: String = get_calling(household)
 	lines.append((calling + " · " if calling != "" else "") + describe_now(city, household))
 	lines.append("Home: " + describe_home(city, household))
+	if household.housing_status != Household.RESIDENCE_HOUSED and household.home_site_note.contains("cannot build a home"):
+		lines.append("Cannot build: " + household.home_site_note.get_slice(": ", 1))
 	var wants: String = FamilyAmbitions.describe(city, household)
 	if HouseholdMigration.is_considering_departure(household):
 		lines.append("Thinking of leaving: its hardship is near what it will endure")
@@ -119,11 +121,17 @@ static func get_detail_lines(city: City, household: Household) -> Array:
 	var today: int = city.construction.day
 	if household.initiative_note != "":
 		lines.append("Decided (%s): %s" % [SidebarOverviewPage.days_ago(today - household.initiative_day), household.initiative_note])
+	if household.home_site_note != "" and household.home_site_note != household.initiative_note:
+		lines.append("Home site (%s): %s" % [SidebarOverviewPage.days_ago(today - household.home_site_day), household.home_site_note])
 	if city.influence.enabled:
 		var outlook: Dictionary = FamilyInitiative.predict_improvement(city, household, true)
 		if str(outlook["outlook"]) != "":
 			var reasons: Array = outlook["reasons"]
-			lines.append("If asked for better work: %s%s" % [outlook["outlook"], " (" + "; ".join(reasons) + ")" if not reasons.is_empty() else ""])
+			lines.append("If investment were put first: %s%s" % [outlook["outlook"], " (" + "; ".join(reasons) + ")" if not reasons.is_empty() else ""])
+		if city.influence.priority != CommunityPriority.NONE:
+			var view: Dictionary = CommunityPriority.get_view(city, household, city.influence.priority)
+			var view_reasons: Array = FamilyInitiative.get_reasons(view["terms"], view["stance"] != CommunityPriority.OPPOSES and float(view["score"]) > 0.0)
+			lines.append("On %s first: %s%s" % [CommunityPriority.PHRASES[city.influence.priority], view["stance"], " (" + "; ".join(view_reasons) + ")" if not view_reasons.is_empty() else ""])
 	lines.append_array(HouseholdRosterHelper.get_card_lines(city, household))
 	var defining: Array[String] = []
 	for value_id: String in city.get_household_defining_values(household):

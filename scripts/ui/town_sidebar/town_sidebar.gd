@@ -371,4 +371,9 @@ static func describe_ground(city: City, tile: Vector2i) -> String:
 		parts.append("marked for tilling")
 	if city.influence.enabled and city.influence.is_work_ground(tile):
 		parts.append("work ground")
+	match int(data.get(HomeSites.RESIDENTIAL_KEY, HomeSites.LAND_NONE)):
+		HomeSites.LAND_PERMITTED:
+			parts.append("set aside for homes")
+		HomeSites.LAND_PREFERRED:
+			parts.append("set aside for homes (preferred)")
 	return ", ".join(parts)

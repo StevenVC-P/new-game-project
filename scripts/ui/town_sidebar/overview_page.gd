@@ -167,8 +167,8 @@ static func get_attention(city: City, context: Dictionary = {}) -> Array[Diction
 
 	if resources["food_shortage"] == true:
 		var buttons: Array = []
-		if families_lead and not city.influence.is_encouraged(TownInfluence.ACTIVITY_FOOD):
-			buttons.append({"text": "Ask families for food", "action": {"action": "toggle_encourage", "activity": TownInfluence.ACTIVITY_FOOD}})
+		if families_lead and city.influence.priority != CommunityPriority.FOOD:
+			buttons.append({"text": "Put food first", "action": {"action": "set_priority", "priority": CommunityPriority.FOOD}})
 		buttons.append({"text": "Plan a farm (2)", "action": {"action": "select_tool", "tool": Building.BUILDING_FARM}})
 		cards.append(make_card(100, SP.TONE_ALERT, "Food has run out", ["Families are going hungry. Hardship builds and newcomers stay away."], buttons))
 
@@ -199,31 +199,41 @@ static func get_attention(city: City, context: Dictionary = {}) -> Array[Diction
 			homes_building += 1 if project.is_home() else 0
 		var lines: Array = ["%d people have no shelter at all." % unsheltered if unsheltered > 0 else "Families are still living in temporary shelters."]
 		var buttons: Array = []
-		if want_plot > 0:
+		if want_plot > 0 and families_lead:
+			lines.append(get_home_site_obstacle(city))
+			buttons.append(LAND_BUTTON)
+		elif want_plot > 0:
 			lines.append("Suggested: designate residential land. %d famil%s waiting for a home plot." % [want_plot, "y is" if want_plot == 1 else "ies are"])
 			buttons.append({"text": "Designate home plots (P)", "action": {"action": "select_tool", "tool": TownConstruction.PLOT}})
 		elif homes_building > 0:
 			lines.append("%d home%s being built." % [homes_building, " is" if homes_building == 1 else "s are"])
+		elif families_lead and HomeSites.count_room(city) > 0:
+			lines.append("Families choose their own sites on the land set aside for homes, and build when they can.")
+		elif families_lead:
+			lines.append("Suggested: set aside residential land; families choose their own sites on it.")
+			buttons.append(LAND_BUTTON)
 		else:
 			lines.append("Suggested: set aside home plots, or plan houses.")
 			buttons.append({"text": "Designate home plots (P)", "action": {"action": "select_tool", "tool": TownConstruction.PLOT}})
 		cards.append(make_card(85 if unsheltered > 0 else 60, SP.TONE_ALERT if unsheltered > 0 else SP.TONE_CAUTION, "Permanent housing needed", lines, buttons))
+	elif want_plot > 0 and families_lead:
+		cards.append(make_card(55, SP.TONE_CAUTION, "Families cannot find a home site", [get_home_site_obstacle(city)], [LAND_BUTTON]))
 	elif want_plot > 0:
 		cards.append(make_card(55, SP.TONE_CAUTION, "Families want home plots", ["%d famil%s ready to build a home but no plot is free." % [want_plot, "y is" if want_plot == 1 else "ies are"]], [{"text": "Designate home plots (P)", "action": {"action": "select_tool", "tool": TownConstruction.PLOT}}]))
 
 	var food: Dictionary = pressure["food"]
 	if food["severity"] == "warning" and resources["food_shortage"] != true:
 		var buttons: Array = []
-		if families_lead and not city.influence.is_encouraged(TownInfluence.ACTIVITY_FOOD):
-			buttons.append({"text": "Ask families for food", "action": {"action": "toggle_encourage", "activity": TownInfluence.ACTIVITY_FOOD}})
+		if families_lead and city.influence.priority != CommunityPriority.FOOD:
+			buttons.append({"text": "Put food first", "action": {"action": "set_priority", "priority": CommunityPriority.FOOD}})
 		buttons.append({"text": "Plan a farm (2)", "action": {"action": "select_tool", "tool": Building.BUILDING_FARM}})
 		cards.append(make_card(70, SP.TONE_CAUTION, "Food stores are falling", ["%d days of food left at today's rate." % int(floor(float(food["values"]["days_stored"])))], buttons))
 
 	var tools: Dictionary = pressure["tools"]
 	if tools["severity"] == "danger" or tools["severity"] == "warning":
 		var buttons: Array = []
-		if families_lead and not city.influence.is_encouraged(TownInfluence.ACTIVITY_TOOLS):
-			buttons.append({"text": "Ask families for tools", "action": {"action": "toggle_encourage", "activity": TownInfluence.ACTIVITY_TOOLS}})
+		if families_lead and city.influence.priority != CommunityPriority.INVESTMENT:
+			buttons.append({"text": "Put investment first", "action": {"action": "set_priority", "priority": CommunityPriority.INVESTMENT}})
 		buttons.append({"text": "Plan a tool mender", "action": {"action": "select_tool", "tool": "tool_mender"}})
 		var danger: bool = tools["severity"] == "danger"
 		cards.append(make_card(75 if danger else 50, SP.TONE_ALERT if danger else SP.TONE_CAUTION, "Tools are running out" if danger else "Tools are low", ["%d tools stored; workplaces use them for upkeep." % int(resources["tools"])], buttons))
@@ -249,6 +259,21 @@ static func get_attention(city: City, context: Dictionary = {}) -> Array[Diction
 
 	cards.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["priority"]) > int(b["priority"]))
 	return cards
+
+const LAND_BUTTON: Dictionary = {"text": "Set aside residential land (N)", "action": {"action": "select_tool", "tool": HomeSites.TOOL_LAND}}
+
+# Why families wanting a home last month could not build one, in the words of the latest of them
+# (HomeSites: no land set aside, all of it taken, or none reachable from their work).
+static func get_home_site_obstacle(city: City) -> String:
+	var latest: Household = null
+	for household: Household in city.households:
+		if household.home_site_note.contains("cannot build a home") and (latest == null or household.home_site_day > latest.home_site_day):
+			latest = household
+	var waiting: int = city.construction.families_without_plot
+	var count: String = "%d famil%s found nowhere to build last month" % [waiting, "y" if waiting == 1 else "ies"]
+	if latest == null:
+		return count + "."
+	return "%s: %s." % [count, latest.home_site_note.get_slice(": ", 1)]
 
 static func get_trader_card(city: City) -> Dictionary:
 	var stay: int = city.trade.trader_until_day - city.construction.day + 1

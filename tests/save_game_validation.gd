@@ -22,6 +22,7 @@ func run_all() -> void:
 	root.size = Vector2i(1600, 900)
 	clear_directory(TEST_DIRECTORY)
 	await test_town_round_trip_plays_on_identically()
+	await test_older_saves_get_starting_land()
 	await test_exploring_a_generated_world_round_trips()
 	await test_atlas_save_round_trips()
 	await test_unrebuildable_world_is_refused()
@@ -164,6 +165,36 @@ func test_app_menus() -> void:
 	await settle()
 
 # --- Helpers -------------------------------------------------------------------------------------
+
+# A town saved before residential land existed (no land, no record of starting land) gets its
+# starting land when loaded, around what already stands; a town whose player cleared the land keeps
+# it cleared.
+func test_older_saves_get_starting_land() -> void:
+	var original: Node2D = await make_main({"use_authored_world": true})
+	await found_town(original, original.world_map_data.find_region_by_name("Meander Plains"))
+	var town_index: int = original.get_player_city_index()
+	var town: City = original.cities[town_index]
+	_check(town.construction.starting_land_given and HomeSites.count_land(town) > 0, "a town founded with families leading starts with residential land")
+	for _day in range(DAYS_BEFORE_SAVE):
+		original.run_simulation_day()
+	var size: Vector2i = town.logistics.map_size()
+	HomeSites.mark(town, Vector2i.ZERO, size - Vector2i.ONE, HomeSites.LAND_NONE)
+	var state: Dictionary = GameState.capture(original)
+	(state["cities"][town_index]["construction"] as Dictionary).erase("starting_land_given")
+	var buildings: Array = state["cities"][town_index]["buildings"].duplicate(true)
+	var projects: Array = state["cities"][town_index]["projects"].duplicate(true)
+	var loaded: Node2D = await make_main({"use_authored_world": true, "world_seed": int(state["world_seed"]), "pending_save_state": state.duplicate(true)})
+	var old_town: City = loaded.cities[town_index]
+	var loaded_data: Dictionary = GameState.capture_city(old_town)
+	_check(old_town.construction.starting_land_given and HomeSites.count_room(old_town) > 0, "an older save gets starting land when loaded (%d spots)" % HomeSites.count_room(old_town))
+	_check(loaded_data["buildings"] == buildings and loaded_data["projects"] == projects, "and nothing that stood or was underway is moved or cleared")
+	await free_main(loaded)
+	town.construction.starting_land_given = true
+	state = GameState.capture(original)
+	loaded = await make_main({"use_authored_world": true, "world_seed": int(state["world_seed"]), "pending_save_state": state})
+	_check(HomeSites.count_land(loaded.cities[town_index]) == 0, "a town whose land the player cleared loads without land")
+	await free_main(original)
+	await free_main(loaded)
 
 func make_main(settings: Dictionary) -> Node2D:
 	var main: Node2D = MainScript.new()

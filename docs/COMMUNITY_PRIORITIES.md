@@ -19,6 +19,12 @@ The owner's brief (2026-10-30): founding families each judge what the community 
 3. Trust's gameplay effects stay as they are for now; households' experiences and trust changes keep being recorded.
 4. Test every priority under both stores rules, to tell persuasion from restriction. Keep comparing passive, informed, uninformed and destructive play, and measure whether informed guidance beats doing nothing. Bad decisions must still be able to ruin a town. No rebalancing of production or survival.
 
+### After the combined evaluation (owner, 2026-10-31)
+
+1. Residential land is reserved for homes (`docs/HOME_SITES.md`).
+2. Families reconsidering their work when circumstances materially change is approved as a direction, as its own simulation milestone after the interface: weighed by the economy, values, calling, opportunity and the cost of changing; no weekly switching, no immediate compliance with the player.
+3. Step 3 integrates the priority and residential land into the playable interface (below).
+
 ## Step 2: The Priority (`CommunityPriority`)
 
 `TownInfluence.priority` holds one of food, housing, investment, cooperation, or none; `set_priority` sets the asks it makes (`encouraged`) and records every family's view. `store_rule` is untouched by it. Every effect is an added, explained term in a decision families already make, with an existing weight:
@@ -111,7 +117,13 @@ The tool-aware strategy (written before its results; tools first while no one ma
 - **Not yet demonstrated:** that judgment beats sensible defaults on ordinary land, or that planning and leadership compound.
 - **Why skill shows so little on ordinary land:** families already weigh the town's food, wood and tools in their own decisions, so a sensible priority mostly repeats their reasoning; work is chosen once, in the first month, and never reconsidered (owner decision 1, still deferred), so the priority reaches only improvements, newcomers and spare time; materials stop being scarce after the first year (5,000–9,000 wood), so there is little to allocate; trust, the cost of poor leadership, only scales receptiveness.
 - **On difficult land almost anything helps** because passive towns there fail on tools and departures, and any priority that asks for tools, better work or help moves families who would otherwise not act; matched uninformed play does as well as informed, so this is the value of acting, not of judgment.
-- **Unintended interactions:** residential land is not reserved, so compact planning backfires; asking for food at the founding draws families away from tools (now warned of); the town's backing amplified private work choices (now removed).
+- **Unintended interactions:** residential land was not reserved, so compact planning backfired (fixed after this evaluation: compact land now 39.0 people, `docs/HOME_SITES.md`); asking for food at the founding draws families away from tools (now warned of); the town's backing amplified private work choices (now removed).
+
+## Step 3: In the Game (branch `feature/step3-integration`)
+
+The Community page's four work asks are replaced by one priority (`docs/TOWN_UI.md`, Community): the five choices with what each asks; the warnings for it under the current stores rule ("Before you lean on it": warnings only, nothing is stopped); how the town takes it (backing worked out afresh, who supports, does not mind or opposes, decisions tipped so far); each family's stance with its reasons; and how the town would take each of the other priorities, so the player can weigh them before changing (each change counts toward the trust cost of a gathering that keeps changing its mind; the page says how many changes there have been). The stores rule stays its own control; norms, rewards and honours are unchanged. The Overview's food and tool cards offer "Put food first" and "Put investment first" in place of the old asks.
+
+A town saved under the four work asks keeps them (`TownInfluence.encouraged`) and the page names them until a priority, or none, is chosen: `set_priority` replaces asks of other kinds even when the priority itself does not change.
 
 ## Step 1: Existing Levers (`tests/sim/priority_check.gd` at commit 8fd8b39)
 

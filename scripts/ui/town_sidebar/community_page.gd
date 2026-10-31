@@ -1,14 +1,24 @@
 class_name SidebarCommunityPage
 extends RefCounted
 
-# How the player leads families who decide for themselves (docs/TOWN_UI.md): what the community
-# asks of them, the rule for the common stores, the customs it appeals to, and the rewards and
+# How the player leads families who decide for themselves (docs/TOWN_UI.md): the one priority the
+# community puts first (CommunityPriority) and how families take it, the rule for the common stores, the customs it appeals to, and the rewards and
 # honours it gives. Each control says what it asks and what the town has recorded since; none
 # promises what families will do, because they decide (TownInfluence, TownSocial).
 
 const SP = preload("res://scripts/ui/town_sidebar/sidebar_painter.gd")
 
-const WORK_ASKS: Array[String] = [TownInfluence.ACTIVITY_FOOD, TownInfluence.ACTIVITY_WOOD, TownInfluence.ACTIVITY_TOOLS]
+# What each priority asks, in the player's terms (CommunityPriority holds what it does).
+const PRIORITY_ASKS: Dictionary = {
+	CommunityPriority.NONE: "Families weigh only their own reasons.",
+	CommunityPriority.FOOD: "Families choosing or improving their work lean toward food.",
+	CommunityPriority.HOUSING: "Families give spare time and long days to home sites, and homes come first for builders and materials.",
+	CommunityPriority.INVESTMENT: "Families on hand work lean toward improving it into proper workplaces, and toward making tools.",
+	CommunityPriority.COOPERATION: "Families give spare time to neighbours' and the town's sites.",
+}
+# Button labels short enough for the narrowest sidebar; the card's tag gives the full name.
+const SHORT_NAMES: Dictionary = {CommunityPriority.NONE: "None", CommunityPriority.FOOD: "Food", CommunityPriority.HOUSING: "Housing", CommunityPriority.INVESTMENT: "Investment", CommunityPriority.COOPERATION: "Cooperation"}
+const SWAYED_NAMES: Dictionary = {"improve": "improvements", "help": "days of help", "long_days": "long days"}
 const HONOUR_LABELS: Array[String] = ["Service", "Holding", "Craft", "Civic"]
 
 static func build(context: Dictionary) -> Array:
@@ -30,28 +40,66 @@ static func build(context: Dictionary) -> Array:
 
 static func get_priorities(city: City) -> Array:
 	var influence: TownInfluence = city.influence
-	var blocks: Array = [{"kind": "heading", "text": "Community priorities"}]
-	var work_buttons: Array = []
-	for activity: String in WORK_ASKS:
-		work_buttons.append({"text": TownInfluence.get_activity_name(activity).capitalize(), "toggle": true, "active": influence.is_encouraged(activity), "action": {"action": "toggle_encourage", "activity": activity}})
-	var work_lines: Array = ["Families choosing their work count the community's asks among their reasons."]
-	if influence.store_rule == TownInfluence.RULE_PRIORITIES:
-		work_lines.append("Under 'priorities first', only projects for what is asked may draw on the stores.")
-	blocks.append({"kind": "card", "title": "Ask for work in", "lines": work_lines, "buttons": work_buttons, "columns": 3})
+	var current: String = influence.priority
+	var blocks: Array = [{"kind": "heading", "text": "Community priority"}]
+	var buttons: Array = []
+	for priority: String in [CommunityPriority.NONE] + CommunityPriority.ALL:
+		buttons.append({"text": SHORT_NAMES[priority], "toggle": true, "active": priority == current, "action": {"action": "set_priority", "priority": priority}})
+	var muted: Array = []
+	var changes: int = city.social.get_recent_policy_changes() if city.social.enabled else 0
+	if city.social.enabled:
+		muted.append("Changed %d time%s in the last %d days; families lose trust in a gathering that changes its mind %d times." % [changes, "" if changes == 1 else "s", TownSocial.POLICY_WINDOW_DAYS, TownSocial.MANY_CHANGES])
+	blocks.append({"kind": "card", "title": "What the community puts first", "tag": CommunityPriority.get_display_name(current).to_lower(), "lines": [PRIORITY_ASKS[current]], "muted": muted, "buttons": buttons, "columns": 2, "tone": SP.TONE_CAUTION if changes >= TownSocial.MANY_CHANGES - 1 else ""})
+	var earlier: Array[String] = influence.get_earlier_asks()
+	if not earlier.is_empty():
+		var names: Array[String] = []
+		for activity: String in earlier:
+			names.append(TownInfluence.get_activity_name(activity))
+		blocks.append({"kind": "text", "text": "Asks from before the community priority still stand (%s). Choosing a priority, or none, replaces them." % ", ".join(names), "tone": SP.TONE_CAUTION})
 
-	var asking: bool = influence.is_encouraged(TownInfluence.ACTIVITY_IMPROVE)
-	var outlooks: Array = []
-	for household: Household in city.households:
-		var outlook: Dictionary = FamilyInitiative.predict_improvement(city, household, true)
-		if str(outlook["outlook"]) == "":
+	var warnings: Array[String] = CommunityPriority.get_warnings(city, current, influence.store_rule)
+	if not warnings.is_empty():
+		blocks.append({"kind": "card", "title": "Before you lean on it", "tone": SP.TONE_CAUTION, "lines": warnings, "muted": ["Warnings only: families still decide, and nothing stops a choice."]})
+
+	if current != CommunityPriority.NONE:
+		blocks.append(get_backing_card(city, current))
+		var views: Array = []
+		for view: Dictionary in CommunityPriority.get_views(city, current):
+			var reasons: Array = view["reasons"]
+			var line: Dictionary = {"kind": "text", "text": "%s %s%s" % [city.get_household_label((view["household"] as Household).id), view["stance"], ": " + "; ".join(reasons.slice(0, 3)) if not reasons.is_empty() else ""], "muted": view["stance"] == CommunityPriority.INDIFFERENT}
+			if view["stance"] == CommunityPriority.OPPOSES:
+				line["tone"] = SP.TONE_CAUTION
+			views.append(line)
+		blocks.append({"kind": "expander", "id": "community_views", "title": "How each family sees it (%d)" % views.size(), "blocks": views})
+
+	var others: Array = []
+	for priority: String in CommunityPriority.ALL:
+		if priority == current:
 			continue
-		var reasons: Array = outlook["reasons"]
-		outlooks.append({"kind": "text", "text": "%s: %s%s" % [city.get_household_label(household.id), outlook["outlook"], " (" + "; ".join(reasons.slice(0, 2)) + ")" if not reasons.is_empty() else ""], "muted": true})
-	var improve: Dictionary = {"kind": "card", "title": "Ask for better work", "lines": ["Families on hand work weigh improving it into a proper workplace."], "muted": ["So far families have opened %d workplaces and improved %d." % [influence.workplaces_opened, influence.improvements_started]], "buttons": [{"text": "Asking for better work" if asking else "Ask for better work", "toggle": true, "active": asking, "action": {"action": "toggle_encourage", "activity": TownInfluence.ACTIVITY_IMPROVE}}]}
-	blocks.append(improve)
-	if not outlooks.is_empty():
-		blocks.append({"kind": "expander", "id": "community_outlooks", "title": "Who might answer (%d on hand work)" % outlooks.size(), "blocks": outlooks})
+		var other_warnings: Array[String] = CommunityPriority.get_warnings(city, priority, influence.store_rule)
+		others.append({"kind": "text", "text": "%s: backed %d%%%s" % [CommunityPriority.get_display_name(priority), roundi(CommunityPriority.get_backing(city, priority) * 100.0), "; " + other_warnings[0] if not other_warnings.is_empty() else ""], "muted": true})
+	blocks.append({"kind": "expander", "id": "community_other_priorities", "title": "How the town would take the others", "blocks": others})
 	return blocks
+
+# The town's backing for its priority, families' stances, and what the priority has tipped.
+static func get_backing_card(city: City, priority: String) -> Dictionary:
+	var counts: Dictionary = {CommunityPriority.SUPPORTS: 0, CommunityPriority.INDIFFERENT: 0, CommunityPriority.OPPOSES: 0}
+	for view: Dictionary in CommunityPriority.get_views(city, priority):
+		counts[view["stance"]] = int(counts[view["stance"]]) + 1
+	# Worked out afresh: the weekly figure families act on (get_town_backing) is cached on the town,
+	# and a page must not set it.
+	var backing: float = CommunityPriority.get_backing(city, priority)
+	var lines: Array = ["%d support it, %d do not much mind, %d oppose it." % [counts[CommunityPriority.SUPPORTS], counts[CommunityPriority.INDIFFERENT], counts[CommunityPriority.OPPOSES]]]
+	lines.append("What the town backs pulls on time families give freely, never on their choice of work.")
+	var tipped: Array[String] = []
+	for decision: String in SWAYED_NAMES.keys():
+		var count: int = int(city.influence.swayed.get("%s:%s" % [priority, decision], 0))
+		if count > 0:
+			tipped.append("%d %s" % [count, SWAYED_NAMES[decision]])
+	var muted: Array = ["Respected voices count double."]
+	muted.append("Decisions it has tipped so far: " + (", ".join(tipped) if not tipped.is_empty() else "none yet"))
+	var tone: String = SP.TONE_GOOD if backing >= 0.6 else SP.TONE_CAUTION if backing < 0.4 else SP.TONE_INFO
+	return {"kind": "card", "title": "How the town takes it", "tag": "backed %d%%" % roundi(backing * 100.0), "tone": tone, "lines": lines, "muted": muted}
 
 static func get_stores(city: City) -> Array:
 	var influence: TownInfluence = city.influence
@@ -60,7 +108,7 @@ static func get_stores(city: City) -> Array:
 	var reserve_parts: Array[String] = []
 	for material: String in reserve.keys():
 		reserve_parts.append("%d %s" % [int(reserve[material]), material])
-	var lines: Array = ["Only projects for what the community asks for may draw on the stores; the rest wait." if priorities else "Families' own projects may draw on the stores above what is kept back."]
+	var lines: Array = ["Only families' projects that serve the community's priority may draw on the stores; the rest wait." if priorities else "Families' own projects may draw on the stores above what is kept back, whatever the priority."]
 	var muted: Array = ["Always kept back from families' projects: " + ", ".join(reserve_parts) + ".", "Times a family's improvement was held back by the stores: %d" % influence.held_back_by_stores]
 	return [
 		{"kind": "heading", "text": "Shared resources"},
