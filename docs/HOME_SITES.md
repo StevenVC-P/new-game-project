@@ -52,7 +52,19 @@ No new bonus or penalty was added. A home's site already matters through:
 
 Hazards do not reach homes yet: high water affects fields and wolves affect camps. Cautious families' aversion is a preference only; if homes should flood, that is a new mechanic for the owner to decide.
 
-First look (one town, one year, a smoke run of `home_site_check`): the share of the working day lost to travel was 3.1% compact, 4.0% with the stand-in's plots, 6.4% dispersed, 12.2% with land in the far corner. The full comparison waits until the Community Priorities runs are done.
+**Comparison** (`home_site_check`, 12 real town maps, 3 years, same seeds, families leading; 2026-10-31):
+
+| Land set aside | Towns off the ground | People | Founders housed (median day) | Homes families built | Travel, share of the day | Site-days waiting for a builder |
+|---|---|---|---|---|---|---|
+| Plots (stand-in, two ahead) | 11/12 | 36.0 | 160 (10/12) | 31.8 | 4.5% | 431 |
+| Compact (81 tiles around the stockpile) | 11/12 | **41.5** | **95** (11/12) | **36.9** | 4.6% | **389** |
+| Dispersed (four 4x4 blocks, 12 tiles out) | 10/12 | 39.8 | 94 (9/12) | 33.5 | 7.2% | 432 |
+| Preferred (dispersed, nearest block preferred) | 10/12 | 39.3 | 94 (9/12) | 32.9 | 6.9% | 440 |
+| Poor (6x6 in the far corner) | **8/12** | **29.1** | 108 (8/12) | 27.8 | **10.6%** | 424 |
+
+- Land planning matters through existing mechanics alone: poorly placed land more than doubles the day lost to travel and loses three more towns than compact land; compact land houses founders two months sooner than plots set two at a time.
+- Compact beats dispersed on these maps because the stand-in towns' work clusters near the stockpile (families open work near their homes and the heart); dispersed land costs travel without a matching gain here. No map in this set rewards spreading out (for example, scattered fields or woods far apart); that is what a dispersed town would need to pay off.
+- Preferring the nearest dispersed block changed little (39.3 against 39.8): founders choose before many homes stand, and the nearest block is already near their work.
 
 ## Integration
 
