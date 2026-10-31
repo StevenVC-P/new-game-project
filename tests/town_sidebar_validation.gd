@@ -172,6 +172,20 @@ func test_clicks(main: Node2D, city: City) -> void:
 	var projects: int = city.construction.projects.size()
 	_check(await _click_action(main, func(a: Dictionary) -> bool: return a.get("action") == "select_tool" and a.get("tool") == "storehouse"), "the planning page lists the storehouse")
 	_check(main.is_placing_building and main.selected_building_type == "storehouse", "clicking the storehouse picks it up")
+	# Families lead: shared works show; a family's own buildings are an optional, folded commission.
+	var hits: Callable = func(tool: String) -> bool:
+		sidebar.rebuild()
+		return sidebar.prims.any(func(p: Dictionary) -> bool: return str(p["p"]) == "hit" and p["action"].get("tool") == tool)
+	_check(hits.call(Building.BUILDING_WATCH_POST) and hits.call(TownConstruction.ROAD), "shared works are listed directly")
+	_check(not hits.call(Building.BUILDING_FARM) and not hits.call("forager_garden"), "a family's own buildings are folded away")
+	_check(await _click_action(main, func(a: Dictionary) -> bool: return a.get("action") == "toggle_expand" and a.get("id") == "planning_commission"), "the optional commission can be opened")
+	_check(hits.call(Building.BUILDING_FARM) and hits.call("forager_garden"), "and holds every other building")
+	_check(await _click_action(main, func(a: Dictionary) -> bool: return a.get("action") == "select_tool" and a.get("tool") == Building.BUILDING_FARM), "a farm can still be commissioned")
+	_check(main.selected_building_type == Building.BUILDING_FARM, "and the tool works as before")
+	sidebar.expanded["planning_commission"] = false
+	city.influence.enabled = false
+	_check(hits.call(Building.BUILDING_FARM), "under the classic rules the whole catalog shows")
+	city.influence.enabled = true
 	_check(city.buildings.size() == buildings and city.construction.projects.size() == projects, "clicks on the sidebar never plan anything on the map")
 	main.is_placing_building = false
 
@@ -251,7 +265,7 @@ func test_shortcuts(main: Node2D) -> void:
 	main.is_placing_building = false
 
 # Residential land in play: the Planning card's tools, marking and clearing a block on the map, the
-# ground under the cursor, and the Overview's card when families find nowhere to build.
+# and the ground under the cursor.
 func test_residential_land(main: Node2D, city: City) -> void:
 	main.show_sidebar_tab(TownSidebar.TAB_PLANNING)
 	await _settle()
@@ -290,16 +304,7 @@ func test_residential_land(main: Node2D, city: City) -> void:
 	main.place_block_corner(city)
 	_check(HomeSites.count_land(city, HomeSites.LAND_PREFERRED) == 0 and HomeSites.count_room(city) == room, "the clear tool takes it back")
 	main.is_placing_building = false
-	var family: Household = city.households[0]
-	var note: String = family.home_site_note
-	var waiting: int = city.construction.families_without_plot
-	family.home_site_note = "%s cannot build a home: every spot set aside for homes is taken or cannot hold one" % city.get_household_label(family.id)
-	family.home_site_day = city.construction.day + 1
-	city.construction.families_without_plot = 1
-	var cards: Array = SidebarOverviewPage.get_attention(city).filter(func(card: Dictionary) -> bool: return (card["buttons"] as Array).any(func(b: Dictionary) -> bool: return b["action"].get("tool") == HomeSites.TOOL_LAND))
-	_check(cards.size() == 1 and (cards[0]["lines"] as Array).any(func(line: String) -> bool: return line.contains("every spot set aside for homes is taken")), "the overview says families cannot find a home site, and why")
-	family.home_site_note = note
-	city.construction.families_without_plot = waiting
+	# The Overview's card for families who find nowhere to build: tests/home_site_validation.gd.
 
 # Scrolls the hit for the first action `matches` accepts into view and clicks it.
 func _click_action(main: Node2D, matches: Callable) -> bool:

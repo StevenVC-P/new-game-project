@@ -11,11 +11,15 @@ extends RefCounted
 # - poor:          in the map's corner farthest from the stockpile;
 # - far_only:      one block DISTANT tiles from the stockpile, on its roomiest side;
 # - preferred_far: compact land, and as much again in the far block, marked preferred.
+# - twin:          two blocks of CAPACITY / 2 spots the same distance from the stockpile on opposite
+#                  sides (get_twin_centres), both plain: how families split between two similar places;
+# - twin_preferred: the same, the first block marked preferred: what the preference adds to that split.
 
 const CAPACITY: int = 24
 const DISPERSED_OFFSET: int = 12
 const DISTANT: int = 12
 const DIRECTIONS: Array[Vector2i] = [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]
+const TWIN_OFFSET: int = 8
 
 static func get_heart(city: City) -> Vector2i:
 	return TownLogistics.center_tile(city.logistics.stockpile_tile, TownLogistics.STOCKPILE_SIZE)
@@ -50,6 +54,21 @@ static func set_aside(city: City, layout: String) -> void:
 			var far: Vector2i = get_far_centre(city, heart)
 			mark_block(city, far, 6, HomeSites.LAND_PREFERRED)
 			trim(city, HomeSites.LAND_PREFERRED, [far], CAPACITY)
+		"twin", "twin_preferred":
+			var centres: Array[Vector2i] = get_twin_centres(city, heart)
+			# Each block trimmed on its own, so each holds exactly half; the second goes through the
+			# preferred level only to keep the two apart while trimming.
+			var first_level: int = HomeSites.LAND_PREFERRED if layout == "twin_preferred" else HomeSites.LAND_PERMITTED
+			mark_block(city, centres[0], 5, first_level)
+			trim(city, first_level, [centres[0]], CAPACITY / 2)
+			var second_level: int = HomeSites.LAND_PERMITTED if layout == "twin_preferred" else HomeSites.LAND_PREFERRED
+			mark_block(city, centres[1], 5, second_level)
+			trim(city, second_level, [centres[1]], CAPACITY / 2)
+			if layout == "twin":
+				for y in range(size.y):
+					for x in range(size.x):
+						if HomeSites.get_land(city, Vector2i(x, y)) == HomeSites.LAND_PREFERRED:
+							(city.local_map[y][x] as Dictionary)[HomeSites.RESIDENTIAL_KEY] = HomeSites.LAND_PERMITTED
 		_:
 			push_error("unknown residential layout: " + layout)
 
@@ -78,6 +97,28 @@ static func trim(city: City, level: int, centres: Array, count: int) -> void:
 	for spot: Dictionary in spots.slice(count):
 		var tile: Vector2i = spot["tile"]
 		(city.local_map[tile.y][tile.x] as Dictionary).erase(HomeSites.RESIDENTIAL_KEY)
+
+# Two centres TWIN_OFFSET tiles from the stockpile on opposite sides (west and east, or north and
+# south: whichever pair's smaller side has more open ground); the first is the one twin_preferred
+# prefers.
+static func get_twin_centres(city: City, heart: Vector2i) -> Array[Vector2i]:
+	var best: Array[Vector2i] = []
+	var best_room: int = -1
+	for pair: Array in [[Vector2i(-1, 0), Vector2i(1, 0)], [Vector2i(0, -1), Vector2i(0, 1)]]:
+		var centres: Array[Vector2i] = [heart + (pair[0] as Vector2i) * TWIN_OFFSET, heart + (pair[1] as Vector2i) * TWIN_OFFSET]
+		var room: int = mini(count_open(city, centres[0], 5), count_open(city, centres[1], 5))
+		if room > best_room:
+			best_room = room
+			best = centres
+	return best
+
+static func count_open(city: City, centre: Vector2i, radius: int) -> int:
+	var room: int = 0
+	for y in range(centre.y - radius, centre.y + radius + 1):
+		for x in range(centre.x - radius, centre.x + radius + 1):
+			if city.construction.is_inside(Vector2i(x, y)) and city.construction.validate(Building.BUILDING_HOUSE, Vector2i(x, y))["is_valid"] == true:
+				room += 1
+	return room
 
 # DISTANT tiles from the stockpile on the side with most open ground for homes.
 static func get_far_centre(city: City, heart: Vector2i) -> Vector2i:

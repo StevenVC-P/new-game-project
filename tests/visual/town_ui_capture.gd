@@ -104,6 +104,12 @@ func run() -> void:
 	main.get_viewport().warp_mouse(main.get_town_map_screen_rect().get_center())
 	await shot("planning_residential")
 	main.is_placing_building = false
+	# The optional commission, opened: every other building, folded away while families lead.
+	main.town_sidebar.expanded["planning_commission"] = true
+	main.town_sidebar.scroll_to(100000.0)
+	await shot("planning_commission_open")
+	main.town_sidebar.expanded["planning_commission"] = false
+	main.town_sidebar.scroll_to(0.0)
 
 	# A family selected on the map: its details open in the Families tab.
 	for index in range(town.buildings.size()):

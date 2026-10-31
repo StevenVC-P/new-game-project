@@ -8,7 +8,7 @@ Code: `scripts/domain/home_sites.gd` (`HomeSites`), called from `FamilyDevelopme
 
 - **Plots** (existing, P): exact sites, as before.
 - **Residential land** (new): broad areas marked on the town map (`HomeSites.mark(city, from, to, level)`, stored on each tile as `residential`, so saves carry it). Two levels: **permitted** and **preferred**. Marking a block again at the same level clears it.
-- **Reserved for homes** (owner, 2026-10-31): no new workplace, field or other building may be planned on residential land, plain or preferred, by a family or the player (`TownConstruction.validate`, "That land is set aside for homes"). Homes, huts, plots and roads may. Land set aside over something already standing leaves it standing and worked. Preference and permission stay separate: preferred land is reserved exactly as plain land is.
+- **What residential land takes** (owner, 2026-10-31, made explicit after Step 3 review): homes and huts, plots, roads, and communal infrastructure (`HomeSites.COMPATIBLE`: the storehouse); never a private workplace or field, whoever asks (`HomeSites.is_compatible`, checked in `TownConstruction.validate`: "That land is set aside for homes and shared works"). A storehouse among the homes takes the room homes would have had, as it would anywhere: putting one there is a planning trade-off. Land set aside over something already standing leaves it standing and worked. Preference and permission stay separate: preferred land takes exactly what plain land takes.
 - **Nothing set aside, nothing built.** A family never builds outside plots and residential land; with none, or none left that can hold a home, it builds nothing and records why ("Household 3 cannot build a home: no land is set aside for homes"). The town's counter of families waiting for land (`families_without_plot`) still counts it.
 
 - **Starting land** (`set_aside_starting_land`): a modest block a few tiles off the stockpile, on its roomiest side, the smallest of 5x5, 7x7 or 9x9 holding every founding family and two more. A passive player has it; it is not an optimized layout (owner, 2026-10-31). `ensure_starting_land` gives it once to a town where families lead: at founding, when a town's families are first given the lead, and when a town saved before residential land existed is loaded (`TownConstruction.starting_land_given` records it, so land the player later clears stays cleared).
@@ -72,13 +72,26 @@ A difference of about 3 people a town is within the spread between towns.
 - **Reserving the land fixed the interaction it was meant to.** Before the rule, families opened workplaces on residential land; compact land around the stockpile, the ground families want for work too, lost 14 of its 24 tiles and left 2.2 families a town unable to build (28.7 people). Now no residential tile is taken by work, nobody is blocked, and compact land does as well as the starting land (39.0).
 - **Geography decides only at the extremes.** With equal capacity from the first day, founders are housed at the same time everywhere (day 94-101). Among sensible places (starting, compact, dispersed, far: 38.8-41.0 people) there is no difference beyond the spread; land in the far corner still costs (11.3% of the day walking, 33.6 people, three towns lost). Planning can hurt a town; on this evidence it cannot make a sensible town better.
 - **Plots, set two at a time, house founders two months later** (day 160) than any land set aside at once: the first comparison's compact advantage was mostly that.
-- **Preferred land does not measurably persuade.** With compact land permitted and a far block preferred, 1 of 16 deferential families, 23 of 90 others and 4 of 20 self-governing ones ended on the preferred land (before the rule: 7 of 17, 37 of 91, 13 of 26). Families who heed the gathering are not drawn more. With the near land no longer eaten by work, fewer families overflow to the far block, so fewer end there whatever its label. The preferred term (2.0 × receptiveness) is worth two to five tiles of walk; the far block is twelve tiles farther from work. Whether preferred land should pull harder is an owner decision (Still Open).
+- **Preferred land against a much better site loses, as intended.** With compact land permitted and a far block preferred, 1 of 16 deferential families, 23 of 90 others and 4 of 20 self-governing ones ended on the preferred land (before the rule: 7 of 17, 37 of 91, 13 of 26). The far block is twelve tiles farther from work; the preference is worth about two (below), and must not override a family's strong interests (owner).
+
+### Why preferred land does little (investigation, 2026-10-31)
+
+- **It is in the actual score.** The preference is a term in both the distance ranking (`get_rough_score`) and the full terms families weigh (`get_terms`, "where the gathering hopes homes will go"), at `ENCOURAGE_WEIGHT` (2.0) × the family's receptiveness. Receptiveness is about 1.0 for a family with no leaning (0.4 for a strongly self-governing one, up to 3-3.5 for a deferential one who trusts the gathering), and every other term is in tiles of walk: the preference is worth about two tiles' walk to work.
+- **Between two equally good sites it decides** (`tests/home_site_validation.gd`, test 11: two sites the same walk from work, whichever is preferred is chosen, and the term carries its full weight). **Against a site much nearer work it does not** (a preferred site 13 tiles farther loses to one 3 tiles from work).
+- **At town scale, between two equal places** (`home_site_check --layouts=twin,twin_preferred`: two blocks of 12 spots 8 tiles from the stockpile on opposite sides, 12 towns, 3 years), preferring one side moves about a tenth of the town's homes to it, at no cost to the town:
+
+| | Homes on the first block | heeds the gathering | others | self-governing | People |
+|---|---|---|---|---|---|
+| Both plain | 74 of 132 (56%) | 8 of 17 | 48 of 90 | 18 of 25 | 40.5 |
+| First block preferred | 87 of 132 (66%) | 9 of 17 | 60 of 91 | 18 of 24 | 40.2 |
+
+- **So it is weak by design, not by a bug:** it settles ties and nudges between similar places, and gives way to a real advantage in walk, kin or room. Deferential families are not measurably more drawn at town scale (17 homes is too few to tell); their receptiveness does change the outcome in single decisions (test 2). No weight was changed.
 - **Families' values shape individual sites** (`tests/home_site_validation.gd`: kin, solitude, callings, caution, the heart), but at town scale the differences are swamped by room and distance to work.
 
 ## Integration (Step 3, branch `feature/step3-integration`)
 
 - **Planning tab:** a Residential land card with three tools: Set aside (N), Preferred, Clear. Each marks a block between two clicks, as the clearing and tilling tools do; the same block again at the same level unmarks it. The card counts tiles set aside, room left for homes, and families who found nowhere to build. Land shows on the town map as a light wash with a line along its edge (warmer for preferred land), and the ground under the cursor says "set aside for homes". Plots (P) stay as the optional exact tool.
-- **Families tab:** each card says "Cannot build: ..." while a family has no site; the selected family's details show "Home site (when): <its explanation>".
+- **Families tab:** each card says "Cannot build a home: ..." while the obstacle holds; the selected family's details show "Home site (when): <its explanation>". An obstacle is recorded apart (`Household.home_site_obstacle`) and is a present reason only while it holds (`FamilyDevelopment.is_home_site_blocked`: the family still has no home, or a grown child it builds for still waits and no home stands empty); after that it is history, shown nowhere as why the family acts (`is_note_current`, used by the Families page, the Overview's recent decisions and the map card).
 - **Overview, Needs attention:** "Families cannot find a home site" (or, with families unhoused, a line in "Permanent housing needed") with the latest family's obstacle and a button to the residential land tool.
 - **Founding, families given the lead, older saves:** starting land (above).
 
@@ -90,9 +103,10 @@ A difference of about 3 people a town is within the spread between towns.
 4. Homes face hazards only where they exist and have real consequences; none reach homes yet, and none are added here.
 5. Comparisons should give layouts equal housing capacity at the same time, and test preferred land against families' own preference (`home_site_check`: compact, dispersed, poor, far only, preferred far, each 24 spots from the first day).
 6. Residential land is reserved for homes: no new workplace on it; what stands stays; permission and preference stay separate; plots stay optional (after the combined evaluation).
+7. Communal infrastructure, the storehouse above all, may stand among homes and takes their room; private workplaces stay out; the list is explicit. Explanations must be current. Preferred land must not override strong interests (Step 3 review).
 
 ## Still Open
 
-- **Preferred land's strength** reuses the ask weight (2.0 × receptiveness), worth a few tiles of walk: it does not move families measurably (above).
+- **Preferred land's strength** reuses the ask weight (2.0 × receptiveness), about two tiles of walk: it moves about a tenth of homes between equal places and none from a much better one (above). Stronger would start to override families' interests.
 - **Does a family ever move?** A family chooses its site once, when it builds; it never relocates.
-- **Shared buildings in a neighbourhood.** Only homes, huts, plots and roads may go on residential land; a storehouse among homes needs that land cleared first.
+- **Which other shared works belong among homes.** Only the storehouse is listed; the watch post is communal too but is worked by a family, so it was left out. A well or a meeting place would be added to `HomeSites.COMPATIBLE` when it exists.

@@ -40,6 +40,16 @@ const TOOL_CLEAR: String = "clear_residential"
 const TOOL_LEVELS: Dictionary = {TOOL_LAND: LAND_PERMITTED, TOOL_PREFERRED: LAND_PREFERRED, TOOL_CLEAR: LAND_NONE}
 const TOOL_NAMES: Dictionary = {TOOL_LAND: "Residential land", TOOL_PREFERRED: "Preferred residential land", TOOL_CLEAR: "Clear residential land"}
 
+# What may be planned on residential land (owner, 2026-10-31): homes and huts, plots, roads, and
+# communal infrastructure (COMPATIBLE); never a private workplace. A shared work takes the room a
+# home would have had, as it would anywhere: setting it among homes is a planning trade-off.
+const COMPATIBLE: Array[String] = [Building.BUILDING_STOREHOUSE]
+
+static func is_compatible(building_type: String) -> bool:
+	if building_type == TownConstruction.PLOT or building_type == TownConstruction.ROAD:
+		return true
+	return BuildingTiers.get_base_type(building_type) == Building.BUILDING_HOUSE or COMPATIBLE.has(building_type)
+
 # Sites weighed in full after the distance ranking, and walked by route after that.
 const ROUGH_KEEP: int = 64
 const SHORTLIST: int = 8
@@ -144,8 +154,8 @@ static func ensure_starting_land(city: City) -> bool:
 
 # --- Choosing a site -----------------------------------------------------------------------------
 
-# A family's choice of site for a home of `home_type`: {"tile", "terms", "note"} with tile (-1, -1)
-# and the obstacle in "note" when it can build nowhere.
+# A family's choice of site for a home of `home_type`: {"tile", "terms", "note", "obstacle"} with
+# tile (-1, -1), and the obstacle in "obstacle" and "note", when it can build nowhere.
 static func choose(city: City, household: Household, home_type: String) -> Dictionary:
 	var logistics: TownLogistics = city.logistics
 	logistics.ensure_ready()
@@ -179,12 +189,12 @@ static func choose(city: City, household: Household, home_type: String) -> Dicti
 			reason = "no land is set aside for homes"
 		elif buildable == 0:
 			reason = "every spot set aside for homes is taken or cannot hold one"
-		return {"tile": Vector2i(-1, -1), "terms": [], "note": "%s cannot build a home: %s" % [label, reason]}
+		return {"tile": Vector2i(-1, -1), "terms": [], "note": "%s cannot build a home: %s" % [label, reason], "obstacle": reason}
 	var best: Dictionary = shortlist[0]
 	for entry: Dictionary in shortlist:
 		if FamilyInitiative.sum(entry["terms"]) > FamilyInitiative.sum(best["terms"]):
 			best = entry
-	return {"tile": best["tile"], "terms": best["terms"], "note": explain(label, best, shortlist)}
+	return {"tile": best["tile"], "terms": best["terms"], "note": explain(label, best, shortlist), "obstacle": ""}
 
 # The tiles a home might go on, in row order: open plots, and residential land not plainly taken
 # (water, woods, or something standing there); the full placement check comes later, only for the

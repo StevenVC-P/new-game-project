@@ -27,6 +27,9 @@ func run_all() -> void:
 	test_rough_ranking_matches_the_terms()
 	test_starting_land()
 	test_land_is_reserved_for_homes()
+	test_preference_settles_equal_sites()
+	test_shared_works_fit_among_homes()
+	test_stale_obstacle_is_not_a_present_reason()
 	test_saved_with_the_town()
 
 	if failure_count > 0:
@@ -262,6 +265,92 @@ func test_land_is_reserved_for_homes() -> void:
 	for household: Household in ringed.households:
 		var site: Vector2i = FamilyInitiative.choose_site(ringed, household, "gatherer_camp")
 		_check(site.x >= 0 and not ringed.construction.is_on_residential_land(TownLogistics.footprint(site, camp_size)), "family %d opens its work off the residential land (at %s)" % [household.id, site])
+
+# 13. What residential land takes is explicit: homes, plots, roads and a storehouse may stand on it;
+# a storehouse takes the room homes would have had there, as it would anywhere. Private
+# workplaces may not, whoever asks.
+func test_shared_works_fit_among_homes() -> void:
+	var city: City = make_city()
+	HomeSites.mark(city, Vector2i(30, 30), Vector2i(35, 33), HomeSites.LAND_PERMITTED)
+	for type: String in [Building.BUILDING_HOUSE, "hut", TownConstruction.PLOT, TownConstruction.ROAD, Building.BUILDING_STOREHOUSE]:
+		_check(HomeSites.is_compatible(type), "%s may stand on residential land" % type)
+	for type: String in ["farm", "gatherer_camp", "toolmaker", "woodcutter", "quarry", "brickworks", "forager_garden", "tool_mender"]:
+		_check(not HomeSites.is_compatible(type), "%s, a private workplace, may not" % type)
+	var room: int = HomeSites.count_room(city)
+	var store: ConstructionProject = city.construction.request_building(Building.BUILDING_STOREHOUSE, Vector2i(31, 31))
+	_check(store != null, "a storehouse can be planned among the homes")
+	var size: Vector2i = city.construction.get_size(Building.BUILDING_STOREHOUSE)
+	_check(HomeSites.count_room(city) == room - size.x * size.y, "and takes the room of %d homes (%d spots left of %d)" % [size.x * size.y, HomeSites.count_room(city), room])
+
+# 11. Preferred land is a term in the actual score: between two sites a family finds equally
+# attractive, it decides, whichever of the two is preferred; against a site much nearer work it
+# does not (worth 2.0 x receptiveness tiles of walk, about 2 for a family with no leaning).
+func test_preference_settles_equal_sites() -> void:
+	var city: City = make_city()
+	var family: Household = city.households[0]
+	give_work(city, family)
+	var context: Dictionary = HomeSites.get_context(city, family)
+	var score: Callable = func(tile: Vector2i) -> float: return FamilyInitiative.sum(HomeSites.get_terms(city, family, tile, context, true))
+	# Two open sites the same walk from work, one on each side.
+	var pair: Array[Vector2i] = []
+	for left_offset in range(3, 9):
+		for right_offset in range(2, 9):
+			var left: Vector2i = WORK + Vector2i(-left_offset, 3)
+			var right: Vector2i = WORK + Vector2i(right_offset, 3)
+			if pair.is_empty() and city.construction.validate(Building.BUILDING_HOUSE, left)["is_valid"] == true and city.construction.validate(Building.BUILDING_HOUSE, right)["is_valid"] == true and absf(float(score.call(left)) - float(score.call(right))) < 0.5:
+				pair = [left, right]
+	_check(pair.size() == 2, "the test town has two sites its work makes equally attractive")
+	if pair.size() < 2:
+		return
+	var weight: float = FamilyInitiative.ENCOURAGE_WEIGHT * float(context["receptive"])
+	_check(weight >= 1.5 and weight <= 2.5, "for a family with no leaning the preference is worth about two tiles of walk (%.2f)" % weight)
+	for hoped: Vector2i in pair:
+		var other: Vector2i = pair[1] if hoped == pair[0] else pair[0]
+		HomeSites.mark(city, Vector2i.ZERO, city.logistics.map_size() - Vector2i.ONE, HomeSites.LAND_NONE)
+		HomeSites.mark(city, other, other, HomeSites.LAND_PERMITTED)
+		HomeSites.mark(city, hoped, hoped, HomeSites.LAND_PREFERRED)
+		var choice: Dictionary = HomeSites.choose(city, family, Building.BUILDING_HOUSE)
+		_check(choice["tile"] == hoped, "between equal sites the preferred one is chosen, whichever it is (%s, not %s)" % [hoped, choice["tile"]])
+		_check(is_equal_approx(HomeSites.get_factor(HomeSites.get_terms(city, family, hoped, context, true), "preferred"), weight), "and the preference is in the site's terms at its full weight")
+	# Much farther from work: the family's own interest wins.
+	HomeSites.mark(city, Vector2i.ZERO, city.logistics.map_size() - Vector2i.ONE, HomeSites.LAND_NONE)
+	var near: Vector2i = WORK + Vector2i(3, 0)
+	var far: Vector2i = Vector2i(-1, -1)
+	for offset in range(12, 20):
+		if far.x < 0 and city.construction.validate(Building.BUILDING_HOUSE, WORK + Vector2i(offset, 0))["is_valid"] == true:
+			far = WORK + Vector2i(offset, 0)
+	HomeSites.mark(city, near, near, HomeSites.LAND_PERMITTED)
+	HomeSites.mark(city, far, far, HomeSites.LAND_PREFERRED)
+	var gap: float = float(score.call(near)) - (float(score.call(far)) - weight)
+	_check(gap > weight and HomeSites.choose(city, family, Building.BUILDING_HOUSE)["tile"] == near, "a preferred site %.1f walk farther does not draw it from one near its work" % gap)
+
+# 12. An obstacle to building a home is the family's present reason only while it holds: once the
+# family has a home, the card no longer gives it as why.
+func test_stale_obstacle_is_not_a_present_reason() -> void:
+	var city: City = make_city()
+	var family: Household = city.households[0]
+	give_work(city, family)
+	FamilyDevelopment.advance(city)
+	_check(family.home_site_obstacle == "no land is set aside for homes" and FamilyDevelopment.is_home_site_blocked(city, family), "with no land, the family is blocked and records why")
+	var card: Dictionary = SidebarFamiliesPage.get_card(city, family, false)
+	_check((card["lines"] as Array).any(func(line: String) -> bool: return line == "Cannot build a home: no land is set aside for homes"), "its card says so while it holds")
+	city.influence.enabled = true
+	var asking: Array = SidebarOverviewPage.get_attention(city).filter(func(c: Dictionary) -> bool: return (c["buttons"] as Array).any(func(button: Dictionary) -> bool: return button["action"].get("tool") == HomeSites.TOOL_LAND))
+	_check(asking.size() == 1 and (asking[0]["lines"] as Array).any(func(line: String) -> bool: return line.contains("found nowhere to build last month: no land is set aside for homes")), "the Overview asks for land and names why: %s" % [SidebarOverviewPage.get_attention(city).map(func(c: Dictionary) -> String: return str(c["title"]) + str(c["lines"]))])
+	house(city, family, Vector2i(40, 30))
+	_check(not FamilyDevelopment.is_home_site_blocked(city, family) and not FamilyDevelopment.is_note_current(city, family, family.initiative_note), "once housed, the obstacle is history")
+	card = SidebarFamiliesPage.get_card(city, family, false)
+	var shown: Array = (card["lines"] as Array) + (card["muted"] as Array)
+	_check(not shown.any(func(line: String) -> bool: return line.contains("cannot build") or line.contains("Cannot build")), "and the card no longer gives it as the family's reason: %s" % [shown])
+	var focused: Array = SidebarFamiliesPage.get_card(city, family, true)["muted"]
+	_check(not focused.any(func(line: String) -> bool: return line.contains("cannot build")), "nor do its details")
+	_check(not SidebarOverviewPage.get_recent_decisions(city, 100).any(func(entry: Dictionary) -> bool: return (entry["ids"] as Array).has(family.id + 1) and str(entry["text"]).contains("cannot build")), "nor the Overview's recent decisions (other families, still without a home, still say it)")
+	# A save from before obstacles were recorded apart reads it from the note.
+	var data: Dictionary = GameState.capture_city(city)
+	family.home_site_obstacle = ""
+	data = GameState.capture_city(city)
+	var loaded: City = GameState.restore_city(data)
+	_check(loaded.households[0].home_site_obstacle == "no land is set aside for homes", "an older save's obstacle is read from its note")
 
 func test_saved_with_the_town() -> void:
 	var city: City = make_city()

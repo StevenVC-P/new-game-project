@@ -45,10 +45,13 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/priority_check.gd > priority.log
 
 # Home sites (docs/HOME_SITES.md): families choosing their own sites on land set aside, preferred land, no land, no
-# overlap, explanations, starting land, land reserved from work; then starting land, plots, and equal-capacity compact, dispersed, poor, far and
+# overlap, explanations, starting land, land reserved from work, shared works among homes, preferred land between equal sites, explanations
+# that no longer hold; then starting land, plots, and equal-capacity compact, dispersed, poor, far and
 # preferred-far land on the same towns (write to a file, filter for [HOME]; "-- --years=N --sites=N --layouts=a,b")
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/home_site_validation.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/home_site_check.gd > homes.log
+# Preferred land between two equal places (two blocks on opposite sides, plain, then one preferred):
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/home_site_check.gd -- --layouts=twin,twin_preferred > twin.log
 
 # Multi-year settlement run, yearly report (filter output for [SIM])
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/settlement_growth_run.gd

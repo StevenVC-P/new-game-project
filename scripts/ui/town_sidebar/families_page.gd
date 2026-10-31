@@ -59,8 +59,8 @@ static func get_card(city: City, household: Household, focused: bool) -> Diction
 	var calling: String = get_calling(household)
 	lines.append((calling + " · " if calling != "" else "") + describe_now(city, household))
 	lines.append("Home: " + describe_home(city, household))
-	if household.housing_status != Household.RESIDENCE_HOUSED and household.home_site_note.contains("cannot build a home"):
-		lines.append("Cannot build: " + household.home_site_note.get_slice(": ", 1))
+	if FamilyDevelopment.is_home_site_blocked(city, household):
+		lines.append("Cannot build a home: " + household.home_site_obstacle)
 	var wants: String = FamilyAmbitions.describe(city, household)
 	if HouseholdMigration.is_considering_departure(household):
 		lines.append("Thinking of leaving: its hardship is near what it will endure")
@@ -72,7 +72,7 @@ static func get_card(city: City, household: Household, focused: bool) -> Diction
 	var brief: String = HouseholdCharacter.describe_briefly(household)
 	if brief != "":
 		muted.append(sentence(brief))
-	if household.initiative_note != "" and not focused:
+	if household.initiative_note != "" and not focused and FamilyDevelopment.is_note_current(city, household, household.initiative_note):
 		muted.append("Why: " + household.initiative_note)
 	var card: Dictionary = {"kind": "card", "title": city.get_household_label(household.id), "tag": "%d %s" % [household.total_population, "person" if household.total_population == 1 else "people"], "lines": lines, "muted": muted, "selected": focused, "action": {"action": "focus_household", "household": household.id}}
 	if tone != "":
@@ -119,9 +119,9 @@ static func describe_home(city: City, household: Household) -> String:
 static func get_detail_lines(city: City, household: Household) -> Array:
 	var lines: Array = []
 	var today: int = city.construction.day
-	if household.initiative_note != "":
+	if household.initiative_note != "" and FamilyDevelopment.is_note_current(city, household, household.initiative_note):
 		lines.append("Decided (%s): %s" % [SidebarOverviewPage.days_ago(today - household.initiative_day), household.initiative_note])
-	if household.home_site_note != "" and household.home_site_note != household.initiative_note:
+	if household.home_site_note != "" and household.home_site_note != household.initiative_note and FamilyDevelopment.is_note_current(city, household, household.home_site_note):
 		lines.append("Home site (%s): %s" % [SidebarOverviewPage.days_ago(today - household.home_site_day), household.home_site_note])
 	if city.influence.enabled:
 		var outlook: Dictionary = FamilyInitiative.predict_improvement(city, household, true)

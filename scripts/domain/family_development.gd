@@ -101,11 +101,27 @@ static func claim_plot(city: City, household: Household, for_itself: bool = true
 	var choice: Dictionary = HomeSites.choose(city, household, home_type)
 	household.home_site_note = choice["note"]
 	household.home_site_day = city.construction.day
+	household.home_site_obstacle = choice["obstacle"]
 	FamilyInitiative.note(city, household, choice["note"])
 	var tile: Vector2i = choice["tile"]
 	if tile.x < 0:
 		return null
 	return city.construction.request_building(home_type, tile, ConstructionProject.REQUESTED_BY_HOUSEHOLD, household.id, household.id if for_itself else -1)
+
+# Whether what last kept a family from building a home still holds: it still has no home, or (when it
+# was building for a grown child) a child is still waiting for one and none stands empty. Once it
+# no longer holds, the obstacle is history, not the family's present reason.
+static func is_home_site_blocked(city: City, household: Household) -> bool:
+	if household.home_site_obstacle == "":
+		return false
+	if household.housing_status != Household.RESIDENCE_HOUSED:
+		return true
+	return household.can_form_new_family() and city.get_empty_house_building_ids().is_empty()
+
+# Whether a family's recorded note is still a present reason: everything is, but an obstacle to
+# building a home that no longer holds.
+static func is_note_current(city: City, household: Household, note: String) -> bool:
+	return note == "" or note != household.home_site_note or household.home_site_obstacle == "" or is_home_site_blocked(city, household)
 
 # The open plot a family would choose (HomeSites), or null when it would choose none.
 static func choose_plot(city: City, household: Household) -> Variant:

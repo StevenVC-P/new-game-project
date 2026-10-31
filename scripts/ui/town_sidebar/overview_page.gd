@@ -267,13 +267,13 @@ const LAND_BUTTON: Dictionary = {"text": "Set aside residential land (N)", "acti
 static func get_home_site_obstacle(city: City) -> String:
 	var latest: Household = null
 	for household: Household in city.households:
-		if household.home_site_note.contains("cannot build a home") and (latest == null or household.home_site_day > latest.home_site_day):
+		if FamilyDevelopment.is_home_site_blocked(city, household) and (latest == null or household.home_site_day > latest.home_site_day):
 			latest = household
 	var waiting: int = city.construction.families_without_plot
 	var count: String = "%d famil%s found nowhere to build last month" % [waiting, "y" if waiting == 1 else "ies"]
 	if latest == null:
 		return count + "."
-	return "%s: %s." % [count, latest.home_site_note.get_slice(": ", 1)]
+	return "%s: %s." % [count, latest.home_site_obstacle]
 
 static func get_trader_card(city: City) -> Dictionary:
 	var stay: int = city.trade.trader_until_day - city.construction.day + 1
@@ -353,7 +353,7 @@ static func get_recent_decisions(city: City, count: int = RECENT_DECISIONS) -> A
 	var by_text: Dictionary = {}
 	for household: Household in city.households:
 		for note: Array in [[household.initiative_note, household.initiative_day], [household.social_note, household.social_note_day]]:
-			if str(note[0]) == "" or int(note[1]) < today - RECENT_DAYS:
+			if str(note[0]) == "" or int(note[1]) < today - RECENT_DAYS or not FamilyDevelopment.is_note_current(city, household, str(note[0])):
 				continue
 			var text: String = str(note[0])
 			if text.contains(" ("):

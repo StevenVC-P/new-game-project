@@ -2,9 +2,10 @@ class_name SidebarPlanningPage
 extends RefCounted
 
 # What the player plans for the community (docs/TOWN_UI.md): land marked for a purpose
-# (Designate), works paid from the common stores (Commission), and a pointer to the appeals that
-# shape families' own choices (Encourage, under Community). Every entry selects an existing tool;
-# nothing here adds a way to build.
+# (Designate), shared works paid from the common stores, and a pointer to the appeals that shape
+# families' own choices (Encourage, under Community). While families lead, placing any other
+# building directly is an optional, folded-away Commission; under the classic rules the whole
+# catalog shows. Every entry selects an existing tool; nothing here adds a way to build.
 
 const SP = preload("res://scripts/ui/town_sidebar/sidebar_painter.gd")
 
@@ -18,6 +19,8 @@ const TOOL_KEYS: Dictionary = {
 	"road": "G", "work_ground": "K", "residential": "N",
 }
 const DESIGNATIONS: Array[String] = [TownConstruction.PLOT, TownInfluence.WORK_GROUND, TownWoodland.CLEAR, TownFarmland.TILL]
+# Communal infrastructure: what families leading their own work still look to the community for.
+const SHARED_WORKS: Array[String] = [TownConstruction.ROAD, Building.BUILDING_STOREHOUSE, Building.BUILDING_WATCH_POST]
 const PROJECTS_SHOWN: int = 6
 # Catalog categories under the names this page gives them.
 const CATEGORY_NAMES: Dictionary = {"Town Planning": "Roads and stores", "Hand Work (Tier 0)": "Hand work"}
@@ -40,24 +43,20 @@ static func build(context: Dictionary) -> Array:
 			continue
 		blocks.append(get_designation_card(city, designation, placing and tool == designation))
 
-	blocks.append({"kind": "heading", "text": "Commission", "note": "paid from the stores"})
-	blocks.append({"kind": "text", "text": "Families do the building, carrying materials from the stores.", "muted": true})
-	var current_category: String = ""
-	for entry: Dictionary in BuildMenuHelper.get_building_catalog():
-		var id: String = str(entry["id"])
-		if DESIGNATIONS.has(id):
-			continue
-		var category: String = str(CATEGORY_NAMES.get(entry["category"], entry["category"]))
-		if category != current_category:
-			current_category = category
-			blocks.append({"kind": "gap", "size": 4.0})
-			blocks.append({"kind": "text", "text": category, "muted": true})
-		var cost: Dictionary = EconomyBalance.get_build_cost(id)
-		var ready: bool = city.construction.can_supply(cost)
-		var row: Dictionary = {"kind": "row", "label": str(entry["display_name"]), "value": cost_text(cost), "tone": SP.TONE_GOOD if ready else SP.TONE_CAUTION, "action": {"action": "select_tool", "tool": id}, "selected": placing and tool == id}
-		if TOOL_KEYS.has(id):
-			row["key"] = TOOL_KEYS[id]
-		blocks.append(row)
+	if city.influence.enabled:
+		# Families lead: land and what the community holds in common come first; placing a family's
+		# building directly stays possible, folded away as an optional commission.
+		blocks.append({"kind": "heading", "text": "Shared works", "note": "paid from the stores"})
+		blocks.append({"kind": "text", "text": "Roads, stores and the watch serve everyone. Families do the building, carrying materials from the stores.", "muted": true})
+		blocks.append_array(get_catalog_rows(city, tool, placing, func(id: String) -> bool: return SHARED_WORKS.has(id), false))
+		var private: Array = [{"kind": "text", "text": "Families build their own homes and choose their own work. Commissioning places a building for them, paid from the stores, for when one is wanted just there.", "muted": true}]
+		private.append_array(get_catalog_rows(city, tool, placing, func(id: String) -> bool: return not SHARED_WORKS.has(id), true))
+		blocks.append({"kind": "gap", "size": 4.0})
+		blocks.append({"kind": "expander", "id": "planning_commission", "title": "Commission a building (optional)", "blocks": private})
+	else:
+		blocks.append({"kind": "heading", "text": "Commission", "note": "paid from the stores"})
+		blocks.append({"kind": "text", "text": "Families do the building, carrying materials from the stores.", "muted": true})
+		blocks.append_array(get_catalog_rows(city, tool, placing, func(_id: String) -> bool: return true, true))
 	blocks.append({"kind": "text", "text": "A dot: the stores can supply it now. A triangle: it waits for materials.", "muted": true})
 
 	if city.influence.enabled:
@@ -92,7 +91,29 @@ static func get_residential_card(city: City, tool: String) -> Dictionary:
 	var buttons: Array = []
 	for id: String in [HomeSites.TOOL_LAND, HomeSites.TOOL_PREFERRED, HomeSites.TOOL_CLEAR]:
 		buttons.append({"text": ["Mark", "Prefer", "Clear"][buttons.size()], "toggle": true, "active": tool == id, "action": {"action": "select_tool", "tool": id}})
-	return {"kind": "card", "title": "Residential land", "tag": "key N", "lines": ["Families choose their own home sites here, by what they value. Preferred land is where the community would rather they build; receptive families heed it more, none is bound to. No workplace may be opened on it.", "Mark sets land aside, Prefer marks the community's preferred land, Clear takes it back: two corners each; the same block again unmarks it."], "muted": muted, "buttons": buttons, "columns": 3, "selected": HomeSites.TOOL_LEVELS.has(tool)}
+	return {"kind": "card", "title": "Residential land", "tag": "key N", "lines": ["Families choose their own home sites here, by what they value. Preferred land is where the community would rather they build; receptive families heed it more, none is bound to. Storehouses and roads may go among the homes, taking their room; no private workplace may.", "Mark sets land aside, Prefer marks the community's preferred land, Clear takes it back: two corners each; the same block again unmarks it."], "muted": muted, "buttons": buttons, "columns": 3, "selected": HomeSites.TOOL_LEVELS.has(tool)}
+
+# The catalog's buildings that `include` accepts (designations aside), with cost, readiness and
+# shortcut; under their category names when `headed`.
+static func get_catalog_rows(city: City, tool: String, placing: bool, include: Callable, headed: bool) -> Array:
+	var blocks: Array = []
+	var current_category: String = ""
+	for entry: Dictionary in BuildMenuHelper.get_building_catalog():
+		var id: String = str(entry["id"])
+		if DESIGNATIONS.has(id) or not include.call(id):
+			continue
+		var category: String = str(CATEGORY_NAMES.get(entry["category"], entry["category"]))
+		if headed and category != current_category:
+			current_category = category
+			blocks.append({"kind": "gap", "size": 4.0})
+			blocks.append({"kind": "text", "text": category, "muted": true})
+		var cost: Dictionary = EconomyBalance.get_build_cost(id)
+		var ready: bool = city.construction.can_supply(cost)
+		var row: Dictionary = {"kind": "row", "label": str(entry["display_name"]), "value": cost_text(cost), "tone": SP.TONE_GOOD if ready else SP.TONE_CAUTION, "action": {"action": "select_tool", "tool": id}, "selected": placing and tool == id}
+		if TOOL_KEYS.has(id):
+			row["key"] = TOOL_KEYS[id]
+		blocks.append(row)
+	return blocks
 
 static func get_designation_card(city: City, designation: String, selected: bool) -> Dictionary:
 	var title: String = ""

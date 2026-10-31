@@ -145,6 +145,10 @@ static func restore_city(data: Dictionary) -> City:
 		SaveCodec.restore(household, household_data)
 		households.append(household)
 	city.households = households
+	# Saves from before obstacles were recorded apart: the obstacle is in the note's words.
+	for household: Household in households:
+		if household.home_site_obstacle == "" and household.home_site_note.contains(" cannot build a home: "):
+			household.home_site_obstacle = household.home_site_note.get_slice(" cannot build a home: ", 1)
 	city.site_profile = SettlementSiteProfile.new()
 	SaveCodec.restore(city.site_profile, data["site_profile"])
 	SaveCodec.restore(city.logistics, data["logistics"])

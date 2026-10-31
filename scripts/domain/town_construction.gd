@@ -92,10 +92,10 @@ func validate(building_type: String, origin: Vector2i) -> Dictionary:
 	var is_home: bool = BuildingTiers.get_base_type(building_type) == Building.BUILDING_HOUSE
 	if is_home and get_open_plot_at(origin) != null:
 		return placement.make_result(true, "On a residential plot", footprint)
-	# Residential land is reserved for homes (owner, 2026-10-31): no new workplace may take it, so
-	# the room the player set aside stays room for homes. What already stands there is left alone.
-	if not is_home and building_type != PLOT and is_on_residential_land(footprint):
-		return placement.make_result(false, "That land is set aside for homes", footprint)
+	# Residential land takes homes and what serves a neighbourhood, never a private workplace
+	# (HomeSites.is_compatible). What already stands there is left alone.
+	if not HomeSites.is_compatible(building_type) and is_on_residential_land(footprint):
+		return placement.make_result(false, "That land is set aside for homes and shared works", footprint)
 	var rule_type: String = Building.BUILDING_HOUSE if building_type == PLOT else building_type
 	return placement.validate(city, city.local_map, rule_type, origin, false)
 

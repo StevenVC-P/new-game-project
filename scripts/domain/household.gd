@@ -75,6 +75,9 @@ var improve_decision_day: int = -1
 # Why the family chose its home's site, or what kept it from building (HomeSites), and when.
 var home_site_note: String = ""
 var home_site_day: int = -1
+# What kept it from building then ("" when it chose a site); whether that still holds is
+# FamilyDevelopment.is_home_site_blocked.
+var home_site_obstacle: String = ""
 
 # The household's character and social life (docs/HOUSEHOLD_SOCIAL_MODEL.md; HouseholdCharacter,
 # TownSocial). Empty until the social model or influence prototype gives the household one.
