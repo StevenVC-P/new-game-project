@@ -36,6 +36,12 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/household_social_validation.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/social_check.gd > social.log
 
+# Home sites (docs/HOME_SITES.md): families choosing their own sites on land set aside, preferred land, no land, no
+# overlap, explanations; then plots, compact, dispersed, poor and preferred residential land on the same towns (write to
+# a file, filter for [HOME]; "-- --years=N --sites=N")
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/home_site_validation.gd
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/home_site_check.gd > homes.log
+
 # Multi-year settlement run, yearly report (filter output for [SIM])
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/settlement_growth_run.gd
 
