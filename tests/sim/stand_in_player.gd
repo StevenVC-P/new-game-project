@@ -109,6 +109,9 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 			defend(city, day)
 		if scenario.get("guided", false) and day % GUIDE_INTERVAL_DAYS == 0:
 			guide(city)
+		# A player strategy from a balance check (priority_check): called with (city, day, this player).
+		if scenario.has("each_day"):
+			(scenario["each_day"] as Callable).call(city, day, self)
 		if scenario.get("hard_winter", false) and day == HARD_WINTER_DAY:
 			city.resources["food"] = mini(int(city.resources["food"]), int(city.resources["food_consumption_rate"]) * HARD_WINTER_FOOD_DAYS)
 		if scenario.get("unfair", false) and day >= UNFAIR_FIRST_DAY and (day - UNFAIR_FIRST_DAY) % UNFAIR_INTERVAL_DAYS == 0:
@@ -377,8 +380,9 @@ func choose_build(city, scenario: Dictionary, day: int) -> String:
 	var food_needed: int = city.get_food_consumption_for_population(city.get_total_population())
 	var wants: Array[String] = []
 	# Families open and improve their own work; the stand-in sets land aside for homes.
+	# "plots_ahead": how many homes beyond one a family the stand-in keeps planned (2 unless set).
 	if scenario.get("families_develop", false):
-		if houses < city.households.size() + 2 and allowed("house", scenario, day, counts):
+		if houses < city.households.size() + int(scenario.get("plots_ahead", 2)) and allowed("house", scenario, day, counts):
 			return "house"
 		return ""
 	if woodcutters == 0:

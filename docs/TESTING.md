@@ -36,6 +36,12 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/household_social_validation.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/social_check.gd > social.log
 
+# Community priorities, step 1 (docs/COMMUNITY_PRIORITIES.md): 14 player strategies on today's controls (passive, fixed
+# priorities, informed, uninformed with matched policy changes, poor, destructive) on ordinary towns, the same towns with
+# the first winter's stores lost, and naturally difficult sites (write to a file, filter for [PRI]; about an hour a
+# condition: run one per process with "-- --conditions=ordinary" etc.; also "--years=N --sites=N --strategies=a,b")
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/priority_check.gd > priority.log
+
 # Multi-year settlement run, yearly report (filter output for [SIM])
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/settlement_growth_run.gd
 
