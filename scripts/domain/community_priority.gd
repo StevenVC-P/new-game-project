@@ -16,7 +16,9 @@ extends RefCounted
 #
 # Each family also judges each priority for itself (get_view): its own circumstances and
 # convictions make it support, oppose, or not much mind one. What the town as a whole backs, with
-# respected voices counting double, pulls on families as a norm's acceptance does (add_backing).
+# respected voices counting double, pulls on time families give freely (helping, through
+# add_help_appeal) as a norm's acceptance does (add_backing); it never pulls on a family's choice of
+# its own work (owner, 2026-10-31).
 # There is no vote: the player sets the priority whatever the town backs.
 
 const NONE: String = ""
@@ -237,10 +239,15 @@ static func get_warnings(city: City, priority: String, store_rule: String) -> Ar
 		if held.has(TownInfluence.ACTIVITY_WOOD):
 			warnings.append("%d families cut wood by hand and could not improve into woodcutters." % held[TownInfluence.ACTIVITY_WOOD])
 	match priority:
+		FOOD:
+			# Whatever the stores rule (owner, 2026-10-31): the ask leans families choosing their work
+			# toward food, away from tools.
+			if FamilyInitiative.count_producers(city, TownInfluence.ACTIVITY_TOOLS) == 0:
+				warnings.append("No one makes tools yet, and with food put first, families choosing their work lean away from it: tools (%d) run down with the upkeep of every proper workplace." % int(city.resources["tools"]))
 		HOUSING:
 			var unhoused: int = city.households.filter(func(h: Household) -> bool: return h.housing_status != Household.RESIDENCE_HOUSED or city.is_household_in_rough_housing(h)).size()
-			if unhoused > 0 and city.construction.get_open_plots().is_empty():
-				warnings.append("No home plots are set aside: %d families cannot build homes until plots are marked." % unhoused)
+			if unhoused > 0 and city.construction.get_open_plots().is_empty() and HomeSites.count_room(city) == 0:
+				warnings.append("No land is set aside for homes: %d families cannot build until land is marked." % unhoused)
 			warnings.append("Families who work long days on homes wear themselves out, and hardship drives families away.")
 		INVESTMENT:
 			var food_days: float = FamilyInitiative.get_food_days(city)

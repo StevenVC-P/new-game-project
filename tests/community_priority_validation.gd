@@ -163,7 +163,15 @@ func test_backing_pulls_like_a_norm() -> void:
 	give_holding(city, helper, "farm", Vector2i(28, 4))
 	var home: ConstructionProject = home_project(city, city.households[1], Vector2i(34, 24))
 	var desire: Dictionary = SocialDecisions.get_help_desire(city, helper, home, city.households[1])
-	_check(has_reason(desire["terms"], "most families back putting homes first"), "what the town backs pulls on a family's decision")
+	_check(has_reason(desire["terms"], "most families back putting homes first"), "what the town backs pulls on time a family gives freely")
+	city.resources["food"] = 100
+	city.influence.set_priority(CommunityPriority.FOOD)
+	_check(CommunityPriority.get_backing(city, CommunityPriority.FOOD) > 0.5, "a town short of food backs putting food first")
+	var garden: Household = city.households[2]
+	give_holding(city, garden, "forager_garden", Vector2i(10, 4))
+	var work: Dictionary = FamilyInitiative.get_work_desire(city, city.households[3], TownInfluence.ACTIVITY_FOOD)
+	var improve: Dictionary = FamilyInitiative.get_improve_desire(city, garden, "farm")
+	_check(has_reason(work["terms"], "the gathering asks for food") and not has_reason(work["terms"], "back putting") and not has_reason(improve["terms"], "back putting"), "but not on a family's choice of its own work: the ask does, the backing does not")
 	for household: Household in city.households:
 		blank(household, {}, {"solitary": 3, "self_governing": 3})
 	_check(CommunityPriority.get_backing(city, CommunityPriority.COOPERATION) < 0.1, "a town of solitary, self-governing families does not back cooperation")
@@ -188,13 +196,15 @@ func test_warnings() -> void:
 	var city: City = social_city()
 	var garden: Household = city.households[0]
 	give_holding(city, garden, "forager_garden", Vector2i(28, 4))
-	_check(CommunityPriority.get_warnings(city, CommunityPriority.FOOD, TownInfluence.RULE_OPEN).is_empty(), "food with the stores open costs nothing worth a warning")
+	_check(CommunityPriority.get_warnings(city, CommunityPriority.FOOD, TownInfluence.RULE_OPEN).any(func(w: String) -> bool: return w.contains("No one makes tools")), "food warns that no one makes tools, even with the stores open")
 	var closed: Array[String] = CommunityPriority.get_warnings(city, CommunityPriority.HOUSING, TownInfluence.RULE_PRIORITIES)
 	_check(closed.any(func(w: String) -> bool: return w.contains("No family's improvement will be funded")), "housing with the stores kept for priorities warns that no improvement will be funded")
 	_check(closed.any(func(w: String) -> bool: return w.contains("grow food by hand")), "and that food growers cannot improve into farms")
-	_check(closed.any(func(w: String) -> bool: return w.contains("No home plots")), "and that no plots are set aside for families without homes")
+	_check(closed.any(func(w: String) -> bool: return w.contains("No land is set aside for homes")), "and that no land is set aside for families without homes")
 	var food_rule: Array[String] = CommunityPriority.get_warnings(city, CommunityPriority.FOOD, TownInfluence.RULE_PRIORITIES)
 	_check(food_rule.any(func(w: String) -> bool: return w.contains("No toolmaker will be funded")), "food with the stores kept for priorities warns about tools")
+	give_holding(city, city.households[1], "tool_mender", Vector2i(40, 30))
+	_check(CommunityPriority.get_warnings(city, CommunityPriority.FOOD, TownInfluence.RULE_OPEN).is_empty(), "with someone making tools, food with the stores open warns of nothing")
 	city.influence.set_priority(CommunityPriority.HOUSING)
 	city.influence.store_rule = TownInfluence.RULE_PRIORITIES
 	_check(city.influence.priority == CommunityPriority.HOUSING and city.influence.store_rule == TownInfluence.RULE_PRIORITIES, "a warning never stops the player")

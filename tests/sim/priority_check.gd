@@ -7,9 +7,10 @@ extends SceneTree
 # (Step 1, before the priority existed, mapped each choice to the old asks: commit 8fd8b39.)
 #
 # Strategies, by kind:
-# Only community choices are play for now (owner, 2026-10-31): the player sets no plots, places
-# nothing, and plans no public works; families choose their own home sites
-# (FamilyDevelopment.choose_own_site) and open and improve their own work.
+# Only community choices are play here (owner, 2026-10-31): the player places nothing and plans no
+# public works. Every town has the modest starting residential land a passive player has
+# (HomeSites.set_aside_starting_land, docs/HOME_SITES.md), and families choose their own home sites
+# on it; families open and improve their own work.
 #
 # - passive:     none;
 # - fixed:       one priority held all game, with the stores open, and with the stores kept for the
@@ -235,6 +236,7 @@ func play(site: Dictionary, strategy: Dictionary, stress: bool, years: int, repl
 	var city: City = City.new("Player Town", Vector2(site["site"]), City.ROLE_PLAYER, EconomyBalance.FOUNDING_FAMILIES, int(site["seed"]))
 	city.site_profile = site["profile"]
 	city.local_map = (site["map"] as Array).duplicate(true)
+	HomeSites.set_aside_starting_land(city)
 	var scenario: Dictionary = BASE.duplicate(true)
 	scenario["hard_winter"] = stress
 	scenario["unfair"] = strategy.get("unfair", false)

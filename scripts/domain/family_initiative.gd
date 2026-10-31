@@ -365,15 +365,16 @@ static func predict_improvement(city: City, household: Household, encouraged: bo
 
 # How receptive a family is to the community's appeals. This is persuasion, not obedience: a
 # self-governing family weighs its own judgment more, and nothing here costs trust.
-# The asks come from the community's priority (CommunityPriority), a directing request; what the
-# town backs pulls too. Returns the weight added.
+# The asks come from the community's priority (CommunityPriority), a directing request. What the
+# town backs does not pull here: it moves time given freely, not a family's own work (owner,
+# 2026-10-31). Returns the weight added.
 static func add_encouragement(city: City, household: Household, activity: String, terms: Array, reason: String) -> float:
 	if not city.influence.is_encouraged(activity):
 		return 0.0
 	var receptive: Dictionary = get_receptiveness(household, city, CommunityPriority.KIND_DIRECTING)
 	var weight: float = ENCOURAGE_WEIGHT * float(receptive["factor"])
 	add(terms, weight, reason + str(receptive["note"]))
-	return weight + CommunityPriority.add_backing(city, household, terms)
+	return weight
 
 # How readily a family heeds the gathering's appeals, {"factor", "note"}. Before there are
 # institutions, the community's decisions come from informal gatherings of its households (owner
