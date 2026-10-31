@@ -1,10 +1,11 @@
 class_name TownStatusBar
 extends RefCounted
 
-# The town's at-a-glance status in the top bar (owner request, 2026-10-28): people, free homes,
-# and labor always; alerts only while they matter (hunger, families thinking of leaving, bandits
-# on the road, a trader in town). Each chip is a small drawn symbol, a short number, and a colour
-# for its state, with a line or two of detail on hover. Stores stay in the sidebar.
+# The town's at-a-glance status in the top bar (owner request, 2026-10-28): people, food in days,
+# free homes, and labor always; alerts only while they matter (hunger, families thinking of
+# leaving, bandits on the road, a trader in town). Each chip is a small drawn symbol, a short
+# number, and a colour for its state, with a line or two of detail on hover. Other stores stay in
+# the sidebar (docs/TOWN_UI.md).
 
 const ICON_SIZE: float = 16.0
 const CHIP_HEIGHT: float = 24.0
@@ -27,6 +28,11 @@ static func get_chips(city: City) -> Array[Dictionary]:
 	var households: int = city.households.size()
 	var people: int = city.get_total_population()
 	chips.append({"icon": "people", "text": "%d · %d" % [households, people], "color": COLOR_OK, "tooltip": ["%d households, %d people" % [households, people]]})
+	# Food in days at today's rate, coloured by the town's own food pressure.
+	var food: Dictionary = city.get_pressure_summary()["food"]
+	var food_days: int = int(floor(float(food["values"]["days_stored"])))
+	var food_color: Color = COLOR_ALERT if food["severity"] == "danger" else (COLOR_CAUTION if food["severity"] == "warning" else COLOR_OK)
+	chips.append({"icon": "food", "text": "%dd" % food_days, "color": food_color, "tooltip": ["Food: %d stored, %d eaten a day" % [int(resources["food"]), int(resources["food_consumption_rate"])], "About %d days at today's rate (%s)" % [food_days, str(food["status"]).to_lower()]]})
 	var free_homes: int = city.get_empty_house_building_ids().size()
 	var blocker: String = HouseholdMigration.get_arrival_blocker(city)
 	chips.append({"icon": "house", "text": "%d free" % free_homes, "color": COLOR_CAUTION if free_homes == 0 else COLOR_OK, "tooltip": ["Empty homes: %d (newcomers need one)" % free_homes, "Newcomers: " + HouseholdMigration.get_arrival_blocker_text(blocker)]})
@@ -43,7 +49,7 @@ static func get_chips(city: City) -> Array[Dictionary]:
 		chips.append({"icon": "bandits", "text": "Bandits %dd" % days, "color": COLOR_ALERT, "tooltip": ["Bandits on the road: here in %d days" % days, "Band %d against guard %d (M: call the militia)" % [city.defense.raid_strength, city.defense.get_guard()]]})
 	if city.trade.is_trader_here():
 		var stay: int = city.trade.trader_until_day - city.construction.day + 1
-		chips.append({"icon": "trader", "text": "Trader %dd" % stay, "color": COLOR_GOOD, "tooltip": ["A trader from %s is in town for %d more days" % [city.trade.partner_name, stay], "Trade in the sidebar's Trader section"]})
+		chips.append({"icon": "trader", "text": "Trader %dd" % stay, "color": COLOR_GOOD, "tooltip": ["A trader from %s is in town for %d more days" % [city.trade.partner_name, stay], "Trade from Needs attention in the sidebar"]})
 	return chips
 
 static func get_chip_width(font: Font, font_size: int, chip: Dictionary) -> float:
@@ -101,6 +107,15 @@ static func draw_icon(c: CanvasItem, icon: String, r: Rect2, color: Color) -> vo
 			# A hammer.
 			c.draw_line(p + Vector2(s * 0.25, s * 0.9), p + Vector2(s * 0.62, s * 0.38), color, s * 0.13)
 			c.draw_colored_polygon(PackedVector2Array([p + Vector2(s * 0.42, s * 0.18), p + Vector2(s * 0.62, s * 0.06), p + Vector2(s * 0.92, s * 0.48), p + Vector2(s * 0.72, s * 0.6)]), color)
+		"food":
+			# A sheaf of grain: three stalks bound at the middle.
+			c.draw_line(p + Vector2(s * 0.5, s * 0.95), p + Vector2(s * 0.5, s * 0.2), color, s * 0.1)
+			c.draw_line(p + Vector2(s * 0.5, s * 0.6), p + Vector2(s * 0.22, s * 0.12), color, s * 0.1)
+			c.draw_line(p + Vector2(s * 0.5, s * 0.6), p + Vector2(s * 0.78, s * 0.12), color, s * 0.1)
+			c.draw_circle(p + Vector2(s * 0.5, s * 0.16), s * 0.12, color)
+			c.draw_circle(p + Vector2(s * 0.22, s * 0.1), s * 0.1, color)
+			c.draw_circle(p + Vector2(s * 0.78, s * 0.1), s * 0.1, color)
+			c.draw_line(p + Vector2(s * 0.3, s * 0.6), p + Vector2(s * 0.7, s * 0.6), color, s * 0.12)
 		"hunger":
 			# An empty bowl.
 			c.draw_arc(p + Vector2(s * 0.5, s * 0.45), s * 0.38, 0.0, PI, 12, color, s * 0.12)

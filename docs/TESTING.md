@@ -87,6 +87,13 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_map_validation.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_map_view_validation.gd
 
+# Town sidebar (docs/TOWN_UI.md): layout, every page from a new and a grown town without changing it, attention from state,
+# tabs, wheel, buttons and family focus by real clicks, the footer, and every shortcut the Planning page lists
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_sidebar_validation.gd
+
+# Town interface screenshots at 1920x1080 and 1366x768: each page, a family selected, a tool placed, alerts (needs a window)
+& (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/town_ui_capture.gd -- <output_dir>
+
 # What town maps hold over 160 real sites, and generation time (filter for [TOWN]); the survey's thresholds come from it
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/town_map_probe.gd
 

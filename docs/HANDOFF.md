@@ -2,9 +2,11 @@
 
 Snapshot for whoever picks the project up next. Update it when a milestone closes; durable detail lives in the linked docs, not here.
 
-*Last updated: 2026-10-30, with families leading made the default way to play.*
+*Last updated: 2026-10-30, with the town interface redesign on its branch.*
 
 ## Current Objective
+
+**Town interface redesign (owner brief, 2026-10-30): `docs/TOWN_UI.md`, on `feature/town-ui-redesign` from `develop`, not merged: waits for the owner's review.** The sidebar is now four scrolling pages (Overview, Families, Planning, Community) built by `scripts/ui/town_sidebar/`; the top bar groups place, time, and status (food in days added); the house card on the map is short and the family's reasons open in the sidebar. No simulation code changed. L now opens the Families page instead of the roster overlay; Tab changes pages. Open for the owner: the judgment calls and missing simulation data listed in that doc.
 
 **Locked into `main` (owner, 2026-10-28):** everything through milestone 6, the town status bar, and the playtest fixes (walker bends, paths meeting roads).
 
