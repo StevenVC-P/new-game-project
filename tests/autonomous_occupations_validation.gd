@@ -24,6 +24,7 @@ func run_all() -> void:
 	test_survival_before_prosperity()
 	test_temperament_and_desperation()
 	test_narrow_shortage_by_default()
+	test_hungry_family_looks_again()
 	if failure_count > 0:
 		push_error("Autonomous occupations validation failed: " + str(failure_count) + " failure(s)")
 		quit(1)
@@ -321,6 +322,34 @@ func test_narrow_shortage_by_default() -> void:
 	_check(FamilyInitiative.get_shortage(city, "food") == 0.0, "a town growing some food, if too little, is not in an essential shortage")
 	city.set_meta("shortage_counts_deficits", true)
 	_check(FamilyInitiative.get_shortage(city, "food") > 0.0, "the broad version, kept for comparison, counts the deficit")
+
+# 12. A family that has itself gone hungry for two months looks at its work again, without waiting
+# for its tenure or its year; with its hunger weighed, it leaves snares in felled woods for a garden.
+func test_hungry_family_looks_again() -> void:
+	var city: City = town()
+	city.resources["food"] = 0
+	var family: Household = city.households[0]
+	set_calling(family, "forest")
+	var snares: Building = give(city, family, "snare_line", Vector2i(57, 2))
+	busy_everyone_else(city, family)
+	city.construction.day = 400
+	for household: Household in city.households:
+		var holding: Building = FamilyInitiative.get_holding(city, household)
+		household.work_building_id = holding.id
+		household.work_since = city.construction.day - 60
+	_check(not OccupationReview.is_due(city, family), "sixty days at its work is too soon for an ordinary review")
+	family.short_days_this_month = 12
+	OccupationReview.update_strain(city, family, snares)
+	_check(not OccupationReview.get_triggers(city, family, snares).has(OccupationReview.HUNGER), "one hungry month is not yet a reason")
+	OccupationReview.update_strain(city, family, snares)
+	_check(OccupationReview.get_triggers(city, family, snares).has(OccupationReview.HUNGER) and OccupationReview.is_due_in_danger(city, family), "two are, and do not wait")
+	var decision: Dictionary = OccupationReview.weigh(city, family, snares)
+	_check(has_reason(decision["stay_terms"], "survival comes first") or has_reason(decision["alternative_terms"], "going hungry"), "its own hunger is weighed: %s / %s" % [reasons(decision["alternative_terms"]), reasons(decision["stay_terms"])])
+	city.set_meta("no_survival_awareness", true)
+	family.work_strain.clear()
+	OccupationReview.update_strain(city, family, snares)
+	OccupationReview.update_strain(city, family, snares)
+	_check(not OccupationReview.get_triggers(city, family, snares).has(OccupationReview.HUNGER), "without survival awareness, hunger starts no review")
 
 func _check(condition: bool, message: String) -> void:
 	if condition:

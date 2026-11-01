@@ -13,7 +13,12 @@ extends RefCounted
 #   food, what its workplaces use) within the season, with what it holds and makes
 #   (FamilyInitiative.get_shortage). This danger does not wait for the family's two seasons at its
 #   work or its year between reviews: a family looks again after a month at its work, and a season
-#   after it last looked, while the danger lasts (owner, 2026-11-01).
+#   after it last looked, while the danger lasts (owner, 2026-11-01);
+# - the family itself has gone hungry for two months (its own work no longer feeds it: the woods
+#   round a hunter's lodge felled, a field gone to waste). Like a shortage, this does not wait for
+#   the usual tenure or year: a desperate family tries some response before it starves (owner,
+#   2026-11-01). Its hunger also makes survival weigh more than its calling in the comparison
+#   (FamilyInitiative.get_hardship). Part of survival awareness (meta "no_survival_awareness").
 #
 # A reason only starts a review; it does not decide it. The family weighs staying against the
 # other work it could take up, with the same reasoning as its first choice (calling, what the
@@ -59,12 +64,16 @@ const OTHER_PRODUCERS_PLENTY: int = 2
 const SHORTAGE_TRIGGER: float = 0.25
 const SHORTAGE_MIN_TENURE_DAYS: int = 30
 const SHORTAGE_REVIEW_INTERVAL_DAYS: int = 90
+# A hungry month: the family itself went short this many days; two such months running start a review.
+const HUNGRY_DAYS_IN_MONTH: int = 5
+const HUNGRY_MONTHS: int = 2
 
 const CALLING: String = "calling"
 const TOOLS: String = "short_of_tools"
 const OVERSUPPLY: String = "oversupplied"
 const DISTANCE: String = "distance"
 const SHORTAGE: String = "essential_shortage"
+const HUNGER: String = "hungry"
 
 static func is_on(city: City) -> bool:
 	return city.influence.enabled and city.influence.reconsider_work
@@ -91,7 +100,7 @@ static func advance_month(city: City) -> void:
 		update_strain(city, household, holding)
 		if is_due(city, household) and not get_triggers(city, household, holding).is_empty():
 			candidates.append(household)
-		elif is_due_in_danger(city, household) and get_triggers(city, household, holding).has(SHORTAGE):
+		elif is_due_in_danger(city, household) and is_urgent(get_triggers(city, household, holding)):
 			candidates.append(household)
 	# The longest-waiting first, so the town's limit does not always pass over the same families.
 	candidates.sort_custom(func(a: Household, b: Household) -> bool: return a.work_review_day < b.work_review_day or (a.work_review_day == b.work_review_day and a.id < b.id))
@@ -100,7 +109,7 @@ static func advance_month(city: City) -> void:
 		var triggers: Array[String] = get_triggers(city, household, holding)
 		# A danger another family has just answered this month is no longer a reason, and a family
 		# brought forward only by the danger does not look again early for its other reasons.
-		if triggers.is_empty() or (not is_due(city, household) and not triggers.has(SHORTAGE)):
+		if triggers.is_empty() or (not is_due(city, household) and not is_urgent(triggers)):
 			continue
 		var decision: Dictionary = weigh(city, household, holding)
 		if bool(decision["change"]) and changes >= get_change_limit(city):
@@ -132,7 +141,11 @@ static func is_due(city: City, household: Household) -> bool:
 		return false
 	return household.work_review_day < 0 or today - household.work_review_day >= REVIEW_INTERVAL_DAYS
 
-# Sooner, when the town is in danger of running out of something essential.
+# Reasons that do not wait for the usual tenure or year: an essential shortage, a family's own hunger.
+static func is_urgent(triggers: Array[String]) -> bool:
+	return triggers.has(SHORTAGE) or triggers.has(HUNGER)
+
+# Sooner, when the town is in danger of running out of something essential, or the family goes hungry.
 static func is_due_in_danger(city: City, household: Household) -> bool:
 	var today: int = city.construction.day
 	if household.labor_capacity <= 0 or household.work_change_from >= 0 or FamilyInitiative.has_own_project(city, household):
@@ -147,6 +160,7 @@ static func update_strain(city: City, household: Household, holding: Building) -
 		TOOLS: holding.needs_maintenance() and holding.maintenance_level < 50,
 		OVERSUPPLY: is_oversupplied(city, holding) and is_short_elsewhere(city, FamilyInitiative.get_activity(holding.type)),
 		DISTANCE: is_far(city, household, holding),
+		HUNGER: household.short_days_this_month >= HUNGRY_DAYS_IN_MONTH and not city.has_meta("no_survival_awareness"),
 	}
 	for reason: String in holds.keys():
 		household.work_strain[reason] = int(household.work_strain.get(reason, 0)) + 1 if bool(holds[reason]) else 0
@@ -161,6 +175,8 @@ static func get_triggers(city: City, household: Household, holding: Building) ->
 			triggers.append(reason)
 	if get_danger(city, FamilyInitiative.get_activity(holding.type)) >= SHORTAGE_TRIGGER:
 		triggers.append(SHORTAGE)
+	if int(household.work_strain.get(HUNGER, 0)) >= HUNGRY_MONTHS:
+		triggers.append(HUNGER)
 	return triggers
 
 # The worst essential shortage the town faces in a good other than `own` (FamilyInitiative.get_shortage).
