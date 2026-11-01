@@ -126,6 +126,8 @@ func test_conflicting_wisdoms_pull_both_ways() -> void:
 	GuidingWisdom.choose(other, GuidingWisdom.PRIDE)
 	var family: Household = other.households[0]
 	give_holding(other, family, Vector2i(28, 4), "gatherer_camp")
+	other.resources["wood"] = 200
+	other.resources["tools"] = 100
 	other.construction.day = 10
 	_check(not GuidingWisdom.asks_to_hold_off(other, "woodcutter"), "in spring, preparation does not ask families to hold off")
 	other.construction.day = Calendar.DAYS_PER_YEAR * 3 / 4
@@ -134,6 +136,19 @@ func test_conflicting_wisdoms_pull_both_ways() -> void:
 	_check(has_reason(improve, "take pride", 1.0) and has_reason(improve, "keep something back", -1.0), "before winter, pride asks it to improve and preparation to wait: %s" % reasons(improve))
 	other.resources["food"] = 0
 	_check(not GuidingWisdom.asks_to_hold_off(other, "farm"), "but not to hold off growing more food while food is short")
+	# Dangerously low tools or wood threaten the winter too (owner, 2026-10-31): the wisdom stops
+	# asking to wait, and nothing else changes; spending the stores still weighs against it.
+	_check(GuidingWisdom.asks_to_hold_off(other, "toolmaker"), "with tools enough, it asks to hold off a toolmaker")
+	other.resources["tools"] = 4
+	var toolmaker: Array = FamilyInitiative.get_improve_desire(other, family, "toolmaker")["terms"]
+	_check(not GuidingWisdom.asks_to_hold_off(other, "toolmaker") and not has_reason(toolmaker, "keep something back", -1.0), "nor a toolmaker while tools run out: %s" % reasons(toolmaker))
+	_check(GuidingWisdom.asks_to_hold_off(other, "woodcutter"), "while wood is plentiful it still asks to hold off a woodcutter")
+	other.resources["wood"] = 5
+	_check(not GuidingWisdom.asks_to_hold_off(other, "woodcutter"), "but not while wood runs out")
+	_check(has_reason(FamilyInitiative.get_work_desire(other, family, TownInfluence.ACTIVITY_TOOLS)["terms"], "keep something back", 1.0), "and a family choosing its work is asked to take up the work the town is short of")
+	other.resources["food"] = 5000
+	other.resources["tools"] = 100
+	_check(not has_reason(FamilyInitiative.get_work_desire(other, family, TownInfluence.ACTIVITY_TOOLS)["terms"], "keep something back", 1.0), "not when tools are plentiful")
 
 # 5. A family's conduct becomes its own experience once it has met the wisdom's choice a few times,
 # at most once a season; it draws lessons by its own lights.
@@ -227,6 +242,14 @@ func test_community_page() -> void:
 	_check((held[0]["muted"] as Array).any(func(line: String) -> bool: return line.contains("Mutual Aid") and line.contains("Self-Governing")), "and the qualities on both sides")
 	_check(page.any(func(b: Dictionary) -> bool: return str(b.get("id", "")).begins_with("community_wisdom_")), "and how each family takes them, with reasons")
 	_check(page.any(func(b: Dictionary) -> bool: return str(b.get("title", "")) == "Respecting claims" and (b["muted"] as Array).any(func(l: String) -> bool: return l.contains("Respect What Others Build"))), "the customs say which wisdom asks them")
+	# The village's Elder: a third slot opens on the page, for the two wisdoms not yet held.
+	city.settlement.stage = SettlementStage.VILLAGE
+	page = SidebarCommunityPage.build({"city": city})
+	actions.clear()
+	collect_actions(page, actions)
+	_check(page.any(func(b: Dictionary) -> bool: return str(b.get("note", "")) == "Elder · 2 of 3"), "a village's page shows its Elder and the third slot")
+	var open: Array = actions.filter(func(a: Dictionary) -> bool: return a.get("action") == "choose_wisdom").map(func(a: Dictionary) -> String: return str(a.get("wisdom")))
+	_check(open.size() == 2 and open.has(GuidingWisdom.PREPARE) and open.has(GuidingWisdom.PRIDE), "where the two wisdoms not yet held can be chosen: %s" % [open])
 
 func collect_actions(blocks: Array, into: Array) -> void:
 	for block: Dictionary in blocks:
@@ -244,6 +267,11 @@ func test_saved_and_older_saves() -> void:
 	GuidingWisdom.record(city, city.households[0], GuidingWisdom.PREPARE, true)
 	var loaded: City = GameState.restore_city(GameState.capture_city(city))
 	_check(loaded.social.wisdoms == city.social.wisdoms and loaded.households[0].wisdom_conduct == city.households[0].wisdom_conduct, "wisdoms and conduct are saved")
+	GuidingWisdom.choose(city, GuidingWisdom.PRIDE)
+	city.settlement.stage = SettlementStage.VILLAGE
+	GuidingWisdom.choose(city, GuidingWisdom.ENDURE)
+	var village: City = GameState.restore_city(GameState.capture_city(city))
+	_check(village.social.wisdoms.size() == 3 and GuidingWisdom.get_slots(village) == 3 and not GuidingWisdom.can_choose(village, GuidingWisdom.RESPECT), "an Elder's three wisdoms are saved, with no slot left")
 	var older: City = social_city()
 	older.social.set_promoted(TownSocial.NORM_HELP, true)
 	var data: Dictionary = GameState.capture_city(older)

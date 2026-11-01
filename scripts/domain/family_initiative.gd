@@ -78,7 +78,10 @@ static func stays_free_to_build(city: City) -> bool:
 	return free <= city.influence.reserved_builders
 
 static func take_up_work(city: City, household: Household) -> ConstructionProject:
-	var food_short: bool = GuidingWisdom.is_food_short(city)
+	var short: Array[String] = []
+	for activity: String in ACTIVITIES:
+		if GuidingWisdom.is_short_of(city, activity):
+			short.append(activity)
 	var choices: Array[Dictionary] = []
 	for activity: String in ACTIVITIES:
 		var desire: Dictionary = get_work_desire(city, household, activity)
@@ -99,8 +102,8 @@ static func take_up_work(city: City, household: Household) -> ConstructionProjec
 			continue
 		city.influence.workplaces_opened += 1
 		# A family chooses its work once (it does not reconsider it), so only this choice counts.
-		if food_short:
-			GuidingWisdom.record(city, household, GuidingWisdom.PREPARE, choice["activity"] == TownInfluence.ACTIVITY_FOOD)
+		if not short.is_empty():
+			GuidingWisdom.record(city, household, GuidingWisdom.PREPARE, short.has(choice["activity"]))
 		use_first_claim(city, household, project)
 		note(city, household, "Took up %s (%s)" % [describe_type(building_type), "; ".join(get_reasons(choice["terms"], true))])
 		return project
@@ -205,7 +208,7 @@ static func get_work_desire(city: City, household: Household, activity: String) 
 			else:
 				add(terms, -2.5 * producers, "others already make tools")
 	add_encouragement(city, household, activity, terms, "the gathering asks for " + TownInfluence.get_activity_name(activity))
-	if activity == TownInfluence.ACTIVITY_FOOD and GuidingWisdom.is_food_short(city):
+	if GuidingWisdom.is_short_of(city, activity):
 		GuidingWisdom.add_appeal(city, household, GuidingWisdom.PREPARE, terms)
 	return {"score": sum(terms), "terms": terms}
 

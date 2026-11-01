@@ -31,7 +31,7 @@ const NAMES: Dictionary = {ENDURE: "We Endure Together", RESPECT: "Respect What 
 const MEANINGS: Dictionary = {
 	ENDURE: "Mutual help, sharing and shared responsibility: families give time to neighbours in need and share in a shortage.",
 	RESPECT: "Property, boundaries and what each family achieves: families make amends for harm to others' fields and do not press for land others hold.",
-	PREPARE: "Caution and readiness for shortage: families keep something back rather than give it away, hold off spending the stores as winter nears, and take up food work as stores run low.",
+	PREPARE: "Caution and readiness for shortage: families keep something back rather than give it away, hold off spending the stores as winter nears, and take up the work of whatever the town runs dangerously short of: food, wood or tools.",
 	PRIDE: "Craft and diligence: families improve their work into proper workplaces and put long days into their own building.",
 }
 # The expectation each wisdom is (TownSocial norms).
@@ -106,21 +106,26 @@ static func add_appeal(city: City, household: Household, wisdom: String, terms: 
 
 # Whether Prepare for Hard Times asks a family to hold off improving into `proper_type`: as winter
 # nears (autumn and winter), when an improvement spends the stores the town will need. Never an
-# improvement to food work while the town's food is short: growing more food then is preparing.
-# (A first version also asked it whenever food ran under three months, which held back the food
-# work a short town most needed: docs/GUIDING_WISDOM.md, first comparison.)
+# improvement to work whose output the town is short of (FamilyInitiative.get_waiting_risk): more
+# food, wood or tools then is preparing. A town that runs out of tools loses its workplaces' upkeep
+# through the winter as surely as one that runs out of food goes hungry. (The first versions
+# exempted only food, and two marginal towns deferred their toolmakers into the tool cliff:
+# docs/GUIDING_WISDOM.md, comparison; owner, 2026-10-31.) The improvement still spends stores and
+# is still weighed as every improvement is; the wisdom only stops counting against it.
 static func asks_to_hold_off(city: City, proper_type: String) -> bool:
 	if city.get_season_index() < 2:
 		return false
-	var activity: String = FamilyInitiative.get_activity(proper_type)
-	return not (activity == TownInfluence.ACTIVITY_FOOD and FamilyInitiative.get_waiting_risk(city, activity) > 0.0)
+	return FamilyInitiative.get_waiting_risk(city, FamilyInitiative.get_activity(proper_type)) <= 0.0
 
-# Whether the town's stores of food are running low enough for Prepare for Hard Times to ask a family
-# choosing its work to take up food work: under three months. (A first version also asked it while
-# the town grew less than it ate, which is every town at its founding, before any field: all the
+# Whether the town runs short enough of an activity's output for Prepare for Hard Times to ask a
+# family choosing its work to take it up: food under three months in store; wood or tools as low as
+# FamilyInitiative.get_waiting_risk counts dangerous. (A first version also counted food while the
+# town grew less than it ate, which is every town at its founding, before any field: all the
 # founders were drawn to food work and none to tools; docs/GUIDING_WISDOM.md, first comparison.)
-static func is_food_short(city: City) -> bool:
-	return FamilyInitiative.get_food_days(city) < 90.0
+static func is_short_of(city: City, activity: String) -> bool:
+	if activity == TownInfluence.ACTIVITY_FOOD:
+		return FamilyInitiative.get_food_days(city) < 90.0
+	return FamilyInitiative.get_waiting_risk(city, activity) > 0.0
 
 # A family met a choice a held wisdom concerns, and kept to it or not. Counted toward its own
 # experience of the wisdom (review), and, for the two expectations the wisdoms add, toward how far

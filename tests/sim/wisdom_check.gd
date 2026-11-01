@@ -3,7 +3,8 @@ extends SceneTree
 # Guiding wisdom check (docs/GUIDING_WISDOM.md): the same towns, seeds and founders under no wisdom
 # and each of the six pairs of the four starting wisdoms, chosen at founding and kept; and two pairs
 # stacked with a community priority (one that reinforces, one that pulls against a wisdom) beside
-# those priorities alone. Families lead, the social model is on, starting residential land; the
+# those priorities alone; and one pair given a third wisdom by the village's Elder (the day the
+# town becomes a Village). Families lead, the social model is on, starting residential land; the
 # stand-in player builds nothing else. Measured at three and six years:
 #
 # - cultural divergence: the share of families holding each wisdom's qualities and
@@ -40,6 +41,9 @@ const STRATEGIES: Array = [
 	{"name": "endure+respect|cooperation", "wisdoms": ["endure", "respect"], "priority": CommunityPriority.COOPERATION},
 	{"name": "investment", "wisdoms": [], "priority": CommunityPriority.INVESTMENT},
 	{"name": "prepare+pride|investment", "wisdoms": ["prepare", "pride"], "priority": CommunityPriority.INVESTMENT},
+	# The Elder's third slot: the same pair, with a third wisdom chosen the day the town is a Village.
+	{"name": "endure+respect>pride", "wisdoms": ["endure", "respect"], "priority": "", "village": "pride"},
+	{"name": "endure+respect>prepare", "wisdoms": ["endure", "respect"], "priority": "", "village": "prepare"},
 ]
 const DIFFICULT_POOL_REGIONS: int = 30
 const REFERENCE_DAYS: int = 720
@@ -104,6 +108,8 @@ func play(site: Dictionary, strategy: Dictionary, stress: bool, years: int) -> D
 				GuidingWisdom.choose(town, W[key])
 			if str(strategy["priority"]) != "":
 				town.influence.set_priority(str(strategy["priority"]))
+		if strategy.has("village") and GuidingWisdom.choose(town, W[strategy["village"]]):
+			town.set_meta("third_wisdom_day", day)
 		if day == SNAPSHOT_YEAR * Calendar.DAYS_PER_YEAR - 1:
 			measured[SNAPSHOT_YEAR] = measure(town)
 	var result: Dictionary = StandInPlayerScript.new().play(city, scenario, years * Calendar.DAYS_PER_YEAR)
@@ -122,6 +128,9 @@ func measure(city: City) -> Dictionary:
 	m["people"] = city.get_total_population()
 	m["households"] = households.size()
 	m["kept_families"] = 1 if households.size() >= EconomyBalance.FOUNDING_FAMILIES else 0
+	m["village"] = 1 if city.settlement.stage >= SettlementStage.VILLAGE else 0
+	m["wisdoms"] = city.social.wisdoms.size()
+	m["third_wisdom_day"] = int(city.get_meta("third_wisdom_day", -1))
 	m["departed"] = int(city.resources.get("departed_households", 0))
 	var trust: float = 0.0
 	var unhoused: int = 0
