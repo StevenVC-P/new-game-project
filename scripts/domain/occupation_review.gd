@@ -8,16 +8,22 @@ extends RefCounted
 # - its work is against its calling, while work of its calling is something it could take up;
 # - its workplace has stood short of tools (worked by hand, or idle) for a season;
 # - the town has more than enough of what it makes, while it is short of something else, for a season;
-# - its home has come to lie much farther from its work than when it took it up, for a season.
+# - its home has come to lie much farther from its work than when it took it up, for a season;
+# - the town will run out of something it cannot do without (tools for its workplaces' upkeep,
+#   food, what its workplaces use) within the season, with what it holds and makes
+#   (FamilyInitiative.get_shortage). This danger does not wait for the family's two seasons at its
+#   work or its year between reviews: a family looks again after a month at its work, and a season
+#   after it last looked, while the danger lasts (owner, 2026-11-01).
 #
 # A reason only starts a review; it does not decide it. The family weighs staying against the
 # other work it could take up, with the same reasoning as its first choice (calling, what the
-# town needs, the priority's ask, Prepare for Hard Times), and staying carries what it would lose:
-# what it has built up, the years it has worked there, its workplace standing idle, its
-# temperament, and the walk to work. It changes only when the other work is clearly better
-# (CHANGE_MARGIN), at most once a year (REVIEW_INTERVAL_DAYS), and at most MAX_CHANGES_PER_MONTH
-# families a month in the town. A Community Priority or a Guiding Wisdom weighs in, but never
-# starts a review (owner, 2026-10-31).
+# town needs and how near a shortage is, the land, the priority's ask, Prepare for Hard Times), and
+# staying carries what it would lose: what it has built up and knows, the years it has worked
+# there, its workplace standing idle, its temperament, and the walk to work. It changes only when
+# the other work is clearly better (CHANGE_MARGIN), at most once a year (REVIEW_INTERVAL_DAYS)
+# unless danger brings it back sooner, and at most MAX_CHANGES_PER_MONTH families a month in the
+# town. A Community Priority or a Guiding Wisdom weighs in, but never starts a review (owner,
+# 2026-10-31): a shortage starts one only from the town's stores and workplaces.
 #
 # Changing: the family opens hand work for the new activity where land is free (no contests),
 # keeps its old work until that is built, then leaves it. The old workplace stays standing, empty
@@ -47,11 +53,18 @@ const TRAVEL_TRIGGER: float = 0.25
 const TRAVEL_TRIGGER_RISE: float = 0.15
 const FOOD_PLENTY_RATIO: float = 1.6
 const OTHER_PRODUCERS_PLENTY: int = 2
+# An essential shortage starts a review once this much of the coming season's use is missing from
+# the stores (FamilyInitiative.get_shortage), after this long at its work, and this long after it
+# last looked.
+const SHORTAGE_TRIGGER: float = 0.25
+const SHORTAGE_MIN_TENURE_DAYS: int = 30
+const SHORTAGE_REVIEW_INTERVAL_DAYS: int = 90
 
 const CALLING: String = "calling"
 const TOOLS: String = "short_of_tools"
 const OVERSUPPLY: String = "oversupplied"
 const DISTANCE: String = "distance"
+const SHORTAGE: String = "essential_shortage"
 
 static func is_on(city: City) -> bool:
 	return city.influence.enabled and city.influence.reconsider_work
@@ -78,11 +91,17 @@ static func advance_month(city: City) -> void:
 		update_strain(city, household, holding)
 		if is_due(city, household) and not get_triggers(city, household, holding).is_empty():
 			candidates.append(household)
+		elif is_due_in_danger(city, household) and get_triggers(city, household, holding).has(SHORTAGE):
+			candidates.append(household)
 	# The longest-waiting first, so the town's limit does not always pass over the same families.
 	candidates.sort_custom(func(a: Household, b: Household) -> bool: return a.work_review_day < b.work_review_day or (a.work_review_day == b.work_review_day and a.id < b.id))
 	for household: Household in candidates:
 		var holding: Building = FamilyInitiative.get_holding(city, household)
 		var triggers: Array[String] = get_triggers(city, household, holding)
+		# A danger another family has just answered this month is no longer a reason, and a family
+		# brought forward only by the danger does not look again early for its other reasons.
+		if triggers.is_empty() or (not is_due(city, household) and not triggers.has(SHORTAGE)):
+			continue
 		var decision: Dictionary = weigh(city, household, holding)
 		if bool(decision["change"]) and changes >= get_change_limit(city):
 			# Another family is already changing its work this month; this one looks again next month.
@@ -98,7 +117,7 @@ static func advance_month(city: City) -> void:
 			changes += 1
 		else:
 			stay(city, household, holding, decision)
-		city.influence._work_review_log.append({"day": today, "household": household.id, "families": city.households.size(), "from": FamilyInitiative.get_activity(holding.type), "proper": not holding.is_tier0(), "to": decision["activity"], "changed": changed, "triggers": triggers, "margin": float(decision["margin"]), "appeal": float(decision["appeal"]), "stay_appeal": float(decision["stay_appeal"]), "for": FamilyInitiative.get_reasons(decision["alternative_terms"], true, 2), "against": FamilyInitiative.get_reasons(decision["stay_terms"], true, 2)})
+		city.influence._work_review_log.append({"day": today, "household": household.id, "families": city.households.size(), "from": BuildingTiers.get_base_type(holding.type), "proper": not holding.is_tier0(), "to": decision["activity"], "changed": changed, "triggers": triggers, "margin": float(decision["margin"]), "appeal": float(decision["appeal"]), "stay_appeal": float(decision["stay_appeal"]), "for": FamilyInitiative.get_reasons(decision["alternative_terms"], true, 2), "against": FamilyInitiative.get_reasons(decision["stay_terms"], true, 2)})
 
 # The town's monthly limit; the comparison may lift it (meta "work_change_limit", 0 for none).
 static func get_change_limit(city: City) -> int:
@@ -113,6 +132,15 @@ static func is_due(city: City, household: Household) -> bool:
 		return false
 	return household.work_review_day < 0 or today - household.work_review_day >= REVIEW_INTERVAL_DAYS
 
+# Sooner, when the town is in danger of running out of something essential.
+static func is_due_in_danger(city: City, household: Household) -> bool:
+	var today: int = city.construction.day
+	if household.labor_capacity <= 0 or household.work_change_from >= 0 or FamilyInitiative.has_own_project(city, household):
+		return false
+	if today - household.work_since < SHORTAGE_MIN_TENURE_DAYS:
+		return false
+	return household.work_review_day < 0 or today - household.work_review_day >= SHORTAGE_REVIEW_INTERVAL_DAYS
+
 # Months each reason has held, reset when it lapses.
 static func update_strain(city: City, household: Household, holding: Building) -> void:
 	var holds: Dictionary = {
@@ -126,20 +154,30 @@ static func update_strain(city: City, household: Household, holding: Building) -
 # The reasons that would make the family look at its work again now.
 static func get_triggers(city: City, household: Household, holding: Building) -> Array[String]:
 	var triggers: Array[String] = []
-	if is_against_calling(household, holding):
+	if is_against_calling(city, household, holding):
 		triggers.append(CALLING)
 	for reason: String in [TOOLS, OVERSUPPLY, DISTANCE]:
 		if int(household.work_strain.get(reason, 0)) >= STRAIN_MONTHS:
 			triggers.append(reason)
+	if get_danger(city, FamilyInitiative.get_activity(holding.type)) >= SHORTAGE_TRIGGER:
+		triggers.append(SHORTAGE)
 	return triggers
+
+# The worst essential shortage the town faces in a good other than `own` (FamilyInitiative.get_shortage).
+static func get_danger(city: City, own: String) -> float:
+	var worst: float = 0.0
+	for good: String in FamilyInitiative.ACTIVITIES:
+		if good != own:
+			worst = maxf(worst, FamilyInitiative.get_shortage(city, good))
+	return worst
 
 # Work against its calling (a poor match, or a calling ambition waiting past its patience) while
 # work of its calling is among what families take up themselves.
-static func is_against_calling(household: Household, holding: Building) -> bool:
+static func is_against_calling(city: City, household: Household, holding: Building) -> bool:
 	if not household.has_values():
 		return false
-	var current: String = FamilyInitiative.get_activity(holding.type)
-	var calling_work: bool = FamilyInitiative.ACTIVITIES.any(func(a: String) -> bool: return a != current and household.get_match_quality(FamilyInitiative.PROPER_WORK[a]) == CultureEffects.MATCH_GOOD)
+	var current: String = BuildingTiers.get_base_type(holding.type)
+	var calling_work: bool = FamilyInitiative.get_occupations(city).any(func(o: String) -> bool: return o != current and household.get_match_quality(o) == CultureEffects.MATCH_GOOD)
 	if not calling_work:
 		return false
 	var poor: bool = household.get_match_quality(holding.type) == CultureEffects.MATCH_POOR
@@ -161,30 +199,36 @@ static func is_far(city: City, household: Household, holding: Building) -> bool:
 
 # Staying against the best other work: {"change", "activity", "margin", "stay_terms",
 # "alternative_terms", "appeal" (the priority's ask for the other work), "stay_appeal"}.
+# "activity" is the trade it would change to (a proper workplace type), "site" where it would open
+# it when the land decides that.
 static func weigh(city: City, household: Household, holding: Building) -> Dictionary:
-	var current: String = FamilyInitiative.get_activity(holding.type)
+	var current: String = BuildingTiers.get_base_type(holding.type)
 	var staying: Dictionary = get_stay_desire(city, household, holding)
 	var stay_score: float = float(staying["score"]) + FamilyInitiative.get_noise(city, household, "stay_at_work")
-	var best: Dictionary = {}
+	var best: Dictionary = {"terms": []}
 	var best_activity: String = ""
 	var best_score: float = -INF
-	for activity: String in FamilyInitiative.ACTIVITIES:
-		if activity == current:
+	for occupation: String in FamilyInitiative.get_occupations(city):
+		if occupation == current:
 			continue
-		var desire: Dictionary = FamilyInitiative.get_work_desire(city, household, activity)
-		var score: float = float(desire["score"]) + FamilyInitiative.get_noise(city, household, "change_to_" + activity)
+		var desire: Dictionary = FamilyInitiative.get_work_desire(city, household, occupation)
+		if not bool(desire["available"]):
+			continue
+		var score: float = float(desire["score"]) + FamilyInitiative.get_noise(city, household, "change_to_" + FamilyInitiative.get_choice_key(occupation))
 		if score > best_score:
 			best_score = score
 			best = desire
-			best_activity = activity
+			best_activity = occupation
 	var margin: float = best_score - stay_score
-	return {"change": margin >= CHANGE_MARGIN, "activity": best_activity, "margin": margin, "stay_terms": staying["terms"], "alternative_terms": best["terms"], "appeal": float(best.get("appeal", 0.0)), "stay_appeal": float(staying.get("appeal", 0.0))}
+	var decision: Dictionary = {"change": margin >= CHANGE_MARGIN, "activity": best_activity, "margin": margin, "stay_terms": staying["terms"], "alternative_terms": best["terms"], "appeal": float(best.get("appeal", 0.0)), "stay_appeal": float(staying.get("appeal", 0.0))}
+	if best.has("site"):
+		decision["site"] = best["site"]
+	return decision
 
 # How much a family wants to keep its work: the same desire as choosing it (calling, the town's
-# need, the priority's ask, Prepare), and what it would give up, in its own words.
+# need, the land, the priority's ask, Prepare), and what it would give up, in its own words.
 static func get_stay_desire(city: City, household: Household, holding: Building) -> Dictionary:
-	var current: String = FamilyInitiative.get_activity(holding.type)
-	var desire: Dictionary = FamilyInitiative.get_work_desire(city, household, current, holding)
+	var desire: Dictionary = FamilyInitiative.get_work_desire(city, household, BuildingTiers.get_base_type(holding.type), holding)
 	var terms: Array = desire["terms"]
 	var name: String = FamilyInitiative.describe_type(holding.type, false)
 	var proper: bool = not holding.is_tier0()
@@ -217,9 +261,10 @@ static func someone_could_take_over(city: City, household: Household) -> bool:
 
 # Opens hand work for the new activity where land is free; the old work is left once it is built.
 static func change_work(city: City, household: Household, holding: Building, decision: Dictionary) -> bool:
-	var activity: String = decision["activity"]
-	var building_type: String = FamilyInitiative.HAND_WORK[activity]
-	var site: Vector2i = FamilyInitiative.choose_site(city, household, building_type)
+	var occupation: String = decision["activity"]
+	var activity: String = FamilyInitiative.get_activity(occupation)
+	var building_type: String = BuildingTiers.get_hand_work_type(occupation)
+	var site: Vector2i = decision["site"] if decision.has("site") else FamilyInitiative.choose_site(city, household, building_type)
 	if site.x < 0:
 		decision["blocked"] = "it found no free land for %s" % FamilyInitiative.describe_type(building_type)
 		return false
@@ -256,7 +301,7 @@ static func stay(city: City, household: Household, holding: Building, decision: 
 		var key: String = reason.split(" (")[0]
 		city.influence.work_stay_reasons[key] = int(city.influence.work_stay_reasons.get(key, 0)) + 1
 	var tempted: Array[String] = FamilyInitiative.get_reasons(decision["alternative_terms"], true, 2)
-	var text: String = "Thought of %s, but keeps its %s (%s)" % [FamilyInitiative.describe_type(FamilyInitiative.HAND_WORK[decision["activity"]]) + (" (" + "; ".join(tempted) + ")" if not tempted.is_empty() else ""), FamilyInitiative.describe_type(holding.type, false), "; ".join(reasons)]
+	var text: String = "Thought of %s, but keeps its %s (%s)" % [FamilyInitiative.describe_type(BuildingTiers.get_hand_work_type(decision["activity"])) +(" (" + "; ".join(tempted) + ")" if not tempted.is_empty() else ""), FamilyInitiative.describe_type(holding.type, false), "; ".join(reasons)]
 	FamilyInitiative.note(city, household, text)
 	set_review_note(city, household, text)
 

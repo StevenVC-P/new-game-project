@@ -145,10 +145,10 @@ func test_conflicting_wisdoms_pull_both_ways() -> void:
 	_check(GuidingWisdom.asks_to_hold_off(other, "woodcutter"), "while wood is plentiful it still asks to hold off a woodcutter")
 	other.resources["wood"] = 5
 	_check(not GuidingWisdom.asks_to_hold_off(other, "woodcutter"), "but not while wood runs out")
-	_check(has_reason(FamilyInitiative.get_work_desire(other, family, TownInfluence.ACTIVITY_TOOLS)["terms"], "keep something back", 1.0), "and a family choosing its work is asked to take up the work the town is short of")
+	_check(has_reason(FamilyInitiative.get_work_desire(other, family, "toolmaker")["terms"], "keep something back", 1.0), "and a family choosing its work is asked to take up the work the town is short of")
 	other.resources["food"] = 5000
 	other.resources["tools"] = 100
-	_check(not has_reason(FamilyInitiative.get_work_desire(other, family, TownInfluence.ACTIVITY_TOOLS)["terms"], "keep something back", 1.0), "not when tools are plentiful")
+	_check(not has_reason(FamilyInitiative.get_work_desire(other, family, "toolmaker")["terms"], "keep something back", 1.0), "not when tools are plentiful")
 
 # 5. A family's conduct becomes its own experience once it has met the wisdom's choice a few times,
 # at most once a season; it draws lessons by its own lights.

@@ -53,7 +53,9 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/wisdom_check.gd -- --conditions=ordinary --strategies=none,endure+respect > wis.log
 
 # Families reconsidering their work (docs/OCCUPATION_RECONSIDERATION.md): the rules; then the wisdom check's towns with
-# reconsideration on and off ("-- --no-reconsider"), and with the monthly limit lifted ("-- --change-limit=0")
+# reconsideration on and off ("-- --no-reconsider"), and with the monthly limit lifted ("-- --change-limit=0").
+# Every work decision traced (docs/WORKPLACE_CHOICE_INVESTIGATION.md; filter for [WPC]):
+# res://tests/sim/workplace_choice_check.gd -- --conditions=ordinary > wpc.log
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/occupation_review_validation.gd
 
 # Emergent recognition and the Speaker of the Gathering (docs/EMERGENT_RECOGNITION_AND_LEADERSHIP.md): the rules; then the
@@ -69,6 +71,15 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # with a disruption in the second autumn ("--disrupt=specialist" or "--disrupt=stores")
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/household_economy_validation.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/wisdom_check.gd -- --conditions=difficult --strategies=none --no-self-sufficiency > hse_off.log
+
+# Autonomous occupations and essential shortages (docs/AUTONOMOUS_OCCUPATIONS.md): the rules; then the wisdom check's
+# towns under four modes, one per process: existing (the first three trades, no shortage seen), occupations (fishing,
+# hunting, herding as families' own choice), shortage (a shortage seen coming starts an early review), both
+# (filter for [OCC]; "-- --years=N --sites=N --priority=investment"); and a copy of a saved game's town replayed under a
+# mode, every work decision traced with the priority's part ("--no-priority" clears it; filter for [REPLAY])
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/autonomous_occupations_validation.gd
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/occupation_check.gd -- --conditions=ordinary --modes=both > occ.log
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/autosave_replay.gd -- --save=C:/path/to/copy.save --mode=both --days=360 > replay.log
 
 # Home sites (docs/HOME_SITES.md): families choosing their own sites on land set aside, preferred land, no land, no
 # overlap, explanations, starting land, land reserved from work, shared works among homes, preferred land between equal sites, explanations

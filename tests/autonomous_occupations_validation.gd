@@ -1,0 +1,266 @@
+extends SceneTree
+
+# Autonomous occupations and essential shortages (docs/AUTONOMOUS_OCCUPATIONS.md): every trade with a
+# hand-work stage is a family's own choice, opened as hand work and improved later, where the land
+# allows it; and a family sees an essential shortage coming and looks at its work again early, the
+# danger weighed against its calling, skill and investment rather than deciding for it.
+
+const ConstructionTest = preload("res://tests/town_construction_validation.gd")
+
+var failure_count: int = 0
+
+func _init() -> void:
+	call_deferred("run_all")
+
+func run_all() -> void:
+	test_every_trade_with_hand_work_is_a_choice()
+	test_water_family_fishes_by_hand()
+	test_no_water_no_fishing()
+	test_loom_family_herds()
+	test_hand_work_improves_into_proper()
+	test_shortage_seen_coming()
+	test_shortage_competes_but_does_not_decide()
+	test_shortage_starts_an_early_review()
+	if failure_count > 0:
+		push_error("Autonomous occupations validation failed: " + str(failure_count) + " failure(s)")
+		quit(1)
+		return
+	print("Autonomous occupations validation passed.")
+	quit()
+
+func profile(calling: String) -> Dictionary:
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = 7
+	var preset: Dictionary = {
+		CultureValues.CATEGORY_CALLING: [calling],
+		CultureValues.CATEGORY_WORK_ETHIC: ["steady"],
+		CultureValues.CATEGORY_KIN: ["fathers_line"],
+		CultureValues.CATEGORY_WEALTH: ["sharing"],
+		CultureValues.CATEGORY_TRADE_COIN: ["fair_dealers"],
+		CultureValues.CATEGORY_AUTHORITY: ["lawful"],
+		CultureValues.CATEGORY_CHANGE_RISK: ["rooted"],
+		CultureValues.CATEGORY_CRAFT_LEARNING: ["hands_on"],
+		CultureValues.CATEGORY_CONFLICT: ["pragmatic"],
+		CultureValues.CATEGORY_FAITH: ["worldly"],
+		CultureValues.CATEGORY_COMMUNITY: ["welcoming"],
+		CultureValues.CATEGORY_HOME_PLACE: ["monument_makers"],
+	}
+	return CultureValues.make_random_profile(rng, preset)
+
+func set_calling(household: Household, calling: String) -> void:
+	household.set_values(profile(calling))
+	for axis: String in HouseholdCharacter.AXES:
+		household.personality[axis] = 0
+	household.value_strengths.clear()
+	for value_id: String in HouseholdCharacter.get_held_values(household):
+		household.value_strengths[value_id] = 0
+
+# Families lead, plenty in store, every family of the soil with a neutral temperament. The test map
+# has farmland along the top, woods down the right edge and a lake in the bottom left.
+func town(map: Array = []) -> City:
+	var city: City = ConstructionTest.make_city()
+	if not map.is_empty():
+		city.local_map = map
+	city.influence.enabled = true
+	city.resources["food"] = 5000
+	city.resources["wood"] = 500
+	city.resources["tools"] = 200
+	for household: Household in city.households:
+		set_calling(household, "soil")
+	return city
+
+func give(city: City, household: Household, type: String, origin: Vector2i) -> Building:
+	var building: Building = Building.new(-1, type, origin, city.construction.get_size(type))
+	city.add_building(building, household)
+	return building
+
+# Every family but one at work on a farm, out of the way.
+func busy_everyone_else(city: City, except: Household) -> void:
+	var x: int = 14
+	for other: Household in city.households:
+		if other != except and FamilyInitiative.get_holding(city, other) == null:
+			give(city, other, "farm", Vector2i(x, 4))
+			x += 4
+
+func reasons(terms: Array) -> String:
+	return " | ".join(terms.map(func(t: Dictionary) -> String: return "%s %.2f" % [t["reason"], float(t["weight"])]))
+
+func has_reason(terms: Array, text: String) -> bool:
+	return terms.any(func(t: Dictionary) -> bool: return str(t["reason"]).contains(text))
+
+func own_project(city: City, household: Household) -> ConstructionProject:
+	for project: ConstructionProject in city.construction.projects:
+		if project.requester_household_id == household.id and not project.is_home():
+			return project
+	return null
+
+# 1. The trades families choose come from the hand-work stages; the comparison can keep the first three.
+func test_every_trade_with_hand_work_is_a_choice() -> void:
+	var city: City = town()
+	var occupations: Array[String] = FamilyInitiative.get_occupations(city)
+	_check(occupations == (["farm", "woodcutter", "toolmaker", "fisher", "hunter", "herder"] as Array[String]), "every trade with a hand-work stage is a choice, the first three first: %s" % str(occupations))
+	for pair: Array in [["fish_weir", "fisher"], ["snare_line", "hunter"], ["grazing_pen", "herder"]]:
+		_check(BuildingTiers.get_upgrade_type(pair[0]) == pair[1] and BuildingTiers.get_hand_work_type(pair[1]) == pair[0], "%s improves into %s" % pair)
+		_check(EconomyBalance.get_build_cost(pair[0]).is_empty(), "%s needs no materials, like all hand work" % pair[0])
+		_check(city.construction.get_size(pair[0]) == city.construction.get_size(pair[1]), "%s stands on its proper workplace's footprint" % pair[0])
+	_check(FamilyInitiative.get_activity("fish_weir") == "food" and FamilyInitiative.get_activity("snare_line") == "food" and FamilyInitiative.get_activity("grazing_pen") == "wool", "each trade is weighed by the good it makes")
+	_check(FamilyInitiative.get_activity("house") == "" and FamilyInitiative.get_activity("hut") == "", "a home is not a trade")
+	city.set_meta("occupations_first_three", true)
+	_check(FamilyInitiative.get_occupations(city) == (["farm", "woodcutter", "toolmaker"] as Array[String]), "the comparison can leave families only the first three")
+
+# 2. A family of the water, free to choose with the lake in reach, takes up a fish weir, not a
+# fisher's hut, beside the water.
+func test_water_family_fishes_by_hand() -> void:
+	var city: City = town()
+	var family: Household = city.households[0]
+	set_calling(family, "water")
+	busy_everyone_else(city, family)
+	var desire: Dictionary = FamilyInitiative.get_work_desire(city, family, "fisher")
+	_check(bool(desire["available"]) and desire.has("site"), "fishing is open to it where water is in reach")
+	_check(has_reason(desire["terms"], "family's calling"), "it weighs its calling: %s" % reasons(desire["terms"]))
+	# A family with no calling for either is not drawn from fields to the woods: game yields less.
+	var plain: Household = city.households[1]
+	set_calling(plain, "hearth")
+	var hunting: Dictionary = FamilyInitiative.get_work_desire(city, plain, "hunter")
+	_check(has_reason(hunting["terms"], "yields less") or has_reason(hunting["terms"], "little game"), "hunting counts as yielding less than a field: %s" % reasons(hunting["terms"]))
+	_check(float(hunting["score"]) < float(FamilyInitiative.get_work_desire(city, plain, "farm")["score"]), "so a family with no calling for either would rather farm")
+	var project: ConstructionProject = FamilyInitiative.take_up_work(city, family)
+	_check(project != null and project.building_type == "fish_weir", "it takes up a fish weir: %s" % family.initiative_note)
+	if project != null:
+		var beside: bool = false
+		for tile: Vector2i in [project.tile + Vector2i.LEFT, project.tile + Vector2i.RIGHT, project.tile + Vector2i.UP, project.tile + Vector2i.DOWN]:
+			if tile.x >= 0 and tile.y >= 0 and tile.y < city.local_map.size() and tile.x < (city.local_map[0] as Array).size():
+				beside = beside or city.local_map[tile.y][tile.x]["type"] == "water"
+		_check(beside, "beside the water")
+
+# 3. Where no water lies, fishing is not weighed at all, whatever the family's calling.
+func test_no_water_no_fishing() -> void:
+	var map: Array = ConstructionTest.make_map()
+	for row: Array in map:
+		for tile: Dictionary in row:
+			if tile["type"] == "water":
+				tile["type"] = "ground"
+				tile["water_kind"] = ""
+	var city: City = town(map)
+	var family: Household = city.households[0]
+	set_calling(family, "water")
+	busy_everyone_else(city, family)
+	_check(not bool(FamilyInitiative.get_work_desire(city, family, "fisher")["available"]), "without water, fishing is no choice")
+	var project: ConstructionProject = FamilyInitiative.take_up_work(city, family)
+	_check(project != null and project.building_type != "fish_weir", "it takes up other work: %s" % family.initiative_note)
+
+# 4. A family of the loom, in a town that grows plenty of food and goes without clothing, takes up a
+# grazing pen for wool.
+func test_loom_family_herds() -> void:
+	var city: City = town()
+	var family: Household = city.households[0]
+	set_calling(family, "loom")
+	busy_everyone_else(city, family)
+	var desire: Dictionary = FamilyInitiative.get_work_desire(city, family, "herder")
+	_check(has_reason(desire["terms"], "no one makes wool") and has_reason(desire["terms"], "goes without clothing"), "it sees no one makes wool and the town goes without clothing: %s" % reasons(desire["terms"]))
+	var project: ConstructionProject = FamilyInitiative.take_up_work(city, family)
+	_check(project != null and project.building_type == "grazing_pen", "it takes up a grazing pen: %s" % family.initiative_note)
+	var other: Household = city.households[1]
+	give(city, other, "grazing_pen", Vector2i(30, 20))
+	var second: Dictionary = FamilyInitiative.get_work_desire(city, family, "herder")
+	_check(not has_reason(second["terms"], "no one makes wool"), "once someone keeps a flock, that reason is gone")
+
+# 5. Hand work improves into the proper workplace through the same pipeline as any other.
+func test_hand_work_improves_into_proper() -> void:
+	var city: City = town()
+	var family: Household = city.households[0]
+	set_calling(family, "water")
+	family.personality[HouseholdCharacter.RISK] = 2
+	family.personality[HouseholdCharacter.AMBITION] = 2
+	family.personality[HouseholdCharacter.DILIGENCE] = 2
+	busy_everyone_else(city, family)
+	var weir: Building = give(city, family, "fish_weir", Vector2i(12, 33))
+	var project: ConstructionProject = FamilyInitiative.consider_improving(city, family, weir)
+	_check(project != null and project.kind == ConstructionProject.KIND_UPGRADE and project.building_type == "fisher", "an eager family improves its fish weir into a fisher's hut: %s" % family.initiative_note)
+
+# A town short of tools: every family on a proper farm, past its grace, and no one making tools.
+func tool_short_town(tools: int) -> City:
+	var city: City = town()
+	busy_everyone_else(city, null)
+	city.resources["tools"] = tools
+	for building: Building in city.buildings:
+		building.upkeep_grace_days = 0
+	return city
+
+# 6. How near the town is to running out: none while anyone makes tools; none for a good the town
+# only goes without; the comparison can turn it off.
+func test_shortage_seen_coming() -> void:
+	var city: City = tool_short_town(3)
+	var shortage: float = FamilyInitiative.get_shortage(city, "tools")
+	_check(shortage > 0.5, "three tools for six farms' season of upkeep is a shortage coming (%.2f)" % shortage)
+	_check(FamilyInitiative.get_shortage(tool_short_town(200), "tools") == 0.0, "two hundred tools are not")
+	_check(FamilyInitiative.get_shortage(city, "wool") == 0.0, "going without clothing is not an essential shortage")
+	for building: Building in city.buildings:
+		building.upkeep_grace_days = 200
+	_check(FamilyInitiative.get_shortage(city, "tools") == 0.0, "workplaces in their grace draw no upkeep this season")
+	city = tool_short_town(3)
+	var mender: Household = city.households[0]
+	for building: Building in city.buildings:
+		if building.assigned_household_id == mender.id:
+			building.unassign_worker(false)
+	give(city, mender, "tool_mender", Vector2i(40, 20))
+	_check(FamilyInitiative.get_shortage(city, "tools") == 0.0, "once a family makes tools, the town is not without them")
+	city = tool_short_town(3)
+	city.set_meta("no_shortage_recognition", true)
+	_check(FamilyInitiative.get_shortage(city, "tools") == 0.0, "the comparison can turn recognition off")
+
+# 7. The danger competes with a family's reasons; it does not decide for it. A family with no calling
+# for farming and little invested leaves for tools; a family of the soil on its own farm stays.
+func test_shortage_competes_but_does_not_decide() -> void:
+	var city: City = tool_short_town(0)
+	var free: Household = city.households[0]
+	set_calling(free, "hearth")
+	var farm: Building = FamilyInitiative.get_holding(city, free)
+	var decision: Dictionary = OccupationReview.weigh(city, free, farm)
+	_check(bool(decision["change"]) and decision["activity"] == "toolmaker" and has_reason(decision["alternative_terms"], "run out of tools"), "a family with no calling for its farm leaves it for tools as they run out (margin %.2f): %s" % [float(decision["margin"]), reasons(decision["alternative_terms"])])
+	city.set_meta("no_shortage_recognition", true)
+	var blind: Dictionary = OccupationReview.weigh(city, free, farm)
+	_check(not bool(blind["change"]), "without seeing the danger it would stay (margin %.2f)" % float(blind["margin"]))
+	city.remove_meta("no_shortage_recognition")
+	var soil: Household = city.households[1]
+	var own: Building = FamilyInitiative.get_holding(city, soil)
+	var kept: Dictionary = OccupationReview.weigh(city, soil, own)
+	_check(not bool(kept["change"]), "a family of the soil on its own farm stays (margin %.2f): %s" % [float(kept["margin"]), reasons(kept["stay_terms"])])
+	HouseholdEconomy.ensure_seeded(city, soil)
+	soil.proficiency["toolmaker"] = HouseholdEconomy.ESTABLISHED
+	var skilled: Dictionary = FamilyInitiative.get_work_desire(city, soil, "toolmaker")
+	_check(has_reason(skilled["terms"], "it knows the work"), "a family that knows toolmaking still counts it: %s" % reasons(skilled["terms"]))
+
+# 8. The danger starts a review early, after a month at the work rather than two seasons; a priority
+# alone, without the danger, never does.
+func test_shortage_starts_an_early_review() -> void:
+	var city: City = tool_short_town(0)
+	var family: Household = city.households[0]
+	set_calling(family, "hearth")
+	var farm: Building = FamilyInitiative.get_holding(city, family)
+	city.construction.day = 400
+	for household: Household in city.households:
+		var holding: Building = FamilyInitiative.get_holding(city, household)
+		household.work_building_id = holding.id
+		household.work_since = city.construction.day - (40 if household == family else 10)
+	_check(not OccupationReview.is_due(city, family), "forty days at its work is too soon for an ordinary review")
+	_check(OccupationReview.get_triggers(city, family, farm).has(OccupationReview.SHORTAGE) and OccupationReview.is_due_in_danger(city, family), "but not when tools are running out")
+	OccupationReview.advance_month(city)
+	_check(city.influence.work_reviews == 1 and int(city.influence.work_triggers.get(OccupationReview.SHORTAGE, 0)) == 1, "it looks at its work again, and only it (reviews %d)" % city.influence.work_reviews)
+	_check(own_project(city, family) != null and own_project(city, family).building_type == "tool_mender", "and takes up mending tools by hand: %s" % family.work_review_note)
+	var calm: City = tool_short_town(200)
+	calm.set_meta("work_change_limit", 0)
+	calm.influence.set_priority(CommunityPriority.INVESTMENT)
+	calm.construction.day = 400
+	for household: Household in calm.households:
+		var holding: Building = FamilyInitiative.get_holding(calm, household)
+		household.work_building_id = holding.id
+		household.work_since = calm.construction.day - 40
+	OccupationReview.advance_month(calm)
+	_check(calm.influence.work_reviews == 0, "the gathering asking for tools starts no review while tools are plentiful")
+
+func _check(condition: bool, message: String) -> void:
+	if condition:
+		return
+	failure_count += 1
+	push_error(message)

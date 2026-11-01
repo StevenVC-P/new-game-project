@@ -109,6 +109,18 @@ func get_reach_factor(building: Building) -> float:
 		_reach[building.id] = get_reach_factor_at(building.type, building.tile, building.size)
 	return float(_reach[building.id])
 
+# What a workplace's yield depends on in its reach ("water", "woods", "pasture"), or "" when the
+# land around it does not matter.
+static func get_reach_kind(building_type: String) -> String:
+	match BuildingTiers.get_base_type(building_type):
+		Building.BUILDING_FISHER:
+			return "water"
+		Building.BUILDING_HUNTER:
+			return "woods"
+		Building.BUILDING_HERDER:
+			return "pasture"
+	return ""
+
 func get_reach_factor_at(building_type: String, origin: Vector2i, size: Vector2i) -> float:
 	var base: String = BuildingTiers.get_base_type(building_type)
 	var found: int = 0

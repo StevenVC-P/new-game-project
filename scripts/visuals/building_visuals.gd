@@ -6,7 +6,8 @@ extends RefCounted
 # later sprite or texture renderer can take the same keys.
 #
 # Tier 0 hand work (hut, forager's garden, gatherer's camp, tool mender) has drawings of its
-# own, rougher than its tier 1 counterpart, and its materials are washed toward bare earth.
+# own, rougher than its tier 1 counterpart, and its materials are washed toward bare earth. Hand work
+# without a drawing yet (fish weir, snare line, grazing pen) uses its tier 1 drawing, washed the same.
 
 const ROOF_THATCH: Color = RegionMapStyle.COLOR_ROOF_THATCH
 const ROOF_TIMBER: Color = RegionMapStyle.COLOR_ROOF_TIMBER

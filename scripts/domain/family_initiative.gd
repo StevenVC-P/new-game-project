@@ -5,24 +5,50 @@ extends RefCounted
 # (docs/FAMILY_INFLUENCE_PROTOTYPE.md). It runs only where the town's influence is enabled
 # (TownInfluence.enabled). Every week, through the same construction pipeline as the player:
 #
-# - a family with no holding chooses work to take up (food, wood, or tools) and opens it near its
-#   home as hand work (tier 0), which needs no materials;
+# - a family with no holding chooses work to take up (any trade with a hand-work stage: farming,
+#   woodcutting, toolmaking, fishing, hunting, herding; get_occupations) and opens it near its home
+#   as hand work (tier 0), which needs no materials;
 # - a family on hand work considers improving it into a proper holding.
 #
 # Desire and ability are kept apart. Desire is a sum of terms, each with the reason it gives: the
-# family's calling, temperament and values, what the town needs, what its neighbours' improved
-# work shows, and what the community encourages. Ability is the land, the family's own hands
-# (hand work needs no materials), and the stores under the community's rule (TownInfluence), which
-# always keeps protected reserves. A family can want something it cannot do, and says so.
+# family's calling, temperament and values, what the town needs of the good the work makes, the
+# land in reach, what its neighbours' improved work shows, and what the community encourages.
+# Every trade is weighed by the same terms, by the good it makes rather than by its name, so a new
+# trade needs a hand-work stage (BuildingTiers) and no decision path of its own. Ability is the land,
+# the family's own hands (hand work needs no materials), and the stores under the community's rule
+# (TownInfluence), which always keeps protected reserves. A family can want something it cannot
+# do, and says so.
 #
 # A small, bounded unknown (NOISE) is added to each decision: a family the player is told is on the
 # fence may go either way, while one clearly for or against does what the player was told.
 
 const INTERVAL_DAYS: int = 7
 const MAX_PROJECTS_PER_PASS: int = 3
+# The goods the community's asks and the wisdoms speak of (TownInfluence, GuidingWisdom).
 const ACTIVITIES: Array[String] = [TownInfluence.ACTIVITY_FOOD, TownInfluence.ACTIVITY_WOOD, TownInfluence.ACTIVITY_TOOLS]
-const HAND_WORK: Dictionary = {"food": "forager_garden", "wood": "gatherer_camp", "tools": "tool_mender"}
+# The first three trades, by the good each makes. Their decisions keep these names (get_choice_key),
+# so the unknown in them is what it was before other trades could be chosen; the comparison can
+# leave families only these (meta "occupations_first_three").
 const PROPER_WORK: Dictionary = {"food": "farm", "wood": "woodcutter", "tools": "toolmaker"}
+
+# Seeing an essential shortage coming (get_shortage): how far ahead a family looks, and how much the
+# danger weighs, at its worst, in choosing work.
+const SHORTAGE_HORIZON_DAYS: int = 90
+const SHORTAGE_WEIGHT: float = 4.0
+# Land in reach (TownLand) for work that lives off it: a family weighs what the work would yield
+# where it would stand against the best any work yields of the same good (get_yield_term), at this
+# weight for each share it falls short; and (choose_site) how many tiles of walk a full yield is
+# worth against an empty one. Good land makes such work as good as the best, never better: it only
+# deters where the land is poor or the work yields less by nature.
+const LAND_WEIGHT: float = 3.0
+const LAND_SITE_TILES: float = 8.0
+const LAND_REASONS: Dictionary = {"water": "little water in reach to fish", "woods": "little game in reach", "pasture": "little pasture in reach"}
+# A good the town only goes without (wool, for clothing; goods to come) pulls less than what it
+# lives on (the food, wood and tools terms of get_work_desire, 1.5 to 3 each): no one making it,
+# the need it meets going unmet, and each other family already making it.
+const COMFORT_NONE_WEIGHT: float = 0.5
+const COMFORT_UNMET_WEIGHT: float = 1.0
+const COMFORT_OTHERS_WEIGHT: float = 1.5
 
 # A family improves its work when its desire reaches this.
 const IMPROVE_THRESHOLD: float = 2.0
@@ -83,18 +109,20 @@ static func take_up_work(city: City, household: Household) -> ConstructionProjec
 		if GuidingWisdom.is_short_of(city, activity):
 			short.append(activity)
 	var choices: Array[Dictionary] = []
-	for activity: String in ACTIVITIES:
-		var desire: Dictionary = get_work_desire(city, household, activity)
-		desire["activity"] = activity
-		desire["score"] = float(desire["score"]) + get_noise(city, household, activity)
+	for occupation: String in get_occupations(city):
+		var desire: Dictionary = get_work_desire(city, household, occupation)
+		if not bool(desire["available"]):
+			continue
+		desire["occupation"] = occupation
+		desire["score"] = float(desire["score"]) + get_noise(city, household, get_choice_key(occupation))
 		choices.append(desire)
 	choices.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["score"]) > float(b["score"]))
-	if city.social.enabled and contest_for_land(city, household, choices):
+	if city.social.enabled and not choices.is_empty() and contest_for_land(city, household, choices):
 		return null
 	# Every workplace starts as hand work; improving it is a decision of its own, later.
 	for choice: Dictionary in choices:
-		var building_type: String = HAND_WORK[choice["activity"]]
-		var site: Vector2i = choose_site(city, household, building_type)
+		var building_type: String = BuildingTiers.get_hand_work_type(choice["occupation"])
+		var site: Vector2i = choice["site"] if choice.has("site") else choose_site(city, household, building_type)
 		if site.x < 0:
 			continue
 		var project: ConstructionProject = city.construction.request_building(building_type, site, ConstructionProject.REQUESTED_BY_HOUSEHOLD, household.id, household.id)
@@ -102,7 +130,7 @@ static func take_up_work(city: City, household: Household) -> ConstructionProjec
 			continue
 		city.influence.workplaces_opened += 1
 		if not short.is_empty():
-			GuidingWisdom.record(city, household, GuidingWisdom.PREPARE, short.has(choice["activity"]))
+			GuidingWisdom.record(city, household, GuidingWisdom.PREPARE, short.has(get_activity(choice["occupation"])))
 		use_first_claim(city, household, project)
 		note(city, household, "Took up %s (%s)" % [describe_type(building_type), "; ".join(get_reasons(choice["terms"], true))])
 		return project
@@ -115,10 +143,10 @@ static func take_up_work(city: City, household: Household) -> ConstructionProjec
 # nearer its home than any land still open, it may ask for that. TownSocial.contest_land decides;
 # returns true when the land changed hands (it then works it, or builds on the claim, as its own).
 static func contest_for_land(city: City, household: Household, choices: Array[Dictionary]) -> bool:
-	var activity: String = choices[0]["activity"]
-	var building_type: String = HAND_WORK[activity]
+	var occupation: String = choices[0]["occupation"]
+	var building_type: String = BuildingTiers.get_hand_work_type(occupation)
 	var free: Vector2i = choose_site(city, household, building_type)
-	var nowhere_else: bool = free.x < 0 and choices.all(func(c: Dictionary) -> bool: return choose_site(city, household, HAND_WORK[c["activity"]]).x < 0)
+	var nowhere_else: bool = free.x < 0 and choices.all(func(c: Dictionary) -> bool: return choose_site(city, household, BuildingTiers.get_hand_work_type(c["occupation"])).x < 0)
 	var anchor: Vector2 = Vector2(get_anchor(city, household))
 	var size: Vector2i = city.construction.get_size(building_type)
 	var free_distance: float = INF if free.x < 0 else Vector2(TownLogistics.center_tile(free, size)).distance_to(anchor)
@@ -136,7 +164,7 @@ static func contest_for_land(city: City, household: Household, choices: Array[Di
 					claim = project
 					holding = null
 		var worked: Building = get_holding(city, other) if nowhere_else else null
-		if worked != null and worked.is_tier0() and get_activity(worked.type) == activity:
+		if worked != null and worked.is_tier0() and BuildingTiers.get_base_type(worked.type) == occupation:
 			var distance: float = Vector2(TownLogistics.center_tile(worked.tile, worked.size)).distance_to(anchor)
 			if distance < nearest:
 				nearest = distance
@@ -171,12 +199,16 @@ static func contest_for_land(city: City, household: Household, choices: Array[Di
 		note(city, holder, "Gave up the land it chose to %s" % city.get_household_label(household.id))
 	return true
 
-# How much a family wants to take up an activity: {"score", "terms", "appeal"} (appeal: the
-# priority's ask). `own`: the workplace the family already works, left out of the producers it
-# counts (OccupationReview weighs staying at it).
-static func get_work_desire(city: City, household: Household, activity: String, own: Building = null) -> Dictionary:
+# How much a family wants to take up a trade (a proper workplace type, get_occupations):
+# {"score", "terms", "appeal", "available", "site"} (appeal: the priority's ask). Work that lives off
+# the land is "available" only where a site for it can be found, and "site" is where the family
+# would open it. `own`: the workplace the family already works, left out of the producers it
+# counts and judged by its own land (OccupationReview weighs staying at it).
+static func get_work_desire(city: City, household: Household, occupation: String, own: Building = null) -> Dictionary:
 	var terms: Array = []
-	var match_quality: String = household.get_match_quality(PROPER_WORK[activity])
+	var result: Dictionary = {"available": true}
+	var activity: String = get_activity(occupation)
+	var match_quality: String = household.get_match_quality(occupation)
 	if match_quality == CultureEffects.MATCH_GOOD:
 		add(terms, 3.0, "it is the family's calling")
 	elif match_quality == CultureEffects.MATCH_POOR:
@@ -208,16 +240,108 @@ static func get_work_desire(city: City, household: Household, activity: String, 
 				add(terms, 1.0, "no one makes tools")
 			else:
 				add(terms, -2.5 * producers, "others already make tools")
+		_:
+			# Any other good (wool, and goods to come): whether anyone makes it, and whether the need
+			# it meets goes unmet; less than what the town lives on.
+			var producers: int = count_producers(city, activity) - (1 if own != null and get_activity(own.type) == activity else 0)
+			var name: String = GoodsNeedBucketHelper.get_good_display_name(activity).to_lower()
+			var unmet: String = get_unmet_need(city, activity)
+			if producers == 0:
+				add(terms, COMFORT_NONE_WEIGHT, "no one makes " + name)
+			elif unmet == "":
+				add(terms, -COMFORT_OTHERS_WEIGHT * producers, "others already make " + name)
+			if unmet != "":
+				add(terms, COMFORT_UNMET_WEIGHT, "the town goes without " + unmet)
+	# An essential good running out within the season: the danger competes with everything else.
+	var shortage: float = get_shortage(city, activity)
+	if shortage > 0.0:
+		var no_one: bool = count_producers(city, activity) - (1 if own != null and get_activity(own.type) == activity else 0) <= 0
+		add(terms, SHORTAGE_WEIGHT * shortage, "the town will run out of %s within the season%s" % [TownInfluence.get_activity_name(activity), ", and no one here makes any" if no_one else ""])
+	# Work that lives off the land is only as good as the land in reach of where it would stand.
+	var reach_kind: String = TownLand.get_reach_kind(occupation)
+	if reach_kind != "" and not city.local_map.is_empty():
+		var reach: float = 0.0
+		if own != null and BuildingTiers.get_base_type(own.type) == occupation:
+			reach = city.land.get_reach_factor(own)
+		else:
+			var hand_work: String = BuildingTiers.get_hand_work_type(occupation)
+			var site: Vector2i = choose_site(city, household, hand_work)
+			if site.x < 0:
+				return {"score": -INF, "terms": terms, "appeal": 0.0, "available": false}
+			result["site"] = site
+			reach = city.land.get_reach_factor_at(hand_work, site, city.construction.get_size(hand_work))
+		var land: float = LAND_WEIGHT * (city.get_base_building_output_amount(occupation) * reach / get_best_output(city, activity) - 1.0)
+		if land <= -0.2:
+			add(terms, land, LAND_REASONS[reach_kind] if reach < 0.75 else "it yields less than other ways of getting " + GoodsNeedBucketHelper.get_good_display_name(activity).to_lower())
 	# What it knows draws it to that work; work it would have to learn, it starts at a novice's pace
 	# (HouseholdEconomy).
 	if HouseholdEconomy.is_on(city) and not city.has_meta("economy_no_proficiency_effects"):
-		var knows: float = HouseholdEconomy.get_level(household, PROPER_WORK[activity])
+		var knows: float = HouseholdEconomy.get_level(household, occupation)
 		if knows >= HouseholdEconomy.FORGOTTEN_BELOW:
 			add(terms, HouseholdEconomy.KNOWN_WORK_WEIGHT * minf(1.0, knows / HouseholdEconomy.ESTABLISHED), "it knows the work (%s)" % HouseholdEconomy.describe_level(knows))
 	var appeal: float = add_encouragement(city, household, activity, terms, "the gathering asks for " + TownInfluence.get_activity_name(activity))
 	if GuidingWisdom.is_short_of(city, activity):
 		GuidingWisdom.add_appeal(city, household, GuidingWisdom.PREPARE, terms)
-	return {"score": sum(terms), "terms": terms, "appeal": appeal}
+	result["score"] = sum(terms)
+	result["terms"] = terms
+	result["appeal"] = appeal
+	return result
+
+# The most a proper workplace of any trade makes of a good on the best land.
+static func get_best_output(city: City, good: String) -> float:
+	var best: float = 0.0
+	for occupation: String in BuildingTiers.TIER0_TO_TIER1.values():
+		if get_activity(occupation) == good:
+			best = maxf(best, city.get_base_building_output_amount(occupation))
+	return maxf(best, 0.001)
+
+# The need a good meets that goes unmet or short in the town ("" when none does).
+static func get_unmet_need(city: City, good: String) -> String:
+	var pressures: Dictionary = city.get_need_pressure_summary()
+	for bucket: String in GoodsNeedBucketHelper.get_need_buckets_for_good(good):
+		var pressure: Dictionary = pressures.get(bucket, {})
+		if bool(pressure.get("active", false)) and str(pressure.get("status", "")) in ["unmet", "low"]:
+			return GoodsNeedBucketHelper.get_bucket_display_name(bucket).to_lower()
+	return ""
+
+# How near the town is to running out of a good it cannot do without: 0 when what it holds and
+# makes will last the coming season (SHORTAGE_HORIZON_DAYS), up to 1 when they cover none of what
+# that season will use. What a town uses up is what it eats, the upkeep its proper workplaces will
+# draw once their grace is over, and what its workplaces use to make their goods; what it makes is
+# what its workplaces, standing and planned, yield on their land (get_expected_output). A good no one
+# makes at all (the tool gap: docs/WORKPLACE_CHOICE_INVESTIGATION.md) is the plainest case; a town
+# growing far less food than it eats with little in store is the same danger. Mending families do
+# for themselves (HouseholdEconomy) is not counted: a family judges by the store it can see. A good
+# the town only goes without (wool for clothing) is never an essential shortage. The comparison can
+# turn this off (meta "no_shortage_recognition"), or count only goods no one makes (meta
+# "shortage_missing_trade_only").
+static func get_shortage(city: City, good: String) -> float:
+	if city.has_meta("no_shortage_recognition"):
+		return 0.0
+	var making: float = 0.0
+	if count_producers(city, good) > 0:
+		if city.has_meta("shortage_missing_trade_only"):
+			return 0.0
+		making = get_expected_output(city, good) * SHORTAGE_HORIZON_DAYS
+	var use: float = get_use(city, good, SHORTAGE_HORIZON_DAYS)
+	if use <= 0.0:
+		return 0.0
+	return clampf(1.0 - (float(int(city.resources.get(good, 0))) + making) / use, 0.0, 1.0)
+
+static func get_use(city: City, good: String, days: int) -> float:
+	var use: float = 0.0
+	if good == TownInfluence.ACTIVITY_FOOD:
+		use += float(city.get_food_consumption_for_population(city.get_total_population())) * days
+	for building: Building in city.buildings:
+		if good == TownInfluence.ACTIVITY_TOOLS and building.needs_maintenance() and building.receives_maintenance:
+			var working_days: int = days - building.upkeep_grace_days
+			if working_days > 0:
+				use += float((building.maintenance_timer + working_days) / building.get_maintenance_interval() * building.get_maintenance_tool_cost())
+		if building.can_produce():
+			var inputs: Dictionary = (EconomyBalance.PRODUCTION.get(BuildingTiers.get_base_type(building.type), {}) as Dictionary).get("inputs", {})
+			if inputs.has(good):
+				use += city.get_base_building_output_amount(building.type) * float(inputs[good]) * days
+	return use
 
 # --- Improving work -----------------------------------------------------------------------------
 
@@ -488,14 +612,15 @@ static func get_food_days(city: City) -> float:
 
 static func get_expected_output(city: City, activity: String) -> float:
 	var total: float = 0.0
+	# Work that lives off the land yields what the water, woods or pasture in its reach allow (TownLand).
 	for building: Building in city.buildings:
 		if get_activity(building.type) == activity:
-			total += city.get_base_building_output_amount(building.type)
+			total += city.get_base_building_output_amount(building.type) * city.land.get_reach_factor(building)
 	for project: ConstructionProject in city.construction.projects:
 		if project.kind == ConstructionProject.KIND_BUILDING and get_activity(project.building_type) == activity:
-			total += city.get_base_building_output_amount(project.building_type)
+			total += city.get_base_building_output_amount(project.building_type) * city.land.get_reach_factor_at(project.building_type, project.tile, project.size)
 		elif project.kind == ConstructionProject.KIND_UPGRADE and get_activity(project.building_type) == activity:
-			total += city.get_base_building_output_amount(project.building_type) * (1.0 - EconomyBalance.TIER0_OUTPUT_FRACTION)
+			total += city.get_base_building_output_amount(project.building_type) * (1.0 - EconomyBalance.TIER0_OUTPUT_FRACTION) * city.land.get_reach_factor_at(project.building_type, project.tile, project.size)
 	return total
 
 static func count_producers(city: City, activity: String) -> int:
@@ -509,7 +634,8 @@ static func count_producers(city: City, activity: String) -> int:
 # --- Where a family opens its work --------------------------------------------------------------
 
 # The valid site a family likes best: near its home and a store, pulled toward or away from the
-# town's heart by its Home and Place values, on the work ground when the player has marked any.
+# town's heart by its Home and Place values, toward richer water, woods or pasture for work that
+# lives off them, on the work ground when the player has marked any.
 # Without a town map, the origin (buildings are placed without terrain).
 static func choose_site(city: City, household: Household, building_type: String) -> Vector2i:
 	if city.local_map.is_empty():
@@ -525,6 +651,7 @@ static func choose_site(city: City, household: Household, building_type: String)
 		pull = HEART_PULL
 	elif has(household, "open_country"):
 		pull = -HEART_PULL
+	var lives_off_land: bool = TownLand.get_reach_kind(building_type) != ""
 	var best: Vector2i = Vector2i(-1, -1)
 	var best_score: float = INF
 	var found: int = 0
@@ -541,6 +668,8 @@ static func choose_site(city: City, household: Household, building_type: String)
 				for store: Vector2i in stores:
 					to_store = minf(to_store, center.distance_to(Vector2(store)))
 				var score: float = center.distance_to(Vector2(anchor)) + (to_store if not is_inf(to_store) else 0.0) + pull * center.distance_to(heart)
+				if lives_off_land:
+					score -= LAND_SITE_TILES * city.land.get_reach_factor_at(building_type, origin, size)
 				if score < best_score:
 					best = origin
 					best_score = score
@@ -571,12 +700,35 @@ static func use_first_claim(city: City, household: Household, project: Construct
 
 # --- Helpers ------------------------------------------------------------------------------------
 
+# Work families choose for themselves: every workplace with a hand-work stage that makes a good
+# (BuildingTiers), in its order, so the first three keep their places.
+static func get_occupations(city: City) -> Array[String]:
+	var occupations: Array[String] = []
+	if city.has_meta("occupations_first_three"):
+		for activity: String in ACTIVITIES:
+			occupations.append(PROPER_WORK[activity])
+		return occupations
+	# Comparison only: trades left out, to tell their effects apart (meta "occupations_left_out").
+	var left_out: Array = city.get_meta("occupations_left_out", [])
+	for proper: String in BuildingTiers.TIER0_TO_TIER1.values():
+		if EconomyBalance.PRODUCTION.has(proper) and not left_out.has(proper):
+			occupations.append(proper)
+	return occupations
+
+# What a decision about a trade is called in its unknown (get_noise).
+static func get_choice_key(occupation: String) -> String:
+	for activity: String in PROPER_WORK.keys():
+		if PROPER_WORK[activity] == occupation:
+			return activity
+	return occupation
+
+# The good a workplace families choose makes ("food", "wood", "tools", "wool"...), or "" for one
+# families do not choose (it has no hand-work stage).
 static func get_activity(building_type: String) -> String:
 	var base: String = BuildingTiers.get_base_type(building_type)
-	for activity: String in PROPER_WORK.keys():
-		if PROPER_WORK[activity] == base:
-			return activity
-	return ""
+	if BuildingTiers.get_hand_work_type(base) == "" or not EconomyBalance.PRODUCTION.has(base):
+		return ""
+	return str((EconomyBalance.PRODUCTION[base] as Dictionary)["output"])
 
 static func get_holding(city: City, household: Household) -> Building:
 	for building: Building in city.buildings:

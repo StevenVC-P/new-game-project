@@ -148,7 +148,7 @@ func test_proper_work_weighs_heavily() -> void:
 	var staying: Dictionary = OccupationReview.get_stay_desire(city, family, farm)
 	_check(reasons(staying["terms"]).contains("it has built up its farm") and reasons(staying["terms"]).contains("would stand idle"), "staying weighs its farm and the farm left idle: %s" % reasons(staying["terms"]))
 	var alone: Dictionary = OccupationReview.weigh(city, family, farm)
-	_check(bool(alone["change"]) and alone["activity"] == TownInfluence.ACTIVITY_TOOLS, "with no one making tools and food to spare, it leaves even a proper farm (margin %.2f): %s" % [float(alone["margin"]), reasons(alone["alternative_terms"])])
+	_check(bool(alone["change"]) and alone["activity"] == "toolmaker", "with no one making tools and food to spare, it leaves even a proper farm (margin %.2f): %s" % [float(alone["margin"]), reasons(alone["alternative_terms"])])
 	var other: Household = city.households[1]
 	for building: Building in city.buildings:
 		if building.assigned_household_id == other.id:
@@ -174,7 +174,7 @@ func test_priority_weighs_in_but_does_not_start() -> void:
 	forge.work_building_id = holding.id
 	forge.work_since = 0
 	var decision: Dictionary = OccupationReview.weigh(city, forge, holding)
-	_check(float(decision["appeal"]) > 0.0 and decision["activity"] == TownInfluence.ACTIVITY_TOOLS, "for a family that reconsiders, the ask for tools is a reason to change: %s" % reasons(decision["alternative_terms"]))
+	_check(float(decision["appeal"]) > 0.0 and decision["activity"] == "toolmaker", "for a family that reconsiders, the ask for tools is a reason to change: %s" % reasons(decision["alternative_terms"]))
 	city.influence.set_priority(CommunityPriority.FOOD)
 	_check(float(OccupationReview.weigh(city, forge, holding)["stay_appeal"]) > 0.0, "and a priority for its own work is a reason to stay")
 

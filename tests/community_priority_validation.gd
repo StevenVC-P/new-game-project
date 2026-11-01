@@ -169,7 +169,7 @@ func test_backing_pulls_like_a_norm() -> void:
 	_check(CommunityPriority.get_backing(city, CommunityPriority.FOOD) > 0.5, "a town short of food backs putting food first")
 	var garden: Household = city.households[2]
 	give_holding(city, garden, "forager_garden", Vector2i(10, 4))
-	var work: Dictionary = FamilyInitiative.get_work_desire(city, city.households[3], TownInfluence.ACTIVITY_FOOD)
+	var work: Dictionary = FamilyInitiative.get_work_desire(city, city.households[3], "farm")
 	var improve: Dictionary = FamilyInitiative.get_improve_desire(city, garden, "farm")
 	_check(has_reason(work["terms"], "the gathering asks for food") and not has_reason(work["terms"], "back putting") and not has_reason(improve["terms"], "back putting"), "but not on a family's choice of its own work: the ask does, the backing does not")
 	for household: Household in city.households:
