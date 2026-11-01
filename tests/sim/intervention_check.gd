@@ -7,15 +7,18 @@ extends SceneTree
 # marked for clearing). No player orders a family.
 #
 # - none: never intervenes;
-# - informed: answers each warning when it shows, with the card's own buttons (food falling or out:
-#   food first, and a field commissioned; tools low: investment first, and a tool mender
-#   commissioned; both calm for a season: no priority; families finding no land for their work:
-#   land near their homes marked to till; hunting grounds being felled: a stand of woods far from
-#   them marked for clearing, so the woodcutters fell there);
-# - late: the same answers, only once food has run out or tools are running out;
+# - informed: answers each warning with what its card offers first (round 3, owner 2026-11-01):
+#   food short ("Food will run short", "grows less food than it eats", "Food has run out"): asks
+#   families to grow food (FocusedAppeal) and marks land near the families' homes to till; tools
+#   short with no one making them: asks someone to take up toolmaking; families finding no land:
+#   land near them marked to till; hunting grounds being felled: the woods round the lodges kept
+#   (TownWoodland.protect_block). No priority, no commissions;
+# - informed_appeal, informed_land: the informed player's appeals alone, its land tools alone;
+# - priority_switcher: answers every warning with a whole-town priority (food first, investment
+#   first), as the cards suggested before, and commissions the workplace the card offered;
 # - inappropriate: puts productive investment first from founding and keeps it;
-# - informed_priority, informed_commission, informed_land: the informed player's answers one kind at
-#   a time (the priority; commissioning; the land tools), to tell them apart.
+# - overprotect: keeps every wood within reach of the town from its founding;
+# - (earlier rounds) informed_priority, informed_commission, late.
 #
 # Records when each warning first showed (could the player see it in time?), what the player did
 # and when, and what families decided (takeups, reviews, changes, decisions the priority tipped).
@@ -124,21 +127,19 @@ func play(site: Dictionary, policy: String, stress: bool, years: int) -> Diction
 				state["first_card"][name] = day
 				if trace:
 					print("[TRACE] day %d | WARNING SHOWN: %s" % [day, name])
-		if policy in ["informed", "late", "informed_priority", "informed_commission"]:
+		if policy in ["late", "informed_priority", "informed_commission", "priority_switcher"]:
 			respond(town, state, day, titles, policy == "late", policy != "informed_commission", policy != "informed_priority")
-		var acute: bool = titles.has("Food has run out") or titles.has("Tools are running out")
-		if policy == "informed" or policy == "informed_land" or (policy == "late" and acute):
-			if titles.has(NO_LAND):
-				till_near_blocked(town, state, day)
-			if titles.has(FELLED):
-				protect_hunting_grounds(town, state, day)
+		if policy in ["informed", "informed_appeal", "informed_land"]:
+			answer_with_cards(town, state, day, titles, policy != "informed_land", policy != "informed_appeal")
+		if policy == "overprotect" and day == 7:
+			keep_all_woods(town, state, day)
 	var result: Dictionary = StandInPlayerScript.new().play(city, scenario, years * Calendar.DAYS_PER_YEAR)
 	return measure(city, state, bool(result["off_the_ground"]))
 
 # Answers the warnings on the cards with the cards' own buttons: a priority and a commission.
 func respond(city: City, state: Dictionary, day: int, titles: Array[String], late: bool, priorities: bool = true, commissions: bool = true) -> void:
 	var food_out: bool = titles.has("Food has run out")
-	var food_falling: bool = titles.has("Food stores are falling")
+	var food_falling: bool = titles.has("Food stores are falling") or titles.has("Food will run short") or titles.has("The town grows less food than it eats")
 	var tools_out: bool = titles.has("Tools are running out")
 	var tools_low: bool = titles.has("Tools are low")
 	var food_warning: bool = food_out or (food_falling and not late)
@@ -157,6 +158,47 @@ func respond(city: City, state: Dictionary, day: int, titles: Array[String], lat
 			commission(city, state, day, "tool_mender", "tool_mender")
 	elif city.influence.priority != CommunityPriority.NONE and day - int(state["calm_since"]) >= CALM_DAYS:
 		act(city, state, day, "no priority", func() -> void: city.influence.set_priority(CommunityPriority.NONE))
+
+# What the cards offer first: a focused appeal for what is short, land to till, woods to keep.
+func answer_with_cards(city: City, state: Dictionary, day: int, titles: Array[String], appeals: bool, land: bool) -> void:
+	var food_short: bool = titles.has("Food will run short") or titles.has("The town grows less food than it eats") or titles.has("Food has run out")
+	var tools_short: bool = (titles.has("Tools are low") or titles.has("Tools are running out")) and FamilyInitiative.count_producers(city, TownInfluence.ACTIVITY_TOOLS) == 0
+	if appeals and food_short and not FocusedAppeal.is_active(city, TownInfluence.ACTIVITY_FOOD):
+		act(city, state, day, "appeal food", func() -> void: FocusedAppeal.make(city, TownInfluence.ACTIVITY_FOOD))
+	if appeals and tools_short and not FocusedAppeal.is_active(city, TownInfluence.ACTIVITY_TOOLS):
+		act(city, state, day, "appeal tools", func() -> void: FocusedAppeal.make(city, TownInfluence.ACTIVITY_TOOLS))
+	if land:
+		if titles.has(NO_LAND) or food_short:
+			till_near_blocked(city, state, day)
+		if titles.has(FELLED):
+			keep_hunting_grounds(city, state, day)
+
+# Hunting grounds are being felled: keeps the woods within a lodge's reach, round each lodge whose
+# land is failing (as the card shows), so no woodcutter fells there.
+func keep_hunting_grounds(city: City, state: Dictionary, day: int) -> void:
+	for building: Building in city.buildings:
+		if TownLand.get_reach_kind(building.type) != "woods" or building.assigned_household_id < 0 or building.peak_land_yield < SidebarOverviewPage.FAILING_MIN_PEAK:
+			continue
+		if city.land.get_reach_factor(building) > building.peak_land_yield * SidebarOverviewPage.FAILING_SHARE:
+			continue
+		var reach: Vector2i = Vector2i(EconomyBalance.HUNTER_REACH, EconomyBalance.HUNTER_REACH)
+		var from: Vector2i = building.tile - reach
+		var to: Vector2i = building.tile + building.size - Vector2i.ONE + reach
+		if city.woodland.get_wooded_in_block(from, to).all(func(tile: Vector2i) -> bool: return city.woodland.is_protected(tile)):
+			continue
+		act(city, state, day, "keep woods %s" % str(building.tile), func() -> void: city.woodland.protect_block(from, to))
+
+# A poor use of keeping: every wood within reach of the town kept from its founding.
+func keep_all_woods(city: City, state: Dictionary, day: int) -> void:
+	var heart: Vector2i = city.logistics.stockpile_tile if city.logistics.stockpile_tile.x >= 0 else Vector2i(city.logistics.map_size() / 2)
+	var side: int = TownWoodland.MAX_MARK_SIDE
+	for by in range(heart.y - 24, heart.y + 24, side):
+		for bx in range(heart.x - 24, heart.x + 24, side):
+			var from: Vector2i = Vector2i(bx, by)
+			var to: Vector2i = from + Vector2i(side - 1, side - 1)
+			if not city.woodland.get_wooded_in_block(from, to).is_empty():
+				city.woodland.protect_block(from, to)
+	(state["actions"] as Array).append({"day": day, "action": "keep all woods (%d tiles)" % city.woodland.protected.size()})
 
 # Plans a workplace near the stores, the proper one when the stores can supply it, else hand work.
 func commission(city: City, state: Dictionary, day: int, proper: String, hand: String) -> void:
@@ -180,6 +222,8 @@ func till_near_blocked(city: City, state: Dictionary, day: int) -> void:
 		if household.blocked_work_type != "" and day - household.blocked_work_day <= SidebarOverviewPage.NO_LAND_DAYS:
 			anchor = FamilyInitiative.get_anchor(city, household)
 			break
+	if anchor.x < 0 and not city.households.is_empty():
+		anchor = FamilyInitiative.get_anchor(city, city.households[0])
 	if anchor.x < 0:
 		return
 	var best: Vector2i = Vector2i(-1, -1)
@@ -300,7 +344,8 @@ func measure(city: City, state: Dictionary, off_the_ground: bool) -> Dictionary:
 		"food_short_days": state["food_short_days"], "tools_out_days": state["tools_out_days"],
 		"worked": worked, "trades": worked.size(), "proper": proper, "improvements": influence.improvements_started,
 		"reviews": influence.work_reviews, "changes": influence.work_changes, "triggers": triggers, "changed_for": changed_for,
-		"swayed": influence.swayed.duplicate(), "swayed_total": swayed, "first_card": state["first_card"], "actions": state["actions"], "takeups": state["takeups"],
+		"swayed": influence.swayed.duplicate(), "swayed_total": swayed,
+		"appeals_made": influence.appeals_made, "appeals_answered": influence.appeals_answered, "appeals_tipped": influence.appeals_tipped, "kept_woods": city.woodland.protected.size(), "first_card": state["first_card"], "actions": state["actions"], "takeups": state["takeups"],
 	}
 
 func get_difficult_sites() -> Array:
