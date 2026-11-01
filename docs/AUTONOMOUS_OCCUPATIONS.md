@@ -15,6 +15,48 @@ Tests:
 
 Comparison: `tests/sim/occupation_check.gd`. Owner's town: `tests/sim/autosave_replay.gd`. Commands in `docs/TESTING.md`.
 
+## Fourth Round, Phase 1 (2026-11-01): Hunger Counted Once; Warnings; Player Agency
+
+The owner's six priorities (player agency and economic adaptation). This phase covers priorities 1–3 and stops for review before 4 (protected woodland, focused appeals) and 5 (the new trades reevaluated). Agency results: `docs/PLAYER_AGENCY_AUDIT.md`, "Round 2".
+
+### Priority 1: hunger counted once
+
+**What changed** (`FamilyInitiative.get_hardship`, `get_work_desire`):
+- **The duplicate is gone.** With survival awareness, the older "the town grows less food than it eats" term no longer sits beside the survival term.
+- **One view of hunger, two horizons, the larger counting:**
+  - **hunger near:** food in store and larders, plus what the work families actually do will bring in over the coming 120 days, seasons included, against what the town will eat;
+  - **a town growing less than it eats,** which a full store only puts off. At half what it eats, it counts as fully as a town with nothing coming.
+- **The reason families give** is whichever horizon dominates: "the town will go hungry before the next harvest is in" or "the town grows less food than it eats". The family's own hunger counts in full whatever its temperament.
+- **"Will only just last" and "plenty in store and coming"** now need what the town grows and what it holds to agree.
+
+**Tested on its own first** (six years, 12 towns; people, ordinary / stressed / difficult):
+
+| | Counted twice (before) | Near horizon only (first attempt) | **One view, two horizons** |
+|---|---|---|---|
+| survival awareness (first three trades) | 38.4 / 24.7 / 52.2 | 51.0 / 48.3 / 50.5 | **58.7 / 50.2 / 56.2** |
+| recognition + survival (first three trades) | 60.8 / 57.3 / 41.1 | 56.2 / 51.1 / 52.2 | **60.0 / 59.8 / 60.2** |
+| all (the new trades too) | 57.6 / 49.0 / 51.2 | 29.6 / 28.3 / 32.5 | 49.3 / 45.6 / 39.6 |
+| (today's game) | 57.8 / 63.2 / 42.8 | | |
+
+- **Why the first attempt failed:** the 120-day view on its own missed a structural deficit hidden by a full store. With the new trades, families drifted from food while the store ran down (food-short days tripled). That failed the requirement to weigh production, so it was corrected before going on (meta `hunger_horizon_only` keeps it for comparison).
+- **The result:** recognition + survival is now the strongest and most even mode measured: about 60 people in every condition, +17 on difficult sites against today's game, never making tools in no ordinary or stressed town.
+- **The new trades fare worse without the double count.** The over-strong pull to food had been masking how weak hunting and herding are as early livelihoods. That is priority 5's question (not tuned here).
+
+### Priority 2: actionable warnings (Overview, Needs attention)
+
+1. **"Families find no land for their work."** It shows families who in the last two months chose work (a first choice or a decided change) and found no free land for it, and still lack it.
+   - **What it says:** what they want, why the land fails them ("a field needs fertile land, and the fertile land within reach of their homes is taken"), and how many are going hungry.
+   - **Buttons:** Till land into farmland (F) and Clear woods (C).
+   - **Source:** `Household.blocked_work_type`, recorded where the choice was blocked.
+2. **"Hunting grounds are being felled"** (also grazing land and fishing water). It shows land-based workplaces whose land now gives two-thirds or less of the best it gave.
+   - **What it says:** the share of the game they still get, what is taking the woods (the woodcutters felling the trees nearest them; woods marked for clearing), and hungry families.
+   - **Button:** Mark woods to fell elsewhere (C), because woodcutters fell marked woods first.
+   - **Source:** `Building.peak_land_yield`, kept monthly.
+
+Both read only simulation state. Tests: `tests/autonomous_occupations_validation.gd` (16, 17).
+
+**Saves:** two new fields, saved automatically; old saves load with neither set.
+
 ## Third Round (2026-11-01): Reasoning Corrections, the Full Comparison, Player Agency
 
 The player agency audit has its own document: `docs/PLAYER_AGENCY_AUDIT.md`.

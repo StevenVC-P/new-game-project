@@ -1,5 +1,64 @@
 # Player Agency Audit
 
+## Round 2 (2026-11-01): after hunger is counted once, and with the new warnings
+
+Same towns, seeds and kinds of player as round 1 (below), with two changes:
+- **The informed player** also answers the two new warnings with their buttons. Families finding no land: land near their homes marked to till. Hunting grounds felled: a stand far from them marked for clearing. This replaces round 1's always-on woods-marking.
+- **`informed_land`** uses only those land tools.
+
+The players were run under two sets of rules: the recommended one (narrow recognition + survival awareness, first three trades) and "all" (the new trades too).
+
+**People at year 6, recommended rules** (towns more than 5 people worse / better than no player):
+
+| | None | Informed | Priority only | Commission only | Land tools only | Late | Investment from founding |
+|---|---|---|---|---|---|---|---|
+| ordinary | 60.0 | 59.4 (2/2) | 58.1 (2/1) | **61.1** (1/2) | 60.0 | 59.6 (2/2) | 46.2 (6/2) |
+| stressed | 59.8 | 56.9 (3/1) | 55.4 (3/1) | 56.7 (2/1) | 59.8 | 56.8 (2/1) | 37.5 (6/0) |
+| difficult | 60.2 | 56.2 (3/1) | 47.7 (3/0) | 55.6 (2/0) | **61.0** (0/1) | 56.6 (3/1) | 53.4 (3/1) |
+
+**People at year 6, all rules (the new trades):**
+
+| | None | Informed | Priority only | Commission only | Land tools only | Late | Investment from founding |
+|---|---|---|---|---|---|---|---|
+| ordinary | 49.3 | 47.1 | 48.2 | **54.2** | 51.2 | 47.3 | 51.7 |
+| stressed | 45.6 | 47.2 | **52.3** | 50.1 | 44.4 | 46.8 | 36.2 |
+| difficult | 39.6 | 35.8 | 34.0 | 37.8 | 39.4 | 40.2 | 24.8 |
+
+### Did the improvements correct the informed player's problem?
+
+**Mostly.**
+- **Round 1:** the informed player lost 16 / 12 / 5 people against no player.
+- **Now:** it loses 0.6 / 2.9 / 4.0 under the recommended rules, and −2 / +2 / −4 under all. Towns worse and towns better are near even. The large systematic harm is gone: it came from the families' double-counted hunger, which every food ask amplified, and from always-on woods-marking.
+
+**Not yet:**
+- **Informed play does not help on average.** Responding as the cards suggest is now roughly neutral, not beneficial.
+- **Commissioning** is the one answer that helps somewhere: ordinary sites under both rule sets, and stressed sites under all.
+
+### Controls whose suggested use is systematically harmful
+
+1. **Productive investment from founding** (no warning suggests it, but players will try it): −14 / −22 / −7 people under the recommended rules, and the most "worse" towns of any player. It pulls founders from food work in the first lean year. The round-1 finding that it helped difficult sites does not survive the hunger correction.
+2. **"Put food first" / "Put investment first" on the warning cards, used as suggested** (priority only): −2 / −4 / −12.5.
+   - **How it harms:** each switch pulls on the town's other need. Days without tools rise from 177 to 368 on ordinary sites when food is put first as food falls, because families already on food work stay and free families go to food, not tools. On difficult sites the switching costs most.
+   - **When:** the food card shows when stores are already falling, usually days 35–42, and the priority then keeps pulling for months after.
+3. **Not harmful, but rarely useful yet:** the land tools. The no-land warning showed in only 2 of 12 towns per condition, late (median days 1,071–1,473). The hunting-grounds warning showed in 3–4 towns, around day 650–1,550. When used, they made little difference: under "all", ordinary +1.9, stressed −1.2, difficult −0.2.
+
+### Is the information timely?
+
+- **Tools: yes.** "Tools are low" shows a median of 133–441 days in; "running out" 45–190 days later.
+- **Food: no.**
+  - **The founding famine:** "Food stores are falling" shows on day 35–42 and "Food has run out" on day 42–49, a single week of warning in the founding famine every hard town faces. The card is driven by days of food in store, not by the forward-looking view families now use, so the player learns of a famine about when the families are already going hungry.
+  - **Food shortages later** show earlier (median lead before the first family leaves: 54–144 days for half the towns, a year or more for the rest).
+- **Livelihoods and land: now visible,** where before they were not at all, but the conditions arise late.
+
+### Remaining gaps (for priorities 4–6 and the owner)
+
+1. **An early food warning from the families' own view** (the forward outlook already computed for their decisions): "The town will run out of food before the harvest: X days of food in store and coming against Y needed". It would give the player weeks, not days, at founding. Interface only.
+2. **The cards suggest priorities as the answer to every shortage,** and that answer is neutral-to-harmful. Focused appeals (priority 4) are the planned alternative. Until then, the cards could suggest the specific tools (commission, till) first, with the priority's cost stated.
+3. **Protected woodland** (priority 4), as approved.
+4. **No fast food lever** for the founding famine (round 1's case 4) remains open.
+
+## Round 1
+
 **Status: findings and proposals (2026-11-01). No new control was built.** Branch `feature/autonomous-occupations`, not merged.
 
 Rules audited: "all" from `docs/AUTONOMOUS_OCCUPATIONS.md` (the new trades, narrow shortage recognition, survival awareness, both reasoning corrections).
