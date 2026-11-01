@@ -288,9 +288,13 @@ func draw_road_preview() -> void:
 		draw_rect(rect, RegionMapLayer.faded(TownMapStyle.COLOR_VALID, 0.35))
 		draw_rect(rect, TownMapStyle.COLOR_VALID, false, px(1.0))
 
-# Land set aside for homes: a light wash, and a line along its edge (and between plain and
-# preferred land), so a block reads as one area rather than a grid of tiles.
+# Land set aside for homes, marked out on the ground as the town's plots are
+# (TownConstructionPainter.plot): a faint wash, a string line along its edge (and between plain and
+# preferred land), and stakes at its corners and every few tiles along it, so a block reads as
+# staked-out land rather than a box drawn over the map.
 func draw_residential(city: City) -> void:
+	# Edge points: where each line of string meets another, and which ways it runs from there.
+	var ends: Dictionary = {}
 	for y in range(city.local_map.size()):
 		var row: Array = city.local_map[y]
 		for x in range(row.size()):
@@ -300,14 +304,32 @@ func draw_residential(city: City) -> void:
 			var tile: Vector2i = Vector2i(x, y)
 			var color: Color = COLOR_PREFERRED if level == HomeSites.LAND_PREFERRED else COLOR_RESIDENTIAL
 			var rect: Rect2 = TownMapStyle.tile_rect(tile)
-			draw_rect(rect, RegionMapLayer.faded(color, 0.28 if level == HomeSites.LAND_PREFERRED else 0.2))
+			draw_rect(rect, RegionMapLayer.faded(color, 0.07 if level == HomeSites.LAND_PREFERRED else 0.04))
 			for side: Vector2i in RESIDENTIAL_SIDES:
 				var next: Vector2i = tile + side
 				if next.y >= 0 and next.y < city.local_map.size() and next.x >= 0 and next.x < row.size() and HomeSites.get_land(city, next) == level:
 					continue
 				var from: Vector2 = rect.get_center() + (Vector2(side) + Vector2(side.y, side.x)) * rect.size * 0.5
 				var to: Vector2 = rect.get_center() + (Vector2(side) - Vector2(side.y, side.x)) * rect.size * 0.5
-				draw_line(from, to, color, px(1.5))
+				var string: Color = RegionMapLayer.faded(color.lerp(TownConstructionPainter.STRING_LINE, 0.5), 0.4)
+				draw_line(from, to, string, maxf(0.6, px(1.0)))
+				var along: String = "v" if side.x != 0 else "h"
+				for point: Vector2 in [from, to]:
+					var key: Vector2 = point.snapped(Vector2(0.01, 0.01))
+					var seen: Dictionary = ends.get(key, {"color": color})
+					seen[along] = true
+					# Along a straight edge, a stake every third tile.
+					if (along == "h" and posmod(x, 3) == 0) or (along == "v" and posmod(y, 3) == 0):
+						seen["every"] = true
+					ends[key] = seen
+	for point: Vector2 in ends.keys():
+		var seen: Dictionary = ends[point]
+		var corner: bool = seen.has("h") and seen.has("v")
+		if corner or seen.has("every"):
+			TownConstructionPainter.stake(self, point, 2.0)
+		# A strip of cloth tied to each corner stake, in the land's colour.
+		if corner:
+			draw_line(point + Vector2(0.4, -0.6), point + Vector2(2.6, -1.4), (seen["color"] as Color).darkened(0.1), 1.1)
 
 # Woods marked for clearing and land marked for tilling (a tint that fills as the work goes on),
 # and the block the clearing or tilling tool would mark.
