@@ -2,17 +2,57 @@
 
 Snapshot for whoever picks the project up next. Update it when a milestone closes; durable detail lives in the linked docs, not here.
 
-*Last updated: 2026-10-31, with Step 3 (community priority and residential land in the game) on its integration branch.*
+*Last updated: 2026-11-01. Everything below "Merged 2026-11-01" is on `develop` and `main`. No feature branch is waiting.*
 
 ## Current Objective
 
-**Household self-sufficiency and occupational skills (owner, 2026-11-01): `docs/HOUSEHOLD_SELF_SUFFICIENCY.md`, branch `feature/household-self-sufficiency` (stacked on `feature/occupation-reconsideration`). Implemented as a prototype, not merged: awaits owner review.** Families give 10-30% of their working day to a garden (on free ground near home), wood or mending, at hand-work rates; each keeps a larder of its own harvest by choice (0-90 days); shortage and hunger are each family's own; proficiency is learned by practice and fades to nothing unused. Results (that doc, Validation Results): secondary work and larders are neutral on ordinary land and keep more towns on difficult land; proficiency's effects (60% output for novices, the pull of known work) cost ordinary towns 10-15 people and are the open decision. The surplus is untouched by self-sufficiency.
+The owner is about to give the next piece of work. Until then, the open owner decisions below stand. None has been acted on.
 
-**Families reconsidering their work (owner, 2026-11-01): `docs/OCCUPATION_RECONSIDERATION.md`, branch `feature/occupation-reconsideration` (stacked on `feature/guiding-wisdom`), implemented, not merged: awaits owner review.** Monthly, a family reconsiders at most once a year, and only for its own reasons: calling, workplace short of tools, oversupply while short elsewhere, home far from work. It weighs staying (what it built up, its years there, its workplace left idle, temperament, the walk) against other work, and changes by a clear margin. Old buildings stay, empty and open. Priorities weigh in but never start a review. The instant calling swap is retired where families lead. Comparison (6 years, 3 conditions, on vs off): changes are rare (about 1 family in 100), with no oscillation and no abandoned toolmaking. Towns where a family changed do better (+6.7 people); one Prepare founding failure now recovers. Retiring the calling swap costs three marginal towns. Open decisions are in that doc.
+**Merged 2026-11-01 (owner-approved: `develop`, then `develop` into `main`).** Each item has a design doc with its owner decisions, how it was built, validation results and open decisions:
+- **Step 3 interface** (community priority and residential land in the game; `docs/TOWN_UI.md`, `docs/HOME_SITES.md`, `docs/COMMUNITY_PRIORITIES.md`).
+- **Guiding wisdom** (`docs/GUIDING_WISDOM.md`): four wisdoms as the town's lasting expectations, chosen by the player as Expedition Leader, then as Elder from Village (a third slot).
+- **Occupation reconsideration** (`docs/OCCUPATION_RECONSIDERATION.md`): families look again at their work, rarely, for their own reasons. It replaced the instant calling swap.
+- **Household self-sufficiency and proficiency** (`docs/HOUSEHOLD_SELF_SUFFICIENCY.md`, `HouseholdEconomy`):
+  - families give 10–30% of their day to a garden near home, wood or mending, at hand-work rates;
+  - a food larder per family, by choice;
+  - shortage and hunger are each family's own;
+  - proficiency is learned by practice and fades.
+- **Emergent recognition and the Speaker of the Gathering** (`docs/EMERGENT_RECOGNITION_AND_LEADERSHIP.md`, `TownRegard`):
+  - families notice, admire and resent each other's achievements;
+  - influence in parts;
+  - from Village, the Elder appoints a Speaker from the three most influential households;
+  - the Speaker leads its followers on the priority, decides first claim within the Elder's rules, and urges settlement.
 
-**Guiding Wisdom prototype (owner, 2026-10-31): `docs/GUIDING_WISDOM.md`, branch `feature/guiding-wisdom` (from the Step 3 integration branch), not merged.** Four founding wisdoms as the town's lasting expectations (helping, claims, keeping something back, doing work well), replacing the expectations' Ask buttons; families' conduct becomes seasonal experiences that grow qualities or counter-qualities through the existing lessons (a level a year at most). Comparison over six years: We Endure Together makes recognisably different families; Prepare has real costs and situational gains; Respect and Pride change behaviour but not values or outcomes beyond the spread. Owner follow-up (2026-10-31): Prepare now counts low tools and wood as threats to winter (version 4: one town gained, the two marginal towns still lost, at the founding: Prepare draws a founder from tools to food); Pride cannot ride on upkeep (dependency documented); wisdom framing is small and static over time (examined); Elder third slot validated; full suite passes. Open decisions are listed in that doc. 
+  It replaced the player's honours and the Reward helping toggle.
+- **Investigation: why no toolmaker or herder's fold** (`docs/WORKPLACE_CHOICE_INVESTIGATION.md`). Findings only. Nothing was changed.
 
-**Step 3, community priority and residential land in the playable interface (owner, 2026-10-31): branch `feature/step3-integration`, not merged: waits for the owner's review.** Built from `develop` with two unmerged branches merged in: `feature/combined-evaluation` (the evaluation harness and docs) and `feature/town-ui-redesign` (the sidebar the pages live in). On top: residential land reserved for homes (`docs/HOME_SITES.md`), the Community page's priority selector with families' views, backing and warnings (`docs/COMMUNITY_PRIORITIES.md`, Step 3), the Planning page's residential land tools (N), home-site explanations on Families and Overview, and starting land at founding, when families are given the lead, and for older saves (`docs/SAVED_GAMES.md`). Gameplay is community choices only (owner, 2026-10-31): families decide, the player persuades and sets land aside; laying out the town stays in the code. A cleanup pass after the owner's first review (2026-10-31) folded the private-building catalog away while families lead, let storehouses stand among homes (explicit list), kept stale housing obstacles out of families' present reasons, measured preferred land (weak by design: about two tiles of walk), and verified existing saves. The owner will play it before merging. Next simulation milestone after review: families reconsidering their work when circumstances change (`docs/COMMUNITY_PRIORITIES.md`, decisions after the combined evaluation).
+**Open owner decisions from this round** (details in each doc):
+1. **Proficiency's cost** (self-sufficiency doc, "For the owner"). Novices at 60% output and the pull toward known work cost ordinary towns 10–15 people, and cancel most of the gain on difficult land. Options:
+   - keep it;
+   - soften to 75%;
+   - give founders basic trades;
+   - first separate which half does it.
+2. **A harder stores disruption for validation** (the first autumn, or food before winter).
+3. **Herding, fishing and hunting** can't be chosen by families at all. They are missing from `FamilyInitiative.ACTIVITIES` and have no hand-work stage. Recommended: a family whose calling points there builds it itself, through the improvement pipeline.
+4. **The tool gap.** A town whose founders all take food or wood work, with no forge-called family, may never get tool work (one test town sat at 0 tools for three years; the owner's playtest town was heading there). Recommended: the occupation review may start early when the town has no toolmaking and is out of tools.
+5. **The "it knows the work" pull** (up to +2) in a family's first choice when the town lacks a whole trade.
+6. **The Speaker:**
+   - should families sometimes oppose an appointment at once (today opposition grows only from its acts)?
+   - prompt the Elder to reappoint after a vacancy?
+   - the office brings favouritism, so any Speaker leaves trust below no Speaker.
+7. **Earlier open decisions still stand:** occupation reconsideration's rate and the retired swap's cost; the guiding-wisdom list.
+
+**Where things are.**
+- **Branches:** the feature branches (`feature/step3-integration`, `feature/guiding-wisdom`, `feature/occupation-reconsideration`, `feature/household-self-sufficiency`, `feature/emergent-recognition`, `investigate/workplace-choices`) are merged and pushed, and kept for reference.
+- **Comparison harnesses:**
+  - `tests/sim/wisdom_check.gd`, with `--no-reconsider`, `--no-self-sufficiency`, `--no-proficiency-effects`, `--no-secondary` and `--disrupt=`;
+  - `tests/sim/speaker_check.gd`, with a `--branch=` per process;
+  - `tests/sim/workplace_choice_check.gd`, which traces every work decision.
+
+  Commands are in `docs/TESTING.md`. A 12-town, 6-year comparison takes 20–60 minutes per process. Run them in parallel, one condition, strategy or branch each, from a separate `git worktree` so editing doesn't change runs in flight.
+- **The owner's playtest town** (autosave, day 82, `%APPDATA%/Godot/app_userdata/New Game Project/saves/autosave.save`): no forge-called family, tools at 8, and a loom family wishing for a fold.
+
+## Earlier History
 
 **Community priorities and home sites (owner, 2026-10-31)** are merged into `develop` and `main` (the simulation; their interface is Step 3 above).
 
@@ -48,7 +88,8 @@ Before that: town building is settled before it is locked in (`docs/TOWN_BUILDIN
 
 ## Status
 
-- **First stage (2026-10-28):** milestones 1-6 of `docs/FIRST_STAGE_LOOP.md` are on `develop`; all 32 headless test scripts pass and import validation is clean. `main` has not been touched: it waits for the owner's playtest and review.
+- **2026-11-01:** everything is on `develop` and `main`; the full headless suite (41 scripts plus the wrapped expanded-goods test) passes on the merged result.
+- **First stage (2026-10-28):** milestones 1-6 of `docs/FIRST_STAGE_LOOP.md`.
 - **Working:** saved games and the start/in-game menus (`docs/SAVED_GAMES.md`): a town saved, loaded, and played 120 more days stays identical to the original; generated worlds (`WorldGenerator`; design in `docs/WORLD_MAP.md`): 30 seeds build without warnings, openings on generated planets get off the ground about as often as on the authored one (38/42 and 40/42 on seeds 1 and 2, authored now 41/42 continuous, since frozen regions are no longer picked, and 46/48 original); world atlas (`docs/WORLD_MAP.md`); continuous regional map (`docs/REGIONAL_MAP.md`); town map (`docs/TOWN_MAP.md`); town building: construction sites, builders, carried materials, travel costs, roads, storehouses, residential plots, families building homes (`docs/TOWN_BUILDING_MODEL.md`). All 25 headless test scripts pass (with `world_generator_validation` and `save_game_validation`); import validation is clean; generated planets were reviewed by eye (`world_map_capture` with `seed=`); `town_map_capture` (now with construction scenes) was reviewed by eye.
 - **Paths** (`docs/TOWN_BUILDING_MODEL.md`, Paths): all 25 headless test scripts pass; balance is unchanged or better (scattered towns 14/20 to 15/20, travel 13% to 11%); `town_map_capture` was reviewed by eye.
 - **Balance:** with construction, the sensible opening stays 20/20 and map luck matches building instantly (46/48, 40/42); an opening that queues every house before the woodcutter falls from 20/20 to 13/20 (queue order). Numbers in the model doc.
@@ -120,4 +161,6 @@ In rough priority order; details in each doc's "Remaining Work" section.
 - **Path levels change routes.** A tile's `path_level` changing is a layout change (`TownLogistics.advance_day`); anything that caches routes must key on `layout_version`. Wear is saved with the town (`TownLogistics.wear`), levels on the town map's tiles.
 - **Buildings are never placed finished in play.** Everything goes through `TownConstruction`; `City.add_building` is the completion step (tests may still call it directly). City's helpers (`logistics`, `construction`) hold the city weakly, or towns leak.
 - **Git:** this repo's `.git` belongs to another Windows account; run git as `git -c safe.directory=D:/AI/projects/incubating/games/new-game-godot ...`.
+- **Writing files from Python on Windows:** open them with `newline=''` (or write LF); text mode turns a whole file to CRLF. Git normalizes it on commit, but string replacements against the file then fail.
+- **Long comparison runs:** run them from a `git worktree` checked out at a fixed commit, so edits in the main folder can't change processes still queued. Stop only processes whose command line names that worktree: the owner's editor and game may be open.
 - **Visual checks** need a real window (no `--headless`): `tests/visual/*_capture.gd`, commands in `CLAUDE.md`.
