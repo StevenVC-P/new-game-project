@@ -8,8 +8,8 @@ extends SceneTree
 # Reads the save given; never writes it. The town alone is replayed: no neighbouring towns or trade
 # routes, so traders and the world calendar's other effects are left out.
 #   <godot> --headless --path . --script res://tests/sim/autosave_replay.gd -- --save=C:/path/copy.save --mode=both --days=360 > replay.log
-# Options: --mode=existing|occupations|shortage|both, --days=N (360), --no-priority (clear the
-# town's priority at the start, to compare).
+# Options: --mode=existing|shortage_survival|all, --days=N (360), --no-priority (clear the town's
+# priority at the start, to compare), --appeal=tools|food|wood (a focused appeal made at the start).
 
 const MODES: Dictionary = {
 	"existing": ["occupations_first_three", "no_shortage_recognition", "no_survival_awareness", "food_ratio_counts_empty", "stay_value_ignores_yield"],
@@ -25,6 +25,7 @@ func run() -> void:
 	var mode: String = "both"
 	var days: int = 360
 	var clear_priority: bool = false
+	var appeal: String = ""
 	for argument: String in OS.get_cmdline_user_args():
 		if argument.begins_with("--save="):
 			path = argument.trim_prefix("--save=")
@@ -34,6 +35,8 @@ func run() -> void:
 			days = int(argument.trim_prefix("--days="))
 		elif argument == "--no-priority":
 			clear_priority = true
+		elif argument.begins_with("--appeal="):
+			appeal = argument.trim_prefix("--appeal=")
 	var state: Dictionary = SaveStore.new().read_state(path)
 	if state.is_empty() or not state.has("cities"):
 		_report("could not read a town from %s" % path)
@@ -47,6 +50,11 @@ func run() -> void:
 		city.set_meta(meta, true)
 	if clear_priority:
 		city.influence.set_priority(CommunityPriority.NONE)
+	# A focused appeal made on the day the save was taken (FocusedAppeal), with who was likely to answer.
+	if appeal != "":
+		for response: Dictionary in FocusedAppeal.get_responses(city, appeal):
+			_report("LIKELY TO ANSWER %s | family %d | %s | %s" % [appeal, (response["household"] as Household).id, response["outlook"], "; ".join(response["reasons"])])
+		FocusedAppeal.make(city, appeal)
 	_report("MODE %s%s | day %d (%s) | priority %s | stores rule %s | wisdoms %s" % [mode, " (priority cleared)" if clear_priority else "", city.construction.day, calendar.get_formatted_date(), city.influence.priority, city.influence.store_rule, str(city.social.wisdoms)])
 	describe_town(city, "start")
 	var reviews_seen: int = 0

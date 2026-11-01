@@ -85,7 +85,10 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/intervention_check.gd -- --conditions=stressed --policies=none,informed > int.log
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/founded_town_regression.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/occupation_check.gd -- --conditions=ordinary --modes=both > occ.log
-& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/autosave_replay.gd -- --save=C:/path/to/copy.save --mode=both --days=360 > replay.log
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/autosave_replay.gd -- --save=C:/path/to/copy.save --mode=all --days=360 > replay.log
+# (replay options: --no-priority clears the town's priority; --appeal=tools|food|wood makes a focused appeal at the start)
+# Save-using tests (save_game_validation, community_play_validation) write to a folder of their own process and found a fixed
+# town, so they may run side by side and pass or fail the same way every run.
 
 # Home sites (docs/HOME_SITES.md): families choosing their own sites on land set aside, preferred land, no land, no
 # overlap, explanations, starting land, land reserved from work, shared works among homes, preferred land between equal sites, explanations
