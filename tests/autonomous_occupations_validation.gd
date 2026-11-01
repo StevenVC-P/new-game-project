@@ -409,9 +409,14 @@ func test_hunger_counted_once() -> void:
 	var twice: Dictionary = FamilyInitiative.get_work_desire(city, family, "farm")
 	_check(has_reason(twice["terms"], "go hungry") and has_reason(twice["terms"], "grows less food than it eats"), "the comparison can count it twice, as before")
 	city.remove_meta("hunger_counted_twice")
-	var fed: City = town()
-	busy_everyone_else(fed, fed.households[0])
-	_check(has_reason(FamilyInitiative.get_work_desire(fed, fed.households[0], "farm")["terms"], "plenty of food in store and coming"), "years of food in store is plenty, looking ahead")
+	# A full store puts off a town growing less than it eats, but does not hide it.
+	var stored: City = town()
+	stored.resources["food"] = 5000
+	var family_two: Household = stored.households[0]
+	_check(float(FamilyInitiative.get_hardship(stored, family_two)["level"]) > 0.5 and str(FamilyInitiative.get_hardship(stored, family_two)["reason"]).contains("grows less food than it eats"), "years of food in store, nothing growing: still a danger, by what the town grows")
+	busy_everyone_else(stored, family_two)
+	var desire: Dictionary = FamilyInitiative.get_work_desire(stored, family_two, "farm")
+	_check(not has_reason(desire["terms"], "go hungry") and not has_reason(desire["terms"], "grows less food"), "fields for most families and years in store: no hunger weighed: %s" % reasons(desire["terms"]))
 
 func card_titled(city: City, title: String) -> Dictionary:
 	for card: Dictionary in SidebarOverviewPage.get_attention(city):

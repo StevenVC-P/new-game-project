@@ -58,6 +58,9 @@ const SURVIVAL_HORIZON_DAYS: int = 120
 const SURVIVAL_WEIGHT: float = 4.0
 const CALLING_YIELD: float = 0.5
 const HUNGRY_DAYS_DESPERATE: float = 10.0
+# A town growing less food than it eats is in danger however full its store: at half what it eats,
+# as much as a town with nothing coming (get_hardship).
+const DEFICIT_WEIGHT: float = 2.0
 
 # A family improves its work when its desire reaches this.
 const IMPROVE_THRESHOLD: float = 2.0
@@ -236,13 +239,13 @@ static func get_work_desire(city: City, household: Household, occupation: String
 			var ratio: float = get_food_ratio(city)
 			var weight: float = 1.0 + 0.25 * maxi(0, -HouseholdCharacter.get_axis(household, HouseholdCharacter.RISK))
 			if weighs_food_ahead(city):
-				# One view of the town's food, looking ahead (get_food_coverage): a shortfall is the
-				# danger of hunger, weighed below as survival (get_hardship), so it is not counted
-				# again here; only how comfortably the coming months are covered is.
+				# One view of the town's food (get_hardship): hunger near, or a town growing less than
+				# it eats, is weighed below as survival and not again here; here only how comfortably
+				# the town is fed, by what it grows and what it holds for the coming months.
 				var coverage: float = get_food_coverage(city)
-				if coverage >= 1.0 and coverage < 1.25:
+				if ratio >= 1.0 and coverage >= 1.0 and (ratio < 1.25 or coverage < 1.25):
 					add(terms, 1.5 * weight, "the town's food will only just last")
-				elif coverage > 1.6:
+				elif ratio > 1.6 and coverage > 1.6:
 					add(terms, -1.5, "the town has plenty of food in store and coming")
 			elif ratio < 1.0:
 				add(terms, 3.0 * weight, "the town grows less food than it eats" + (", and it puts food first" if cautious else ""))
@@ -331,10 +334,17 @@ static func get_hardship(city: City, household: Household) -> Dictionary:
 	var risk: int = HouseholdCharacter.get_axis(household, HouseholdCharacter.RISK)
 	var ambition: int = HouseholdCharacter.get_axis(household, HouseholdCharacter.AMBITION)
 	var temperament: float = 1.0 + 0.25 * maxi(0, -risk) - 0.1 * maxi(0, risk) - 0.1 * maxi(0, ambition)
-	var town: float = clampf(get_food_outlook(city) * temperament, 0.0, 1.0)
+	# Two horizons of one danger, the larger counting: hunger near (what the town holds and will bring
+	# in over the coming months against what it will eat), and a town growing less than it eats,
+	# which a full store only puts off. Until 2026-11-01 only the first (meta "hunger_horizon_only").
+	var near: float = get_food_outlook(city)
+	var deficit: float = 0.0 if city.has_meta("hunger_horizon_only") else clampf((1.0 - get_food_ratio(city)) * DEFICIT_WEIGHT, 0.0, 1.0)
+	var town: float = clampf(maxf(near, deficit) * temperament, 0.0, 1.0)
 	var own: float = clampf(float(household.short_days_this_month) / HUNGRY_DAYS_DESPERATE, 0.0, 1.0)
 	if own > town:
 		return {"level": own, "reason": "the family itself is going hungry"}
+	if deficit > near:
+		return {"level": town, "reason": "the town grows less food than it eats"}
 	var winter: bool = city.get_season_index() >= 2
 	return {"level": town, "reason": "the town will go hungry before %s" % ("the winter is out" if winter else "the next harvest is in")}
 
