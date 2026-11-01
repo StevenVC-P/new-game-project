@@ -27,6 +27,7 @@ func run_all() -> void:
 	test_hungry_family_looks_again()
 	test_food_judged_by_work_done()
 	test_holding_worth_what_it_yields()
+	test_hunger_counted_once()
 	if failure_count > 0:
 		push_error("Autonomous occupations validation failed: " + str(failure_count) + " failure(s)")
 		quit(1)
@@ -394,6 +395,21 @@ func test_holding_worth_what_it_yields() -> void:
 	var field: Building = FamilyInitiative.get_holding(city, city.households[1])
 	city.remove_meta("stay_value_ignores_yield")
 	_check(OccupationReview.get_holding_worth(city, field) == 1.0, "a farm is judged by its land elsewhere, not here")
+
+# 15. A town about to go hungry is one reason, looking ahead, not two: the survival term, without the
+# older "grows less food than it eats" beside it (owner, 2026-11-01).
+func test_hunger_counted_once() -> void:
+	var city: City = hungry_town(0)
+	var family: Household = city.households[0]
+	var farm: Dictionary = FamilyInitiative.get_work_desire(city, family, "farm")
+	_check(has_reason(farm["terms"], "go hungry") and not has_reason(farm["terms"], "grows less food than it eats"), "hunger is weighed once, looking ahead: %s" % reasons(farm["terms"]))
+	city.set_meta("hunger_counted_twice", true)
+	var twice: Dictionary = FamilyInitiative.get_work_desire(city, family, "farm")
+	_check(has_reason(twice["terms"], "go hungry") and has_reason(twice["terms"], "grows less food than it eats"), "the comparison can count it twice, as before")
+	city.remove_meta("hunger_counted_twice")
+	var fed: City = town()
+	busy_everyone_else(fed, fed.households[0])
+	_check(has_reason(FamilyInitiative.get_work_desire(fed, fed.households[0], "farm")["terms"], "plenty of food in store and coming"), "years of food in store is plenty, looking ahead")
 
 func _check(condition: bool, message: String) -> void:
 	if condition:

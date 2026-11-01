@@ -44,6 +44,10 @@ const MODES: Dictionary = {
 	"all_uncorrected": ["food_ratio_counts_empty", "stay_value_ignores_yield"],
 	"all_food_only": ["stay_value_ignores_yield"],
 	"all_stay_only": ["food_ratio_counts_empty"],
+	# Hunger counted twice (the older food term beside the survival term), for the correction's effect.
+	"survival_twice": ["occupations_first_three", "no_shortage_recognition", "hunger_counted_twice"],
+	"shortage_survival_twice": ["occupations_first_three", "hunger_counted_twice"],
+	"all_twice": ["hunger_counted_twice"],
 	# Earlier diagnostics.
 	"occupations_blind": ["no_shortage_recognition", "no_survival_awareness"],
 }

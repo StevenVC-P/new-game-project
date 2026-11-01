@@ -232,7 +232,16 @@ static func get_work_desire(city: City, household: Household, occupation: String
 		TownInfluence.ACTIVITY_FOOD:
 			var ratio: float = get_food_ratio(city)
 			var weight: float = 1.0 + 0.25 * maxi(0, -HouseholdCharacter.get_axis(household, HouseholdCharacter.RISK))
-			if ratio < 1.0:
+			if weighs_food_ahead(city):
+				# One view of the town's food, looking ahead (get_food_coverage): a shortfall is the
+				# danger of hunger, weighed below as survival (get_hardship), so it is not counted
+				# again here; only how comfortably the coming months are covered is.
+				var coverage: float = get_food_coverage(city)
+				if coverage >= 1.0 and coverage < 1.25:
+					add(terms, 1.5 * weight, "the town's food will only just last")
+				elif coverage > 1.6:
+					add(terms, -1.5, "the town has plenty of food in store and coming")
+			elif ratio < 1.0:
 				add(terms, 3.0 * weight, "the town grows less food than it eats" + (", and it puts food first" if cautious else ""))
 			elif ratio < 1.25:
 				add(terms, 1.5 * weight, "the town's food is only just enough")
@@ -334,14 +343,25 @@ static func get_hardship(city: City, household: Household) -> Dictionary:
 # standing empty feeds no one (docs/AUTONOMOUS_OCCUPATIONS.md: counting empty farms, families saw
 # plenty in towns about to starve).
 static func get_food_outlook(city: City) -> float:
+	return clampf(1.0 - get_food_coverage(city), 0.0, 1.0)
+
+# The town's food in store, in families' larders and coming from its work over the next
+# SURVIVAL_HORIZON_DAYS, as a share of what its people will eat then (1: just enough).
+static func get_food_coverage(city: City) -> float:
 	var eats: float = float(city.get_food_consumption_for_population(city.get_total_population())) * SURVIVAL_HORIZON_DAYS
 	if eats <= 0.0:
-		return 0.0
+		return INF
 	var coming: float = float(int(city.resources["food"]))
 	for household: Household in city.households:
 		coming += household.larder
 	coming += get_working_output(city, TownInfluence.ACTIVITY_FOOD, true)
-	return clampf(1.0 - coming / eats, 0.0, 1.0)
+	return coming / eats
+
+# Whether a family choosing its work judges the town's food by the coming months (survival
+# awareness), rather than by today's output against today's eating. The comparison can keep the
+# older term beside the survival term, as before 2026-11-01 (meta "hunger_counted_twice").
+static func weighs_food_ahead(city: City) -> bool:
+	return not city.has_meta("no_survival_awareness") and not city.has_meta("hunger_counted_twice")
 
 # A workplace's output over the coming SURVIVAL_HORIZON_DAYS, in days of its average output: fields
 # follow the farming year and hunting its own seasons (EconomyBalance).
