@@ -64,6 +64,96 @@ Following the proposal below, with these specifics:
 - **Vacancy:** a Speaker whose family leaves or passes on leaves the office empty, and the Elder appoints again.
 - **Weights:** fixed before the comparison. One 2-town smoke run of the harness was looked at, to check the harness worked, before the comparison was launched.
 
+## Validation Results (2026-11-01)
+
+**Setup:**
+- **Towns:** 12 per condition, on ordinary and difficult land, for six years. They are the wisdom check's towns, with families leading and the social model on. The stand-in player never honours anyone.
+- **Three cultures,** each a community priority with its wisdoms: the food priority alone; We Endure Together + Respect What Others Build with the cooperation priority; Prepare for Hard Times + Take Pride in Your Work with the investment priority.
+- **Eight branches of each town,** identical until Village:
+  - the existing system;
+  - emergent recognition with no Speaker;
+  - the first, second or third candidate appointed at Village;
+  - each candidate replaced by the next 540 days later.
+- **Weights** stayed as fixed before the runs.
+
+**Measurement caveats:**
+- **Towns that never reach Village** (26–75% of them, depending on the land) have no Speaker.
+- **Vacancies:** Speakers are often old couples, and the office falls vacant when their family passes on. The stand-in player never appoints again, so some branches spend part of their time with no Speaker.
+
+### 1. Existing system against emergent recognition
+
+| Measure (per town at year 6) | Existing | Emergent |
+|---|---|---|
+| Achievements noticed | 0 | 29–63 |
+| Admirations / resentments | 0 / 0 | 93–257 / 9–27 |
+| Achievements both admired and resented | 0 | 4.5–7.8 |
+| Positive / negative ties | 22–69 / 0–0.8 | 50–101 / 2.4–8.1 |
+| Value changes | 4.5–36 | 21–68 (2–4×) |
+| Different households ever among the three most influential | – | 5.8–8.2 |
+| Changes in the top three | – | 10–13 |
+| People | as existing | −5 to +0.3 |
+
+**Recognition now happens without the player.**
+- **It divides families:** every town has achievements that some families admire and others resent.
+- **Influence moves:** six to eight different households pass through the top three in a town's life.
+- **Cultures develop faster.** The town's political values (egalitarian, hierarchical, communal, private and so on) end up 0.55–1.22 apart (L1 over value shares) from the same town without it.
+- **Population** is little changed.
+
+**Who becomes influential:**
+- **Mostly farming families:** 10–24 of each culture's candidates. They are the most common work, with the most kin.
+- **Also toolmakers and woodcutters:** in every culture.
+- **Their values follow the culture:**
+  - communal and mutual-aid families lead in the cooperative culture;
+  - private-holdings, acquisitive and keepers-of-craft families are common among candidates in the food and investment cultures.
+- **Likely policies in office:**
+  - **Cooperative culture:** "helpers" almost everywhere (28 of 33 candidates).
+  - **Other cultures:** split between "helpers" (15) and "its own" (9–11).
+
+### 2. The same towns with each of their three candidates appointed
+
+Means over towns that reached Village, at year 6:
+
+| Culture, land | Trust (none / 1st / 2nd / 3rd Speaker) | Wary families | Negative ties | Trust range across the three, per town | Towns where the Speakers' main policy differs |
+|---|---|---|---|---|---|
+| Food, ordinary | +0.93 / −0.45 / +0.53 / +0.33 | 0 / 6.3 / 2.8 / 4.3 | 7.8 / 23 / 15 / 20 | 2.2 | 6 of 9 |
+| Prepare+Pride, ordinary | +0.97 / −0.07 / +0.53 / +0.08 | 0 / 5.0 / 2.6 / 4.5 | 9.5 / 18 / 14 / 19 | 2.4 | 6 of 10 |
+| Endure+Respect, ordinary | +1.25 / +1.28 / +1.25 / +0.70 | 0 / 0.1 / 0.1 / 2.8 | 5 / 5 / 6 / 10 | 0.8 | 2 of 11 |
+| Food, difficult | +0.92 / +0.27 / +0.59 / −0.18 | 0 / 4.2 / 3.4 / 6.4 | 7 / 14 / 11 / 23 | 2.2 | 2 of 5 |
+| Prepare+Pride, difficult | +0.90 / −0.92 / −0.46 / −0.52 | 0 / 8.8 / 6.2 / 6.0 | 7 / 21 / 18 / 19 | 2.3 | 2 of 5 |
+| Endure+Respect, difficult | +1.42 / +1.44 / +0.98 / +0.88 | 0 / 0.1 / 2.9 / 3.1 | 4 / 4 / 8 / 10 | 0.7 | 1 of 7 |
+
+**Political divergence is real, and depends on the culture.**
+- **The food and Prepare+Pride cultures:**
+  - **Trust spread:** which candidate leads moves the town's trust by more than 2 points on a −3 to 3 scale.
+  - **Policy:** the Speakers' main policy differs in most towns.
+  - **Grants:** a Speaker who favours its own gives 6–8 grants a town, and leaves 5–9 families wary of the gathering.
+- **The cooperative culture:** every candidate holds similar communal values and rewards helpers, so the choice matters little.
+- **No Speaker at all** keeps trust highest everywhere. An office brings favouritism and opposition that the town didn't have.
+
+**Other effects:**
+- **Population:** almost unchanged by the choice (within about 1 person on average). The consequences are political, not demographic, as the owner asked.
+- **Disputes:** in the cooperative culture, Speakers urge settlement in 3–7 disputes a town, and nearly all are settled.
+- **Appointments are rarely opposed at first:**
+  - **The first reaction:** families support or don't mind (no family opposed an appointment; at most 3 doubted it). Opposition grows from what the Speaker does.
+  - **Weights:** a stronger first reaction would need different weights. That is a judgment call left to the owner.
+
+### 3. Replacing a Speaker
+
+In 71 replacements of a sitting Speaker, the circumstances decided the outcome:
+
+- **Replacing a Speaker that had lost the town** (more detractors than supporters at the time, e.g. 3 for and 7 against, or 2 for and 10 against):
+  - **The town's reaction:** most families approved (approved ≥ opposed in every such case).
+  - **Trust at year 6:** recovered by 1.5–3.5 points against keeping that Speaker. For example −1.68 → +1.39, −3.31 → +0.10, −3.13 → −0.42.
+- **Replacing a respected Speaker** (supporters far outnumbering detractors):
+  - **The town's reaction:** most families opposed (5–14 a town). The immediate trust cost was small (−0.0 to −0.3).
+  - **What follows:** depends on the successor. Where it favoured its own, trust fell 2–3.5 points by year 6 (e.g. +2.09 → −1.42, +1.06 → −2.14, +0.77 → −2.52). Where it didn't, nothing much changed.
+- **How the former Speaker took it:** 85% stepped down, 7 resented it, 2 wouldn't forgive it. All of these were ambitious, assertive or well-backed families. Nothing was imposed.
+
+### Not yet measured
+
+- **Long-term reappointment** after vacancies (the stand-in player never reappoints).
+- **The player's own reading of the candidate cards.** This needs playtesting.
+
 ## 1. Audit
 
 ### What the player controls today (Community page)
