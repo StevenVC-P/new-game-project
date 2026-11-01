@@ -457,8 +457,9 @@ func advance_day() -> void:
 	for project: ConstructionProject in projects:
 		project.crew_household_ids.clear()
 		project.blocked_reason = ""
-	# Hungry families lose working days on sites as on their holdings.
-	var hungry_day: bool = city.should_skip_for_food_shortage()
+	# Hungry families lose working days on sites as on their holdings: all of them when the town goes
+	# short, or with household larders only those who went short (City.skips_work_today).
+	var hungry_day: bool = city.should_skip_for_food_shortage() and not HouseholdEconomy.is_on(city)
 	var workable: Array[ConstructionProject] = []
 	for project: ConstructionProject in projects:
 		if can_progress(project):
@@ -479,7 +480,10 @@ func advance_day() -> void:
 			project.blocked_reason = "builders hungry today"
 		return
 
-	var free_families: Array[Household] = get_free_families()
+	var free_families: Array[Household] = []
+	for household: Household in get_free_families():
+		if not city.skips_work_today(household.id):
+			free_families.append(household)
 	for project: ConstructionProject in workable:
 		if free_families.is_empty():
 			break
@@ -493,7 +497,7 @@ func advance_day() -> void:
 				break
 
 	for household: Household in city.households:
-		if household.labor_capacity <= 0 or household.assigned_workers <= 0:
+		if household.labor_capacity <= 0 or household.assigned_workers <= 0 or city.skips_work_today(household.id):
 			continue
 		var target: ConstructionProject = get_spare_time_project(household, workable)
 		if target == null:

@@ -20,7 +20,10 @@ extends SceneTree
 # Run one condition and some strategies per process (write to a file, filter for [WIS]):
 #   <godot> --headless --path . --script res://tests/sim/wisdom_check.gd -- --conditions=ordinary --strategies=none,endure+respect > wis.log
 # Options: --years=N (default 6, with a year-3 snapshot), --sites=N, --prepare-difficult (pick and cache),
-# --no-reconsider (families never reconsider their work), --change-limit=N (families changing work a month; 0 none).
+# --no-reconsider (families never reconsider their work), --change-limit=N (families changing work a month; 0 none),
+# --no-self-sufficiency (no secondary work, larders or proficiency: docs/HOUSEHOLD_SELF_SUFFICIENCY.md),
+# --disrupt=specialist|stores (at DISRUPT_DAY, the same on both sides of a comparison: every family
+# working tools leaves the town, or the common stores lose DISRUPT_STORE_LOSS of their food, wood and tools).
 
 const TownBuildingCheck = preload("res://tests/sim/town_building_check.gd")
 const StandInPlayerScript = preload("res://tests/sim/stand_in_player.gd")
@@ -51,6 +54,9 @@ const DIFFICULT_POOL_REGIONS: int = 30
 const REFERENCE_DAYS: int = 720
 const DIFFICULT_CACHE: String = "user://wisdom_difficult_seeds.txt"
 const SNAPSHOT_YEAR: int = 3
+# The second autumn: a town past founding, before its second winter.
+const DISRUPT_DAY: int = 540
+const DISRUPT_STORE_LOSS: float = 0.8
 
 func _init() -> void:
 	call_deferred("run")
@@ -76,6 +82,10 @@ func run() -> void:
 			reconsider = false
 		elif argument.begins_with("--change-limit="):
 			change_limit = int(argument.trim_prefix("--change-limit="))
+		elif argument == "--no-self-sufficiency":
+			self_sufficiency = false
+		elif argument.begins_with("--disrupt="):
+			disrupt = argument.trim_prefix("--disrupt=")
 	var ordinary: Array = TownBuildingCheck.collect_sites().slice(0, site_count)
 	if prepare:
 		pick_difficult_sites(ordinary, site_count)
@@ -104,18 +114,23 @@ func run() -> void:
 
 var reconsider: bool = true
 var change_limit: int = -1
+var self_sufficiency: bool = true
+var disrupt: String = ""
 
 func play(site: Dictionary, strategy: Dictionary, stress: bool, years: int) -> Dictionary:
 	var city: City = City.new("Player Town", Vector2(site["site"]), City.ROLE_PLAYER, EconomyBalance.FOUNDING_FAMILIES, int(site["seed"]))
 	city.site_profile = site["profile"]
 	city.local_map = (site["map"] as Array).duplicate(true)
 	Layouts.set_aside(city, "starting")
+	# Before the first day, so a town compared without it never runs it.
+	city.influence.self_sufficiency = self_sufficiency
 	var scenario: Dictionary = BASE.duplicate(true)
 	scenario["hard_winter"] = stress
 	var measured: Dictionary = {}
 	scenario["each_day"] = func(town: City, day: int, _player) -> void:
 		if day == 0:
 			town.influence.reconsider_work = reconsider
+			town.influence.self_sufficiency = self_sufficiency
 			if change_limit >= 0:
 				town.set_meta("work_change_limit", change_limit)
 			for key: String in strategy["wisdoms"]:
@@ -128,6 +143,8 @@ func play(site: Dictionary, strategy: Dictionary, stress: bool, years: int) -> D
 		if day % 30 == 29 and int(town.resources["tools"]) < 10 and town.buildings.any(func(b: Building) -> bool: return b.needs_maintenance()):
 			town.set_meta("tools_short_months", int(town.get_meta("tools_short_months", 0)) + 1)
 			town.set_meta("last_tools_short_day", day)
+		if day == DISRUPT_DAY and disrupt != "":
+			disrupt_town(town)
 		if day == SNAPSHOT_YEAR * Calendar.DAYS_PER_YEAR - 1:
 			measured[SNAPSHOT_YEAR] = measure(town)
 	var result: Dictionary = StandInPlayerScript.new().play(city, scenario, years * Calendar.DAYS_PER_YEAR)
@@ -136,6 +153,26 @@ func play(site: Dictionary, strategy: Dictionary, stress: bool, years: int) -> D
 	if not measured.has(SNAPSHOT_YEAR):
 		measured[SNAPSHOT_YEAR] = measured[years]
 	return {"years": measured}
+
+# The test's shock, identical with the system on and off: the town's toolmakers leave (their
+# workplaces stay, open to others), or the common stores lose most of what they hold (larders kept).
+func disrupt_town(city: City) -> void:
+	if disrupt == "specialist":
+		var leaving: Array[Household] = []
+		for household: Household in city.households:
+			var holding: Building = FamilyInitiative.get_holding(city, household)
+			if holding != null and FamilyInitiative.get_activity(holding.type) == TownInfluence.ACTIVITY_TOOLS:
+				leaving.append(household)
+		for household: Household in leaving:
+			HouseholdMigration.release_departing_household_work(city, household, 0)
+			city.households.erase(household)
+		city.update_shelter_counts()
+		city.auto_assign_workers()
+		city.set_meta("disrupted_families", leaving.size())
+	elif disrupt == "stores":
+		for good: String in ["food", "wood", "tools"]:
+			city.resources[good] = int(round(float(int(city.resources[good])) * (1.0 - DISRUPT_STORE_LOSS)))
+	city.set_meta("disrupted_people", city.get_total_population())
 
 # One town at one moment: what its families are like, what they did, and how the town fares.
 func measure(city: City) -> Dictionary:
@@ -190,6 +227,59 @@ func measure(city: City) -> Dictionary:
 	m["unhoused"] = unhoused
 	m["food_days"] = FamilyInitiative.get_food_days(city)
 	m["tools"] = int(city.resources["tools"])
+	m["wood"] = int(city.resources["wood"])
+	m["food"] = int(city.resources["food"])
+	m["disrupted_families"] = int(city.get_meta("disrupted_families", 0))
+	m["disrupted_people"] = int(city.get_meta("disrupted_people", -1))
+	# Household self-sufficiency and proficiency (HouseholdEconomy).
+	m["primary_share_days"] = influence.primary_share_days
+	m["secondary_share_days"] = influence.secondary_share_days.duplicate()
+	m["secondary_output"] = influence.secondary_output.duplicate()
+	m["lost_primary_output"] = influence.lost_primary_output.duplicate()
+	m["wood_to_own_projects"] = influence.wood_to_own_projects
+	m["mended_upkeep"] = influence.mended_upkeep
+	m["larder_eaten_own"] = influence.larder_eaten_own
+	m["larder_eaten_short"] = influence.larder_eaten_short
+	m["household_short_days"] = influence.household_short_days
+	m["food_gifts"] = influence.food_gifts
+	var larder: float = 0.0
+	var larder_days: Array = []
+	var secondary: Dictionary = {}
+	var targets: Dictionary = {}
+	var working_levels: Array = []
+	var novices: int = 0
+	var known: int = 0
+	var by_value: Dictionary = {}
+	for household: Household in households:
+		larder += household.larder
+		larder_days.append(HouseholdEconomy.get_larder_days(household))
+		if household.secondary_share > 0.0:
+			secondary[household.secondary_activity] = int(secondary.get(household.secondary_activity, 0)) + 1
+		targets[str(household.larder_target_days)] = int(targets.get(str(household.larder_target_days), 0)) + 1
+		known += household.proficiency.size()
+		var holding: Building = FamilyInitiative.get_holding(city, household)
+		if holding != null:
+			var level: float = HouseholdEconomy.get_level(household, holding.type)
+			working_levels.append(level)
+			novices += 1 if level < HouseholdEconomy.ESTABLISHED else 0
+		# Families by conviction: their time and larders.
+		for value_id: String in ["self_reliant", "thrifty", "common_stores", "sharing"]:
+			if HouseholdCharacter.get_strength(household, value_id) > 0:
+				var row: Dictionary = by_value.get(value_id, {"families": 0, "secondary": 0.0, "larder_target": 0.0})
+				row["families"] = int(row["families"]) + 1
+				row["secondary"] = float(row["secondary"]) + household.secondary_share
+				row["larder_target"] = float(row["larder_target"]) + household.larder_target_days
+				by_value[value_id] = row
+	m["larder_food"] = larder
+	larder_days.sort()
+	m["larder_days_median"] = float(larder_days[larder_days.size() / 2]) if not larder_days.is_empty() else 0.0
+	m["families_secondary"] = secondary
+	m["larder_targets"] = targets
+	working_levels.sort()
+	m["working_level_median"] = float(working_levels[working_levels.size() / 2]) if not working_levels.is_empty() else 0.0
+	m["working_novices"] = novices
+	m["trades_known_per_family"] = known / n
+	m["by_value"] = by_value
 	m["proper_workplaces"] = city.buildings.filter(func(b: Building) -> bool: return b.needs_maintenance()).size()
 	m["improvements"] = city.influence.improvements_started
 	m["help_weeks"] = social.help_weeks

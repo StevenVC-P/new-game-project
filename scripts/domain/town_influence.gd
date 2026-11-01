@@ -67,6 +67,24 @@ var workplaces_left_proper: int = 0
 var workplaces_left_empty: int = 0
 # Every review this session, for checks (not saved).
 var _work_review_log: Array = []
+# Household self-sufficiency and proficiency (HouseholdEconomy); off only for comparison. The day it
+# started in this town, and for balance tools: share-days of work, what secondary work made, what
+# holdings gave up for it, larders eaten, families' short days, gifts of food.
+var self_sufficiency: bool = true
+var economy_started_day: int = -1
+var primary_share_days: float = 0.0
+var secondary_share_days: Dictionary = {}
+var secondary_output: Dictionary = {}
+var lost_primary_output: Dictionary = {}
+var wood_to_own_projects: int = 0
+var mended_upkeep: int = 0
+var larder_eaten_own: float = 0.0
+var larder_eaten_short: float = 0.0
+var household_short_days: int = 0
+var food_gifts: int = 0
+var food_gift_units: float = 0.0
+# Today's share of each family's day given to secondary work (recomputed every day; not saved).
+var _secondary_today: Dictionary = {}
 
 func _init(owner: City) -> void:
 	_city_ref = weakref(owner)

@@ -94,6 +94,25 @@ var work_change_from: int = -1
 var work_history: Array = []
 var work_review_note: String = ""
 var work_review_note_day: int = -1
+# Its household economy (HouseholdEconomy): proficiency by trade (0-1) and whether it has been
+# given its starting knowledge; the share of its day it gives to secondary work and which, the
+# garden ground or woods it has for it, and what it has gathered or mended toward a whole unit;
+# its larder of food, the days of its own eating it keeps back, and its days short this month.
+var proficiency: Dictionary = {}
+var proficiency_seeded: bool = false
+var secondary_activity: String = ""
+var secondary_share: float = 0.0
+var garden_land: float = 0.0
+var woods_land: float = 0.0
+var gathered_wood: float = 0.0
+var mending: float = 0.0
+var larder: float = 0.0
+var larder_target_days: int = 0
+var short_today: bool = false
+var short_days_this_month: int = 0
+var economy_note: String = ""
+var economy_note_day: int = -1
+var larder_note: String = ""
 
 # The household's character and social life (docs/HOUSEHOLD_SOCIAL_MODEL.md; HouseholdCharacter,
 # TownSocial). Empty until the social model or influence prototype gives the household one.

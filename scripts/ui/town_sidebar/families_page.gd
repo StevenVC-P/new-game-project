@@ -125,6 +125,18 @@ static func get_detail_lines(city: City, household: Household) -> Array:
 		lines.append("Home site (%s): %s" % [SidebarOverviewPage.days_ago(today - household.home_site_day), household.home_site_note])
 	if household.work_review_note != "" and household.work_review_note != household.initiative_note:
 		lines.append("Its work (%s): %s" % [SidebarOverviewPage.days_ago(today - household.work_review_note_day), household.work_review_note])
+	if HouseholdEconomy.is_on(city):
+		if household.economy_note != "":
+			lines.append("Its time (%s): %s" % [SidebarOverviewPage.days_ago(today - household.economy_note_day), household.economy_note])
+		if household.larder > 0.5 or household.larder_target_days > 0:
+			lines.append("Larder: %d days of its food. %s" % [floori(HouseholdEconomy.get_larder_days(household)), household.larder_note])
+		var known: Array[String] = []
+		var trades: Array = household.proficiency.keys()
+		trades.sort_custom(func(a: String, b: String) -> bool: return float(household.proficiency[a]) > float(household.proficiency[b]))
+		for trade: String in trades.slice(0, 3):
+			known.append("%s (%s)" % [FamilyInitiative.describe_type(trade, false), HouseholdEconomy.describe_level(float(household.proficiency[trade]))])
+		if not known.is_empty():
+			lines.append("Knows: " + ", ".join(known))
 	if city.influence.enabled:
 		var outlook: Dictionary = FamilyInitiative.predict_improvement(city, household, true)
 		if str(outlook["outlook"]) != "":

@@ -1,10 +1,75 @@
 # Household Self-Sufficiency and Occupational Skills
 
-**Status: audit and proposal for owner review (2026-11-01). Nothing implemented.** Branch `feature/household-self-sufficiency`, stacked on `feature/occupation-reconsideration`. Not merged.
+**Status: implemented as a prototype (2026-11-01). Branch `feature/household-self-sufficiency`, stacked on `feature/occupation-reconsideration`. Not merged: awaits owner review.**
+
+Code: `scripts/domain/household_economy.gd` (`HouseholdEconomy`). It hooks into:
+- `City`: `tick`, `consume_food`, `skips_work_today`, `get_work_time_factor`, output modifiers, upkeep;
+- `TownConstruction` (hungry builders);
+- `HouseholdMigration` (the monthly decision; short days);
+- `TownSocial.share_in_shortage`;
+- `FamilyInitiative.get_work_desire`;
+- the Families page.
+
+Tests: `tests/household_economy_validation.gd`. Comparison: `tests/sim/wisdom_check.gd` with `--no-self-sufficiency` and `--disrupt=specialist|stores`.
 
 Objective (owner, 2026-11-01): families respond to changing economic circumstances by adapting how they spend their time, developing useful skills, and deciding how much to depend on other families, without direct orders from the player. A town's economic behaviour should emerge from the decisions and accumulated experience of its households.
 
 Core principle (owner): a family has limited working time, and everything it does competes for that time.
+
+## Owner Decisions (proposal review, 2026-11-01)
+
+The architecture and directions D1 to D8 are approved, with these changes:
+
+1. **Larders: choosing to eat, save or share.** The first proposal had a family eat its harvest first. A garden yields about an eighth of a family's food, so nothing would ever be stored. Families need a real choice between eating, saving and sharing their produce. A family may eat from the common store while saving its own harvest, and that has consequences for the store and for how others see it. Food must never be made or eaten twice. Resolved below, before larders were built.
+2. **Skills: no permanent floor.** Unused proficiency decays slowly and can disappear entirely. Inherited proficiency reflects what the parent family still knows. The learning rates and 60% beginner output are accepted as prototype values, subject to the simulation.
+3. **Secondary work** runs at hand-work efficiency, but a garden needs suitable land near home and follows the season. It needs no placed building, but families can't garden anywhere at all.
+4. **Errands:** existing behaviour kept.
+5. **Starting skills:** founders and newcomers are experienced in the trades they already know, not in unfamiliar work they happen to take up.
+6. **Disruption testing is required:** both the loss of a specialist and the loss of communal stores, on matched seeds.
+7. **Time:** secondary work directly reduces time for specialised work.
+8. **The existing surplus** isn't rebalanced in this milestone. Its effects are reported separately.
+
+## How It Was Built
+
+**The larder accounting (decision 1).** A family's harvest always goes into its larder, never directly into anyone's mouth or the common store. The family decides, monthly and one step at a time, how much of its own food it keeps back: 0, 30, 60 or 90 days of its own eating.
+
+Each day, the town's demand is counted exactly as before: one food per two people, over the whole town, rounded up. Each family then eats in this order:
+
+1. **Its own food above its target.** This is how a family that keeps nothing back shares its harvest: every unit it eats of its own is a unit the common store keeps. What families eat this way comes off the town's demand, so total eating is unchanged.
+2. **The common store.** Below its target, a family eats from here and saves its harvest. This is the choice the owner described. It costs the common store what the family would otherwise have spared it.
+3. **Its larder, only when the common store falls short.**
+
+A family whose food wasn't all met is short today. The common store's shortfall is spread across families in proportion to what they draw from it.
+
+**Conservation:**
+- A larder fills only from the family's own harvest or a gift. It never draws from the common store.
+- So every unit is in exactly one place: the common store, a larder, or eaten.
+- With every larder empty, the store, the town flag and every family's shortness are exactly what they were (tested).
+
+**Consequences:**
+- **Hardship and hunger:** shortage hardship and lost working days follow each family's own short days (decision D2). The town flag stays for births, arrivals and the wisdoms' sense of shortage.
+- **Sharing:**
+  - In a shortage, a family that is short and near leaving asks families it knows, as before.
+  - A donor with food put by gives real food: 10 days of the recipient's eating, from its larder to the recipient's. It takes on no hardship for this.
+  - A donor without such food shares its ration as before, as an abstract point of hardship.
+  - A family that could have given from its larder and didn't is remembered for it ("kept its larder while we went hungry").
+  - That is how others see a family that saves. No wider gossip or perception system was built.
+
+**Garden land (decision 3).**
+- **Within reach:** a garden takes two tiles of free ground within 3 tiles of the family's home. Free means open ground, no trees, no road, nothing built or reserved.
+- **Ground quality:** fertile land yields in full; plain ground yields half.
+- **No sharing tiles:** families claim their tiles in turn each month, by family number, so no two families garden the same tile.
+- **No home:** a family without a home has no garden.
+- **Season:** output follows the farming year (`FARM_SEASON_YIELD`), and the season is one of the family's reasons.
+- **Gathering wood** needs woods within 4 tiles of home, scaled by the number of wooded tiles there, up to 6.
+- **Mending** needs the family's own proper workplace.
+- **Unit tests:** in tests without a town map, the land doesn't constrain anything.
+
+**Skills (decisions 2 and 5).**
+- **Decay:** unused proficiency decays toward nothing at a quarter of the learning rate, and is forgotten below 0.02.
+- **Inheritance:** a new family inherits 60% of what its parents know at the moment it is first counted.
+- **Founders and newcomers:** established (0.7) in the trades their calling draws them to. Nothing else.
+- **A town already going** when the system first runs (an older save) knows the work it has been doing.
 
 ## 1. Audit
 

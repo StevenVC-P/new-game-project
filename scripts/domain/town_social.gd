@@ -589,12 +589,16 @@ func notice_unreturned(household: Household, target: Household) -> void:
 # Before a month's hardship is counted (HouseholdMigration): in a month of shortage, each household
 # the shortage would bring close to leaving looks to the households it knows. The first willing
 # donor gives up part of its ration: the donor takes on a point of the shortage's hardship, the
-# recipient is spared one. Each donor gives once a month.
+# recipient is spared one. Each donor gives once a month. With household larders (HouseholdEconomy)
+# a donor with food put by gives food instead: some days of the recipient's eating move from its
+# larder to the recipient's, and the donor carries no hardship for it.
 func share_in_shortage() -> void:
-	if not enabled or int(city.resources["shortage_days_this_month"]) < HouseholdMigration.HARDSHIP_SHORTAGE_DAYS:
+	if not enabled:
 		return
 	var at_risk: Array[Household] = []
 	for household: Household in city.households:
+		if HouseholdMigration.get_short_days(city, household) < HouseholdMigration.HARDSHIP_SHORTAGE_DAYS:
+			continue
 		if household.hardship_points + HouseholdMigration.HARDSHIP_SHORTAGE_POINTS >= HouseholdMigration.get_departure_threshold(household) - HouseholdMigration.DEPARTURE_WARNING_MARGIN:
 			at_risk.append(household)
 	at_risk.sort_custom(func(a: Household, b: Household) -> bool: return get_security_margin(a) < get_security_margin(b) or (get_security_margin(a) == get_security_margin(b) and a.id < b.id))
@@ -607,7 +611,8 @@ func share_in_shortage() -> void:
 		var refused_able: bool = false
 		for donor: Household in donors:
 			var desire: Dictionary = SocialDecisions.get_share_desire(city, donor, recipient)
-			var able: bool = can_afford_to_share(donor)
+			var has_food: bool = HouseholdEconomy.is_on(city) and HouseholdEconomy.can_give_food(donor, recipient)
+			var able: bool = can_afford_to_share(donor) or has_food
 			var gives: bool = able and float(desire["score"]) + FamilyInitiative.get_noise(city, donor, "share:%d" % recipient.id) >= SocialDecisions.SHARE_THRESHOLD
 			# A choice only for a family that could afford to give: sharing is what We Endure
 			# Together asks, keeping something back what Prepare for Hard Times asks.
@@ -623,7 +628,10 @@ func share_in_shortage() -> void:
 		if donor_found != null:
 			shares += 1
 			given.append(donor_found.id)
-			donor_found.shortage_hardship_adjust += 1
+			if HouseholdEconomy.is_on(city) and HouseholdEconomy.can_give_food(donor_found, recipient):
+				HouseholdEconomy.give_food(city, donor_found, recipient)
+			else:
+				donor_found.shortage_hardship_adjust += 1
 			recipient.shortage_hardship_adjust -= 1
 			donor_found.help_given += 1
 			adjust_standing(donor_found, 0.5)
@@ -640,9 +648,10 @@ func share_in_shortage() -> void:
 				adjust_trust(recipient, 0.5, "hardship answered")
 		elif not donors.is_empty():
 			var asked: Household = donors[0]
-			var could_not: bool = not can_afford_to_share(asked)
+			var kept_larder: bool = HouseholdEconomy.is_on(city) and HouseholdEconomy.can_give_food(asked, recipient)
+			var could_not: bool = not can_afford_to_share(asked) and not kept_larder
 			if not could_not:
-				HouseholdMemory.touch_tie(city, recipient, asked, -1, "would not share in the shortage")
+				HouseholdMemory.touch_tie(city, recipient, asked, -1, "kept its larder while we went hungry" if kept_larder else "would not share in the shortage")
 				norms[NORM_HELP]["sanctions"] = int(norms[NORM_HELP]["sanctions"]) + 1
 			HouseholdMemory.experience(city, recipient, "food_refused", "%s did not share its food in the shortage" % city.get_household_label(asked.id), asked, {"benefit": -1, "could_not": could_not, "major": true})
 			if refused_able:

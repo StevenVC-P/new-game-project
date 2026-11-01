@@ -58,6 +58,7 @@ static func advance_month(city, city_index: int = 0) -> void:
 
 	FamilyAmbitions.advance_month(city)
 	OccupationReview.advance_month(city)
+	HouseholdEconomy.advance_month(city)
 	# Neighbours may share their rations before the shortage's hardship falls (TownSocial).
 	city.social.share_in_shortage()
 	update_hardship(city)
@@ -65,6 +66,7 @@ static func advance_month(city, city_index: int = 0) -> void:
 	for household: Household in city.households:
 		household.shortage_hardship_adjust = 0
 		household.long_weeks_this_month = 0
+		household.short_days_this_month = 0
 	resolve_departure(city, city_index)
 	if month_index % POOL_REFILL_MONTHS == 0:
 		city.resources["regional_migrant_families"] = min(POOL_MAX_FAMILIES, int(city.resources["regional_migrant_families"]) + 1)
@@ -85,7 +87,7 @@ static func is_household_crowded(household: Household, city = null) -> bool:
 
 static func get_monthly_hardship_points(city, household: Household) -> int:
 	var points: int = 0
-	if int(city.resources["shortage_days_this_month"]) >= HARDSHIP_SHORTAGE_DAYS:
+	if get_short_days(city, household) >= HARDSHIP_SHORTAGE_DAYS:
 		# A family that shared its ration carries more of the shortage; one helped carries less.
 		points += maxi(0, HARDSHIP_SHORTAGE_POINTS + household.shortage_hardship_adjust)
 	# Long days out of a family's rest (TownSocial.choose_hours) wear on it.
@@ -98,6 +100,13 @@ static func get_monthly_hardship_points(city, household: Household) -> int:
 	if household.rough_housing_months > EconomyBalanceScript.ROUGH_HOUSING_GRACE_MONTHS:
 		points += CultureEffectsScript.get_crowding_hardship_points(household.values)
 	return points
+
+# Days this month the family went short: its own with household larders (HouseholdEconomy), else
+# the town's.
+static func get_short_days(city, household: Household) -> int:
+	if HouseholdEconomy.is_on(city):
+		return household.short_days_this_month
+	return int(city.resources["shortage_days_this_month"])
 
 # Hardship is capped just past the threshold, so once conditions improve a family recovers in a
 # few months instead of carrying an old crisis indefinitely.
