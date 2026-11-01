@@ -389,9 +389,13 @@ static func decide_time(city: City, household: Household, claimed: Dictionary) -
 	var before: int = step
 	if step > 0 and household.secondary_activity != best_activity:
 		step -= 1
+	elif wanted > step and step == 0:
+		# Taking it up, a family chooses how much of its day to give, up to what its reasons call
+		# for (random among those for now: owner, 2026-11-01).
+		step = get_starting_step(city, household, wanted)
+		household.secondary_activity = best_activity
 	elif wanted > step:
 		step += 1
-		household.secondary_activity = best_activity
 	elif wanted < step:
 		step -= 1
 	household.secondary_share = SECONDARY_STEPS[step]
@@ -413,6 +417,12 @@ static func decide_time(city: City, household: Household, claimed: Dictionary) -
 		set_note(city, household, "Gives %d%% of its day to %s (%s)" % [roundi(household.secondary_share * 100.0), SECONDARY_NAMES[household.secondary_activity], "; ".join(FamilyInitiative.get_reasons(best["terms"], true))])
 	else:
 		set_note(city, household, "Keeps to its own work rather than %s (%s)" % [SECONDARY_NAMES[best_activity], "; ".join(FamilyInitiative.get_reasons(best["terms"], false))])
+
+# Drawn from the town, the family and the day, so a loaded game chooses as the original would have.
+static func get_starting_step(city: City, household: Household, wanted: int) -> int:
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = hash([city.founding_seed, household.id, city.construction.day, "secondary_start"])
+	return rng.randi_range(1, wanted)
 
 # {"possible", "score", "terms", "appeal", "prepare", "pride"}.
 static func get_secondary_desire(city: City, household: Household, holding: Building, activity: String, claimed: Dictionary) -> Dictionary:

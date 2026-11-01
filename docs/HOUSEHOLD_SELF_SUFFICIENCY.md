@@ -55,6 +55,8 @@ A family whose food wasn't all met is short today. The common store's shortfall 
   - A family that could have given from its larder and didn't is remembered for it ("kept its larder while we went hungry").
   - That is how others see a family that saves. No wider gossip or perception system was built.
 
+**How much time (owner, 2026-11-01).** A family taking up secondary work chooses how much of its day to give: 10%, 20% or 30%, never more than its reasons call for. The choice is random among those for now, and deterministic per town, family and day. After that the share moves at most one step a month.
+
 **Garden land (decision 3).**
 - **Within reach:** a garden takes two tiles of free ground within 3 tiles of the family's home. Free means open ground, no trees, no road, nothing built or reserved.
 - **Ground quality:** fertile land yields in full; plain ground yields half.

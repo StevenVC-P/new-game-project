@@ -286,11 +286,12 @@ func test_families_decide_their_time() -> void:
 	city.resources["food"] = 20
 	city.construction.day = 200
 	HouseholdEconomy.advance_month(city)
-	_check(keen.secondary_activity == "food" and is_equal_approx(keen.secondary_share, 0.1), "the cautious family starts a garden at a tenth of its day: %s" % keen.economy_note)
+	var first: float = keen.secondary_share
+	_check(keen.secondary_activity == "food" and first >= 0.1 - 0.0001, "the cautious family starts a garden, at a share of its own choosing (%.1f): %s" % [first, keen.economy_note])
 	_check(keen.economy_note.contains("short of food") and keen.economy_note.contains("garden"), "and says why: %s" % keen.economy_note)
 	city.construction.day += 30
 	HouseholdEconomy.advance_month(city)
-	_check(keen.secondary_share > 0.1 and keen.secondary_share <= 0.2 + 0.0001, "then a step more, never a leap (%.1f)" % keen.secondary_share)
+	_check(keen.secondary_share >= first - 0.0001 and keen.secondary_share <= first + 0.1 + 0.0001, "then at most a step a month, never a leap (%.1f -> %.1f)" % [first, keen.secondary_share])
 	city.resources["food"] = 5000
 	keen.larder = 1000.0
 	for i in range(3):
