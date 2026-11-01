@@ -6,21 +6,39 @@ Snapshot for whoever picks the project up next. Update it when a milestone close
 
 ## Current Objective
 
-**Waiting for owner review: `feature/autonomous-occupations`** (from `develop`, not merged; `docs/AUTONOMOUS_OCCUPATIONS.md`). It acts on open decisions 3 and 4 below.
-- **What it adds:**
-  - fish weir, snare line and grazing pen, so families take up fishing, hunting and herding themselves, as hand work first;
-  - families choose among every trade with a hand-work stage, weighed by the good it makes and the land in reach;
-  - **survival before prosperity:** the town's food outlook from the work families actually do, through the coming seasons, sets aside part of a calling's pull and draws families to food work as far as it would really feed people;
-  - **narrow shortage recognition** (owner-approved default): a good no one makes running out within the season starts an early review;
-  - a family hungry for two months looks at its work again.
-- **Results** (six years, 12 towns, ordinary/stressed/difficult, people):
-  - **today:** 57.8 / 63.2 / 42.8;
-  - **survival awareness with the first three trades:** 67.5 / 56.2 / 47.4;
-  - **everything:** 51.8 / 41.7 / 44.8.
+**Waiting for owner review: `feature/autonomous-occupations`** (from `develop`, not merged). Docs:
+- `docs/AUTONOMOUS_OCCUPATIONS.md` (third round at the top: the corrections, the five-way comparison, decisions before merging);
+- `docs/PLAYER_AGENCY_AUDIT.md` (findings and five proposed controls, none built).
 
-  The remaining stressed gap is traced to hunting families staying at lodges whose woods were felled: the staying weights count the investment at full value.
-- **The owner's decisions are listed in that doc ("For the Owner").** Each part switches off on its own (city metas).
-- **Worktrees:** `ngg-occupations` (the branch), `ngg-occ-runs`, `ngg-occ-runs2` and `ngg-occ-runs3` (fixed commits the comparisons ran from; `runs3` is the final one) and `ngg-baseline` (`develop`, detached), all beside the main folder.
+What it adds:
+- **The new trades:** fishing, hunting and herding (hand work first) as families' own choice.
+- **Narrow shortage recognition:** owner-approved.
+- **Survival awareness:** owner-approved.
+- **A hungry family looks at its work again.**
+- **Two reasoning corrections:**
+  - the food judgement from work actually done;
+  - a holding worth what its land still yields.
+- **Tests:** a deterministic sidebar test, and a separate gameplay regression.
+
+Each part switches off with a comparison meta. With all of them off, the branch plays exactly as `develop` (96/96 snapshots).
+
+Results (six years, ordinary/stressed/difficult, people):
+
+| Mode | People |
+|---|---|
+| today | 57.8 / 63.2 / 42.8 |
+| narrow recognition with the corrections | 61.9 / 62.8 / 45.9 |
+| everything | 57.6 / 49.0 / 51.2 |
+
+- **The food correction makes towns worse without shortage recognition.** Families then neglect tools.
+- **The agency finding:** warnings come in time, but a player answering them as the cards suggest does worse than none.
+
+Open decisions are listed in both docs.
+
+**Worktrees** beside the main folder:
+- `ngg-occupations`: the branch;
+- `ngg-occ-runs` to `ngg-occ-runs5`: the fixed commits the comparisons ran from (`runs4` and `runs5` are the latest);
+- `ngg-baseline`: `develop`, detached.
 
 **Merged 2026-11-01 (owner-approved: `develop`, then `develop` into `main`).** Each item has a design doc with its owner decisions, how it was built, validation results and open decisions:
 - **Step 3 interface** (community priority and residential land in the game; `docs/TOWN_UI.md`, `docs/HOME_SITES.md`, `docs/COMMUNITY_PRIORITIES.md`).

@@ -79,6 +79,10 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # mode, every work decision traced with the priority's part ("--no-priority" clears it; filter for [REPLAY])
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/autonomous_occupations_validation.gd
 # Gameplay regression: the town the sidebar test founds (fixed seed), played a year, must keep its families, be fed and house one
+# Player agency (docs/PLAYER_AGENCY_AUDIT.md): the towns under kinds of player acting only on what the game shows, through its
+# controls (none, informed, informed_priority/_commission/_woods, late, inappropriate); "--seed=N --trace" prints one town's
+# timeline (warnings, the player's acts, every family's choice and review with reasons; filter for [TRACE], else [INT])
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/intervention_check.gd -- --conditions=stressed --policies=none,informed > int.log
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/founded_town_regression.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/occupation_check.gd -- --conditions=ordinary --modes=both > occ.log
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/autosave_replay.gd -- --save=C:/path/to/copy.save --mode=both --days=360 > replay.log

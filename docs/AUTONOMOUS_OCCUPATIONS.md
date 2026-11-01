@@ -15,6 +15,109 @@ Tests:
 
 Comparison: `tests/sim/occupation_check.gd`. Owner's town: `tests/sim/autosave_replay.gd`. Commands in `docs/TESTING.md`.
 
+## Third Round (2026-11-01): Reasoning Corrections, the Full Comparison, Player Agency
+
+The player agency audit has its own document: `docs/PLAYER_AGENCY_AUDIT.md`.
+
+**Owner decisions:**
+- **Approved:** narrow shortage recognition and survival awareness.
+- **Under evaluation:** the new trades. Herding makes clothing only.
+- **To fix:** two reasoning problems, without forcing anyone off their work:
+  - the old food judgement counting empty farms;
+  - families valuing workplaces whose resources are gone.
+- **The comparison asked for:** five modes on the same seeds, with the corrections' effects reported separately.
+
+### The two corrections
+
+1. **The food judgement uses work actually done** (`FamilyInitiative.get_food_ratio`, `get_working_output`).
+   - **Where it is used:** "The town grows less food than it eats / plenty of food", in first choices and in the review's oversupply reason.
+   - **What it counts now:** only work a family does or has claimed, on its land, at its pace (hands, skill, the share of its day left after walking and other work), and at hand pace where short of tools.
+   - **Shared:** the survival outlook uses the same count.
+   - **The old count:** meta `food_ratio_counts_empty`.
+2. **A holding is worth what its land still yields** (`OccupationReview.get_holding_worth`).
+   - **What scales:** "it has built up its …" and "its … would stand idle" scale with the share of a full yield the workplace's water, woods or pasture still gives ("…, though its land yields little now").
+   - **What stays in full:** its years at the work, its skill, its calling and convictions. A family may still stay.
+   - **Fields, woodcutters and workshops** are unaffected (their land is judged elsewhere).
+   - **The old weighting:** meta `stay_value_ignores_yield`.
+
+**Tests:**
+- **Fixtures:** the review tests' fixtures now work at full pace without skill (`economy_no_proficiency_effects`). Their subject is the review rules, and their premise ("food to spare") is about how much the town grows. Before, families with no skill were counted at full pace by the old judgement.
+- **New checks:** `tests/autonomous_occupations_validation.gd` covers both corrections.
+
+### Five modes, six years (people; towns kept of 12)
+
+All modes but "existing" include the two corrections.
+
+| | 1. Existing | 2. Narrow recognition | 3. Survival awareness | 4. Recognition + survival | 5. All (new trades too) |
+|---|---|---|---|---|---|
+| **Ordinary** | 57.8 (10) | **61.9 (11)** | 38.4 (9) | 60.8 (11) | 57.6 (10) |
+| **Stressed** | **63.2 (10)** | 62.8 (10) | 24.7 (5) | 57.3 (10) | 49.0 (9) |
+| **Difficult** | 42.8 (7) | 45.9 (8) | **52.2 (9)** | 41.1 (9) | 51.2 (9) |
+
+| Ordinary / stressed / difficult | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| days out of food | 104 / 107 / 128 | 96 / 131 / 120 | 143 / 204 / 91 | 81 / 106 / 97 | 126 / 140 / 108 |
+| days out of tools | 168 / 236 / 818 | 229 / 297 / 720 | 1107 / 1239 / 952 | 392 / 550 / 552 | 328 / 422 / 799 |
+| towns never making tools | 1 / 1 / 2 | **0 / 0 / 1** | 4 / 5 / 1 | 0 / 1 / 0 | 1 / 1 / 2 |
+| trades per town | 2.5 / 2.4 / 1.8 | 2.7 / 2.6 / 1.8 | 2.2 / 1.3 / 2.2 | 2.7 / 2.4 / 2.1 | 3.8 / 3.7 / 3.4 |
+| months clothing unmet | 69 / 65 / 52 | 69 / 68 / 52 | 66 / 56 / 57 | 67 / 67 / 61 | 44 / 49 / 39 |
+
+### The corrections' effects, separately
+
+| People | Without the corrections | With both | Food judgement only | Staying worth only |
+|---|---|---|---|---|
+| **First three trades (existing)** | 57.8 / 63.2 / 42.8 | 44.3 / 43.8 / 44.4 | (the same; the staying correction does not apply without land trades) | — |
+| **All (new trades)** | 51.8 / 41.7 / 44.8 | **57.6 / 49.0 / 51.2** | 61.2 / 48.5 / 45.6 | 51.8 / 46.5 / 42.5 |
+
+- **With the full rules,** the corrections are worth +6 to +7 people in every condition. Most comes from the food judgement. The staying correction alone helps stressed towns (+4.8), where hunting lodges lose their woods.
+- **The food correction alone, without shortage recognition, makes towns worse** (−13 to −19 on ordinary and stressed sites, 3 towns never making tools).
+  - **Why:** judging food honestly, families see more often that the town grows less than it eats. More choose food work and stay at it, and no one takes up tools.
+  - **What fixes it:** paired with narrow recognition, which lets them see the tool danger too, it is the best mode on ordinary sites (61.9).
+  - **So:** the food correction should ship only with shortage recognition.
+- **Survival awareness without shortage recognition collapses stressed towns** (24.7), for the same reason, more strongly. The old food term ("the town grows less food than it eats", up to +3.75) and the survival term (up to +4) now weigh the same hunger twice, so a family may set aside every other need. That double count is decision 3 below.
+- **Callings and geography** (mode 5, as in the second round): water families fish, loom families herd, forest and shield families hunt. Lake towns build fisher-and-farm economies, wooded towns hunt, open farmland farms and herds.
+- **Player priorities change outcomes:**
+  - **Investment from founding** gives difficult sites 64.2 people and 11 towns kept (against 51.2), but costs ordinary sites 14 people.
+  - **Answering every warning promptly** does worse than no player (`docs/PLAYER_AGENCY_AUDIT.md`).
+
+### The owner's town (day-82 autosave, replayed two years)
+
+- **The newcomer now farms.** It judges the town's food "only just enough" (+1.5), not "plenty" (−1.5), and takes up a garden instead of a grazing pen.
+- **The Investment priority decides the tool response.**
+  - **With it:** family 0 (muse) leaves its farm for tool mending on day 112, margin 3.27. Without the priority's +2.0 it would be 1.27 against the 2.0 needed.
+  - **Priority cleared:** the families weigh the shortage 49 times in two years and keep their work; tools wait until day 687.
+- **Outcome:** all three rule sets end at 37 people at day 802.
+
+### Before Merging (owner decisions)
+
+**What improves simulation correctness:**
+- narrow shortage recognition;
+- survival awareness;
+- the food judgement from work actually done;
+- a holding worth what it yields;
+- the hunger reason for review;
+- the deterministic sidebar test, and the gameplay regression kept apart from it.
+
+**What improves player agency:**
+- **Real influence:** priorities now have measurable, decisive effects. The Investment priority is what gets the owner's town making tools.
+- **Not yet meaningful:** the warnings the player sees do not suggest controls that help (`docs/PLAYER_AGENCY_AUDIT.md`). No new control was built; five proposals await decision there.
+
+**Unresolved:**
+1. **What to merge:**
+   - **Recommended:** modes 2 + corrections (narrow recognition, both corrections), or 4 (with survival awareness), both with the first three trades. These are the strongest and most even modes.
+   - **The new trades:** they make towns differ by land and calling, and cost stressed sites 14 people against today's game.
+2. **The food correction depends on shortage recognition.** Merge them together, or not at all.
+3. **The double count of hunger** (the old food term and the survival term). Options:
+   - leave it;
+   - let the survival term replace the old food term when survival awareness is on;
+   - cap the two together.
+
+   Not changed without the owner.
+4. **The agency proposals** (`docs/PLAYER_AGENCY_AUDIT.md`): two warning cards (interface only), woods kept for the town, narrower asks, rationing.
+5. **Flaky tests on `develop` as well:**
+   - `save_game_validation`, where an errand route's layout counter is off by one after loading: 1 failure in 3 runs on `develop`, and passed 3 of 3 on the branch when run alone;
+   - `community_play_validation`, which failed once while running alongside other tests and passed alone.
+
 ## Owner Briefs and Decisions
 
 **First brief (2026-11-01):** carry out the corrections in `docs/WORKPLACE_CHOICE_INVESTIGATION.md`. Every viable occupation open to autonomous families, none guaranteed. Families recognise economic danger without automatically solving the town's problems.
