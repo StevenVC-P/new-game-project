@@ -84,7 +84,7 @@ static func get_level(household: Household, building_type: String) -> float:
 
 # Output of a family's work for its proficiency: full from ESTABLISHED, NOVICE_OUTPUT with none.
 static func get_output_factor(city: City, household: Household, building_type: String) -> float:
-	if household == null or not is_on(city):
+	if household == null or not is_on(city) or city.has_meta("economy_no_proficiency_effects"):
 		return 1.0
 	return NOVICE_OUTPUT + (1.0 - NOVICE_OUTPUT) * minf(1.0, get_level(household, building_type) / ESTABLISHED)
 
@@ -362,7 +362,8 @@ static func get_holding_output(holding: Building) -> String:
 # winds one activity down before taking up another.
 static func decide_time(city: City, household: Household, claimed: Dictionary) -> void:
 	var holding: Building = FamilyInitiative.get_holding(city, household)
-	if holding == null or household.labor_capacity <= 0:
+	# Comparison only (tests/sim/wisdom_check.gd --no-secondary): no secondary work at all.
+	if holding == null or household.labor_capacity <= 0 or city.has_meta("economy_no_secondary"):
 		household.secondary_share = 0.0
 		household.secondary_activity = ""
 		household.garden_land = 0.0

@@ -22,7 +22,7 @@ extends SceneTree
 # Options: --years=N (default 6, with a year-3 snapshot), --sites=N, --prepare-difficult (pick and cache),
 # --no-reconsider (families never reconsider their work), --change-limit=N (families changing work a month; 0 none),
 # --no-self-sufficiency (no secondary work, larders or proficiency: docs/HOUSEHOLD_SELF_SUFFICIENCY.md),
-# --disrupt=specialist|stores (at DISRUPT_DAY, the same on both sides of a comparison: every family
+# --no-proficiency-effects / --no-secondary (to tell their effects apart), --disrupt=specialist|stores (at DISRUPT_DAY, the same on both sides of a comparison: every family
 # working tools leaves the town, or the common stores lose DISRUPT_STORE_LOSS of their food, wood and tools).
 
 const TownBuildingCheck = preload("res://tests/sim/town_building_check.gd")
@@ -84,6 +84,10 @@ func run() -> void:
 			change_limit = int(argument.trim_prefix("--change-limit="))
 		elif argument == "--no-self-sufficiency":
 			self_sufficiency = false
+		elif argument == "--no-proficiency-effects":
+			economy_meta = "economy_no_proficiency_effects"
+		elif argument == "--no-secondary":
+			economy_meta = "economy_no_secondary"
 		elif argument.begins_with("--disrupt="):
 			disrupt = argument.trim_prefix("--disrupt=")
 	var ordinary: Array = TownBuildingCheck.collect_sites().slice(0, site_count)
@@ -116,6 +120,8 @@ var reconsider: bool = true
 var change_limit: int = -1
 var self_sufficiency: bool = true
 var disrupt: String = ""
+# Comparison only: proficiency tracked but without effect on output or choices, or no secondary work.
+var economy_meta: String = ""
 
 func play(site: Dictionary, strategy: Dictionary, stress: bool, years: int) -> Dictionary:
 	var city: City = City.new("Player Town", Vector2(site["site"]), City.ROLE_PLAYER, EconomyBalance.FOUNDING_FAMILIES, int(site["seed"]))
@@ -124,6 +130,8 @@ func play(site: Dictionary, strategy: Dictionary, stress: bool, years: int) -> D
 	Layouts.set_aside(city, "starting")
 	# Before the first day, so a town compared without it never runs it.
 	city.influence.self_sufficiency = self_sufficiency
+	if economy_meta != "":
+		city.set_meta(economy_meta, true)
 	var scenario: Dictionary = BASE.duplicate(true)
 	scenario["hard_winter"] = stress
 	var measured: Dictionary = {}

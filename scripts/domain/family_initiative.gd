@@ -210,7 +210,7 @@ static func get_work_desire(city: City, household: Household, activity: String, 
 				add(terms, -2.5 * producers, "others already make tools")
 	# What it knows draws it to that work; work it would have to learn, it starts at a novice's pace
 	# (HouseholdEconomy).
-	if HouseholdEconomy.is_on(city):
+	if HouseholdEconomy.is_on(city) and not city.has_meta("economy_no_proficiency_effects"):
 		var knows: float = HouseholdEconomy.get_level(household, PROPER_WORK[activity])
 		if knows >= HouseholdEconomy.FORGOTTEN_BELOW:
 			add(terms, HouseholdEconomy.KNOWN_WORK_WEIGHT * minf(1.0, knows / HouseholdEconomy.ESTABLISHED), "it knows the work (%s)" % HouseholdEconomy.describe_level(knows))
