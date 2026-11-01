@@ -7,7 +7,11 @@ extends SceneTree
 
 const MainScript = preload("res://scripts/main.gd")
 const AppScript = preload("res://scripts/app.gd")
-const TEST_DIRECTORY: String = "user://save_game_validation"
+# Saves go to a folder of this process's own, removed at the end, so runs side by side (and other
+# worktrees of the project, which share its user folder) never touch each other's saves.
+var TEST_DIRECTORY: String = "user://save_game_validation_%d" % OS.get_process_id()
+# The game's random numbers from here, so every run founds the same town.
+const FOUNDING_SEED: int = 20261102
 const DAYS_BEFORE_SAVE: int = 75
 # Long enough for construction, a season change, births, and monthly family turns.
 const DAYS_AFTER_LOAD: int = 120
@@ -201,6 +205,7 @@ func make_main(settings: Dictionary) -> Node2D:
 	for key: String in settings:
 		main.set(key, settings[key])
 	root.add_child(main)
+	main.rng.seed = FOUNDING_SEED
 	await settle()
 	return main
 
@@ -288,6 +293,7 @@ func clear_directory(path: String) -> void:
 			continue
 		for file_name: String in DirAccess.get_files_at(directory):
 			DirAccess.remove_absolute(directory.path_join(file_name))
+		DirAccess.remove_absolute(directory)
 
 func settle() -> void:
 	for _frame in range(3):

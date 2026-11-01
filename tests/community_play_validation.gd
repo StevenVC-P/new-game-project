@@ -7,7 +7,11 @@ extends SceneTree
 # the stores rule; and saving and loading the town with all of it.
 
 const MainScript = preload("res://scripts/main.gd")
-const SAVE_DIRECTORY: String = "user://community_play_validation"
+# Saves go to a folder of this process's own, removed at the end, so runs side by side (and other
+# worktrees of the project, which share its user folder) never touch each other's saves.
+var SAVE_DIRECTORY: String = "user://community_play_validation_%d" % OS.get_process_id()
+# The game's random numbers from here, so every run founds the same town.
+const FOUNDING_SEED: int = 20261102
 # Long enough for the founders' first homes (median day 96 on the balance check's towns).
 const DAYS_PLAYED: int = 150
 
@@ -23,6 +27,7 @@ func run_all() -> void:
 	var main: Node2D = MainScript.new()
 	main.use_authored_world = true
 	root.add_child(main)
+	main.rng.seed = FOUNDING_SEED
 	await _settle()
 	var city: City = await found_town(main)
 	await test_marking_land_on_the_map(main, city)
@@ -137,7 +142,9 @@ func test_reading_a_familys_reasons(main: Node2D, city: City) -> void:
 	_check(main.town_sidebar.focused_household_id == family.id, "clicking its card opens it")
 	var card: Dictionary = SidebarFamiliesPage.get_card(city, family, true)
 	var muted: Array = card["muted"]
-	_check(muted.any(func(line: String) -> bool: return line.begins_with("Home site (") and line.contains(family.home_site_note)), "its details say why it chose its home site")
+	# Its own line, or the "Decided" line when choosing the site was its latest decision (the card
+	# shows a note once).
+	_check(muted.any(func(line: String) -> bool: return (line.begins_with("Home site (") or line.begins_with("Decided (")) and line.contains(family.home_site_note)), "its details say why it chose its home site")
 	_check(muted.any(func(line: String) -> bool: return line.begins_with("On homes first: ")), "and how it takes housing being put first")
 
 # A warning, and the player's answer to it: housing first with the stores kept for priorities
@@ -208,6 +215,7 @@ func clear_directory() -> void:
 			continue
 		for file_name: String in DirAccess.get_files_at(directory):
 			DirAccess.remove_absolute(directory.path_join(file_name))
+		DirAccess.remove_absolute(directory)
 
 func _click(position: Vector2) -> void:
 	_mouse_button(MOUSE_BUTTON_LEFT, true, position)
