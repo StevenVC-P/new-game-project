@@ -123,6 +123,8 @@ static func get_detail_lines(city: City, household: Household) -> Array:
 		lines.append("Decided (%s): %s" % [SidebarOverviewPage.days_ago(today - household.initiative_day), household.initiative_note])
 	if household.home_site_note != "" and household.home_site_note != household.initiative_note and FamilyDevelopment.is_note_current(city, household, household.home_site_note):
 		lines.append("Home site (%s): %s" % [SidebarOverviewPage.days_ago(today - household.home_site_day), household.home_site_note])
+	if household.work_review_note != "" and household.work_review_note != household.initiative_note:
+		lines.append("Its work (%s): %s" % [SidebarOverviewPage.days_ago(today - household.work_review_note_day), household.work_review_note])
 	if city.influence.enabled:
 		var outlook: Dictionary = FamilyInitiative.predict_improvement(city, household, true)
 		if str(outlook["outlook"]) != "":

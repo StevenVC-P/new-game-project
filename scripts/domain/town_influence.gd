@@ -55,6 +55,18 @@ var held_back_by_stores: int = 0
 # Experiment (influence check, growth bottleneck): this many families without a holding stay free
 # to build while any site is planned, instead of taking up work. 0: families take up work at once.
 var reserved_builders: int = 0
+# Families reconsidering their work (OccupationReview); off only for comparison.
+var reconsider_work: bool = true
+var work_reviews: int = 0
+var work_changes: int = 0
+var work_deferred: int = 0
+var work_triggers: Dictionary = {}
+var work_stay_reasons: Dictionary = {}
+var work_change_reasons: Dictionary = {}
+var workplaces_left_proper: int = 0
+var workplaces_left_empty: int = 0
+# Every review this session, for checks (not saved).
+var _work_review_log: Array = []
 
 func _init(owner: City) -> void:
 	_city_ref = weakref(owner)

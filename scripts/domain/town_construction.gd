@@ -362,7 +362,8 @@ func assign_claimants() -> void:
 		if project.is_home():
 			if claimant == null:
 				project.claimant_household_id = find_family_needing_home(project)
-		elif claimant == null or claimant.assigned_workers > 0:
+		# A family changing its work keeps the site it opened while it still works its old one.
+		elif claimant == null or (claimant.assigned_workers > 0 and claimant.work_change_from < 0):
 			project.claimant_household_id = find_family_for_workplace(project)
 
 # The household id a workplace site is being built for (it will work it), or -1.
@@ -629,7 +630,9 @@ func complete(project: ConstructionProject) -> void:
 			var claimant: Household = city.get_household_by_id(project.claimant_household_id)
 			if claimant != null and building.is_house() and not wants_to_move_in(claimant, building):
 				claimant = null
-			if claimant != null and building.is_production_building() and claimant.assigned_workers > 0:
+			# A family that already works takes on no second workplace, unless this is the new work it is
+			# changing to; it then leaves its old one (OccupationReview.on_workplace_added).
+			if claimant != null and building.is_production_building() and claimant.assigned_workers > 0 and claimant.work_change_from < 0:
 				claimant = null
 			city.add_building(building, claimant)
 	if project.requested_by == ConstructionProject.REQUESTED_BY_HOUSEHOLD:

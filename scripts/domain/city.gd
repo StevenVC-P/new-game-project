@@ -923,6 +923,7 @@ func add_building(building: Building, household: Household = null):
 	logistics.mark_layout_changed()
 	if building.is_production_building() and household != null:
 		building.assign_household(household, Building.ASSIGNMENT_AUTO)
+		OccupationReview.on_workplace_added(self, household, building)
 	if building.is_house():
 		if household != null:
 			household.move_to_house(building.id)

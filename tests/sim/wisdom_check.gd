@@ -19,7 +19,8 @@ extends SceneTree
 #
 # Run one condition and some strategies per process (write to a file, filter for [WIS]):
 #   <godot> --headless --path . --script res://tests/sim/wisdom_check.gd -- --conditions=ordinary --strategies=none,endure+respect > wis.log
-# Options: --years=N (default 6, with a year-3 snapshot), --sites=N, --prepare-difficult (pick and cache).
+# Options: --years=N (default 6, with a year-3 snapshot), --sites=N, --prepare-difficult (pick and cache),
+# --no-reconsider (families never reconsider their work), --change-limit=N (families changing work a month; 0 none).
 
 const TownBuildingCheck = preload("res://tests/sim/town_building_check.gd")
 const StandInPlayerScript = preload("res://tests/sim/stand_in_player.gd")
@@ -40,6 +41,7 @@ const STRATEGIES: Array = [
 	{"name": "cooperation", "wisdoms": [], "priority": CommunityPriority.COOPERATION},
 	{"name": "endure+respect|cooperation", "wisdoms": ["endure", "respect"], "priority": CommunityPriority.COOPERATION},
 	{"name": "investment", "wisdoms": [], "priority": CommunityPriority.INVESTMENT},
+	{"name": "food", "wisdoms": [], "priority": CommunityPriority.FOOD},
 	{"name": "prepare+pride|investment", "wisdoms": ["prepare", "pride"], "priority": CommunityPriority.INVESTMENT},
 	# The Elder's third slot: the same pair, with a third wisdom chosen the day the town is a Village.
 	{"name": "endure+respect>pride", "wisdoms": ["endure", "respect"], "priority": "", "village": "pride"},
@@ -70,6 +72,10 @@ func run() -> void:
 			only.assign(argument.trim_prefix("--strategies=").split(","))
 		elif argument == "--prepare-difficult":
 			prepare = true
+		elif argument == "--no-reconsider":
+			reconsider = false
+		elif argument.begins_with("--change-limit="):
+			change_limit = int(argument.trim_prefix("--change-limit="))
 	var ordinary: Array = TownBuildingCheck.collect_sites().slice(0, site_count)
 	if prepare:
 		pick_difficult_sites(ordinary, site_count)
@@ -82,6 +88,8 @@ func run() -> void:
 			if not only.is_empty() and not only.has(str(strategy["name"])):
 				continue
 			var started: int = Time.get_ticks_msec()
+			if not reconsider:
+				_report("   (families do not reconsider their work)")
 			var snapshots: Dictionary = {SNAPSHOT_YEAR: [], years: []}
 			for site: Dictionary in sites:
 				var result: Dictionary = play(site, strategy, stress, years)
@@ -94,6 +102,9 @@ func run() -> void:
 			_report("   (%s %s took %.0f s)" % [condition, strategy["name"], (Time.get_ticks_msec() - started) / 1000.0])
 	quit()
 
+var reconsider: bool = true
+var change_limit: int = -1
+
 func play(site: Dictionary, strategy: Dictionary, stress: bool, years: int) -> Dictionary:
 	var city: City = City.new("Player Town", Vector2(site["site"]), City.ROLE_PLAYER, EconomyBalance.FOUNDING_FAMILIES, int(site["seed"]))
 	city.site_profile = site["profile"]
@@ -104,12 +115,19 @@ func play(site: Dictionary, strategy: Dictionary, stress: bool, years: int) -> D
 	var measured: Dictionary = {}
 	scenario["each_day"] = func(town: City, day: int, _player) -> void:
 		if day == 0:
+			town.influence.reconsider_work = reconsider
+			if change_limit >= 0:
+				town.set_meta("work_change_limit", change_limit)
 			for key: String in strategy["wisdoms"]:
 				GuidingWisdom.choose(town, W[key])
 			if str(strategy["priority"]) != "":
 				town.influence.set_priority(str(strategy["priority"]))
 		if strategy.has("village") and GuidingWisdom.choose(town, W[strategy["village"]]):
 			town.set_meta("third_wisdom_day", day)
+		# Each month: tools short (under 10) while proper workplaces need upkeep.
+		if day % 30 == 29 and int(town.resources["tools"]) < 10 and town.buildings.any(func(b: Building) -> bool: return b.needs_maintenance()):
+			town.set_meta("tools_short_months", int(town.get_meta("tools_short_months", 0)) + 1)
+			town.set_meta("last_tools_short_day", day)
 		if day == SNAPSHOT_YEAR * Calendar.DAYS_PER_YEAR - 1:
 			measured[SNAPSHOT_YEAR] = measure(town)
 	var result: Dictionary = StandInPlayerScript.new().play(city, scenario, years * Calendar.DAYS_PER_YEAR)
@@ -131,6 +149,37 @@ func measure(city: City) -> Dictionary:
 	m["village"] = 1 if city.settlement.stage >= SettlementStage.VILLAGE else 0
 	m["wisdoms"] = city.social.wisdoms.size()
 	m["third_wisdom_day"] = int(city.get_meta("third_wisdom_day", -1))
+	# Families reconsidering their work (OccupationReview).
+	var influence: TownInfluence = city.influence
+	m["work_reviews"] = influence.work_reviews
+	m["work_changes"] = influence.work_changes
+	m["work_deferred"] = influence.work_deferred
+	m["left_proper"] = influence.workplaces_left_proper
+	m["left_empty"] = influence.workplaces_left_empty
+	m["work_triggers"] = influence.work_triggers.duplicate()
+	m["swayed_work"] = int(influence.swayed.get("%s:work" % influence.priority, 0))
+	var changed_families: int = 0
+	var twice: int = 0
+	var back: int = 0
+	for household: Household in households:
+		var history: Array = household.work_history
+		changed_families += 1 if history.size() >= 2 else 0
+		twice += 1 if history.size() >= 3 else 0
+		for i in range(2, history.size()):
+			back += 1 if history[i] == history[i - 2] else 0
+	m["changed_families"] = changed_families
+	m["changed_twice"] = twice
+	m["changed_back"] = back
+	var vacant: Dictionary = {}
+	for building: Building in city.buildings:
+		if building.is_production_building() and building.assigned_household_id < 0 and FamilyInitiative.get_activity(building.type) != "":
+			var key: String = ("proper_" if building.needs_maintenance() else "hand_") + FamilyInitiative.get_activity(building.type)
+			vacant[key] = int(vacant.get(key, 0)) + 1
+	m["vacant"] = vacant
+	m["toolmakers_worked"] = city.buildings.filter(func(b: Building) -> bool: return FamilyInitiative.get_activity(b.type) == TownInfluence.ACTIVITY_TOOLS and b.assigned_household_id >= 0).size()
+	m["tools_short_months"] = int(city.get_meta("tools_short_months", 0))
+	m["last_tools_short_day"] = int(city.get_meta("last_tools_short_day", -1))
+	m["review_log"] = influence._work_review_log.duplicate(true)
 	m["departed"] = int(city.resources.get("departed_households", 0))
 	var trust: float = 0.0
 	var unhoused: int = 0

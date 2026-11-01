@@ -82,6 +82,18 @@ var home_site_obstacle: String = ""
 # (wisdom -> [followed, declined]), and when that was (GuidingWisdom.review).
 var wisdom_conduct: Dictionary = {}
 var wisdom_lesson_day: Dictionary = {}
+# Its work as OccupationReview sees it: the workplace and since when, the share of its day spent
+# travelling then, months each reason to reconsider has held, when it last reconsidered, the
+# workplace it is leaving once its new work is built, and the activities it has changed to.
+var work_building_id: int = -1
+var work_since: int = -1
+var work_start_travel: float = 0.0
+var work_strain: Dictionary = {}
+var work_review_day: int = -1
+var work_change_from: int = -1
+var work_history: Array = []
+var work_review_note: String = ""
+var work_review_note_day: int = -1
 
 # The household's character and social life (docs/HOUSEHOLD_SOCIAL_MODEL.md; HouseholdCharacter,
 # TownSocial). Empty until the social model or influence prototype gives the household one.

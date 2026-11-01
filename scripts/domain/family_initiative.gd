@@ -101,7 +101,6 @@ static func take_up_work(city: City, household: Household) -> ConstructionProjec
 		if project == null:
 			continue
 		city.influence.workplaces_opened += 1
-		# A family chooses its work once (it does not reconsider it), so only this choice counts.
 		if not short.is_empty():
 			GuidingWisdom.record(city, household, GuidingWisdom.PREPARE, short.has(choice["activity"]))
 		use_first_claim(city, household, project)
@@ -172,8 +171,10 @@ static func contest_for_land(city: City, household: Household, choices: Array[Di
 		note(city, holder, "Gave up the land it chose to %s" % city.get_household_label(household.id))
 	return true
 
-# How much a family wants to take up an activity: {"score", "terms"}.
-static func get_work_desire(city: City, household: Household, activity: String) -> Dictionary:
+# How much a family wants to take up an activity: {"score", "terms", "appeal"} (appeal: the
+# priority's ask). `own`: the workplace the family already works, left out of the producers it
+# counts (OccupationReview weighs staying at it).
+static func get_work_desire(city: City, household: Household, activity: String, own: Building = null) -> Dictionary:
 	var terms: Array = []
 	var match_quality: String = household.get_match_quality(PROPER_WORK[activity])
 	if match_quality == CultureEffects.MATCH_GOOD:
@@ -192,7 +193,7 @@ static func get_work_desire(city: City, household: Household, activity: String) 
 			elif ratio > 1.6:
 				add(terms, -1.5, "the town grows plenty of food")
 		TownInfluence.ACTIVITY_WOOD:
-			var producers: int = count_producers(city, activity)
+			var producers: int = count_producers(city, activity) - (1 if own != null and get_activity(own.type) == activity else 0)
 			if producers == 0:
 				add(terms, 2.5, "no one cuts wood")
 			elif producers >= 2:
@@ -200,17 +201,17 @@ static func get_work_desire(city: City, household: Household, activity: String) 
 			if int(city.resources["wood"]) < 20:
 				add(terms, 1.5, "wood is short")
 		TownInfluence.ACTIVITY_TOOLS:
-			var producers: int = count_producers(city, activity)
+			var producers: int = count_producers(city, activity) - (1 if own != null and get_activity(own.type) == activity else 0)
 			if producers == 0 and int(city.resources["tools"]) < 10:
 				add(terms, 2.5, "tools are running out")
 			elif producers == 0:
 				add(terms, 1.0, "no one makes tools")
 			else:
 				add(terms, -2.5 * producers, "others already make tools")
-	add_encouragement(city, household, activity, terms, "the gathering asks for " + TownInfluence.get_activity_name(activity))
+	var appeal: float = add_encouragement(city, household, activity, terms, "the gathering asks for " + TownInfluence.get_activity_name(activity))
 	if GuidingWisdom.is_short_of(city, activity):
 		GuidingWisdom.add_appeal(city, household, GuidingWisdom.PREPARE, terms)
-	return {"score": sum(terms), "terms": terms}
+	return {"score": sum(terms), "terms": terms, "appeal": appeal}
 
 # --- Improving work -----------------------------------------------------------------------------
 

@@ -57,6 +57,7 @@ static func advance_month(city, city_index: int = 0) -> void:
 	city.resources["migration_month_index"] = month_index
 
 	FamilyAmbitions.advance_month(city)
+	OccupationReview.advance_month(city)
 	# Neighbours may share their rations before the shortage's hardship falls (TownSocial).
 	city.social.share_in_shortage()
 	update_hardship(city)

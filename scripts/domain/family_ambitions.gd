@@ -46,7 +46,7 @@ static func advance_month(city: City) -> void:
 				household.contentment -= 1
 		if household.ambition == FENCE:
 			fence_own_field(city, household)
-		elif household.ambition == CALLING:
+		elif household.ambition == CALLING and not OccupationReview.is_on(city):
 			take_calling_work(city, household)
 
 # The first ambition that applies, or "".
@@ -138,7 +138,8 @@ static func get_trampled_field(city: City, household: Household) -> Building:
 # - it swaps with a family that holds such work automatically and is not drawn to it;
 # - it takes up a free workplace, when another family is free to take up the holding it leaves
 #   (a family does not abandon work the town needs).
-# Work the player assigned stays as it is.
+# Work the player assigned stays as it is. Only under the classic rules: where families lead, a
+# calling is one reason among others when they reconsider their work (OccupationReview).
 static func take_calling_work(city: City, household: Household) -> void:
 	var held: Building = null
 	for building: Building in city.buildings:
