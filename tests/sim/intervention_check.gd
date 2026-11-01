@@ -36,7 +36,7 @@ const MODES: Dictionary = {
 }
 const DIFFICULT_POOL_REGIONS: int = 30
 const DIFFICULT_CACHE: String = "user://wisdom_difficult_seeds.txt"
-const CARDS: Array[String] = ["Food stores are falling", "Food has run out", "Tools are low", "Tools are running out", "Workplaces are wearing down", "thinking of leaving", "Families find no land for their work", "Hunting grounds are being felled"]
+const CARDS: Array[String] = ["Food will run short", "The town grows less food than it eats", "Food stores are falling", "Food has run out", "Tools are low", "Tools are running out", "Workplaces are wearing down", "thinking of leaving", "Families find no land for their work", "Hunting grounds are being felled"]
 const NO_LAND: String = "Families find no land for their work"
 const FELLED: String = "Hunting grounds are being felled"
 # A block of land marked to till, tiles per side, and how often the player marks again.

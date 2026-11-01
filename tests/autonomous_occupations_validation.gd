@@ -30,6 +30,7 @@ func run_all() -> void:
 	test_hunger_counted_once()
 	test_warning_no_land()
 	test_warning_failing_livelihood()
+	test_warning_food_ahead()
 	if failure_count > 0:
 		push_error("Autonomous occupations validation failed: " + str(failure_count) + " failure(s)")
 		quit(1)
@@ -456,6 +457,28 @@ func test_warning_failing_livelihood() -> void:
 	var card: Dictionary = card_titled(city, "Hunting grounds are being felled")
 	_check(not card.is_empty() and str(card["lines"]).contains("of the game they did"), "a lodge whose woods are going is: %s" % str(card.get("lines", [])))
 	_check(not card.is_empty() and (card["buttons"] as Array).any(func(b: Dictionary) -> bool: return b["action"]["tool"] == TownWoodland.CLEAR), "with the tool to steer felling elsewhere")
+
+# 18. The food warning is the families' own view looking ahead: it comes while the store still holds,
+# says when food runs out and why, offers land before a priority, and reading it changes nothing.
+func test_warning_food_ahead() -> void:
+	var city: City = hungry_town(400)
+	city.resources["food_shortage"] = false
+	var before: Dictionary = city.resources.duplicate(true)
+	var notes: Array = city.households.map(func(h: Household) -> String: return h.initiative_note)
+	var card: Dictionary = card_titled(city, "Food will run short")
+	_check(not card.is_empty() and str(card["lines"]).contains("runs out in about") and str(card["lines"]).contains("of what its people eat"), "the food warning says when and why: %s" % str(card.get("lines", [])))
+	_check(not card.is_empty() and not (card["buttons"] as Array).any(func(b: Dictionary) -> bool: return b["action"]["action"] == "set_priority"), "and does not offer a whole-town priority as the answer")
+	_check(not card.is_empty() and (card["buttons"] as Array).any(func(b: Dictionary) -> bool: return b["action"].get("tool", "") == TownFarmland.TILL) and str(card["lines"]).contains("away from tools and wood"), "it offers land first, and says what putting food first would cost")
+	_check(city.resources == before and city.households.map(func(h: Household) -> String: return h.initiative_note) == notes, "reading it changes nothing")
+	var fed: City = town()
+	busy_everyone_else(fed, fed.households[0])
+	_check(card_titled(fed, "Food will run short").is_empty() and card_titled(fed, "The town grows less food than it eats").is_empty(), "no food warning in a fed town")
+	var tools: City = tool_short_town(2)
+	tools.influence.enabled = true
+	var tool_card: Dictionary = card_titled(tools, "Tools are running out")
+	if tool_card.is_empty():
+		tool_card = card_titled(tools, "Tools are low")
+	_check(not tool_card.is_empty() and str(tool_card["lines"]).contains("No one makes tools") and not (tool_card["buttons"] as Array).any(func(b: Dictionary) -> bool: return b["action"]["action"] == "set_priority"), "the tools warning says who makes tools, without a priority button: %s" % str(tool_card.get("lines", [])))
 
 func _check(condition: bool, message: String) -> void:
 	if condition:

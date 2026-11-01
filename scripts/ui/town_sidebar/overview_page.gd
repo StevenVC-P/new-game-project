@@ -166,11 +166,12 @@ static func get_attention(city: City, context: Dictionary = {}) -> Array[Diction
 	var families_lead: bool = city.influence.enabled
 
 	if resources["food_shortage"] == true:
-		var buttons: Array = []
-		if families_lead and city.influence.priority != CommunityPriority.FOOD:
-			buttons.append({"text": "Put food first", "action": {"action": "set_priority", "priority": CommunityPriority.FOOD}})
-		buttons.append({"text": "Plan a farm (2)", "action": {"action": "select_tool", "tool": Building.BUILDING_FARM}})
-		cards.append(make_card(100, SP.TONE_ALERT, "Food has run out", ["Families are going hungry. Hardship builds and newcomers stay away."], buttons))
+		var lines: Array = ["Families are going hungry. Hardship builds and newcomers stay away."]
+		var buttons: Array = [FARM_BUTTON]
+		if families_lead:
+			lines.append_array(get_food_causes(city))
+			buttons = get_food_responses(city, lines)
+		cards.append(make_card(100, SP.TONE_ALERT, "Food has run out", lines, buttons))
 
 	if city.defense.is_band_coming():
 		var days: int = maxi(0, city.defense.raid_day - city.construction.day)
@@ -222,21 +223,22 @@ static func get_attention(city: City, context: Dictionary = {}) -> Array[Diction
 		cards.append(make_card(55, SP.TONE_CAUTION, "Families want home plots", ["%d famil%s ready to build a home but no plot is free." % [want_plot, "y is" if want_plot == 1 else "ies are"]], [{"text": "Designate home plots (P)", "action": {"action": "select_tool", "tool": TownConstruction.PLOT}}]))
 
 	var food: Dictionary = pressure["food"]
-	if food["severity"] == "warning" and resources["food_shortage"] != true:
-		var buttons: Array = []
-		if families_lead and city.influence.priority != CommunityPriority.FOOD:
-			buttons.append({"text": "Put food first", "action": {"action": "set_priority", "priority": CommunityPriority.FOOD}})
-		buttons.append({"text": "Plan a farm (2)", "action": {"action": "select_tool", "tool": Building.BUILDING_FARM}})
-		cards.append(make_card(70, SP.TONE_CAUTION, "Food stores are falling", ["%d days of food left at today's rate." % int(floor(float(food["values"]["days_stored"])))], buttons))
+	if resources["food_shortage"] != true:
+		if families_lead:
+			var card: Dictionary = get_food_outlook_card(city)
+			if not card.is_empty():
+				cards.append(card)
+		elif food["severity"] == "warning":
+			cards.append(make_card(70, SP.TONE_CAUTION, "Food stores are falling", ["%d days of food left at today's rate." % int(floor(float(food["values"]["days_stored"])))], [FARM_BUTTON]))
 
 	var tools: Dictionary = pressure["tools"]
 	if tools["severity"] == "danger" or tools["severity"] == "warning":
-		var buttons: Array = []
-		if families_lead and city.influence.priority != CommunityPriority.INVESTMENT:
-			buttons.append({"text": "Put investment first", "action": {"action": "set_priority", "priority": CommunityPriority.INVESTMENT}})
-		buttons.append({"text": "Plan a tool mender", "action": {"action": "select_tool", "tool": "tool_mender"}})
 		var danger: bool = tools["severity"] == "danger"
-		cards.append(make_card(75 if danger else 50, SP.TONE_ALERT if danger else SP.TONE_CAUTION, "Tools are running out" if danger else "Tools are low", ["%d tools stored; workplaces use them for upkeep." % int(resources["tools"])], buttons))
+		var lines: Array = ["%d tools stored; workplaces use them for upkeep." % int(resources["tools"])]
+		var buttons: Array = [TOOL_MENDER_BUTTON]
+		if families_lead:
+			buttons = get_tool_responses(city, lines)
+		cards.append(make_card(75 if danger else 50, SP.TONE_ALERT if danger else SP.TONE_CAUTION, "Tools are running out" if danger else "Tools are low", lines, buttons))
 
 	var upkeep: Dictionary = pressure["maintenance"]
 	if upkeep["severity"] == "danger":
@@ -357,6 +359,102 @@ static func get_failing_livelihood_cards(city: City) -> Array[Dictionary]:
 			lines.append("%d of their families %s going hungry." % [int(row[3]), "is" if int(row[3]) == 1 else "are"])
 		cards.append(make_card(68 if int(row[3]) > 0 else 46, SP.TONE_ALERT if int(row[3]) > 0 else SP.TONE_CAUTION, title, lines, buttons))
 	return cards
+
+const FARM_BUTTON: Dictionary = {"text": "Plan a farm (2)", "action": {"action": "select_tool", "tool": Building.BUILDING_FARM}}
+const TOOL_MENDER_BUTTON: Dictionary = {"text": "Plan a tool mender", "action": {"action": "select_tool", "tool": "tool_mender"}}
+const TILL_BUTTON: Dictionary = {"text": "Till land into farmland (F)", "action": {"action": "select_tool", "tool": TownFarmland.TILL}}
+
+# --- Food and tools: what the families see coming, and what the player could do ----------------
+
+# The town's food as its families judge it (FamilyInitiative: store, larders, and what the work
+# families actually do will bring in over the coming months, seasons included): a warning while
+# there is still time to act, with its causes. Reading it changes nothing.
+static func get_food_outlook_card(city: City) -> Dictionary:
+	var coverage: float = FamilyInitiative.get_food_coverage(city)
+	var ratio: float = FamilyInitiative.get_food_ratio(city)
+	if coverage >= 1.0 and ratio >= 1.0:
+		return {}
+	var eats: float = float(city.get_food_consumption_for_population(city.get_total_population()))
+	var held: float = float(int(city.resources["food"]))
+	for household: Household in city.households:
+		held += household.larder
+	var coming: float = FamilyInitiative.get_working_output(city, TownInfluence.ACTIVITY_FOOD, true) / float(FamilyInitiative.SURVIVAL_HORIZON_DAYS)
+	var lines: Array = []
+	var title: String = ""
+	var priority: int = 0
+	var tone: String = SP.TONE_CAUTION
+	if coverage < 1.0:
+		var days: int = int(floor(held / maxf(0.1, eats - coming)))
+		title = "Food will run short"
+		lines.append("At this rate the town's food runs out in about %d days, %s." % [days, "before the next harvest" if city.get_season_index() < 2 else "before the winter is out"])
+		priority = 78 if days < 30 else 70
+		tone = SP.TONE_ALERT if days < 30 else SP.TONE_CAUTION
+	else:
+		var days: int = int(floor(held / maxf(0.1, eats - coming)))
+		title = "The town grows less food than it eats"
+		lines.append("Its stores carry it about %d days; after that it goes hungry unless more food is grown." % days)
+		priority = 52
+	lines.append_array(get_food_causes(city))
+	var buttons: Array = get_food_responses(city, lines)
+	return make_card(priority, tone, title, lines, buttons)
+
+# Why the town's food falls short, from what the town holds: its work's share of what it eats, the
+# season ahead, fields standing empty or worked by hand for want of tools, families going hungry.
+static func get_food_causes(city: City) -> Array:
+	var causes: Array = []
+	causes.append("Its food work brings in %d%% of what its people eat." % roundi(100.0 * FamilyInitiative.get_food_ratio(city)))
+	if FamilyInitiative.get_season_days(city, Building.BUILDING_FARM) < float(FamilyInitiative.SURVIVAL_HORIZON_DAYS) * 0.95:
+		causes.append("Winter is coming: fields will yield less.")
+	var empty: int = 0
+	var by_hand: int = 0
+	for building: Building in city.buildings:
+		if FamilyInitiative.get_activity(building.type) != TownInfluence.ACTIVITY_FOOD:
+			continue
+		empty += 1 if building.assigned_household_id < 0 else 0
+		by_hand += 1 if building.assigned_household_id >= 0 and building.is_working_by_hand() else 0
+	if empty > 0:
+		causes.append("%d food workplace%s stand%s empty." % [empty, "" if empty == 1 else "s", "s" if empty == 1 else ""])
+	if by_hand > 0:
+		causes.append("%d food workplace%s work%s by hand for want of tools." % [by_hand, "" if by_hand == 1 else "s", "s" if by_hand == 1 else ""])
+	var hungry: int = city.households.filter(func(h: Household) -> bool: return h.short_days_this_month > 0).size()
+	if hungry > 0:
+		causes.append("%d famil%s already going hungry." % [hungry, "y is" if hungry == 1 else "ies are"])
+	return causes
+
+# What the player could do about food, with what each costs; nothing is prescribed.
+static func get_food_responses(city: City, lines: Array) -> Array:
+	var buttons: Array = []
+	lines.append("Land: more farmland lets more families farm. Families working fields till land you mark, as part of their work.")
+	buttons.append(TILL_BUTTON)
+	if not has_free_family(city):
+		lines.append("A farm you plan yourself costs wood and a tool, and stands empty until a family is free to take it; none is now.")
+	else:
+		lines.append("A farm you plan yourself costs wood and a tool; a family free to work may take it.")
+	buttons.append(FARM_BUTTON)
+	if city.influence.priority != CommunityPriority.FOOD:
+		lines.append("Putting food first would draw every family choosing its work toward food, and away from tools and wood.")
+	return buttons
+
+# What the player could do about tools, with what each costs.
+static func get_tool_responses(city: City, lines: Array) -> Array:
+	var use: int = roundi(FamilyInitiative.get_use(city, TownInfluence.ACTIVITY_TOOLS, FamilyInitiative.SHORTAGE_HORIZON_DAYS))
+	if use > 0:
+		lines.append("The town's workplaces will use about %d in the coming season." % use)
+	var makers: int = FamilyInitiative.count_producers(city, TownInfluence.ACTIVITY_TOOLS)
+	lines.append("No one makes tools." if makers == 0 else "%d famil%s make tools." % [makers, "y" if makers == 1 else "ies"])
+	var buttons: Array = []
+	if makers == 0:
+		if has_free_family(city):
+			lines.append("A tool mender you plan costs nothing to build; a family free to work may take it.")
+		else:
+			lines.append("A tool mender you plan costs nothing to build, but no family is free to take it now.")
+		buttons.append(TOOL_MENDER_BUTTON)
+	if city.influence.priority != CommunityPriority.INVESTMENT:
+		lines.append("Putting investment first would draw families toward tools and better work, and away from food.")
+	return buttons
+
+static func has_free_family(city: City) -> bool:
+	return city.households.any(func(h: Household) -> bool: return h.labor_capacity > 0 and FamilyInitiative.get_holding(city, h) == null and not city.construction.is_promised_to_workplace(h.id))
 
 const LAND_BUTTON: Dictionary = {"text": "Set aside residential land (N)", "action": {"action": "select_tool", "tool": HomeSites.TOOL_LAND}}
 
