@@ -73,6 +73,138 @@ A family whose food wasn't all met is short today. The common store's shortfall 
 - **Founders and newcomers:** established (0.7) in the trades their calling draws them to. Nothing else.
 - **A town already going** when the system first runs (an older save) knows the work it has been doing.
 
+## Validation Results (2026-11-01)
+
+**Setup.** The wisdom check's towns: 12 per condition; ordinary, stressed (the first winter's stores lost) and difficult land; years 3 and 6. Each run has the system on, and off with `--no-self-sufficiency`, on the same seeds. Six strategies: none, four wisdom pairs, and the food priority. Disruptions are on ordinary towns in the second autumn (day 540), the same with the system on and off: the town's toolmaking families leave, or the common stores lose 80%. The weights stayed as fixed before the runs.
+
+**Off is the old game exactly.** With the system off, all 72 town-snapshots match the occupation-reconsideration branch.
+
+### Time and lost production
+
+Secondary work takes 0.2% to 11% of working time, depending on the culture and the conditions:
+- **Most:** Respect+Prepare on difficult land, 11% at year 3.
+- **Least:** Endure+Pride, under 1%, as Pride asks.
+
+It falls once towns are established (year 6 is lower than year 3).
+
+| Activity | Share of secondary time |
+|---|---|
+| Food (gardens) | 50–80% |
+| Mending | 20–40%, most on difficult land |
+| Wood | rare |
+
+**What it costs.** The specialised output given up is per town over six years, at what the holding would have made in that time. Most of it falls on wood, which is in surplus.
+
+| Strategy | Wood given up | Food given up | Tools given up | Food grown | Upkeep tools saved by mending |
+|---|---|---|---|---|---|
+| None | 1,300 | 570 | 110 | 270 | 30 |
+| Respect+Prepare | 2,600 | 800 | 250 | 580 | 50 |
+
+Hand work is a third as efficient as proper work, and that shows here.
+
+### Survival and food security
+
+People at year 6, system on against off. "Towns" is towns kept, gained or lost.
+
+| Strategy | Ordinary | Stressed | Difficult |
+|---|---|---|---|
+| None | −14.8 (−2 towns) | −13.7 (−1) | +0.5 (+2/−1) |
+| Endure+Respect | −3.8 | −3.1 | +9.2 (+3/−1) |
+| Prepare+Pride | +0.5 (+1/−1) | −6.8 (+1/−1) | +6.3 (+3/−1) |
+| Respect+Prepare | −15.8 (+1/−3) | −13.0 (+1/−2) | +8.2 (+3/−1) |
+| Endure+Pride | −4.6 | −8.7 (−1) | +2.0 (+1/−1) |
+| Food priority | +4.3 (+2/−1) | −7.3 (+3/−1) | +18.9 (+3/−0) |
+
+On difficult land the system keeps more towns under every strategy. On ordinary and stressed land it costs people, mostly in a few towns (e.g. −83 and −54 people in two of the twelve).
+
+**What causes the loss: the effects of proficiency.** Ordinary, stressed and difficult were rerun with no strategy, in two ways:
+1. `--no-proficiency-effects`: proficiency is tracked but changes neither output nor families' choices.
+2. `--no-secondary`: no secondary work at all.
+
+People at year 6, against the system off:
+
+| Variant | Ordinary | Stressed | Difficult |
+|---|---|---|---|
+| All on | −14.8 | −13.7 | +0.5 |
+| Without proficiency's effects | +0.3 (same towns) | −1.2 | +10.8 (+3 towns) |
+| Without secondary work | −9.6 | −10.7 | −3.1 |
+
+**What this shows:**
+- **Secondary work and larders:** neutral where land is good, and they save towns where it is hard.
+- **Proficiency:**
+  - **The cost:** about 10–15 people on ordinary land, mostly in a few towns. Inexperienced families make 60% at first, and families are drawn toward work they know.
+  - **On difficult land:** it cancels most of the benefit.
+  - **Not yet separated:** which of the two parts (the output loss or the pull toward known work) does more.
+
+At year 6, 12–18% of working families are still below established in their work.
+
+### Shortages and stores
+
+The surplus isn't reduced by self-sufficiency. Medians at year 6, ordinary land:
+
+| | Tools | Wood |
+|---|---|---|
+| Without proficiency's effects | 2,375 | 24,462 |
+| System off | 2,344 | 23,642 |
+| All on | 1,840 | 13,914 |
+
+The lower stores with the system fully on come from novices producing less, not from families gardening.
+
+**Shortages:**
+- **Tools-short months fall** with Prepare+Pride (9.3 against 12.7) and the food priority (10.2 against 18.6).
+- **They rise** with no strategy on stressed land (10.2 against 6.2).
+- **Larders hold** 0 to about 290 food per town. They are drawn on in shortages for 10 to 100 food per town over six years.
+- **Gifts of food in a shortage** are near zero, because shortages severe enough to put families at risk are rare in these towns.
+
+### Disruptions
+
+People at year 6, disrupted against undisrupted, ordinary land:
+
+| Strategy | Toolmakers leave, on | Toolmakers leave, off | Stores lost, on | Stores lost, off |
+|---|---|---|---|---|
+| None | −13.7 | −15.5 | +2.5 | −0.5 |
+| Endure+Respect | −17.4 | −14.6 | +0.2 | +0.9 |
+| Prepare+Pride | −15.9 | −10.4 | +0.1 | −1.8 |
+
+- **Losing the toolmakers** costs every town 10–17 people. With proficiency, the families who take over start as novices, so the drop is a little larger with the system on in two of three cultures.
+- **Losing 80% of the common stores** in year 2 barely matters. These towns already hold hundreds to thousands of tools and wood, so this test doesn't stress them. A loss in year 1, or of food before winter, would.
+
+### Proficiency
+
+- **The working families' median level** is 0.9–1.0. Each family knows about 4 trades at some level, mostly from related work.
+- **Novices** are 12–18% of working families at year 6.
+- **Changing work** stays rare (0–6 changes per condition), with no family changing twice or changing back.
+
+### Families of different convictions
+
+Pooled across towns at year 6. Each figure is the mean share of the day given to secondary work, then the mean days of food kept back.
+
+| Value | No wisdom | Prepare cultures | Endure cultures |
+|---|---|---|---|
+| Self-Reliant | 3.2% / 1.9 days | 5.5% / 15.5 days | 2.8% / 0 days |
+| Thrifty | 0.4% / 2.3 days | 7.3% / 37 days | 0.6% / 0.9 days |
+| Common Stores | 0.4% / 0 days | 1.6% / 9.6 days | 0.4% / 0 days |
+
+**What the cultures do:**
+- **Endure** cultures keep no larders.
+- **Endure+Pride** gives almost no time to secondary work.
+- **Prepare** cultures keep the largest larders. Up to 22 of 183 families keep 90 days.
+
+**How they fare:** the self-reliant cultures (Prepare, the food priority) do best on difficult land (+6 to +19 people), and the cooperative ones close to them. No culture is best on every kind of land.
+
+### For the owner
+
+1. **Proficiency's cost.**
+   - **The finding:** inexperience (60% output at first) and the pull toward known work cost ordinary towns about 10–15 people, concentrated in a few towns, and cancel most of the gain on difficult land.
+   - **Options:**
+     - keep it as a real hardship;
+     - soften the inexperience penalty (for example 75%);
+     - give founders some knowledge of the town's basic trades;
+     - or find out first which of the two parts does the damage.
+   - **Not changed:** nothing has been changed without your decision.
+2. **The surplus** is untouched by self-sufficiency, as expected.
+3. **The stores disruption** at day 540 is too mild to test fragility. It could move to the first autumn or target food before winter, with your approval.
+
 ## 1. Audit
 
 ### Time allocation
