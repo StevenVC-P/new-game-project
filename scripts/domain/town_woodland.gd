@@ -15,6 +15,11 @@ extends RefCounted
 # Design: docs/TOWN_BUILDING_MODEL.md (Woodland). A town without a town map has no woodland.
 
 const CLEAR: String = "clear_woods"
+# Woods the player keeps (owner, 2026-11-01): a binding designation, like clearing. No tree in them
+# is felled, by any woodcutter or gatherer's camp; woodcutters fell elsewhere, and bring in less
+# wood the farther they must go for it (get_felling_factor). A tile is kept or marked for clearing,
+# never both: the player's later designation replaces the earlier.
+const PROTECT: String = "protect_woods"
 # The largest block one marking covers, tiles per side.
 const MAX_MARK_SIDE: int = 16
 const SIDES: Array[Vector2i] = [Vector2i(0, -1), Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, 1)]
@@ -27,6 +32,8 @@ var city: City:
 		return _city_ref.get_ref() as City
 # Woods marked for clearing: tile -> working days spent felling it so far.
 var marked: Dictionary = {}
+# Woods kept: tile -> true. Saved with the town, like the clearing marks.
+var protected: Dictionary = {}
 # Unmarked trees a woodcutter is cutting: tile -> working days spent so far.
 var cutting: Dictionary = {}
 # This year's chosen spread: tile -> the day of the year it grows in.
@@ -105,11 +112,82 @@ func mark_block(from: Vector2i, to: Vector2i) -> int:
 			changed += 1
 		elif not marked.has(tile):
 			marked[tile] = 0.0
+			if protected.erase(tile):
+				_cut_targets.clear()
 			changed += 1
 	return changed
 
 func is_marked(tile: Vector2i) -> bool:
 	return marked.has(tile)
+
+# Keeps every wooded tile in the block (taking any clearing marks off it); when all of them are kept
+# already, lifts the keeping instead. Returns how many tiles changed.
+func protect_block(from: Vector2i, to: Vector2i) -> int:
+	var tiles: Array[Vector2i] = get_wooded_in_block(from, to)
+	var all_kept: bool = tiles.all(func(tile: Vector2i) -> bool: return protected.has(tile))
+	var changed: int = 0
+	for tile: Vector2i in tiles:
+		if all_kept:
+			protected.erase(tile)
+			changed += 1
+		elif not protected.has(tile):
+			protected[tile] = true
+			marked.erase(tile)
+			cutting.erase(tile)
+			changed += 1
+	# Which trees woodcutters may fell has changed (the woods themselves have not).
+	if changed > 0:
+		_cut_targets.clear()
+	return changed
+
+func is_protected(tile: Vector2i) -> bool:
+	return protected.has(tile)
+
+# Woods a woodcutter may fell: wooded and not kept.
+func is_fellable(tile: Vector2i) -> bool:
+	return is_wooded(tile) and not protected.has(tile)
+
+# How much of its wood a woodcutter still brings in with woods kept: the trees it may fell lie
+# farther than the nearest trees of all, and the walk costs it in proportion, down to the land's
+# floor (EconomyBalance.LAND_YIELD_FLOOR). 1 with nothing kept, or when the nearest trees are its
+# to fell.
+func get_felling_factor(building: Building) -> float:
+	if protected.is_empty() or not has_map():
+		return 1.0
+	var origin: Vector2i = TownLogistics.center_tile(building.tile, building.size)
+	var any: Vector2i = nearest_wooded(building)
+	if any.x < 0:
+		return 1.0
+	var free: Vector2i = nearest_trees(building)
+	if free.x < 0:
+		return EconomyBalance.LAND_YIELD_FLOOR
+	var near: float = maxf(2.0, Vector2(any - origin).length())
+	var far: float = maxf(2.0, Vector2(free - origin).length())
+	return clampf(near / far, EconomyBalance.LAND_YIELD_FLOOR, 1.0)
+
+# The wooded tile nearest a building, kept or not (for get_felling_factor). Kept until the woods change.
+var _any_targets: Dictionary = {}
+var _any_targets_version: int = -1
+func nearest_wooded(building: Building) -> Vector2i:
+	if _any_targets_version != land_version:
+		_any_targets_version = land_version
+		_any_targets.clear()
+	if _any_targets.has(building.id):
+		return _any_targets[building.id]
+	var origin: Vector2i = TownLogistics.center_tile(building.tile, building.size)
+	var best: Vector2i = Vector2i(-1, -1)
+	var best_distance: int = 1 << 30
+	var size: Vector2i = city.logistics.map_size()
+	for y in range(size.y):
+		for x in range(size.x):
+			var tile: Vector2i = Vector2i(x, y)
+			if is_wooded(tile):
+				var distance: int = (tile - origin).length_squared()
+				if distance < best_distance or (distance == best_distance and is_before(tile, best)):
+					best_distance = distance
+					best = tile
+	_any_targets[building.id] = best
+	return best
 
 # Working woodcutters of any tier: a gatherer's camp fells too, at its tier's pace.
 func get_woodcutters() -> Array[Building]:
@@ -170,7 +248,7 @@ func nearest_trees(building: Building) -> Vector2i:
 	if _cut_targets_version != land_version:
 		_cut_targets_version = land_version
 		_cut_targets.clear()
-	if _cut_targets.has(building.id) and is_wooded(_cut_targets[building.id]):
+	if _cut_targets.has(building.id) and is_fellable(_cut_targets[building.id]):
 		return _cut_targets[building.id]
 	var origin: Vector2i = TownLogistics.center_tile(building.tile, building.size)
 	var size: Vector2i = city.logistics.map_size()
@@ -179,7 +257,7 @@ func nearest_trees(building: Building) -> Vector2i:
 		var ring: Array[Vector2i] = []
 		for y in range(origin.y - radius, origin.y + radius + 1):
 			for x in range(origin.x - radius, origin.x + radius + 1):
-				if maxi(absi(x - origin.x), absi(y - origin.y)) == radius and is_wooded(Vector2i(x, y)):
+				if maxi(absi(x - origin.x), absi(y - origin.y)) == radius and is_fellable(Vector2i(x, y)):
 					ring.append(Vector2i(x, y))
 		ring.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
 			var da: int = (a - origin).length_squared()
@@ -214,6 +292,8 @@ static func is_before(a: Vector2i, b: Vector2i) -> bool:
 	return a.y < b.y or (a.y == b.y and a.x < b.x)
 
 func fell(tile: Vector2i) -> void:
+	if protected.has(tile):
+		return
 	tile_data(tile)["has_trees"] = false
 	marked.erase(tile)
 	cutting.erase(tile)

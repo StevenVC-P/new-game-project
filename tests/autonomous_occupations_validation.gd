@@ -31,6 +31,7 @@ func run_all() -> void:
 	test_warning_no_land()
 	test_warning_failing_livelihood()
 	test_warning_food_ahead()
+	test_kept_woods_are_binding()
 	if failure_count > 0:
 		push_error("Autonomous occupations validation failed: " + str(failure_count) + " failure(s)")
 		quit(1)
@@ -479,6 +480,42 @@ func test_warning_food_ahead() -> void:
 	if tool_card.is_empty():
 		tool_card = card_titled(tools, "Tools are low")
 	_check(not tool_card.is_empty() and str(tool_card["lines"]).contains("No one makes tools") and not (tool_card["buttons"] as Array).any(func(b: Dictionary) -> bool: return b["action"]["action"] == "set_priority"), "the tools warning says who makes tools, without a priority button: %s" % str(tool_card.get("lines", [])))
+
+# 19. Woods the player keeps are never felled; woodcutters fell elsewhere and bring in less for the
+# walk; the player's later designation replaces the earlier; woods marked for clearing are cleared
+# through the woodcutters' work.
+func test_kept_woods_are_binding() -> void:
+	var city: City = town()
+	var family: Household = city.households[0]
+	set_calling(family, "forest")
+	busy_everyone_else(city, family)
+	var cutter: Building = give(city, family, "woodcutter", Vector2i(52, 10))
+	var nearest: Vector2i = city.woodland.nearest_trees(cutter)
+	_check(nearest.x == 56 and FamilyInitiative.get_activity(cutter.type) == "wood", "the woodcutter would fell the nearest trees, at the woods' edge (%s)" % str(nearest))
+	_check(city.woodland.get_felling_factor(cutter) == 1.0, "with nothing kept it brings in its full wood")
+	# One marking covers at most TownWoodland.MAX_MARK_SIDE tiles a side: the edge in three blocks.
+	var kept: int = 0
+	for top: int in [0, 16, 32]:
+		kept += city.woodland.protect_block(Vector2i(56, top), Vector2i(59, mini(top + 15, 43)))
+	_check(kept > 0, "the player keeps the woods' edge")
+	var elsewhere: Vector2i = city.woodland.nearest_trees(cutter)
+	_check(elsewhere.x >= 60 and city.woodland.is_fellable(elsewhere), "the woodcutter seeks timber beyond the kept woods (%s)" % str(elsewhere))
+	var factor: float = city.woodland.get_felling_factor(cutter)
+	_check(factor < 1.0 and factor >= EconomyBalance.LAND_YIELD_FLOOR and city.land.get_output_factor(cutter) < 1.0, "and brings in less for the walk (%.2f)" % factor)
+	for day in range(200):
+		city.woodland.fell_woods()
+	var kept_standing: bool = true
+	for tile: Vector2i in city.woodland.protected.keys():
+		kept_standing = kept_standing and city.woodland.is_wooded(tile)
+	_check(kept_standing, "no kept tree is felled, however long the woodcutter works")
+	city.woodland.mark_block(Vector2i(56, 10), Vector2i(56, 10))
+	_check(city.woodland.is_marked(Vector2i(56, 10)) and not city.woodland.is_protected(Vector2i(56, 10)), "marking a kept tile for clearing replaces keeping it: the later designation holds")
+	for day in range(40):
+		city.woodland.fell_woods()
+	_check(not city.woodland.is_wooded(Vector2i(56, 10)), "and the woodcutter clears it through its work")
+	var before: int = city.woodland.protected.size()
+	city.woodland.protect_block(Vector2i(56, 32), Vector2i(59, 43))
+	_check(city.woodland.protected.size() < before, "keeping a kept block again lifts it")
 
 func _check(condition: bool, message: String) -> void:
 	if condition:

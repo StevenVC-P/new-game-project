@@ -13,6 +13,7 @@ static func get_building_catalog() -> Array[Dictionary]:
 		{"id": "road", "display_name": "Road", "category": "Town Planning"},
 		{"id": "storehouse", "display_name": "Storehouse", "category": "Town Planning"},
 		{"id": "clear_woods", "display_name": "Clear Woods", "category": "Town Planning"},
+		{"id": "protect_woods", "display_name": "Keep Woods", "category": "Town Planning"},
 		{"id": "till_land", "display_name": "Till Land", "category": "Town Planning"},
 		{
 			"id": "house",

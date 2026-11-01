@@ -15,10 +15,10 @@ const TOOL_KEYS: Dictionary = {
 	"house": "1", "farm": "2", "woodcutter": "3", "toolmaker": "4", "quarry": "5", "stonecutter": "6",
 	"brickworks": "7", "lime_kiln": "8", "mortar_yard": "9", "mason_yard": "0", "sculptor": "Q",
 	"carver": "W", "tileworks": "E", "paver_yard": "R", "storehouse": "T", "fisher": "Y",
-	"hunter": "U", "watch_post": "O", "herder": "H", "plot": "P", "clear_woods": "C", "till_land": "F",
+	"hunter": "U", "watch_post": "O", "herder": "H", "plot": "P", "clear_woods": "C", "protect_woods": "V", "till_land": "F",
 	"road": "G", "work_ground": "K", "residential": "N",
 }
-const DESIGNATIONS: Array[String] = [TownConstruction.PLOT, TownInfluence.WORK_GROUND, TownWoodland.CLEAR, TownFarmland.TILL]
+const DESIGNATIONS: Array[String] = [TownConstruction.PLOT, TownInfluence.WORK_GROUND, TownWoodland.CLEAR, TownWoodland.PROTECT, TownFarmland.TILL]
 # Communal infrastructure: what families leading their own work still look to the community for.
 const SHARED_WORKS: Array[String] = [TownConstruction.ROAD, Building.BUILDING_STOREHOUSE, Building.BUILDING_WATCH_POST]
 const PROJECTS_SHOWN: int = 6
@@ -135,6 +135,10 @@ static func get_designation_card(city: City, designation: String, selected: bool
 			title = "Clear woods"
 			lines.append("Woods for the woodcutters to fell. Two corners.")
 			muted.append("%d tiles marked%s" % [city.woodland.marked.size(), "" if not city.woodland.get_woodcutters().is_empty() or city.woodland.marked.is_empty() else "; needs a working woodcutter"])
+		TownWoodland.PROTECT:
+			title = "Keep woods"
+			lines.append("Woods no one may fell: hunting grounds, the town's firewood, its shelter. Woodcutters go farther for timber and bring in less. Two corners; again to lift.")
+			muted.append("%d tiles kept" % city.woodland.protected.size() if not city.woodland.protected.is_empty() else "None kept")
 		TownFarmland.TILL:
 			title = "Till land"
 			lines.append("Open land for a field's family to till into farmland. Two corners.")

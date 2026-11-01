@@ -367,6 +367,8 @@ static func describe_ground(city: City, tile: Vector2i) -> String:
 				parts.append("worn path")
 	if city.woodland.marked.has(tile):
 		parts.append("marked for clearing")
+	if city.woodland.protected.has(tile):
+		parts.append("woods kept")
 	if city.farmland.marked.has(tile):
 		parts.append("marked for tilling")
 	if city.influence.enabled and city.influence.is_work_ground(tile):
