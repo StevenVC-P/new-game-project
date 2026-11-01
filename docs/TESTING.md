@@ -46,7 +46,8 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 
 # Guiding wisdom (docs/GUIDING_WISDOM.md): leadership and fixed choices, no change without a wisdom, one expectation each,
 # conflicting wisdoms, conduct becoming experience, counter-qualities, a level a year, framed lessons, the page, saves;
-# then no wisdom against the six pairs and two priority stacks, six years with a year-3 snapshot (one condition and
+# then no wisdom against the six pairs, two priority stacks, and a pair given a third wisdom by the village's Elder
+# (endure+respect>pride, endure+respect>prepare), six years with a year-3 snapshot (one condition and
 # strategy per process; "--prepare-difficult" caches the difficult sites first; filter for [WIS])
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/guiding_wisdom_validation.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/wisdom_check.gd -- --conditions=ordinary --strategies=none,endure+respect > wis.log
