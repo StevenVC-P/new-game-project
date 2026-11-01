@@ -128,7 +128,7 @@ Whether existing upkeep can carry a genuine recurring household decision: **no, 
 - **When tools are short**, keeping one's workplace up means taking a tool the town's other workplaces need. That is a real trade-off, but it is about sharing a scarce store, so it belongs to We Endure Together and Prepare for Hard Times, not to craft. Pride asking a family to take the tool would deepen the tool cliff.
 - **Upkeep costs families no time**, so there is no effort for diligence or pride to give.
 
-**Dependency:** Pride needs one of these before upkeep can carry it: upkeep that takes a family's own time and has a better result than "working" (a part of the goods-quality system), or goods that can be better made. Until then Pride reaches improving and long days on own building, and it would gain a natural recurring decision from occupational reconsideration: staying with work a family has built up through a lean spell (`docs/OCCUPATION_RECONSIDERATION.md`).
+**Dependency:** Pride needs one of these before upkeep can carry it: upkeep that takes a family's own time and has a better result than "working" (a part of the goods-quality system), or goods that can be better made. Until then Pride reaches improving and long days on own building. (Owner, 2026-11-01: Pride does not ask families to stay at their workplace when they reconsider their work; pride in craft can survive a change of work. Persistence comes from temperament, calling and investment: `docs/OCCUPATION_RECONSIDERATION.md`.)
 
 ## Learning: Priority Experience and Wisdom Interpretation (examined, owner 2026-10-31)
 
@@ -158,8 +158,8 @@ The wisdom's lessons on its own conduct add about 500 experiences, 20% of them r
 
 ## Open Decisions
 
-1. **Prepare at the founding:** every town is founded with under three months of food, so Prepare always asks founders to take up food work; in two marginal towns this costs the only toolmaker. Options: accept it as Prepare's real risk; have Prepare's food ask wait until the town has stood a season; or let occupational reconsideration repair it (a family whose workplace stands short of tools reconsiders, and Prepare then asks for tools). No threshold was changed.
+1. **Prepare at the founding:** every town is founded with under three months of food, so Prepare always asks founders to take up food work; in two marginal towns this costs the only toolmaker. With occupational reconsideration (2026-11-01, Prepare unchanged), one of the two now recovers: a farm family short of tools takes up tool mending in its first year (`docs/OCCUPATION_RECONSIDERATION.md`); the other still starves. Options: accept it as Prepare's real risk; have Prepare's food ask wait until the town has stood a season; or let occupational reconsideration repair it (a family whose workplace stands short of tools reconsiders, and Prepare then asks for tools). No threshold was changed.
 2. **Framing over time:** scale the wisdom's interpretation of lessons by the custom's acceptance and the family's stance (Learning, above), or keep it flat.
-3. **Pride's dependency:** upkeep cannot carry it until upkeep takes family effort or goods have quality; occupational reconsideration can give it a decision sooner.
+3. **Pride's dependency:** upkeep cannot carry it until upkeep takes family effort or goods have quality.
 4. **Mayor and Law** wait for a defined town stage.
 

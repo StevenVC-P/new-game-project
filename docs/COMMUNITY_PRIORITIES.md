@@ -4,7 +4,7 @@ The owner's brief (2026-10-30): founding families each judge what the community 
 
 ## Owner Decisions (2026-10-31)
 
-1. Families do not reconsider their work in the first pass; investigate that separately later.
+1. Families do not reconsider their work in the first pass; investigate that separately later. (Since built: `docs/OCCUPATION_RECONSIDERATION.md`, 2026-11-01. A priority weighs in but never starts a reconsideration.)
 2. One primary priority replaces the four work asks (food, wood, tools, better work). Norms, honours and their controls stay separate.
 3. Evaluate under both the test-only first-winter store loss and naturally difficult sites, reported separately.
 4. Reuse existing decision weights; no tuning to make guidance win.

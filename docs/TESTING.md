@@ -52,6 +52,11 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/guiding_wisdom_validation.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/wisdom_check.gd -- --conditions=ordinary --strategies=none,endure+respect > wis.log
 
+# Families reconsidering their work (docs/OCCUPATION_RECONSIDERATION.md): the rules; then the wisdom check's towns with
+# reconsideration on and off ("-- --no-reconsider"), and with the monthly limit lifted ("-- --change-limit=0")
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/occupation_review_validation.gd
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/wisdom_check.gd -- --conditions=ordinary --strategies=none,food --no-reconsider > occ_off.log
+
 # Home sites (docs/HOME_SITES.md): families choosing their own sites on land set aside, preferred land, no land, no
 # overlap, explanations, starting land, land reserved from work, shared works among homes, preferred land between equal sites, explanations
 # that no longer hold; then starting land, plots, and equal-capacity compact, dispersed, poor, far and
