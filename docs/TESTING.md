@@ -55,6 +55,13 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # Families reconsidering their work (docs/OCCUPATION_RECONSIDERATION.md): the rules; then the wisdom check's towns with
 # reconsideration on and off ("-- --no-reconsider"), and with the monthly limit lifted ("-- --change-limit=0")
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/occupation_review_validation.gd
+
+# Emergent recognition and the Speaker of the Gathering (docs/EMERGENT_RECOGNITION_AND_LEADERSHIP.md): the rules; then the
+# same towns under three priority/wisdom strategies, one branch per process: existing, emergent, speaker0/1/2 (the first,
+# second or third most influential household appointed at Village), replace01/12/20 (appointed, then replaced 540 days
+# later); filter for [SPK]
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_regard_validation.gd
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/speaker_check.gd -- --conditions=ordinary --strategies=food --branch=speaker0 > spk.log
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/wisdom_check.gd -- --conditions=ordinary --strategies=none,food --no-reconsider > occ_off.log
 
 # Household self-sufficiency and proficiency (docs/HOUSEHOLD_SELF_SUFFICIENCY.md): the rules; then the wisdom check's towns with the

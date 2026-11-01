@@ -166,14 +166,4 @@ static func get_detail_buttons(city: City, household: Household) -> Array:
 	if household.residence_building_id >= 0 and household.residence_building_id < city.buildings.size() and city.buildings[household.residence_building_id].is_house():
 		buttons.append({"text": "Show on map", "action": {"action": "select_household", "household": household.id, "focus_camera": true}})
 	buttons.append({"text": "Close", "action": {"action": "focus_household", "household": household.id}})
-	if city.social.enabled:
-		buttons.append_array(get_honour_buttons(household))
-	return buttons
-
-# Honouring a family for one of the four kinds of contribution (TownSocial.recognize).
-static func get_honour_buttons(household: Household) -> Array:
-	var buttons: Array = []
-	var labels: Array[String] = ["Honour: service", "Honour: holding", "Honour: craft", "Honour: civic"]
-	for index in range(TownSocial.RECOGNITIONS.size()):
-		buttons.append({"text": labels[index], "action": {"action": "honour_household", "household": household.id, "category": TownSocial.RECOGNITIONS[index]}})
 	return buttons

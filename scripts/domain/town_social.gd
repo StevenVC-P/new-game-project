@@ -133,6 +133,42 @@ var value_reversals: int = 0
 var value_change_directions: Dictionary = {}
 # Honours given, and the different readings households made of them, summed over honours.
 var honours: int = 0
+# Emergent recognition and the Speaker of the Gathering (TownRegard); off only for comparison.
+# Achievements noticed, admirations and resentments, achievements both admired and resented, and
+# the latest of them for the Community page; the three most influential households, how often that
+# changed, and months each household spent among them.
+var emergent_regard: bool = true
+var notices: int = 0
+var admirations: int = 0
+var resentments: int = 0
+var divided_notices: int = 0
+var regard_log: Array = []
+var influential: Array = []
+var influential_changes: int = 0
+var ever_influential: Dictionary = {}
+# The Speaker: who, since when, its stance on the priority, its stores policy (and why), each
+# family's view when appointed and its trust then, this term's record and policies, all terms, and
+# counts across terms.
+var speaker_id: int = -1
+var speaker_since: int = -1
+var speaker_stance: String = ""
+var speaker_policy: String = ""
+var speaker_policy_note: String = ""
+var speaker_verdicts: Dictionary = {}
+var speaker_start_trust: Dictionary = {}
+var speaker_record: Dictionary = {}
+var speaker_policies: Dictionary = {}
+var speaker_history: Array = []
+var speaker_policy_counts: Dictionary = {}
+var speaker_grants: Dictionary = {}
+var appointments: int = 0
+var replacements: int = 0
+var vacancies: int = 0
+var mediations: int = 0
+var mediated_settled: int = 0
+var former_speaker_responses: Dictionary = {}
+var removal_approved: int = 0
+var removal_opposed: int = 0
 var honour_readings: int = 0
 # Trust gained and lost, by source, for the social check: source -> total.
 var trust_by_source: Dictionary = {}
@@ -209,6 +245,7 @@ func run_week() -> void:
 	observe_needy_week()
 	run_disputes()
 	update_norms()
+	TownRegard.update_stance(city)
 
 # --- Neighbours ----------------------------------------------------------------------------------
 
@@ -705,6 +742,10 @@ func press_claim(victim: Household, crosser: Household, field: Building, loss: f
 	dispute["count"] = int(dispute["count"]) + 1
 	note(victim, "Demands that %s stop trampling its field (%s)" % [city.get_household_label(crosser.id), "; ".join(FamilyInitiative.get_reasons(raise["terms"], true))])
 	var amends: Dictionary = SocialDecisions.get_amends_desire(city, crosser, victim)
+	# The Speaker of the Gathering, if there is one, urges amends (TownRegard).
+	if TownRegard.add_mediation(city, crosser, victim, amends["terms"]):
+		amends["score"] = FamilyInitiative.sum(amends["terms"])
+		amends["mediated"] = true
 	if float(amends["score"]) + FamilyInitiative.get_noise(city, crosser, "amends:%d" % victim.id) >= SocialDecisions.AMENDS_THRESHOLD:
 		settle(victim, crosser, field, dispute, amends)
 	else:
@@ -729,6 +770,8 @@ func settle(victim: Household, crosser: Household, field: Building, dispute: Dic
 	HouseholdMemory.experience(city, crosser, "dispute_settled", "It made amends to %s for trampling their field" % city.get_household_label(victim.id), victim, {"cost": 1.0})
 	crosser.civic_acts += 1
 	judge_settlement([victim, crosser] as Array[Household])
+	if bool(amends.get("mediated", false)):
+		TownRegard.on_mediated_settlement(city, [victim, crosser] as Array[Household])
 	observe_norm(NORM_CLAIMS, true)
 	GuidingWisdom.record(city, crosser, GuidingWisdom.RESPECT, true)
 
@@ -1041,7 +1084,9 @@ func grant_first_claim(household: Household, days: int) -> void:
 # others (help given, food shared) against the town's middle and its own, and how often the same
 # family is favoured. Given to a family in hardship, it is a response to need, and those who are
 # moved by others' need see it as right.
-func judge_distribution(target: Household, text: String) -> void:
+# Given by the Speaker (`by`), families also judge the Speaker for it: answering hardship is
+# welcomed by those moved by need; favouring its own breeds resentment of the Speaker too.
+func judge_distribution(target: Household, text: String, by: Household = null) -> void:
 	var contributions: Array[int] = []
 	for household: Household in city.households:
 		contributions.append(household.help_given)
@@ -1056,9 +1101,14 @@ func judge_distribution(target: Household, text: String) -> void:
 		var favoured: bool = target.recognized + target.grants_received > 2
 		var moved_by_need: bool = in_need and (HouseholdCharacter.get_axis(observer, HouseholdCharacter.EMPATHY) > 0 or HouseholdCharacter.get_strength(observer, "charitable") > 0)
 		var deserved: bool = (moved_by_need or (target.help_given >= middle and overlooked < 2)) and not favoured and observer.grants_received >= target.grants_received - 1
+		if observer == by:
+			continue
 		if deserved:
 			if moved_by_need:
 				adjust_trust(observer, 0.25, "hardship answered")
+				if by != null:
+					HouseholdMemory.touch_tie(city, observer, by, 1, "the Speaker answered hardship")
+					speaker_record["favours_welcomed"] = int(speaker_record.get("favours_welcomed", 0)) + 1
 			continue
 		var resentment: float = 1.0 + HouseholdCharacter.get_strength(observer, "egalitarian") + 0.5 * maxi(0, HouseholdCharacter.get_axis(observer, HouseholdCharacter.AMBITION)) + (0.5 if overlooked >= 2 else 0.0) - HouseholdCharacter.get_strength(observer, "hierarchical") - 0.5 * HouseholdCharacter.get_strength(observer, "deferential")
 		var said: String = text
@@ -1067,6 +1117,9 @@ func judge_distribution(target: Household, text: String) -> void:
 		if resentment >= 1.5:
 			adjust_trust(observer, -1.0, "favouritism")
 			HouseholdMemory.touch_tie(city, observer, target, -1, "was favoured over us")
+			if by != null:
+				HouseholdMemory.touch_tie(city, observer, by, -1, "the Speaker plays favourites")
+				speaker_record["favours_resented"] = int(speaker_record.get("favours_resented", 0)) + 1
 			note(observer, "Resents the favour shown to %s" % city.get_household_label(target.id))
 		else:
 			adjust_trust(observer, -0.25, "favouritism")
@@ -1099,6 +1152,9 @@ func on_first_claim_used(household: Household) -> void:
 # households of highest standing, earned by what they did (helping, sharing, honours), never
 # granted. Their weight shows in how appeals are received (FamilyInitiative.get_receptiveness).
 func get_respected_voices() -> Array[Household]:
+	# With emergent regard, the voices are the most influential households (TownRegard).
+	if TownRegard.is_on(city):
+		return TownRegard.get_voices(city)
 	var voices: Array[Household] = []
 	for household: Household in city.households:
 		if household.standing >= VOICE_STANDING:
@@ -1131,6 +1187,7 @@ func get_recent_policy_changes() -> int:
 # mind. A family that values order, tradition, or caution cares most; one that welcomes new ways
 # minds changes little. Steadiness counts only once the gathering has made some decision to keep.
 func review_month() -> void:
+	TownRegard.advance_month(city)
 	if not enabled:
 		return
 	var changes: int = get_recent_policy_changes()
@@ -1174,6 +1231,12 @@ func judge_settlement(parties: Array[Household]) -> void:
 			adjust_trust(household, -0.25, "settlement pressed on it")
 
 # --- Trust, standing, norms -----------------------------------------------------------------------
+
+# An achievement some families admired or resented, for the Community page (newest last).
+func record_regard(target: Household, kind: String, admirers: int, resenters: int) -> void:
+	regard_log.append({"day": city.construction.day, "household": target.id, "kind": kind, "admirers": admirers, "resenters": resenters})
+	if regard_log.size() > 12:
+		regard_log.pop_front()
 
 func adjust_trust(household: Household, amount: float, source: String = "") -> void:
 	if source != "":
