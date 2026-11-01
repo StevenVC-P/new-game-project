@@ -1,8 +1,68 @@
 # Emergent Recognition and Community Leadership
 
-**Status: audit and proposal for owner review (2026-11-01). Nothing implemented.** Branch `feature/emergent-recognition`, from `feature/occupation-reconsideration`, so it stays separate from the household-economy work. Not merged.
+**Status: implemented as a prototype (2026-11-01). Branch `feature/emergent-recognition`, from `feature/occupation-reconsideration`, so it stays separate from the household-economy work. Not merged: awaits owner review.**
+
+Code: `scripts/domain/town_regard.gd` (`TownRegard`). It hooks into:
+- `TownSocial`: the monthly review, the weekly stance, dispute mediation, the Speaker's grants judged in `judge_distribution`, and the voices;
+- `CommunityPriority.get_view` and `FamilyInitiative.get_receptiveness` (the Speaker's lead);
+- `TownInfluence.get_funding_block` (first claim stays within the Elder's rule);
+- the Community page;
+- `main.gd` (`appoint_speaker`).
+
+Tests: `tests/town_regard_validation.gd`. Comparison: `tests/sim/speaker_check.gd`.
 
 Core goal (owner, 2026-11-01): a family can become powerful without the player's approval, and the player decides which of the community's emerging interests to empower.
+
+Guiding principle (owner): families create the community's politics. The player influences who receives authority, but can't dictate what those families believe or how everyone responds.
+
+## Owner Decisions (proposal review, 2026-11-01)
+
+1. **Emergent recognition** replaces the manual Honour and Reward helping controls.
+   - Contributions are recognised when they happen, without awarding standing again and again for the same achievement.
+   - Influence reflects economic importance, relationships, supporters, detractors and contributions.
+   - Disagreement is preserved.
+2. **The office is called Speaker of the Gathering**, chosen at Village from the three most influential households.
+   - **The player stays the Elder,** with authority over guiding wisdom, the community priority, the stores rules and land planning.
+   - **The Speaker's limited influence:**
+     - it shapes how families take the priority, positively or negatively, by its own convictions;
+     - it decides preferential access to the stores within the player's rules and protected reserves;
+     - it tries to settle disputes through its relationships;
+     - it keeps making its own household decisions.
+   - **Families judge the Speaker's actions.**
+3. **Replacing a Speaker** is allowed. The consequences emerge from the circumstances (the former Speaker's temperament, ambition, supporters and reputation). There is no automatic resentment and no fixed ban on reappointment.
+4. **Not yet:** preparedness contributions come with household reserves. No formal government, laws, factions or individual characters yet. The work stays separate from the household-economy branch.
+5. **Validation:**
+   - Matched simulations compare the existing system against emergent recognition, the same towns with each of their three candidates appointed, and different replacement circumstances.
+   - Weights are fixed before evaluation.
+   - Political divergence, not population, is the main measure of success.
+
+## As Built
+
+Following the proposal below, with these specifics:
+- **Noticing:**
+  - Monthly, not seasonal, so a contribution is recognised close to when it happens.
+  - Service (weeks helped and food shared) and civic acts (amends, land given up) are noticed at 2, then at each doubling.
+  - A holding or craft is noticed at each new level from 2 up.
+  - The highest level noticed is kept per household (`noticed_merit`), so the same achievement never counts twice.
+- **Thresholds:** admired at a score of at least 1.0, resented at -1.5 or below. Standing changes by +0.25 per admirer (at most +1 per achievement) and -0.25 per resenter (at most -0.5). The deed is real, so desert and favouritism terms don't apply.
+- **Voices:** the gathering's voices become the most influential households with influence of at least 2, replacing standing of at least 2.
+- **First claim** that the Speaker gives keeps its place at the front of the building queue, but no longer passes the Elder's priorities rule. This keeps the Speaker inside the Elder's rules (owner decision 2). Protected reserves always held.
+- **The Speaker's lead:**
+  - A family that backs the Speaker (by its tie, or by its view when the Speaker was appointed) takes the priority as the Speaker does, +/-0.5 in its view and +/-0.2 in how readily it heeds appeals.
+  - A family that opposes the Speaker leans the other way, at half the strength.
+- **The Speaker's stores policy:** chosen every season by its values and ties:
+  - families who help (the old incentive);
+  - families in hardship;
+  - its own kin and friends;
+  - nothing beyond the Elder's rules.
+
+  It grants first claim to up to two households a season. The town judges each grant (`judge_distribution`), and holds the result for or against the Speaker.
+- **Mediation:** a Speaker that doesn't think little of civic work urges amends in field disputes that don't involve it. A crossing family that backs it is moved toward amends (+0.8); one that opposes it, away (-0.4); one with no view, a little (+0.2).
+- **Replacement:**
+  - **The former Speaker** weighs its ambition, its temperament, its following and regard, whether it had lost the town's confidence, and its view of its successor. It steps down, resents the removal, or won't forgive it.
+  - **Each family** weighs its tie to the former Speaker, whether its trust rose or fell during the term, and whether it ever wanted that Speaker. It approves, minds, or doesn't care.
+- **Vacancy:** a Speaker whose family leaves or passes on leaves the office empty, and the Elder appoints again.
+- **Weights:** fixed before the comparison. One 2-town smoke run of the harness was looked at, to check the harness worked, before the comparison was launched.
 
 ## 1. Audit
 

@@ -437,6 +437,11 @@ static func get_receptiveness(household: Household, city: City = null, kind: Str
 		elif voices < 0.0:
 			note_text += ", though families it is at odds with speak for it"
 		factor += voices
+		# The Speaker of the Gathering leads the families who follow it, one way or the other.
+		if kind != "":
+			var lead: Dictionary = TownRegard.get_lead_receptiveness(city, household)
+			factor += float(lead["factor"])
+			note_text += str(lead["note"])
 	return {"factor": maxf(0.2, factor), "note": note_text}
 
 # Proper workplaces worked by kin and near neighbours: how many pay (well kept) and how many stand

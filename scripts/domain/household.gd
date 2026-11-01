@@ -142,6 +142,9 @@ var civic_acts: int = 0
 var inspired_by: String = ""
 var inspired_by_household: int = -1
 var inspired_until: int = -1
+# The highest of each kind of contribution the town has noticed (TownRegard), so the same
+# achievement is recognised once.
+var noticed_merit: Dictionary = {}
 
 func _init(household_id: int = -1, building_id: int = -1, work_preference: String = WORK_PREF_NEUTRAL, population: int = 4, residence_status: String = RESIDENCE_TEMPORARY):
 	id = household_id

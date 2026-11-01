@@ -3,8 +3,8 @@ extends RefCounted
 
 # How the player leads families who decide for themselves (docs/TOWN_UI.md): the town's lasting
 # guiding wisdom (GuidingWisdom), the one priority the community puts first for now
-# (CommunityPriority) and how families take each, the rule for the common stores, the customs forming, the customs it appeals to, and the rewards and
-# honours it gives. Each control says what it asks and what the town has recorded since; none
+# (CommunityPriority) and how families take each, the rule for the common stores, the customs forming,
+# and who the town regards and who leads it (TownRegard). Each control says what it asks and what the town has recorded since; none
 # promises what families will do, because they decide (TownInfluence, TownSocial).
 
 const SP = preload("res://scripts/ui/town_sidebar/sidebar_painter.gd")
@@ -20,14 +20,13 @@ const PRIORITY_ASKS: Dictionary = {
 # Button labels short enough for the narrowest sidebar; the card's tag gives the full name.
 const SHORT_NAMES: Dictionary = {CommunityPriority.NONE: "None", CommunityPriority.FOOD: "Food", CommunityPriority.HOUSING: "Housing", CommunityPriority.INVESTMENT: "Investment", CommunityPriority.COOPERATION: "Cooperation"}
 const SWAYED_NAMES: Dictionary = {"improve": "improvements", "help": "days of help", "long_days": "long days"}
-const HONOUR_LABELS: Array[String] = ["Service", "Holding", "Craft", "Civic"]
 
 static func build(context: Dictionary) -> Array:
 	var city: City = context["city"]
 	var blocks: Array = []
 	if not city.influence.enabled and not city.social.enabled:
 		blocks.append({"kind": "heading", "text": "Community"})
-		blocks.append({"kind": "card", "title": "Classic rules", "lines": ["You assign work directly, and families make no choices of their own here."], "muted": ["Esc > Town rules (or I) lets families lead: they choose their work, and this page holds the appeals, store rules, and honours that guide them."]})
+		blocks.append({"kind": "card", "title": "Classic rules", "lines": ["You assign work directly, and families make no choices of their own here."], "muted": ["Esc > Town rules (or I) lets families lead: they choose their work, and this page holds the appeals, store rules, and leadership that guide them."]})
 		return blocks
 	blocks.append({"kind": "text", "text": "Families weigh what the community asks alongside their own reasons. Receptive families answer more readily; none is bound to.", "muted": true})
 	if city.social.enabled:
@@ -37,7 +36,7 @@ static func build(context: Dictionary) -> Array:
 		blocks.append_array(get_stores(city))
 	if city.social.enabled:
 		blocks.append_array(get_customs(city))
-		blocks.append_array(get_recognition(city, int(context.get("focused_household_id", -1))))
+		blocks.append_array(get_regard(city))
 		blocks.append_array(get_gathering(city))
 	return blocks
 
@@ -208,22 +207,58 @@ static func get_customs(city: City) -> Array:
 		blocks.append({"kind": "text", "text": "Unsettled disputes over land: %d%s" % [open, "; families are looking for agreed rules" if social.dispute_pressure >= 2 else ""], "tone": SP.TONE_CAUTION})
 	return blocks
 
-static func get_recognition(city: City, focused_household_id: int) -> Array:
+# Regard and leadership (TownRegard): who the town admires or resents, the most influential
+# households and what each stands for, and from Village the Speaker of the Gathering, whom the Elder
+# appoints from those three. Recognition is the families' own; the player only chooses the Speaker.
+static func get_regard(city: City) -> Array:
 	var social: TownSocial = city.social
-	var blocks: Array = [{"kind": "heading", "text": "Recognition and incentives"}]
-	blocks.append({"kind": "card", "title": "Reward helping", "tag": "on" if social.incentive else "off", "lines": ["Families who help a neighbour build, or share food in a shortage, get first claim on the stores for %d days." % TownSocial.FIRST_CLAIM_DAYS], "muted": ["First claim passes the priorities rule, never what is kept back."], "buttons": [{"text": "Rewarding help" if social.incentive else "Reward help", "toggle": true, "active": social.incentive, "action": {"action": "toggle_incentive"}}]})
-	var focused: Household = city.get_household_by_id(focused_household_id) if focused_household_id >= 0 else null
-	var lines: Array = ["Each family judges an honour by what it prizes and by what the honoured family did. An undeserved honour breeds resentment."]
-	if focused == null:
-		blocks.append({"kind": "card", "title": "Honour a family", "lines": lines, "muted": ["Select a family on the map or under Families first.", "Honours given so far: %d" % social.honours], "buttons": [{"text": "Choose a family", "action": {"action": "show_tab", "tab": "families"}}]})
-		return blocks
-	var buttons: Array = []
-	for index in range(TownSocial.RECOGNITIONS.size()):
-		buttons.append({"text": HONOUR_LABELS[index], "action": {"action": "honour_household", "household": focused.id, "category": TownSocial.RECOGNITIONS[index]}})
-	var muted: Array = ["Honours given so far: %d" % social.honours]
-	if focused.social_note != "":
-		muted.append("%s lately: %s" % [city.get_household_label(focused.id), focused.social_note])
-	blocks.append({"kind": "card", "title": "Honour " + city.get_household_label(focused.id), "lines": lines, "muted": muted, "buttons": buttons, "columns": 2})
+	var village: bool = TownRegard.can_appoint(city)
+	var blocks: Array = [{"kind": "heading", "text": "Regard and leadership", "note": "Speaker of the Gathering" if village else "a Speaker from Village"}]
+	var speaker: Household = TownRegard.get_speaker(city)
+	if speaker != null:
+		var parts: Dictionary = TownRegard.get_influence(city, speaker)
+		var lines: Array = [HouseholdCharacter.describe_convictions(speaker)]
+		if social.speaker_policy_note != "":
+			lines.append(social.speaker_policy_note)
+		if social.speaker_stance != "":
+			lines.append("On the community's priority it %s." % {CommunityPriority.SUPPORTS: "speaks for it", CommunityPriority.OPPOSES: "speaks against it"}.get(social.speaker_stance, "does not much mind"))
+		var muted: Array = ["%d families back it, %d oppose it." % [(parts["supporters"] as Array).size(), (parts["detractors"] as Array).size()], "Disputes it urged settled: %d of %d" % [int(social.speaker_record.get("mediated_settled", 0)), int(social.speaker_record.get("mediations", 0))], "It keeps its own counsel: the Elder appoints, but does not direct it."]
+		blocks.append({"kind": "card", "title": "Speaker: " + city.get_household_label(speaker.id), "tag": "since day %d" % social.speaker_since, "lines": lines, "muted": muted})
+	elif village:
+		blocks.append({"kind": "card", "title": "Speaker of the Gathering", "tone": SP.TONE_CAUTION, "lines": ["The town is a Village: as Elder you may appoint one of its three most influential households to speak for the gathering."], "muted": ["The Speaker keeps its own counsel. It sways how families take the community's priority, decides who gets first claim on the stores within your rules, and urges settlement in disputes. Families judge it, and you, for the choice."]})
+	var candidates: Array = TownRegard.get_ranked(city)
+	for entry: Dictionary in candidates:
+		var household: Household = entry["household"]
+		var parts: Dictionary = entry["influence"]
+		var lines: Array = [HouseholdCharacter.describe_convictions(household), TownRegard.describe_influence(parts)]
+		var muted: Array = []
+		var supporters: Array[String] = []
+		for other: Household in (parts["supporters"] as Array).slice(0, 4):
+			supporters.append(city.get_household_label(other.id))
+		var detractors: Array[String] = []
+		for other: Household in (parts["detractors"] as Array).slice(0, 4):
+			detractors.append(city.get_household_label(other.id))
+		muted.append("Backed by: " + (", ".join(supporters) if not supporters.is_empty() else "no one in particular"))
+		muted.append("Opposed by: " + (", ".join(detractors) if not detractors.is_empty() else "no one in particular"))
+		var leanings: Array[String] = []
+		for priority: String in CommunityPriority.ALL:
+			if CommunityPriority.get_view(city, household, priority)["stance"] == CommunityPriority.SUPPORTS:
+				leanings.append(CommunityPriority.get_display_name(priority).to_lower())
+		muted.append("Would back: " + (", ".join(leanings) if not leanings.is_empty() else "no priority strongly"))
+		muted.append("As Speaker it would likely: " + str(TownRegard.POLICY_TEXT[TownRegard.choose_policy(city, household)["policy"]]))
+		var card: Dictionary = {"kind": "card", "title": city.get_household_label(household.id), "tag": "influence %.1f" % float(parts["total"]), "lines": lines, "muted": muted}
+		if household == speaker:
+			card["tag"] = "Speaker"
+		elif village:
+			card["buttons"] = [{"text": "Appoint as Speaker" if speaker == null else "Make Speaker instead", "action": {"action": "appoint_speaker", "household": household.id}}]
+		blocks.append(card)
+	var recent: Array = []
+	for entry: Dictionary in social.regard_log.slice(-5):
+		var who: String = city.get_household_label(int(entry["household"]))
+		recent.append({"kind": "text", "text": "%s's %s: admired by %d, resented by %d" % [who, TownSocial.RECOGNITION_NAMES[entry["kind"]], int(entry["admirers"]), int(entry["resenters"])], "muted": true})
+	if not recent.is_empty():
+		recent.reverse()
+		blocks.append({"kind": "expander", "id": "community_regard", "title": "What families noticed lately", "blocks": recent})
 	return blocks
 
 static func get_gathering(city: City) -> Array:

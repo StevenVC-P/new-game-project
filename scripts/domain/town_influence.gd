@@ -128,7 +128,8 @@ func get_funding_block(cost: Dictionary, activities: Array[String], household: H
 	if cost.is_empty():
 		return ""
 	if store_rule == RULE_PRIORITIES and not activities.any(is_encouraged):
-		if household == null or household.first_claim_until < city.construction.day:
+		# First claim given by the Speaker of the Gathering stays within the Elder's rule (TownRegard).
+		if household == null or household.first_claim_until < city.construction.day or TownRegard.is_on(city):
 			return "the stores go to the community's priorities first"
 	if not city.construction.can_supply(cost, get_protected_reserve()):
 		return "the stores hold too little beyond what is kept back"

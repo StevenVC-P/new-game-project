@@ -1255,12 +1255,8 @@ func apply_city_action(option_data: Dictionary) -> void:
 		city.influence.store_rule = str(option_data["rule"])
 	elif action == "choose_wisdom":
 		GuidingWisdom.choose(city, str(option_data["wisdom"]))
-	elif action == "toggle_incentive":
-		city.social.incentive = not city.social.incentive
-	elif action == "honour_household":
-		var honoured: Household = city.get_household_by_id(int(option_data["household"]))
-		if honoured != null:
-			city.social.recognize(honoured, str(option_data.get("category", TownSocial.RECOGNITION_SERVICE)))
+	elif action == "appoint_speaker":
+		TownRegard.appoint(city, city.get_household_by_id(int(option_data["household"])))
 	elif action == "select_tool":
 		select_building_type(str(option_data["tool"]))
 	elif action == "stop_placing":

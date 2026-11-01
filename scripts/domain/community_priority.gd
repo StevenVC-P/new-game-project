@@ -117,6 +117,8 @@ static func get_view(city: City, household: Household, priority: String) -> Dict
 		SocialDecisions.add_strength(terms, household, "deferential", 0.25, "it follows the gathering's lead")
 	if household.trust != 0:
 		FamilyInitiative.add(terms, 0.25 * household.trust, "it trusts the gathering" if household.trust > 0 else "it distrusts the gathering")
+	if priority == city.influence.priority:
+		TownRegard.add_lead_to_view(city, household, terms)
 	var score: float = FamilyInitiative.sum(terms)
 	var stance: String = SUPPORTS if score >= SUPPORT_AT else OPPOSES if score <= OPPOSE_AT else INDIFFERENT
 	return {"score": score, "terms": terms, "stance": stance}
