@@ -238,7 +238,7 @@ static func weigh(city: City, household: Household, holding: Building) -> Dictio
 			best = desire
 			best_activity = occupation
 	var margin: float = best_score - stay_score
-	var decision: Dictionary = {"change": margin >= CHANGE_MARGIN, "activity": best_activity, "margin": margin, "stay_terms": staying["terms"], "alternative_terms": best["terms"], "appeal": float(best.get("appeal", 0.0)), "stay_appeal": float(staying.get("appeal", 0.0))}
+	var decision: Dictionary = {"change": margin >= CHANGE_MARGIN, "activity": best_activity, "margin": margin, "stay_terms": staying["terms"], "alternative_terms": best["terms"], "appeal": float(best.get("appeal", 0.0)), "stay_appeal": float(staying.get("appeal", 0.0)), "focused": float(best.get("focused", 0.0))}
 	if best.has("site"):
 		decision["site"] = best["site"]
 	return decision
@@ -311,6 +311,9 @@ static func change_work(city: City, household: Household, holding: Building, dec
 		city.influence.work_change_reasons[reason] = int(city.influence.work_change_reasons.get(reason, 0)) + 1
 	if CommunityPriority.is_swayed(float(decision["margin"]), float(decision["appeal"]), CHANGE_MARGIN):
 		CommunityPriority.record_swayed(city, household, "work")
+	# Tipped by a focused appeal (FocusedAppeal): without it, the other work would not have won.
+	if float(decision.get("focused", 0.0)) > 0.0 and float(decision["margin"]) - float(decision["focused"]) < CHANGE_MARGIN:
+		city.influence.appeals_tipped += 1
 	var short: Array[String] = []
 	for a: String in FamilyInitiative.ACTIVITIES:
 		if GuidingWisdom.is_short_of(city, a):

@@ -32,6 +32,7 @@ func run_all() -> void:
 	test_warning_failing_livelihood()
 	test_warning_food_ahead()
 	test_kept_woods_are_binding()
+	test_focused_appeal()
 	if failure_count > 0:
 		push_error("Autonomous occupations validation failed: " + str(failure_count) + " failure(s)")
 		quit(1)
@@ -516,6 +517,35 @@ func test_kept_woods_are_binding() -> void:
 	var before: int = city.woodland.protected.size()
 	city.woodland.protect_block(Vector2i(56, 32), Vector2i(59, 43))
 	_check(city.woodland.protected.size() < before, "keeping a kept block again lifts it")
+
+# 20. A focused appeal asks the community for one thing for a while; families weigh it; it pulls only
+# on that work, ends when answered or after its season, is no priority, and starts no review.
+func test_focused_appeal() -> void:
+	var city: City = tool_short_town(0)
+	var free: Household = city.households[0]
+	for building: Building in city.buildings:
+		if building.assigned_household_id == free.id:
+			building.unassign_worker(false)
+	set_calling(free, "hearth")
+	var before: Dictionary = city.influence.appeals.duplicate(true)
+	var responses: Array[Dictionary] = FocusedAppeal.get_responses(city, "tools")
+	_check(city.influence.appeals == before, "asking who would answer changes nothing")
+	var free_response: Array = responses.filter(func(r: Dictionary) -> bool: return r["household"] == free)
+	_check(not free_response.is_empty() and str(free_response[0]["outlook"]) in [FocusedAppeal.LIKELY, FocusedAppeal.MIGHT], "a family without work and no calling against tools would likely answer: %s" % str(free_response))
+	_check(FocusedAppeal.make(city, "tools") and FocusedAppeal.is_active(city, "tools") and not FocusedAppeal.make(city, "tools"), "the gathering asks, once at a time")
+	_check(city.influence.priority == CommunityPriority.NONE and city.influence.encouraged.is_empty(), "the appeal is not a priority")
+	_check(has_reason(FamilyInitiative.get_work_desire(city, free, "toolmaker")["terms"], "asks someone to take up toolmaking") and not has_reason(FamilyInitiative.get_work_desire(city, free, "farm")["terms"], "asks someone"), "it pulls on toolmaking only")
+	var settled: Household = city.households[1]
+	settled.work_building_id = FamilyInitiative.get_holding(city, settled).id
+	settled.work_since = city.construction.day
+	_check(not OccupationReview.get_triggers(city, settled, FamilyInitiative.get_holding(city, settled)).has("appeal"), "it gives no family a reason to look again at its work")
+	give(city, free, "tool_mender", Vector2i(40, 20))
+	FocusedAppeal.advance_day(city)
+	_check(not FocusedAppeal.is_active(city, "tools") and city.influence.appeals_answered == 1, "it ends once a family takes up the work")
+	FocusedAppeal.make(city, "food")
+	city.construction.day += FocusedAppeal.APPEAL_DAYS
+	FocusedAppeal.advance_day(city)
+	_check(not FocusedAppeal.is_active(city, "food"), "an unanswered appeal lapses after its season")
 
 func _check(condition: bool, message: String) -> void:
 	if condition:

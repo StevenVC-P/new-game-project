@@ -144,6 +144,9 @@ static func take_up_work(city: City, household: Household) -> ConstructionProjec
 		if project == null:
 			continue
 		city.influence.workplaces_opened += 1
+		# Tipped by a focused appeal: without it, another choice would have come first.
+		if float(choice.get("focused", 0.0)) > 0.0 and choices.size() > 1 and choice == choices[0] and float(choice["score"]) - float(choice["focused"]) < float(choices[1]["score"]):
+			city.influence.appeals_tipped += 1
 		if not short.is_empty():
 			GuidingWisdom.record(city, household, GuidingWisdom.PREPARE, short.has(get_activity(choice["occupation"])))
 		use_first_claim(city, household, project)
@@ -317,6 +320,8 @@ static func get_work_desire(city: City, household: Household, occupation: String
 		if knows >= HouseholdEconomy.FORGOTTEN_BELOW:
 			add(terms, HouseholdEconomy.KNOWN_WORK_WEIGHT * minf(1.0, knows / HouseholdEconomy.ESTABLISHED), "it knows the work (%s)" % HouseholdEconomy.describe_level(knows))
 	var appeal: float = add_encouragement(city, household, activity, terms, "the gathering asks for " + TownInfluence.get_activity_name(activity))
+	# A focused appeal for this good, while it stands (FocusedAppeal): apart from the priority's ask.
+	result["focused"] = FocusedAppeal.add_appeal(city, household, activity, terms)
 	if GuidingWisdom.is_short_of(city, activity):
 		GuidingWisdom.add_appeal(city, household, GuidingWisdom.PREPARE, terms)
 	result["score"] = sum(terms)

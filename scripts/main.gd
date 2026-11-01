@@ -1251,6 +1251,8 @@ func apply_city_action(option_data: Dictionary) -> void:
 		city.defense.call_militia()
 	elif action == "set_priority":
 		city.influence.set_priority(str(option_data["priority"]))
+	elif action == "make_appeal":
+		FocusedAppeal.make(city, str(option_data["good"]))
 	elif action == "set_store_rule":
 		city.influence.store_rule = str(option_data["rule"])
 	elif action == "choose_wisdom":

@@ -421,9 +421,16 @@ static func get_food_causes(city: City) -> Array:
 		causes.append("%d famil%s already going hungry." % [hungry, "y is" if hungry == 1 else "ies are"])
 	return causes
 
+# A focused appeal for a good, with who would likely answer, and its button while none stands.
+static func add_appeal_response(city: City, good: String, text: String, lines: Array, buttons: Array) -> void:
+	lines.append_array(FocusedAppeal.describe(city, good))
+	if not FocusedAppeal.is_active(city, good):
+		buttons.append({"text": text, "action": {"action": "make_appeal", "good": good}})
+
 # What the player could do about food, with what each costs; nothing is prescribed.
 static func get_food_responses(city: City, lines: Array) -> Array:
 	var buttons: Array = []
+	add_appeal_response(city, TownInfluence.ACTIVITY_FOOD, "Ask families to grow food", lines, buttons)
 	lines.append("Land: more farmland lets more families farm. Families working fields till land you mark, as part of their work.")
 	buttons.append(TILL_BUTTON)
 	if not has_free_family(city):
@@ -444,6 +451,7 @@ static func get_tool_responses(city: City, lines: Array) -> Array:
 	lines.append("No one makes tools." if makers == 0 else "%d famil%s make tools." % [makers, "y" if makers == 1 else "ies"])
 	var buttons: Array = []
 	if makers == 0:
+		add_appeal_response(city, TownInfluence.ACTIVITY_TOOLS, "Ask someone to take up toolmaking", lines, buttons)
 		if has_free_family(city):
 			lines.append("A tool mender you plan costs nothing to build; a family free to work may take it.")
 		else:
