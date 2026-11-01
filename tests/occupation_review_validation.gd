@@ -53,6 +53,9 @@ func profile(calling: String) -> Dictionary:
 func town() -> City:
 	var city: City = ConstructionTest.make_city()
 	city.influence.enabled = true
+	# These rules are not about skill: families work at full pace and weigh no skill, so how much food
+	# the town grows (FamilyInitiative.get_food_ratio, from work actually done) is what the test sets up.
+	city.set_meta("economy_no_proficiency_effects", true)
 	city.resources["food"] = 5000
 	city.resources["wood"] = 500
 	city.resources["tools"] = 200

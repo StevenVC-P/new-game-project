@@ -25,6 +25,8 @@ func run_all() -> void:
 	test_temperament_and_desperation()
 	test_narrow_shortage_by_default()
 	test_hungry_family_looks_again()
+	test_food_judged_by_work_done()
+	test_holding_worth_what_it_yields()
 	if failure_count > 0:
 		push_error("Autonomous occupations validation failed: " + str(failure_count) + " failure(s)")
 		quit(1)
@@ -66,6 +68,9 @@ func town(map: Array = []) -> City:
 	if not map.is_empty():
 		city.local_map = map
 	city.influence.enabled = true
+	# Skill is not what these rules are about: families work at full pace and weigh no skill, so the
+	# food the town grows (from work actually done) is what each test sets up.
+	city.set_meta("economy_no_proficiency_effects", true)
 	city.resources["food"] = 5000
 	city.resources["wood"] = 500
 	city.resources["tools"] = 200
@@ -230,6 +235,7 @@ func test_shortage_competes_but_does_not_decide() -> void:
 	var own: Building = FamilyInitiative.get_holding(city, soil)
 	var kept: Dictionary = OccupationReview.weigh(city, soil, own)
 	_check(not bool(kept["change"]), "a family of the soil on its own farm stays (margin %.2f): %s" % [float(kept["margin"]), reasons(kept["stay_terms"])])
+	city.remove_meta("economy_no_proficiency_effects")
 	HouseholdEconomy.ensure_seeded(city, soil)
 	soil.proficiency["toolmaker"] = HouseholdEconomy.ESTABLISHED
 	var skilled: Dictionary = FamilyInitiative.get_work_desire(city, soil, "toolmaker")
@@ -350,6 +356,44 @@ func test_hungry_family_looks_again() -> void:
 	OccupationReview.update_strain(city, family, snares)
 	OccupationReview.update_strain(city, family, snares)
 	_check(not OccupationReview.get_triggers(city, family, snares).has(OccupationReview.HUNGER), "without survival awareness, hunger starts no review")
+
+# 13. The town's food is judged by work actually done: an empty farm feeds no one.
+func test_food_judged_by_work_done() -> void:
+	var city: City = town()
+	var farmer: Household = city.households[0]
+	give(city, farmer, "farm", Vector2i(14, 4))
+	var empty: Building = Building.new(-1, "farm", Vector2i(20, 4), city.construction.get_size("farm"))
+	city.add_building(empty)
+	empty.unassign_worker(false)
+	var worked: float = FamilyInitiative.get_working_output(city, "food")
+	_check(worked > 0.0 and worked <= city.get_base_building_output_amount("farm") + 0.01, "only the worked farm counts (%.2f a day)" % worked)
+	var ratio: float = FamilyInitiative.get_food_ratio(city)
+	city.set_meta("food_ratio_counts_empty", true)
+	var old_ratio: float = FamilyInitiative.get_food_ratio(city)
+	_check(old_ratio > ratio * 1.9, "the old judgement counted the empty farm as well (%.2f against %.2f)" % [old_ratio, ratio])
+
+# 14. What a family has built is worth what its land still yields; its years and convictions count
+# in full, and it may still stay.
+func test_holding_worth_what_it_yields() -> void:
+	var city: City = town()
+	var family: Household = city.households[0]
+	set_calling(family, "forest")
+	busy_everyone_else(city, family)
+	var lodge: Building = give(city, family, "hunter", Vector2i(30, 20))
+	var worth: float = OccupationReview.get_holding_worth(city, lodge)
+	_check(worth < 0.75, "a lodge far from the woods is not the holding it would be in them (%.2f)" % worth)
+	var staying: Dictionary = OccupationReview.get_stay_desire(city, family, lodge)
+	_check(has_reason(staying["terms"], "yields little now") and has_reason(staying["terms"], "family's calling"), "it weighs a failing holding for what it yields, its calling in full: %s" % reasons(staying["terms"]))
+	var built: float = 0.0
+	for term: Dictionary in staying["terms"]:
+		if str(term["reason"]).begins_with("it has built up"):
+			built = float(term["weight"])
+	_check(absf(built - OccupationReview.BUILT_UP_PROPER * worth) < 0.01, "what it built counts for its yield (%.2f)" % built)
+	city.set_meta("stay_value_ignores_yield", true)
+	_check(OccupationReview.get_holding_worth(city, lodge) == 1.0, "the comparison can count it in full")
+	var field: Building = FamilyInitiative.get_holding(city, city.households[1])
+	city.remove_meta("stay_value_ignores_yield")
+	_check(OccupationReview.get_holding_worth(city, field) == 1.0, "a farm is judged by its land elsewhere, not here")
 
 func _check(condition: bool, message: String) -> void:
 	if condition:

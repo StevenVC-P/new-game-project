@@ -12,10 +12,9 @@ extends SceneTree
 # town's priority at the start, to compare).
 
 const MODES: Dictionary = {
-	"existing": ["occupations_first_three", "no_shortage_recognition", "no_survival_awareness"],
-	"shortage": ["occupations_first_three", "no_survival_awareness"],
-	"occupations": ["no_shortage_recognition"],
-	"both": [],
+	"existing": ["occupations_first_three", "no_shortage_recognition", "no_survival_awareness", "food_ratio_counts_empty", "stay_value_ignores_yield"],
+	"shortage_survival": ["occupations_first_three"],
+	"all": [],
 }
 
 func _init() -> void:

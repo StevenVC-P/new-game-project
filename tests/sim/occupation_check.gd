@@ -4,14 +4,14 @@ extends SceneTree
 # seeds and founders under four modes, families leading and the social model on, the stand-in player
 # building only homes and shared works (as wisdom_check):
 #
-# - existing: families choose among the first three trades, never see a shortage coming, and do not
-#   weigh hunger against their calling (today's game);
-# - shortage: families see a shortage of a good no one makes coming and look at their work again early;
-# - occupations: every trade with a hand-work stage (fishing, hunting, herding) is a family's choice,
-#   weighed with the town's hunger against its calling (survival before prosperity);
-# - both;
-# - diagnostics: occupations_blind (the new trades without survival awareness, the first
-#   comparison's "occupations") and survival_only (survival awareness with the first three trades).
+# - existing: today's game (the first three trades; no shortage seen; no survival weighing; the old
+#   food judgement counting every workplace; a holding's worth to its family in full);
+# - corrections: the two reasoning corrections alone (food judged by work actually done; a holding
+#   worth what its land still yields);
+# - shortage, survival, shortage_survival: narrow recognition and survival awareness, with the
+#   corrections and the first three trades;
+# - all: everything, the new trades included; all_uncorrected, all_food_only, all_stay_only isolate
+#   the corrections.
 #
 # Measured at three and six years: the trades families work (and which callings chose them), how
 # varied and how improved the town's work is, food and clothing going short, tools running out and
@@ -31,13 +31,21 @@ const Layouts = preload("res://tests/sim/residential_layouts.gd")
 
 const BASE: Dictionary = {"hand_method": true, "families_develop": true, "homes_on_plots": true, "social": true, "land_food": false, "never": ["herder", "fisher", "hunter", "house"]}
 const MODES: Dictionary = {
-	"existing": ["occupations_first_three", "no_shortage_recognition", "no_survival_awareness"],
+	# Today's game.
+	"existing": ["occupations_first_three", "no_shortage_recognition", "no_survival_awareness", "food_ratio_counts_empty", "stay_value_ignores_yield"],
+	# The two reasoning corrections alone (the food judgement from work actually done; a holding's
+	# worth to its family by what its land still yields).
+	"corrections": ["occupations_first_three", "no_shortage_recognition", "no_survival_awareness"],
 	"shortage": ["occupations_first_three", "no_survival_awareness"],
-	"occupations": ["no_shortage_recognition"],
-	"both": [],
-	# Diagnostics: each part of "occupations" alone.
+	"survival": ["occupations_first_three", "no_shortage_recognition"],
+	"shortage_survival": ["occupations_first_three"],
+	"all": [],
+	# Everything without the corrections, and with each alone.
+	"all_uncorrected": ["food_ratio_counts_empty", "stay_value_ignores_yield"],
+	"all_food_only": ["stay_value_ignores_yield"],
+	"all_stay_only": ["food_ratio_counts_empty"],
+	# Earlier diagnostics.
 	"occupations_blind": ["no_shortage_recognition", "no_survival_awareness"],
-	"survival_only": ["occupations_first_three", "no_shortage_recognition"],
 }
 const SNAPSHOT_YEAR: int = 3
 const DIFFICULT_POOL_REGIONS: int = 30

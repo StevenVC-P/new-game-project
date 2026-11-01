@@ -340,23 +340,7 @@ static func get_food_outlook(city: City) -> float:
 	var coming: float = float(int(city.resources["food"]))
 	for household: Household in city.households:
 		coming += household.larder
-	for building: Building in city.buildings:
-		if building.assigned_household_id < 0 or get_activity(building.type) != TownInfluence.ACTIVITY_FOOD:
-			continue
-		var family: Household = city.get_household_by_id(building.assigned_household_id)
-		var pace: float = city.get_family_labor_factor(family) * HouseholdEconomy.get_output_factor(city, family, building.type) * city.get_work_time_factor(building)
-		coming += city.get_base_building_output_amount(building.type) * city.land.get_reach_factor(building) * get_season_days(city, building.type) * pace
-	for project: ConstructionProject in city.construction.projects:
-		if get_activity(project.building_type) != TownInfluence.ACTIVITY_FOOD or project.claimant_household_id < 0:
-			continue
-		var share: float = 0.0
-		if project.kind == ConstructionProject.KIND_BUILDING:
-			share = 1.0
-		elif project.kind == ConstructionProject.KIND_UPGRADE:
-			share = 1.0 - EconomyBalance.TIER0_OUTPUT_FRACTION
-		var claimant: Household = city.get_household_by_id(project.claimant_household_id)
-		var pace: float = city.get_family_labor_factor(claimant) * HouseholdEconomy.get_output_factor(city, claimant, project.building_type)
-		coming += city.get_base_building_output_amount(project.building_type) * share * city.land.get_reach_factor_at(project.building_type, project.tile, project.size) * get_season_days(city, project.building_type) * pace
+	coming += get_working_output(city, TownInfluence.ACTIVITY_FOOD, true)
 	return clampf(1.0 - coming / eats, 0.0, 1.0)
 
 # A workplace's output over the coming SURVIVAL_HORIZON_DAYS, in days of its average output: fields
@@ -701,11 +685,50 @@ static func get_spending_risk(city: City, cost: Dictionary) -> float:
 		risk += float(cost[material]) / float(maxi(1, free))
 	return minf(1.5, risk)
 
-# The food the town's workplaces will grow (standing and planned, upgrades counted as done)
-# against what it eats.
+# The food the town's work really brings in a day (get_working_output) against what it eats: what
+# families weigh as "the town grows less food than it eats" or "plenty". Until 2026-11-01 it counted
+# every workplace standing or planned at full yield, empty ones included, and families saw plenty in
+# towns about to starve (docs/AUTONOMOUS_OCCUPATIONS.md); the comparison can restore that (meta
+# "food_ratio_counts_empty").
 static func get_food_ratio(city: City) -> float:
 	var eats: float = maxf(1.0, float(city.get_food_consumption_for_population(city.get_total_population())))
-	return get_expected_output(city, TownInfluence.ACTIVITY_FOOD) / eats
+	if city.has_meta("food_ratio_counts_empty"):
+		return get_expected_output(city, TownInfluence.ACTIVITY_FOOD) / eats
+	return get_working_output(city, TownInfluence.ACTIVITY_FOOD) / eats
+
+# What the town's work in a good really brings in a day: only work a family does or has claimed, on
+# its land, at that family's pace (its hands, its skill, the share of its day left after walking,
+# spare time and secondary work), and at hand work's pace where a proper workplace stands short of
+# tools. With `seasonal`, the total over the coming SURVIVAL_HORIZON_DAYS, fields and hunting
+# following their seasons.
+static func get_working_output(city: City, good: String, seasonal: bool = false) -> float:
+	var total: float = 0.0
+	for building: Building in city.buildings:
+		if building.assigned_household_id < 0 or get_activity(building.type) != good:
+			continue
+		var family: Household = city.get_household_by_id(building.assigned_household_id)
+		var pace: float = city.get_family_labor_factor(family) * HouseholdEconomy.get_output_factor(city, family, building.type) * city.get_work_time_factor(building)
+		if building.is_working_by_hand():
+			pace *= EconomyBalance.TIER0_OUTPUT_FRACTION
+		total += city.get_base_building_output_amount(building.type) * city.land.get_reach_factor(building) * pace * (get_season_days(city, building.type) if seasonal else 1.0)
+	for project: ConstructionProject in city.construction.projects:
+		if get_activity(project.building_type) != good:
+			continue
+		var share: float = 0.0
+		var worker: int = project.claimant_household_id
+		if project.kind == ConstructionProject.KIND_BUILDING:
+			share = 1.0
+		elif project.kind == ConstructionProject.KIND_UPGRADE:
+			share = 1.0 - EconomyBalance.TIER0_OUTPUT_FRACTION
+			for building: Building in city.buildings:
+				if building.id == project.target_building_id:
+					worker = building.assigned_household_id
+		if worker < 0 or share <= 0.0:
+			continue
+		var family: Household = city.get_household_by_id(worker)
+		var pace: float = city.get_family_labor_factor(family) * HouseholdEconomy.get_output_factor(city, family, project.building_type)
+		total += city.get_base_building_output_amount(project.building_type) * share * city.land.get_reach_factor_at(project.building_type, project.tile, project.size) * pace * (get_season_days(city, project.building_type) if seasonal else 1.0)
+	return total
 
 static func get_food_days(city: City) -> float:
 	return float(city.resources["food"]) / maxf(1.0, float(city.get_food_consumption_for_population(city.get_total_population())))

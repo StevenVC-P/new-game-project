@@ -248,12 +248,17 @@ static func get_stay_desire(city: City, household: Household, holding: Building)
 	var terms: Array = desire["terms"]
 	var name: String = FamilyInitiative.describe_type(holding.type, false)
 	var proper: bool = not holding.is_tier0()
-	FamilyInitiative.add(terms, BUILT_UP_PROPER if proper else BUILT_UP_HAND, ("it has built up its " if proper else "it knows its ") + name)
+	# What it has built is worth what it still yields: a lodge in felled woods, or a weir on thin water,
+	# is not the holding it was. Its years at the work and its convictions count in full (owner,
+	# 2026-11-01); the comparison can count the holding in full too (meta "stay_value_ignores_yield").
+	var worth: float = get_holding_worth(city, holding)
+	var failing: String = ", though its land yields little now" if worth < 0.75 else ""
+	FamilyInitiative.add(terms, (BUILT_UP_PROPER if proper else BUILT_UP_HAND) * worth, ("it has built up its " if proper else "it knows its ") + name + failing)
 	var years: int = (city.construction.day - household.work_since) / Calendar.DAYS_PER_YEAR
 	if years > 0:
 		FamilyInitiative.add(terms, minf(TENURE_MAX, TENURE_PER_YEAR * years), "it has worked it for %d year%s" % [years, "" if years == 1 else "s"])
-	if not someone_could_take_over(city, household):
-		FamilyInitiative.add(terms, LEFT_IDLE_PROPER if proper else LEFT_IDLE_HAND, "its %s would stand idle" % name)
+	if not someone_could_take_over(city, household) and worth > 0.1:
+		FamilyInitiative.add(terms, (LEFT_IDLE_PROPER if proper else LEFT_IDLE_HAND) * worth, "its %s would stand idle" % name)
 	var tradition: int = HouseholdCharacter.get_strength(household, "traditionalist")
 	if tradition > 0:
 		FamilyInitiative.add(terms, 0.75 * tradition, "it keeps to what it knows")
@@ -267,6 +272,13 @@ static func get_stay_desire(city: City, household: Household, holding: Building)
 	if travel >= TRAVEL_NOTICED:
 		FamilyInitiative.add(terms, -TRAVEL_WEIGHT * travel, "its work is a long way from home (%d%% of its day)" % roundi(travel * 100.0))
 	return {"score": FamilyInitiative.sum(terms), "terms": terms, "appeal": desire["appeal"]}
+
+# How much of what a workplace was built for it still yields, 0 to 1: the water, woods or pasture in
+# its reach (TownLand). Fields, woodcutters and workshops are judged by their land elsewhere.
+static func get_holding_worth(city: City, holding: Building) -> float:
+	if city.has_meta("stay_value_ignores_yield") or TownLand.get_reach_kind(holding.type) == "":
+		return 1.0
+	return city.land.get_reach_factor(holding)
 
 # Whether another family is free to take on a workplace it leaves (no work, none being built).
 static func someone_could_take_over(city: City, household: Household) -> bool:
