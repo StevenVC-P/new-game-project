@@ -2,11 +2,18 @@
 
 Snapshot for whoever picks the project up next. Update it when a milestone closes; durable detail lives in the linked docs, not here.
 
-*Last updated: 2026-11-01. Everything below "Merged 2026-11-01" is on `develop` and `main`. No feature branch is waiting.*
+*Last updated: 2026-11-01. Everything below "Merged 2026-11-01" is on `develop` and `main`. One feature branch is waiting for review: `feature/autonomous-occupations`.*
 
 ## Current Objective
 
-The owner is about to give the next piece of work. Until then, the open owner decisions below stand. None has been acted on.
+**Waiting for owner review: `feature/autonomous-occupations`** (from `develop`, not merged; `docs/AUTONOMOUS_OCCUPATIONS.md`). It acts on open decisions 3 and 4 below.
+- **What it adds:**
+  - fish weir, snare line and grazing pen, so families take up fishing, hunting and herding themselves, as hand work first;
+  - families choose among every trade with a hand-work stage, weighed by the good it makes and the land in reach;
+  - an essential shortage coming within the season is a reason in choosing work, and brings a review forward.
+- **Results:** recognition alone answers the tool gap at little cost. The new trades cost towns heavily, because families follow their callings into lower-yield or non-food work in a founding year with no slack.
+- **The owner's decisions are listed in that doc ("For the owner").** Each part can be switched off on its own (city metas), so either can be merged without the other.
+- **Worktrees:** `ngg-occupations` (the branch), `ngg-occ-runs` (fixed commit for comparisons) and `ngg-baseline` (`develop`, detached), all beside the main folder.
 
 **Merged 2026-11-01 (owner-approved: `develop`, then `develop` into `main`).** Each item has a design doc with its owner decisions, how it was built, validation results and open decisions:
 - **Step 3 interface** (community priority and residential land in the game; `docs/TOWN_UI.md`, `docs/HOME_SITES.md`, `docs/COMMUNITY_PRIORITIES.md`).
@@ -139,6 +146,7 @@ In rough priority order; details in each doc's "Remaining Work" section.
 
 ## Risks And Gotchas
 
+- **Flaky test:** `tests/town_sidebar_validation.gd` founds its town at random (founders differ each run) and plays it a year. It then checks there is no hunger card, and fails when that town happens to be short of food that day. On `develop` it failed 2 of 4 runs (2026-11-01), on `feature/autonomous-occupations` 4 of 7. Not a UI fault; it needs a fixed town to be a reliable check.
 - **Flaky test:** `tests/world_map_flow_validation.gd`, "wheel zoom on the regional map should keep the point under the cursor", failed 2 of 8 runs on the milestone 6 branch (drift 0.51 and 0.55 against a 0.5 limit) and 0 of 5 on `develop`. The zoom animates over the 30 frames the test waits, so a busy machine leaves it unfinished; nothing in milestones 1-6 touches the regional map. Not loosened here: worth a look (wait for the animation to end, not a frame count).
 
 - **Anything kept across days that steers play must be saved,** even if it looks like a cache: errand routes were kept a month and not saved, so loaded towns drifted (fixed 2026-10-31). `tests/save_game_validation.gd` only catches such state once the test town exercises it.
