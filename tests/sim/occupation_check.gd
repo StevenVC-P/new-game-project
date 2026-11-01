@@ -4,10 +4,14 @@ extends SceneTree
 # seeds and founders under four modes, families leading and the social model on, the stand-in player
 # building only homes and shared works (as wisdom_check):
 #
-# - existing: families choose among the first three trades and never see a shortage coming;
-# - occupations: every trade with a hand-work stage (fishing, hunting, herding) is a family's choice;
-# - shortage: families see an essential shortage coming and look at their work again early;
-# - both.
+# - existing: families choose among the first three trades, never see a shortage coming, and do not
+#   weigh hunger against their calling (today's game);
+# - shortage: families see a shortage of a good no one makes coming and look at their work again early;
+# - occupations: every trade with a hand-work stage (fishing, hunting, herding) is a family's choice,
+#   weighed with the town's hunger against its calling (survival before prosperity);
+# - both;
+# - diagnostics: occupations_blind (the new trades without survival awareness, the first
+#   comparison's "occupations") and survival_only (survival awareness with the first three trades).
 #
 # Measured at three and six years: the trades families work (and which callings chose them), how
 # varied and how improved the town's work is, food and clothing going short, tools running out and
@@ -27,13 +31,13 @@ const Layouts = preload("res://tests/sim/residential_layouts.gd")
 
 const BASE: Dictionary = {"hand_method": true, "families_develop": true, "homes_on_plots": true, "social": true, "land_food": false, "never": ["herder", "fisher", "hunter", "house"]}
 const MODES: Dictionary = {
-	"existing": ["occupations_first_three", "no_shortage_recognition"],
+	"existing": ["occupations_first_three", "no_shortage_recognition", "no_survival_awareness"],
+	"shortage": ["occupations_first_three", "no_survival_awareness"],
 	"occupations": ["no_shortage_recognition"],
-	"shortage": ["occupations_first_three"],
 	"both": [],
-	# Shortage recognition counting only goods no one makes (the brief's tool gap), not deficits.
-	"both_narrow": ["shortage_missing_trade_only"],
-	"shortage_narrow": ["occupations_first_three", "shortage_missing_trade_only"],
+	# Diagnostics: each part of "occupations" alone.
+	"occupations_blind": ["no_shortage_recognition", "no_survival_awareness"],
+	"survival_only": ["occupations_first_three", "no_shortage_recognition"],
 }
 const SNAPSHOT_YEAR: int = 3
 const DIFFICULT_POOL_REGIONS: int = 30
@@ -103,6 +107,7 @@ func play(site: Dictionary, mode: String, stress: bool, years: int) -> Dictionar
 		"first_day": {}, "tools_short_months": 0, "tools_out_days": 0, "tool_work_days": 0,
 		"first_tools_short_day": -1, "tool_work_after_short_day": -1, "recovered_day": -1,
 		"food_short_days": 0, "clothing_unmet_months": 0, "clothing_met_months": 0, "danger_months": 0,
+		"coverage_sum": 0.0, "coverage_months": 0, "hardship_sum": 0.0,
 	}
 	scenario["each_day"] = func(town: City, day: int, _player) -> void:
 		if day == 0 and priority != "":
@@ -131,6 +136,10 @@ func play(site: Dictionary, mode: String, stress: bool, years: int) -> Dictionar
 				track["tools_short_months"] = int(track["tools_short_months"]) + 1
 			if OccupationReview.get_danger(town, "") >= OccupationReview.SHORTAGE_TRIGGER:
 				track["danger_months"] = int(track["danger_months"]) + 1
+			# Food production coverage: what the town's food work yields on its land against what it eats.
+			track["coverage_sum"] = float(track["coverage_sum"]) + FamilyInitiative.get_food_ratio(town)
+			track["coverage_months"] = int(track["coverage_months"]) + 1
+			track["hardship_sum"] = float(track["hardship_sum"]) + FamilyInitiative.get_food_outlook(town)
 			var status: String = str(town.get_clothing_need_pressure().get("status", ""))
 			track["clothing_unmet_months"] = int(track["clothing_unmet_months"]) + (1 if status == "unmet" or status == "low" else 0)
 			track["clothing_met_months"] = int(track["clothing_met_months"]) + (1 if status == "met" else 0)
@@ -156,12 +165,17 @@ func measure(city: City, track: Dictionary) -> Dictionary:
 	var proper: Dictionary = {}
 	var by_calling: Dictionary = {}
 	var by_risk: Dictionary = {"cautious": [0, 0], "even": [0, 0], "daring": [0, 0]}
+	# Families working their calling, work their calling is indifferent to, or against it.
+	var calling_match: Dictionary = {"good": 0, "neutral": 0, "poor": 0}
 	for household: Household in city.households:
 		var holding: Building = FamilyInitiative.get_holding(city, household)
 		if holding == null:
 			continue
 		var trade: String = BuildingTiers.get_base_type(holding.type)
 		worked[trade] = int(worked.get(trade, 0)) + 1
+		var quality: String = household.get_match_quality(trade)
+		var match_key: String = "good" if quality == CultureEffects.MATCH_GOOD else "poor" if quality == CultureEffects.MATCH_POOR else "neutral"
+		calling_match[match_key] = int(calling_match[match_key]) + 1
 		if not holding.is_tier0():
 			proper[trade] = int(proper.get(trade, 0)) + 1
 		var callings: Array = CultureEffects.get_callings(household.values)
@@ -172,6 +186,8 @@ func measure(city: City, track: Dictionary) -> Dictionary:
 		row[0] = int(row[0]) + 1
 		row[1] = int(row[1]) + (0 if holding.is_tier0() else 1)
 	m["worked"] = worked
+	m["calling_match"] = calling_match
+	m["site"] = describe_site(city)
 	m["proper"] = proper
 	m["trades"] = worked.size()
 	m["by_calling"] = by_calling
@@ -249,6 +265,20 @@ func summarize(condition: String, mode: String, year: int, rows: Array) -> void:
 	keys.sort()
 	_report("%-9s %-11s y%d | calling>trade: %s | improved by temperament: cautious %d/%d, even %d/%d, daring %d/%d" % [
 		condition, mode, year, ", ".join(keys.map(func(k: String) -> String: return "%s %d" % [k, callings[k]])), risk["cautious"][1], risk["cautious"][0], risk["even"][1], risk["even"][0], risk["daring"][1], risk["daring"][0]])
+
+# The town's land, for comparing economies with geography: water, wooded, fertile and open tiles.
+func describe_site(city: City) -> Dictionary:
+	var site: Dictionary = {"water": 0, "woods": 0, "fertile": 0, "open": 0}
+	for row: Array in city.local_map:
+		for tile: Dictionary in row:
+			if tile["type"] == "water":
+				site["water"] += 1
+			elif tile["has_trees"] == true:
+				site["woods"] += 1
+			elif tile["type"] == "ground":
+				site["open"] += 1
+				site["fertile"] += 1 if tile["is_fertile"] == true else 0
+	return site
 
 # Difficult sites as wisdom_check chose and cached them (run it with --prepare-difficult first).
 func get_difficult_sites() -> Array:

@@ -49,6 +49,15 @@ const LAND_REASONS: Dictionary = {"water": "little water in reach to fish", "woo
 const COMFORT_NONE_WEIGHT: float = 0.5
 const COMFORT_UNMET_WEIGHT: float = 1.0
 const COMFORT_OTHERS_WEIGHT: float = 1.5
+# Survival before prosperity (owner, 2026-11-01; get_hardship): how far ahead a family looks at the
+# town's food, how much the danger of hunger weighs for food work at its worst (scaled by what that
+# work would really bring in here), and how much of its calling's pull a family sets aside at the
+# worst of it. Cautious families weigh hunger more, daring and ambitious ones less; a family
+# already going hungry weighs its own hunger fully whatever its temperament.
+const SURVIVAL_HORIZON_DAYS: int = 120
+const SURVIVAL_WEIGHT: float = 4.0
+const CALLING_YIELD: float = 0.5
+const HUNGRY_DAYS_DESPERATE: float = 10.0
 
 # A family improves its work when its desire reaches this.
 const IMPROVE_THRESHOLD: float = 2.0
@@ -208,11 +217,16 @@ static func get_work_desire(city: City, household: Household, occupation: String
 	var terms: Array = []
 	var result: Dictionary = {"available": true}
 	var activity: String = get_activity(occupation)
+	# Hardship: a calling is what a family pursues when it can; as hunger nears, it matters less.
+	var hardship: Dictionary = get_hardship(city, household)
+	var level: float = float(hardship["level"])
+	var prosperity: float = 1.0 - CALLING_YIELD * level
+	var hard_times: String = ", though survival comes first now" if level >= 0.3 else ""
 	var match_quality: String = household.get_match_quality(occupation)
 	if match_quality == CultureEffects.MATCH_GOOD:
-		add(terms, 3.0, "it is the family's calling")
+		add(terms, 3.0 * prosperity, "it is the family's calling" + hard_times)
 	elif match_quality == CultureEffects.MATCH_POOR:
-		add(terms, -2.0, "it is not the family's calling")
+		add(terms, -2.0 * prosperity, "it is not the family's calling")
 	var cautious: bool = HouseholdCharacter.get_axis(household, HouseholdCharacter.RISK) < 0
 	match activity:
 		TownInfluence.ACTIVITY_FOOD:
@@ -246,12 +260,14 @@ static func get_work_desire(city: City, household: Household, occupation: String
 			var producers: int = count_producers(city, activity) - (1 if own != null and get_activity(own.type) == activity else 0)
 			var name: String = GoodsNeedBucketHelper.get_good_display_name(activity).to_lower()
 			var unmet: String = get_unmet_need(city, activity)
-			if producers == 0:
-				add(terms, COMFORT_NONE_WEIGHT, "no one makes " + name)
+			# What the town only goes without counts for less as hunger nears.
+			var comfort: float = 1.0 - level
+			if producers == 0 and comfort > 0.0:
+				add(terms, COMFORT_NONE_WEIGHT * comfort, "no one makes " + name)
 			elif unmet == "":
 				add(terms, -COMFORT_OTHERS_WEIGHT * producers, "others already make " + name)
-			if unmet != "":
-				add(terms, COMFORT_UNMET_WEIGHT, "the town goes without " + unmet)
+			if unmet != "" and comfort > 0.0:
+				add(terms, COMFORT_UNMET_WEIGHT * comfort, "the town goes without " + unmet)
 	# An essential good running out within the season: the danger competes with everything else.
 	var shortage: float = get_shortage(city, activity)
 	if shortage > 0.0:
@@ -259,8 +275,8 @@ static func get_work_desire(city: City, household: Household, occupation: String
 		add(terms, SHORTAGE_WEIGHT * shortage, "the town will run out of %s within the season%s" % [TownInfluence.get_activity_name(activity), ", and no one here makes any" if no_one else ""])
 	# Work that lives off the land is only as good as the land in reach of where it would stand.
 	var reach_kind: String = TownLand.get_reach_kind(occupation)
+	var reach: float = 1.0
 	if reach_kind != "" and not city.local_map.is_empty():
-		var reach: float = 0.0
 		if own != null and BuildingTiers.get_base_type(own.type) == occupation:
 			reach = city.land.get_reach_factor(own)
 		else:
@@ -273,6 +289,12 @@ static func get_work_desire(city: City, household: Household, occupation: String
 		var land: float = LAND_WEIGHT * (city.get_base_building_output_amount(occupation) * reach / get_best_output(city, activity) - 1.0)
 		if land <= -0.2:
 			add(terms, land, LAND_REASONS[reach_kind] if reach < 0.75 else "it yields less than other ways of getting " + GoodsNeedBucketHelper.get_good_display_name(activity).to_lower())
+	# The danger of hunger draws a family to food work, as far as that work would really feed people
+	# here: on this land, with its skill, through the coming seasons.
+	if activity == TownInfluence.ACTIVITY_FOOD and level > 0.0:
+		var relief: float = get_food_relief(city, household, occupation, reach)
+		if relief > 0.05:
+			add(terms, SURVIVAL_WEIGHT * level * relief, str(hardship["reason"]))
 	# What it knows draws it to that work; work it would have to learn, it starts at a novice's pace
 	# (HouseholdEconomy).
 	if HouseholdEconomy.is_on(city) and not city.has_meta("economy_no_proficiency_effects"):
@@ -286,6 +308,74 @@ static func get_work_desire(city: City, household: Household, occupation: String
 	result["terms"] = terms
 	result["appeal"] = appeal
 	return result
+
+# How near hunger is, for a family choosing its work: {"level" 0-1, "reason"}. The town's outlook
+# (get_food_outlook) weighed by the family's temperament; a family already going hungry itself
+# weighs its own hunger fully. 0 when the comparison turns survival awareness off (meta
+# "no_survival_awareness").
+static func get_hardship(city: City, household: Household) -> Dictionary:
+	if city.has_meta("no_survival_awareness"):
+		return {"level": 0.0, "reason": ""}
+	var risk: int = HouseholdCharacter.get_axis(household, HouseholdCharacter.RISK)
+	var ambition: int = HouseholdCharacter.get_axis(household, HouseholdCharacter.AMBITION)
+	var temperament: float = 1.0 + 0.25 * maxi(0, -risk) - 0.1 * maxi(0, risk) - 0.1 * maxi(0, ambition)
+	var town: float = clampf(get_food_outlook(city) * temperament, 0.0, 1.0)
+	var own: float = clampf(float(household.short_days_this_month) / HUNGRY_DAYS_DESPERATE, 0.0, 1.0)
+	if own > town:
+		return {"level": own, "reason": "the family itself is going hungry"}
+	var winter: bool = city.get_season_index() >= 2
+	return {"level": town, "reason": "the town will go hungry before %s" % ("the winter is out" if winter else "the next harvest is in")}
+
+# How far the town's food falls short of what its people will eat over the coming
+# SURVIVAL_HORIZON_DAYS, 0 (enough) to 1 (nothing in store or coming): its food in store, and what its
+# food work, standing and planned, will bring in on its land through the seasons ahead (a winter
+# coming yields less).
+static func get_food_outlook(city: City) -> float:
+	var eats: float = float(city.get_food_consumption_for_population(city.get_total_population())) * SURVIVAL_HORIZON_DAYS
+	if eats <= 0.0:
+		return 0.0
+	var coming: float = float(int(city.resources["food"]))
+	for building: Building in city.buildings:
+		if get_activity(building.type) == TownInfluence.ACTIVITY_FOOD:
+			coming += city.get_base_building_output_amount(building.type) * city.land.get_reach_factor(building) * get_season_days(city, building.type)
+	for project: ConstructionProject in city.construction.projects:
+		if get_activity(project.building_type) != TownInfluence.ACTIVITY_FOOD:
+			continue
+		var share: float = 0.0
+		if project.kind == ConstructionProject.KIND_BUILDING:
+			share = 1.0
+		elif project.kind == ConstructionProject.KIND_UPGRADE:
+			share = 1.0 - EconomyBalance.TIER0_OUTPUT_FRACTION
+		coming += city.get_base_building_output_amount(project.building_type) * share * city.land.get_reach_factor_at(project.building_type, project.tile, project.size) * get_season_days(city, project.building_type)
+	return clampf(1.0 - coming / eats, 0.0, 1.0)
+
+# A workplace's output over the coming SURVIVAL_HORIZON_DAYS, in days of its average output: fields
+# follow the farming year and hunting its own seasons (EconomyBalance).
+static func get_season_days(city: City, building_type: String) -> float:
+	var base: String = BuildingTiers.get_base_type(building_type)
+	var yields: Array[float] = []
+	if base == Building.BUILDING_FARM:
+		yields = EconomyBalance.FARM_SEASON_YIELD
+	elif base == Building.BUILDING_HUNTER:
+		yields = EconomyBalance.HUNT_SEASON_YIELD
+	if yields.is_empty():
+		return float(SURVIVAL_HORIZON_DAYS)
+	var total: float = 0.0
+	var start: int = city.get_day_of_year() - 1
+	for i in range(SURVIVAL_HORIZON_DAYS):
+		total += yields[(posmod(start + i, Calendar.DAYS_PER_YEAR) / (Calendar.DAYS_PER_YEAR / 4)) % 4]
+	return total
+
+# What taking up food work would bring in, as a share of the best any food work brings in starting by
+# hand: its hand work's output on this land, at the family's skill, through the coming seasons.
+static func get_food_relief(city: City, household: Household, occupation: String, reach: float) -> float:
+	var best: float = 0.001
+	for hand_work: String in BuildingTiers.TIER0_TO_TIER1.keys():
+		if get_activity(hand_work) == TownInfluence.ACTIVITY_FOOD:
+			best = maxf(best, city.get_base_building_output_amount(hand_work) * get_season_days(city, hand_work))
+	var own_hand: String = BuildingTiers.get_hand_work_type(occupation)
+	var own: float = city.get_base_building_output_amount(own_hand) * reach * get_season_days(city, own_hand) * HouseholdEconomy.get_output_factor(city, household, occupation)
+	return clampf(own / best, 0.0, 1.0)
 
 # The most a proper workplace of any trade makes of a good on the best land.
 static func get_best_output(city: City, good: String) -> float:
@@ -304,23 +394,23 @@ static func get_unmet_need(city: City, good: String) -> String:
 			return GoodsNeedBucketHelper.get_bucket_display_name(bucket).to_lower()
 	return ""
 
-# How near the town is to running out of a good it cannot do without: 0 when what it holds and
-# makes will last the coming season (SHORTAGE_HORIZON_DAYS), up to 1 when they cover none of what
-# that season will use. What a town uses up is what it eats, the upkeep its proper workplaces will
-# draw once their grace is over, and what its workplaces use to make their goods; what it makes is
-# what its workplaces, standing and planned, yield on their land (get_expected_output). A good no one
-# makes at all (the tool gap: docs/WORKPLACE_CHOICE_INVESTIGATION.md) is the plainest case; a town
-# growing far less food than it eats with little in store is the same danger. Mending families do
-# for themselves (HouseholdEconomy) is not counted: a family judges by the store it can see. A good
-# the town only goes without (wool for clothing) is never an essential shortage. The comparison can
-# turn this off (meta "no_shortage_recognition"), or count only goods no one makes (meta
-# "shortage_missing_trade_only").
+# How near the town is to running out of a good it cannot do without and no one here makes: 0 when
+# what it holds will last the coming season (SHORTAGE_HORIZON_DAYS), up to 1 when it covers none of
+# what that season will use (the tool gap: docs/WORKPLACE_CHOICE_INVESTIGATION.md). What a town uses
+# up is what it eats, the upkeep its proper workplaces will draw once their grace is over, and what
+# its workplaces use to make their goods. Mending families do for themselves (HouseholdEconomy) is
+# not counted: a family judges by the store it can see. A good the town only goes without (wool for
+# clothing) is never an essential shortage.
+# Narrow by the owner's decision (2026-11-01): a deficit in a good the town does make (food grown,
+# but too little) is not this danger; families weigh it in choosing their work (get_hardship). The
+# comparison can count deficits too (meta "shortage_counts_deficits", what the first comparison
+# measured as "broad") or turn recognition off (meta "no_shortage_recognition").
 static func get_shortage(city: City, good: String) -> float:
 	if city.has_meta("no_shortage_recognition"):
 		return 0.0
 	var making: float = 0.0
 	if count_producers(city, good) > 0:
-		if city.has_meta("shortage_missing_trade_only"):
+		if not city.has_meta("shortage_counts_deficits"):
 			return 0.0
 		making = get_expected_output(city, good) * SHORTAGE_HORIZON_DAYS
 	var use: float = get_use(city, good, SHORTAGE_HORIZON_DAYS)

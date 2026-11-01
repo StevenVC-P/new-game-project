@@ -21,6 +21,9 @@ func run_all() -> void:
 	test_shortage_seen_coming()
 	test_shortage_competes_but_does_not_decide()
 	test_shortage_starts_an_early_review()
+	test_survival_before_prosperity()
+	test_temperament_and_desperation()
+	test_narrow_shortage_by_default()
 	if failure_count > 0:
 		push_error("Autonomous occupations validation failed: " + str(failure_count) + " failure(s)")
 		quit(1)
@@ -258,6 +261,66 @@ func test_shortage_starts_an_early_review() -> void:
 		household.work_since = calm.construction.day - 40
 	OccupationReview.advance_month(calm)
 	_check(calm.influence.work_reviews == 0, "the gathering asking for tools starts no review while tools are plentiful")
+
+# A town about to go hungry: little in store, and every other family cutting wood.
+func hungry_town(food: int) -> City:
+	var city: City = town()
+	city.resources["food"] = food
+	var x: int = 14
+	for other: Household in city.households.slice(1):
+		give(city, other, "woodcutter", Vector2i(x, 20))
+		x += 4
+	return city
+
+# 9. A calling pursues prosperity; hunger makes survival come first. A family of the loom in a town
+# about to go hungry would rather grow food than keep sheep; in a fed town it keeps sheep. No rule
+# forbids either.
+func test_survival_before_prosperity() -> void:
+	var city: City = hungry_town(0)
+	var loom: Household = city.households[0]
+	set_calling(loom, "loom")
+	var hardship: Dictionary = FamilyInitiative.get_hardship(city, loom)
+	_check(float(hardship["level"]) > 0.8, "with nothing in store and no one growing food, hunger is near (%.2f)" % float(hardship["level"]))
+	var farm: Dictionary = FamilyInitiative.get_work_desire(city, loom, "farm")
+	var herd: Dictionary = FamilyInitiative.get_work_desire(city, loom, "herder")
+	_check(has_reason(farm["terms"], "go hungry") and has_reason(herd["terms"], "survival comes first"), "it weighs the coming hunger, and sets its calling aside for now: farm %s / herd %s" % [reasons(farm["terms"]), reasons(herd["terms"])])
+	_check(float(farm["score"]) > float(herd["score"]), "it would rather grow food (farm %.2f, herd %.2f)" % [float(farm["score"]), float(herd["score"])])
+	_check(bool(herd["available"]) and float(herd["score"]) > -INF, "herding stays a choice it can make")
+	var fed: City = town()
+	var fed_loom: Household = fed.households[0]
+	set_calling(fed_loom, "loom")
+	busy_everyone_else(fed, fed_loom)
+	_check(float(FamilyInitiative.get_hardship(fed, fed_loom)["level"]) == 0.0, "a town with years of food in store faces no hunger")
+	_check(float(FamilyInitiative.get_work_desire(fed, fed_loom, "herder")["score"]) > float(FamilyInitiative.get_work_desire(fed, fed_loom, "farm")["score"]), "in a fed town it follows its calling")
+	city.set_meta("no_survival_awareness", true)
+	_check(float(FamilyInitiative.get_hardship(city, loom)["level"]) == 0.0, "the comparison can turn survival awareness off")
+
+# 10. A cautious family weighs coming hunger more than a daring one; a family already going hungry
+# weighs it fully; and food work that would bring in little here relieves less.
+func test_temperament_and_desperation() -> void:
+	var city: City = hungry_town(600)
+	var family: Household = city.households[0]
+	family.personality[HouseholdCharacter.RISK] = -2
+	var cautious: float = float(FamilyInitiative.get_hardship(city, family)["level"])
+	family.personality[HouseholdCharacter.RISK] = 2
+	family.personality[HouseholdCharacter.AMBITION] = 2
+	var daring: float = float(FamilyInitiative.get_hardship(city, family)["level"])
+	_check(cautious > daring and daring > 0.0, "the cautious weigh coming hunger more (%.2f) than the daring and ambitious (%.2f)" % [cautious, daring])
+	family.short_days_this_month = 10
+	var desperate: Dictionary = FamilyInitiative.get_hardship(city, family)
+	_check(float(desperate["level"]) == 1.0 and str(desperate["reason"]).contains("itself is going hungry"), "a family going hungry itself weighs it fully, whatever its temperament")
+	var garden: float = FamilyInitiative.get_food_relief(city, family, "farm", 1.0)
+	var poor_snares: float = FamilyInitiative.get_food_relief(city, family, "hunter", 0.3)
+	_check(garden > poor_snares, "snares in thin woods would feed fewer than a garden (%.2f against %.2f)" % [poor_snares, garden])
+
+# 11. Shortage recognition is narrow by default: a good no one makes, not a deficit in one the town
+# does make (owner, 2026-11-01).
+func test_narrow_shortage_by_default() -> void:
+	var city: City = hungry_town(0)
+	give(city, city.households[0], "forager_garden", Vector2i(28, 4))
+	_check(FamilyInitiative.get_shortage(city, "food") == 0.0, "a town growing some food, if too little, is not in an essential shortage")
+	city.set_meta("shortage_counts_deficits", true)
+	_check(FamilyInitiative.get_shortage(city, "food") > 0.0, "the broad version, kept for comparison, counts the deficit")
 
 func _check(condition: bool, message: String) -> void:
 	if condition:
