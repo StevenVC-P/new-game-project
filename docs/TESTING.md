@@ -72,12 +72,14 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/household_economy_validation.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/wisdom_check.gd -- --conditions=difficult --strategies=none --no-self-sufficiency > hse_off.log
 
-# Autonomous occupations and essential shortages (docs/AUTONOMOUS_OCCUPATIONS.md): the rules; then the wisdom check's
-# towns under four modes, one per process: existing (the first three trades, no shortage seen), occupations (fishing,
-# hunting, herding as families' own choice), shortage (a shortage seen coming starts an early review), both
-# (filter for [OCC]; "-- --years=N --sites=N --priority=investment"); and a copy of a saved game's town replayed under a
+# Autonomous occupations and survival-aware work decisions (docs/AUTONOMOUS_OCCUPATIONS.md): the rules; then the wisdom
+# check's towns under four modes, one per process: existing (today's game), shortage (narrow recognition), occupations
+# (fishing, hunting, herding, with survival awareness), both; diagnostics survival_only and occupations_blind
+# (filter for [OCC]; "-- --years=N --sites=N --from=K --priority=investment"); and a copy of a saved game's town replayed under a
 # mode, every work decision traced with the priority's part ("--no-priority" clears it; filter for [REPLAY])
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/autonomous_occupations_validation.gd
+# Gameplay regression: the town the sidebar test founds (fixed seed), played a year, must keep its families, be fed and house one
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/founded_town_regression.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/occupation_check.gd -- --conditions=ordinary --modes=both > occ.log
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/autosave_replay.gd -- --save=C:/path/to/copy.save --mode=both --days=360 > replay.log
 

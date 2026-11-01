@@ -1,22 +1,39 @@
-# Autonomous Occupations and Economic Adaptation
+# Autonomous Occupations and Survival-Aware Work Decisions
 
 **Status: implemented (2026-11-01), awaiting owner review.** Branch `feature/autonomous-occupations`, from `develop`. Not merged.
 
 Code:
 - `scripts/domain/building_tiers.gd`: the three new hand-work stages.
-- `scripts/domain/family_initiative.gd`: occupations, the land in reach, essential shortages.
-- `scripts/domain/occupation_review.gd`: the early review in danger.
+- `scripts/domain/family_initiative.gd`: occupations, land in reach, shortages, hardship.
+- `scripts/domain/occupation_review.gd`: early reviews for a shortage or a family's own hunger.
 - `scripts/domain/economy_balance.gd`: build cost and work for the new stages only.
 
-Tests: `tests/autonomous_occupations_validation.gd`. Comparison: `tests/sim/occupation_check.gd`. Owner's town: `tests/sim/autosave_replay.gd`. Commands in `docs/TESTING.md`.
+Tests:
+- `tests/autonomous_occupations_validation.gd`: the rules.
+- `tests/founded_town_regression.gd`: gameplay, one founded town for a year.
+- `tests/town_sidebar_validation.gd`: now deterministic, interface only.
 
-Brief (owner, 2026-11-01): carry out the corrections in `docs/WORKPLACE_CHOICE_INVESTIGATION.md`. Every viable occupation should be open to autonomous families and none guaranteed. Families should recognise economic danger and respond to it with their own preferences, skills and convictions. They should not automatically solve the town's problems.
+Comparison: `tests/sim/occupation_check.gd`. Owner's town: `tests/sim/autosave_replay.gd`. Commands in `docs/TESTING.md`.
 
-## What Was Found Before Building
+## Owner Briefs and Decisions
 
-- **The hand-work stages did not exist.** Nothing in the code or docs had a grazing pen, fish weir or snare line. A fisher's hut, hunter's lodge and herder's fold existed only as proper buildings the player places.
-- **Hand work inherits nearly everything from its proper workplace** through `BuildingTiers.get_base_type`: footprint, placement rules (water beside a weir, woods near a snare line), a third of the output, land yield, wolves, callings and proficiency.
-- **What was hardcoded:** families chose only among `FamilyInitiative.ACTIVITIES` (food, wood, tools), each tied to one workplace (`HAND_WORK`, `PROPER_WORK`). One word meant both the good and the trade.
+**First brief (2026-11-01):** carry out the corrections in `docs/WORKPLACE_CHOICE_INVESTIGATION.md`. Every viable occupation open to autonomous families, none guaranteed. Families recognise economic danger without automatically solving the town's problems.
+
+**Second brief (2026-11-01), after the first comparison** (history at the end):
+1. **Shortage recognition:** the narrow version is approved and is the default. Emergency reconsideration and a family's first choice of work are separate decisions.
+2. **First choices:** families should weigh whether the settlement can sustain itself before committing to work, from these, with no hard rule and mistakes allowed:
+   - food in store and coming against what the town eats;
+   - the seasons and the coming winter;
+   - who already grows food;
+   - essential trades, tools included;
+   - realistic opportunities on the land;
+   - the family's calling, skill, temperament and values.
+
+   **The design principle:** calling drives the pursuit of prosperity; growing hardship makes survival matter more. Enterprising families may seize an opportunity, cautious ones put security first, and a desperate family tries some feasible response before it starves.
+3. **The new occupations stay** (grazing pen, fish weir, snare line). Herding makes clothing only. No livestock. Production and upkeep numbers unchanged.
+4. **Matched comparison:** four modes (existing, narrow shortage, occupations, both), ordinary, stressed and difficult sites, six years. Don't tune to restore survival numbers; find whether failures are understandable choices or defective reasoning.
+5. **Replay the day-82 autosave.**
+6. **The sidebar test:** make it deterministic without hiding simulation failures, and keep gameplay regression apart from interface validation.
 
 ## What Changed
 
@@ -25,202 +42,228 @@ Brief (owner, 2026-11-01): carry out the corrections in `docs/WORKPLACE_CHOICE_I
 - **Three hand-work stages** (`BuildingTiers.TIER0_TO_TIER1`):
   - fish weir → fisher's hut;
   - snare line → hunter's lodge;
-  - grazing pen → herder's fold.
+  - grazing pen → herder's fold (wool, for clothing).
 
-  Like all hand work they need no materials (2–3 family-days of work), make a third of the proper output, and need no tool upkeep. They draw as their proper building, washed toward earth (no new art yet). The player can plan them from the hand-work list too.
-- **Occupations come from the data.** `FamilyInitiative.get_occupations` is every proper workplace with a hand-work stage that makes a good: farm, woodcutter, toolmaker, fisher, hunter, herder. A future trade becomes a family's choice by adding its stage to `BuildingTiers`, with no decision path of its own.
-- **Trades are weighed by the good they make,** with the same terms as before:
+  Like all hand work they need no materials (2–3 family-days), make a third of the proper output, need no upkeep, and take their placement, land yield, wolves and callings from the proper workplace. No art of their own yet: they draw as their proper building, washed toward earth. The player can plan them from the hand-work list.
+- **Occupations come from the data** (`FamilyInitiative.get_occupations`): every proper workplace with a hand-work stage that makes a good. A future trade becomes a family's choice by adding its stage, with no decision code of its own. Trades are weighed by the good they make:
   - calling;
   - the town's need for the good;
-  - what the family knows;
-  - the priority's ask (a food priority asks for fishing and hunting as much as farming);
+  - skill;
+  - the priority's ask;
   - Prepare for Hard Times.
-
-  Goods other than food, wood and tools (today only wool) use one shared rule (below).
+- **What the town only goes without** (wool for clothing) pulls less than what it lives on: +0.5 when no one makes it, +1 when the need goes unmet.
 - **Land:**
-  - **No site, no choice.** Work that lives off the land is weighed only where a site exists, so a town without water never sees fishing.
-  - **The site** is chosen near home, drawn toward richer water, woods or pasture.
-  - **Poor yield deters.** The family weighs what the work would yield there against the best any trade yields of that good: "little game in reach", "it yields less than other ways of getting food".
-  - **Good land never makes such work better than the best.**
-- **Families still start with hand work and improve it later** through the same pipeline and stores rule as before. Nothing is built finished, and no family is directed to a trade.
-- **Callings:** a family whose calling is herding, fishing or hunting now has calling work it can take up itself. Its first choice and its reconsideration both include those trades (`OccupationReview.is_against_calling`).
+  - Work that lives off the land is a choice only where a site exists.
+  - The site is drawn toward richer water, woods or pasture.
+  - Poor yield deters: "little game in reach", "it yields less than other ways of getting food". Good land never makes it better than the best food work.
+- **Hand work first:** families start by hand and improve through the same pipeline and stores rule.
 
-### 2. Recognising an essential shortage
+### 2. Survival before prosperity (`FamilyInitiative.get_hardship`)
 
-- **What counts** (`FamilyInitiative.get_shortage`): a good the town uses up that no one here makes, where what is in store won't cover the coming season (90 days). It runs from 0 to 1. "Uses up" means:
-  - food eaten;
-  - tool upkeep its proper workplaces will draw once their grace is over;
-  - what its workplaces consume (wood for tools).
+- **The town's food outlook** (`get_food_outlook`): over the coming 120 days, the food in store and in families' larders, plus what the town's food work will bring in:
+  - **only work a family does or has claimed**, at that family's real pace (its hands, skill, and the share of its day left after walking, spare time and secondary work);
+  - on its land;
+  - through the seasons ahead (a winter coming yields less);
 
-  A good the town only goes without (wool for clothing) is never an essential shortage.
-- **Seeing it:** the danger is a term in choosing work, 4 × the shortage: "the town will run out of tools within the season, and no one here makes any". It competes with calling (+3 or −2), knowing the work (up to +2), and what a family has built up (+3 for a proper workplace). It does not override them.
-- **Looking again early** (`OccupationReview`):
-  - **The trigger:** a quarter of the season's need missing starts a review.
-  - **Waiting:** after 30 days at the work instead of 180, and 90 days after the last review instead of 360.
-  - **What the family weighs:** the same as any review. It changes only when the other work wins by 2 or more.
-  - **Limits:** at most one family a month in the town changes.
-  - **When the danger passes:** once anyone takes up the work, no one else looks again for it. A family brought forward by the danger does not look again early for its other reasons.
-- **What cannot start a review:** a Community Priority or a Guiding Wisdom still never starts one. The danger is read only from the stores and workplaces. The priority's ask is still one of the reasons once a family is reconsidering.
+  all against what the town will eat. The shortfall is 0 (enough) to 1 (nothing).
+- **Temperament** weighs the town's outlook:
+  - cautious: up to +50% (very cautious);
+  - daring: −10% a step;
+  - ambitious: −10% a step.
+- **A family going hungry itself** (`short_days_this_month`, 10 days = fully desperate) weighs its own hunger in full, whatever its temperament.
+- **What hardship does** to a family's choice of work:
+  - **Calling yields:** up to half of the calling's pull (for or against) is set aside ("it is the family's calling, though survival comes first now").
+  - **Clothing waits:** the pull of a need the town only goes without fades to nothing.
+  - **Food work gains a survival reason:** 4 × the hardship × what that work would really bring in, against the best any food work brings in by hand ("the town will go hungry before the next harvest is in"). It counts the land in reach, the family's skill and the coming seasons, so snares in thin woods relieve less than a garden.
+- **No rule:**
+  - Herding, toolmaking and every other trade stay open.
+  - A family of the loom in a starving town would rather grow food, but may still herd if the rest of its reasons are strong.
+  - In a fed town hardship is 0, and calling and opportunity decide as before.
 
-### 3. Unchanged
+### 3. Narrow shortage recognition (owner-approved default)
 
-Tool output, upkeep numbers, every proper workplace's cost and output, the improvement threshold, the review's change margin and monthly limit, and proficiency are all unchanged. A cautious family may still take years to improve, and a town may still lack a trade.
+- **What it is** (`get_shortage`): a good the town uses up that **no one here makes**, about to run out within the season (90 days).
+  - **What the town uses up:** food eaten, tool upkeep its proper workplaces will draw after their grace, and what its workplaces consume.
+  - **How it weighs:** 4 × the shortage as a term in choosing work.
+  - **Early review:** a quarter missing starts one, after 30 days at the work (not 180) and 90 days after the last look (not 360).
+- **Not this danger:** a deficit in a good the town does make. That is weighed in first choices (section 2). The broad version, kept for comparison, is meta `shortage_counts_deficits`.
+
+### 4. A hungry family looks at its work again (`OccupationReview`, reason `hungry`)
+
+- **The trigger:** a family that has itself gone short of food 5 or more days in each of two months running looks at its work again, without waiting for tenure or its year (as for a shortage).
+- **The weighing:** its hunger makes survival weigh more than its calling. It changes only when the other work wins by 2, as in every review.
+- **Why it was added:** the comparison traced hunting families whose woods were felled around them. They went hungry for months and never reconsidered, because none of the review's reasons applied.
+- **Switch:** part of survival awareness (`no_survival_awareness` turns it off).
+
+### 5. Tests
+
+- **The sidebar test** founds the same town every run (`FOUNDING_SEED` for the game's random numbers), and its card checks set the food state they test. Before, its town was founded at random, and it failed on `develop` in 2 of 4 runs.
+- **The gameplay regression** (`tests/founded_town_regression.gd`) plays that same town for a year. It must keep its founding families, be fed on the last day, and have a family in a proper home.
+- **Both trees:** both tests pass on the branch and on `develop`, identically on repeated runs.
+
+### Comparison switches
+
+City metas, comparison only:
+- `occupations_first_three`;
+- `no_shortage_recognition`;
+- `no_survival_awareness`;
+- `shortage_counts_deficits`;
+- `occupations_left_out`.
+
+With the first three set, the branch plays as `develop`: 96 of 96 town snapshots identical (`wisdom_check`, ordinary and stressed, two years, with and without the investment priority).
 
 ## Validation
 
-**Method.** `tests/sim/occupation_check.gd`:
-- **Towns:** the wisdom check's 12 towns (seeds, founders and maps identical across modes), families leading, the social model on, and the stand-in player building only homes and shared works.
+**Method.**
+- **Towns:** `tests/sim/occupation_check.gd` on the wisdom check's 12 towns (identical seeds, founders and maps across modes), families leading, the social model on, the stand-in building only homes and shared works.
 - **Conditions:** ordinary, stressed (the first winter's stores lost), and difficult sites.
-- **Length:** six years, with a year-3 snapshot.
-- **Modes:** "existing" (switches off), "occupations" (the new trades only), "shortage" (recognition only), and "both".
+- **Length:** six years.
+- **Modes:**
+  - "existing": today's game;
+  - "shortage": narrow recognition only;
+  - "occupations": the new trades with survival awareness;
+  - "both";
+  - **diagnostics:** "survival only" (survival awareness with the first three trades) and "occupations, blind" (the new trades without survival awareness, the first comparison's mode).
 
-**"Existing" is today's game.** With both switches off, `wisdom_check` produced the same towns as `develop` in all 96 snapshots compared: ordinary and stressed, two years, with and without the investment priority.
+**How the weights were reached.** Three things were found in diagnosis and corrected before the final runs. They are reported because they changed results:
+1. **Families counted empty workplaces as feeding the town** (a smoke run, then a food audit). In one town three of four farms stood empty and families still saw plenty. Actual food was 0–9% of what the outlook counted, and 8–13% in the first season, when families build, are novices and walk. The outlook now counts only worked or claimed work at its real pace (section 2). The older food term, `get_food_ratio` ("the town grows plenty of food"), has the same flaw and is unchanged: decision 3.
+2. **Hungry families never looked again** (the trace above). The hunger reason was added (section 4).
+3. **The survival weights** (4, 0.5, 120 days) were set before any measured run and not changed after.
 
-**Weights.** They were fixed before the measured runs, but not before every run. A two-year trial run of the first version collapsed most towns (1 of 12 kept with the new trades). That exposed three errors in the decision terms, which were corrected before the measured comparison:
-1. **The town's food count ignored the land.** A snare line counted at full yield whatever the woods.
-2. **The land term rewarded fishing and hunting above farming.** Good land gave up to +1.2, which farming cannot get. It now only deters: what the work yields there against the best any work yields of that good.
-3. **Clothing pulled almost as hard as hunger.** Wool's terms (+2.5) nearly matched the town growing less food than it eats (+3). A need the town only goes without now weighs +0.5 / +1.0.
+### Six years (people; towns kept of 12)
 
-After the trial, the shortage was also widened from "no one makes it" to "will run out within the season, counting what the town makes" (see "For the owner", decision 2). Nothing was changed after the measured runs.
+| | Existing | Shortage | Occupations | **Both** | Survival only | Occupations, blind |
+|---|---|---|---|---|---|---|
+| **Ordinary** | 57.8 (10) | 56.1 (10) | 42.4 (6) | **51.8 (9)** | 67.5 (11) | 42.7 (7) |
+| **Stressed** | 63.2 (10) | 59.7 (10) | 39.7 (8) | **41.7 (8)** | 56.2 (10) | 41.3 (6) |
+| **Difficult** | 42.8 (7) | 46.3 (8) | 36.3 (7) | **44.8 (8)** | 47.4 (8) | 17.9 (4) |
 
-### Six years (year-3 numbers in brackets where they differ in kind)
-
-| | Ordinary | | | | Stressed | | | | Difficult | | | |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| | existing | occ. | shortage | both | existing | occ. | shortage | both | existing | occ. | shortage | both |
-| towns kept (of 12) | 10 | 7 | 10 | 7 | 10 | 6 | 9 | 6 | 7 | 4 | 8 | 6 |
-| people | 57.8 | 42.7 | 59.6 | 35.4 | 63.2 | 41.3 | 52.3 | 33.7 | 42.8 | 17.9 | 37.4 | 29.2 |
-| families departed | 3.3 | 4.9 | 3.0 | 4.8 | 3.2 | 5.3 | 3.8 | 4.1 | 3.4 | 5.3 | 3.2 | 4.3 |
-| days the town ran out of food | 104 | 199 | 102 | 191 | 107 | 196 | 163 | 195 | 128 | 226 | 101 | 163 |
-| family-days short of food | 532 | 911 | 565 | 895 | 554 | 923 | 750 | 911 | 606 | 976 | 431 | 709 |
-| months clothing unmet | 69 | 38 | 69 | 35 | 65 | 30 | 64 | 30 | 52 | 27 | 52 | 27 |
-| months short of tools | 6.2 | 26.3 | 6.9 | 23.3 | 8.6 | 28.6 | 14.2 | 26.3 | 30.1 | 53.4 | 21.3 | 37.3 |
-| days out of tools | 168 | 755 | 132 | 627 | 236 | 823 | 379 | 732 | 818 | 1522 | 557 | 1032 |
-| towns short of tools / tool work began after / recovered | 2/1/1 | 5/2/1 | 3/3/2 | 5/5/1 | 3/2/1 | 5/1/0 | 4/4/1 | 6/6/1 | 8/6/3 | 11/5/1 | 8/7/4 | 10/10/4 |
-| towns that never made tools | 1 | 3 | **0** | **0** | 1 | 4 | **0** | **0** | 2 | 6 | 1 | **0** |
-| reviews (for a shortage) | 3.9 (0) | 6.8 (0) | 5.4 (0.5) | 10.2 (5.0) | 5.9 (0) | 6.1 (0) | 6.7 (0.5) | 10.0 (5.3) | 4.2 (0) | 4.7 (0) | 5.8 (4.7) | 17.2 (15.7) |
-| changes of work (for a shortage) | 0.1 | 0.3 | 0.3 (0.2) | 0.9 (0.9) | 0.1 | 0.2 | 0.3 (0.2) | 1.0 (0.9) | 0.3 | 0.2 | 0.2 (0.2) | 0.7 (0.6) |
-| trades worked per town | 2.5 | 3.1 | 2.6 | 2.8 | 2.4 | 2.5 | 2.2 | 2.6 | 1.8 | 1.2 | 1.9 | 2.4 |
-| towns >5 people worse / better than existing (same seed) | | 5 / 2 | 1 / 2 | 6 / 1 | | 6 / 2 | 3 / 1 | 6 / 2 | | 6 / 1 | 3 / 2 | 5 / 3 |
-
-**Work families do (ordinary, year 6, per town; improved share).**
-- **Existing:** farm 10.5 (125/126), woodcutter 2.2, toolmaker 1.9.
-- **Both:**
-  - farm 4.9 (58/59), woodcutter 1.1, toolmaker 1.1;
-  - fisher 0.7 (8/8, in the one town with water);
-  - hunter 0.8 (9/9, 5 towns);
-  - herder 0.8 (8/9, 6 towns).
-- **Improvement:** every new trade that is taken up is improved into its proper workplace, at about the same rate as farms.
+| Ordinary / stressed / difficult | Existing | Shortage | Occupations | Both |
+|---|---|---|---|---|
+| days the town ran out of food | 104 / 107 / 128 | 100 / 118 / 104 | 212 / 216 / 135 | 124 / 151 / 119 |
+| family-days short of food | 532 / 554 / 606 | 510 / 585 / 451 | 967 / 1056 / 621 | 599 / 707 / 541 |
+| days out of tools | 168 / 236 / 818 | 167 / 235 / 557 | 573 / 778 / 1104 | 173 / 326 / 658 |
+| towns never making tools | 1 / 1 / 2 | **0 / 0 / 1** | 2 / 3 / 4 | 1 / 1 / 1 |
+| tool shortages followed by tool work | 1 of 2 / 2 of 3 / 6 of 8 | 2/2, 3/3, 7/8 | 3/5, 3/6, 5/9 | 3/4, 5/6, 8/9 |
+| months clothing went unmet | 69 / 65 / 52 | 69 / 63 / 52 | 48 / 48 / 32 | 38 / 39 / 30 |
+| trades worked per town | 2.5 / 2.4 / 1.8 | 2.5 / 2.4 / 1.9 | 2.7 / 2.8 / 2.6 | 3.5 / 3.2 / 3.2 |
+| reviews (changes) per town | 3.9 (0.1) / 5.9 (0.1) / 4.2 (0.3) | 4.8 (0.2) / 4.8 (0.2) / 5.6 (0.6) | 21 (0.9) / 24 (0.8) / 14 (0.3) | 17 (1.0) / 18 (0.9) / 18 (1.2) |
 
 ### What the numbers say
 
-1. **Shortage recognition does what was asked.**
-   - **No town is left without tool work** on ordinary or stressed sites (1 → 0), and on difficult sites 2 → 1 (0 with the new trades).
-   - **Tool shortages are answered:** after a shortage, tool work began in 3 of 3 towns (ordinary), 4 of 4 (stressed) and 7 of 8 (difficult), against 1/2, 2/3 and 6/8.
-   - **Difficult towns** spend 260 fewer days out of tools and have 175 fewer family-days of hunger.
-   - **Few changes:** 0.2–0.3 changes of work per town in six years.
-   - **The cost is on stressed sites:** 11 fewer people. Food recognition there brings families to food after the lost winter, and tools then run short later (379 days out against 236). The narrow version below separates this.
-2. **Opening fishing, hunting and herding costs towns heavily, in every condition.**
-   - **The size of it:** a quarter to over half the people, and 3–4 fewer towns kept.
-   - **Food and tools:** twice the days without food, and four times the days without tools.
-   - **The cause:** the cost is not a fault in the new work. Families follow their callings into hunting (yields less than a field), herding (no food) and fishing (only where there is water), and away from farming, woodcutting and toolmaking. Farms per town halve. The founding year has no slack: in the trace of one town, the cautious loom family that improves the town's first farm on day 7 under today's rules takes up a grazing pen instead, the first farm comes on day 30–60, and the town empties. Fewer families also take up toolmaking, while lodges, huts and folds add tool upkeep.
-   - **Clothing:** better met (69 → 35 months unmet), but at that price.
-3. **Together** ("both"), recognition does not make up for the trades' cost on ordinary and stressed sites (35 and 34 people). On difficult sites it recovers part of it (29 against 18). It does answer every tool shortage.
-4. **Callings and values still decide, and differently** (all conditions, year 6, "both" against "existing"):
+1. **Survival awareness works.**
+   - **With the first three trades,** it is the best mode on ordinary sites: 67.5 people, 11 towns kept, food-short days 104 → 74.
+   - **With the new trades,** it halves their cost on difficult sites (blind 17.9 → 36.3; with shortage recognition, 44.8, above today's game).
+   - **At founding,** families now take up food work when the town cannot feed itself. In the town traced, every founder took food work, and the forge family still took up tools.
+2. **Narrow shortage recognition** closes the tool gap and costs little: ordinary −1.7 and stressed −3.5 people, difficult +3.5 and one more town kept. Together with the new trades it is what keeps toolmaking alive: days out of tools 573 → 173 on ordinary sites.
+3. **Both against today's game:**
+
+   | Sites | Change in people | Towns kept |
+   |---|---|---|
+   | difficult | +2.0 | +1 |
+   | ordinary | −6.0 | −1 |
+   | stressed | **−21.5** | −2 |
+
+   The towns differ more: 3.2–3.5 trades each against 1.8–2.5. Clothing goes unmet half as often.
+4. **Understandable choice or defective reasoning?**
+   - **Fixed:** the two defects found (empty workplaces counted; no reason for a hungry family to look again).
+   - **What remains:** the stressed gap is mostly four towns where founders took up hunting. Founding goes as intended: food work, a toolmaker. Over three to four years the town's woodcutter fells the woods round the hunting lodges (reach 1.0 → 0.33), and food falls to 61% of what the town eats.
+   - **What the hungry hunters do:** they now look again, but stay by a wide margin (about −8). Their calling, their skill, "it has built up its hunter's lodge" (+3), years there (+1.5) and the lodge standing idle (+1.5) outweigh their hunger and a farm they would work as novices.
+   - **The judgement:** the staying weights count an investment at full value when the land under it no longer yields. A lodge in felled woods is not worth what it was. That is arguably a reasoning gap rather than a choice. The weights are the owner-approved reconsideration weights, so they were not changed: decision 2.
+   - **The rest is understandable:** families follow callings into work that yields less than farming in good times (stressed sites lose the winter's stores and so have no slack), and woodcutters and hunters compete for the same woods.
+5. **Callings and values shape the economy** (all conditions, year 6):
 
    | Calling | Existing | Both |
    |---|---|---|
-   | water | farm 85% | fisher 51%, farm 35% |
-   | loom | farm 88% | herder 48%, farm 36% |
-   | forest | woodcutter 66% | hunter 53%, woodcutter 33% |
-   | shield | farm 65% | hunter 45% |
+   | water | farm 85% | fisher 42%, farm 36% |
+   | loom | farm 88% | herder 44%, farm 44% |
+   | forest | woodcutter 66% | hunter 40%, woodcutter 36% |
+   | shield | farm 65% | hunter 54% |
    | soil | farm 98% | farm 80% |
-   | forge | toolmaker 74% | toolmaker 59% |
-   | hearth (no material calling) | farm 92% | farm 83% |
+   | forge | toolmaker 74% | toolmaker 44% |
+   | hearth (no material calling) | farm 92% | farm 74% |
 
-   Temperament still sets the pace of improvement (cautious families improved 95% of their hand work by year 6, daring ones 100%).
+   Families on work of their calling: 34–37% today, 35–47% in "both".
+6. **Geography makes different economies** ("both", towns that kept their families, year 6):
+   - **Lake and river towns fish:** 1,306 water tiles gives farm 8, fisher 8, herder 4, 111 people; 27 water tiles gives farm 10, fisher 8, 98 people.
+   - **Wooded towns hunt:** 1,500 woods gives farm 8, hunter 6, 96 people.
+   - **Open farmland farms and herds:** 906 fertile tiles gives farm 17, herder 3, 97 people.
 
-## The Owner's Town (day-82 autosave, replayed)
+   Today every town is mostly farms.
+7. **Food coverage as the old term sees it** (`get_food_ratio`) stays at 2–5× in every mode, while towns go hungry 100–200 days. It overstates real production (point 1 of "How the weights were reached"), so it is not a fair measure of coverage; the hunger days are.
 
-A copy of the autosave was replayed for two years under each mode (`tests/sim/autosave_replay.gd`). The town was replayed alone: no neighbours or trade routes. Every work decision was traced with its reasons, and with the priority's ask taken out.
+### Priorities ("both", set at founding and kept for six years)
 
-**At the start (day 82):**
-- **Stores:** 8 tools, with six proper workplaces about to need upkeep (17 tools of use in the coming season), so the shortage stands at 0.53.
-- **The priority:** Productive investment, under the "priorities first" stores rule.
-- **The families:** families 0–5 work five farms and a woodcutter. None has the forge calling. Newcomer family 6 (deep_earth/soil) is free.
-- **Who sees the danger:**
-  - **Without recognition:** no one.
-  - **With it:** every working family has the shortage among its reasons to look again (`essential_shortage`), and each is due for an early look at day 112, after 30 days at its work.
-
-**What happened:**
-
-| Mode | First tool work | Who, and why |
-|---|---|---|
-| Existing | day 687 (605 days later) | A newcomer. Tools stayed at 0–2 for a year and a half. Around day 200 every family looked again at its work (food oversupplied) and stayed. The closest was family 2 (loom), margin 1.99 against the 2.0 needed, with the priority's ask +2.4. |
-| Occupations only | day 687 | As existing. In addition, the newcomer took up a grazing pen (its calling: herder 3.99 against farm 3.43), and family 2 (loom) left its farm for herding on day 202 (its calling, margin 5.0). |
-| Shortage only | day 85 | The newcomer took up tool mending: toolmaker 3.76 (not its calling −2, tools running out +2.5, the season's danger +2.1, the gathering's ask +1.6) against farm 3.43. **Tipped by the priority:** without the ask it would have farmed. |
-| Shortage only, priority cleared | day 112 | The newcomer farmed. On day 112 family 0 (muse calling, so no calling for farming), in an early review, left its farm for tool mending, margin 2.77. **No priority involved.** It gave up "it has built up its farm" and "its farm would stand idle". |
-| Both | day 112 | The newcomer took up a grazing pen (calling). Family 0 left its farm for tool mending on day 112, margin 4.77. The priority added 2.0, but without it the margin was still 2.77, so it was not decisive. Family 2 (loom) moved to herding on day 202. |
-| Both, priority cleared | day 112 | As both. |
-
-**Answers to the owner's questions:**
-- **Does any family recognise the approaching shortage?**
-  - **Without recognition:** no. The tool terms appeared only in families' first choices ("tools are running out" +2.5), and no working family could look again before day 202.
-  - **With it:** all six working families had the danger as a reason. Only the one with no stake in its farm (no calling for it, little skill) acted.
-  - **Families of the soil:** with farming's calling, skill and a proper farm, they weighed the danger (+2.1) and stayed. That is the intended behaviour, not a failure to see it.
-- **What reasons does it consider?**
-  - **For changing:** "the town will run out of tools within the season, and no one here makes any", "tools are running out", and the gathering's ask.
-  - **For staying:** "it has built up its farm", "its farm would stand idle", its calling, and "it knows the work".
-- **Does the Investment priority meaningfully influence the choice?**
-  - **Yes, at the margin.** It decided the newcomer's first choice in "shortage only".
-  - **No when the danger is serious.** It added +2.0 to family 0's review, but family 0 changed without it.
-  - **Not enough alone.** In "existing" it brought family 2 to within 0.01 of changing, but no further.
-  - **It starts nothing.** It started no review in any mode.
-- **Two years on (day 802):**
-  - **Without the new trades** (existing, occupations only, shortage only): 37 people.
-  - **With them** ("both"): 33 people and 23 days of food in store. Two families herd rather than farm.
-  - **The priority-cleared replays** end lower (31). With the "priorities first" stores rule and no priority, the stores fund no improvement (6 proper workplaces instead of 10). Compare their decisions, not their outcomes.
-
-### Broad or narrow shortage recognition
-
-The measured runs used the broad shortage: a good running out within the season, counting what the town holds and makes, so a food deficit counts too. The narrow version counts only a good no one in the town makes, the tool gap the brief described (meta `shortage_missing_trade_only`). It was run on the same towns.
-
-| Year 6, shortage only | Existing | Broad | Narrow |
+| People (towns kept) | No priority | Productive investment | Food security |
 |---|---|---|---|
-| ordinary: people / towns never making tools / days out of tools | 57.8 / 1 / 168 | 59.6 / 0 / 132 | 56.1 / 0 / 167 |
-| stressed | 63.2 / 1 / 236 | 52.3 / 0 / 379 | 59.7 / 0 / 235 |
-| difficult: people (towns kept) / never / days out | 42.8 (7) / 2 / 818 | 37.4 (8) / 1 / 557 | **46.3 (8)** / 1 / 557 |
+| ordinary | 51.8 (9) | 45.1 (8) | 46.7 (8) |
+| stressed | 41.7 (8) | 38.2 (7) | **49.8 (8)** |
+| difficult | 44.8 (8) | **31.5 (6)** | **48.0 (8)** |
 
-- **Same effect on the tool gap:** both close it equally.
-- **Broad costs the stressed towns:** families pulled to food after the lost winter leave tools short later. It also costs 9 people on difficult sites against narrow.
-- **With the new trades** ("both" against "both, narrow"), the two hardly differ: ordinary 35.4 / 36.5 people, stressed 33.7 / 39.2, difficult 29.2 / 30.6.
-- **Recommendation: narrow.** It does what was asked and nothing that costs towns. The branch still defaults to broad, as measured; changing that is one line in `FamilyInitiative.get_shortage`.
+- **Priorities change outcomes, in both directions.**
+  - **Food security** helps where food is the danger: stressed +8, difficult +3, food-short days unchanged or fewer. It costs tools (days out 326 → 713 on stressed sites) and wood work.
+  - **Productive investment** costs people everywhere: ordinary −7, stressed −4, difficult −13. Families improve hand work and take up tools (most tool shortages followed by tool work, no town without toolmaking), but they lean away from food early.
+- **The trades follow:** under investment, more lodges and toolmakers; under food, more farms and fewer woodcutters.
+- **Setting the priority at founding has lasting effects:** it is an ask, weighed by each family's receptiveness, but it steers founders' first choices, and those shape the town for years.
 
-## For the owner
+## The Owner's Town (day-82 autosave, replayed two years)
 
-1. **Merge shortage recognition, the new trades, both, or neither?** They are independent: each part switches off on its own (`no_shortage_recognition`, `occupations_first_three`).
-   - **Recognition alone:**
-     - closes the tool gap (no ordinary or stressed town left without tool work);
-     - answers nearly every tool shortage;
-     - helps difficult towns (narrow: +3.5 people, one more town kept, 260 fewer days without tools);
-     - costs ordinary and stressed towns 2–4 people.
-   - **The new trades:** they work as designed (callings now lead families to fishing, herding and hunting), but cost a quarter to over half of towns' people under today's economy.
-2. **Broad or narrow shortage?** Narrow is recommended (above).
-3. **If the new trades are wanted, what should carry their cost?** Options, none built:
-   - **a. Accept it.** It is what calling and skill deciding means in a founding year with no slack. Towns differ more, and many fail.
-   - **b. Food before comfort.** No family takes up a trade that makes no food (herding today) while the town grows less food than it eats. A rule, not a weight. This would remove the herding part of the cost (about 4 people per ordinary town in the two-year diagnostic).
-   - **c. The founding year:** founders weigh the town's hunger more than their calling until the first harvest. This changes today's behaviour too.
-   - **d. The land trades' hand-work yields.** A snare line makes a third of a lodge's 3.5 food, under a garden's third of 4. Economy numbers were out of scope this time.
-   - **e. Proficiency** (open decision 1 in the handoff). The novice penalty and "it knows the work" (+2) pull families toward their calling's trades. Softening it would weaken the pull as well.
-4. **Clothing.** Herding halves the months clothing goes unmet (69 → 35). Nothing else makes wool yet.
+A copy of the autosave was replayed alone (no neighbours or trade routes) under each mode, every work decision traced, with and without the priority's ask.
+
+**At the start:**
+- **Stores:** 8 tools, with six proper workplaces about to need upkeep (shortage 0.53), and 26 days of food in store.
+- **Food:** five farms grow plenty for the year (hardship 0).
+- **Rules:** the Productive investment priority, "priorities first" stores rule.
+- **Families:** families 0–5 work; newcomer family 6 (deep_earth/soil) is free.
+
+| Mode | First tool work | What decided it | Day 802 |
+|---|---|---|---|
+| Existing | day 687 | A newcomer, 605 days later. Tools stayed at 0–2 for a year and a half. | 37 people |
+| Shortage | day 85 | The newcomer took up tool mending: toolmaker 3.76 against farm 3.43. **The priority tipped it:** without the ask it farms. | 37 |
+| Shortage, priority cleared | day 112 | Family 0 (muse calling: nothing ties it to farming) saw the danger in an early review and left its farm, margin 2.77. No priority involved. | 37* |
+| Both | day 112 | The newcomer took up a grazing pen (its calling; the town was fed, so survival did not weigh). Family 0 left its farm for tools on day 112. The priority added 2.0, but it changed without it too. Family 2 (loom) moved to herding on day 202. | 33, 23 days of food |
+| Both, priority cleared | day 112 | As "both". | 31* |
+
+\* The priority-cleared replays fund no improvements: the "priorities first" stores rule with no priority funds nothing. Compare their decisions, not their outcomes.
+
+**The owner's questions:**
+- **How do families respond to the approaching tool shortage?**
+  - **Today:** no one can until day 687.
+  - **With recognition:** every working family has the shortage among its reasons. The one with no stake in its farm acts within a month. The families of the soil weigh it and keep their farms.
+- **Do they establish sustainable food production?**
+  - **Shortage only:** yes. Five to seven farms, 200+ days of food at day 802.
+  - **Both:** food is thinner (23 days in store at day 802). Two families herd for clothing while the town is fed, as the design allows, and the store runs down without hunger yet.
+- **Does the Investment priority change any consequential decision?**
+  - **Once:** the newcomer's first choice in "shortage" (tools instead of a farm).
+  - **Not decisive elsewhere:** in every other mode it adds weight but decides nothing, and it starts no review.
+
+## For the Owner (before merging)
+
+1. **What to merge.** Each part switches off on its own.
+   - **Recommended:** narrow shortage recognition and survival awareness. Together with the first three trades they are the best mode measured on ordinary sites, and close the tool gap.
+   - **The new trades:** they make towns differ by land and calling, and halve unmet clothing, but cost stressed towns about 21 people and ordinary towns 6.
+2. **The staying weights for land that has failed.** A family's built-up workplace, its years there and the workplace left idle count in full even when the land under it no longer yields (a lodge in felled woods). The recommendation is to scale them by the workplace's current yield, but they are the weights approved for reconsideration, so it is the owner's call. Expected effect: hungry hunters leave failing lodges for farms, which addresses most of the stressed gap. Not built or measured.
+3. **The old food term** (`get_food_ratio`, "the town grows plenty of food", used in first choices and the oversupply reason for reviews) counts empty workplaces and full pace, like the outlook did before its correction. Correcting it changes today's game too. Not done.
+4. **Woodcutters fell hunting grounds.** The two trades compete for the same woods with nothing to mediate it. Families could weigh it (a hunter's family opposing felling near its lodge, or woodcutters cutting elsewhere), or it could be left as a real conflict.
+5. **Hand-work art** for the three stages, when wanted.
 
 ## Remaining Limitations
 
-- **New hand work has no art of its own:** it draws as its proper building, washed toward earth.
-- **What families count as the town's output is optimistic:** standing and planned workplaces at base yield on their land, empty ones included, without proficiency or travel.
-- **Mending families do for themselves is not counted** in the shortage. Families judge by the store they see, so they may see danger a little early.
-- **A family's work history** (`Household.work_history`) records goods, as it did before (saves and tests depend on it). A family moving from farming to fishing records food twice.
-- **Hunting:** several lodges in the same woods each count the whole woods.
-- **Fishing is rare:** only one of the 12 ordinary sites has water in reach.
-- **Saves:** no new saved fields. Old saves load unchanged, and families in them may now choose the new trades.
-- **Tests:** 43 headless scripts (with the wrapped expanded-goods test) pass on the branch. The new rules are covered by `tests/autonomous_occupations_validation.gd`. `tests/town_sidebar_validation.gd` is flaky on `develop` as well (its town is founded at random; it failed 2 of 4 runs there, 4 of 7 on the branch; see `docs/HANDOFF.md`).
+- **Families judge shortages by the store they see:** mending families do for themselves is not counted.
+- **Work history** (`Household.work_history`) records goods: a family moving from farming to fishing records food twice.
+- **Shared woods:** several lodges in the same woods each count the whole woods.
+- **Fishing is rare:** only one ordinary site and two difficult sites have water in reach.
+- **Saves:** no new saved fields; old saves load unchanged. Each family's monthly strain gains a "hungry" count.
+- **Tests:** the full headless suite passes on the branch: 44 scripts, including the new rules test and the gameplay regression, plus the wrapped expanded-goods test.
+
+## History: the First Comparison (superseded)
+
+The first brief's comparison (before survival awareness, with the broad shortage, which counted food deficits too) found:
+- **The new trades cost** a quarter to over half of towns' people. Families followed callings into hunting and herding during a founding year with no slack.
+- **Broad recognition cost stressed towns 11 people.** The narrow version, measured beside it, did as well on tools without that cost.
+- **Three errors were corrected in that first smoke run:**
+  - the land term rewarded hunting above farming;
+  - clothing pulled as hard as hunger;
+  - the town's food count ignored the land.
+
+The owner then approved the narrow version and asked for survival-aware first choices (above).
