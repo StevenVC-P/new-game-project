@@ -15,7 +15,8 @@ extends SceneTree
 #
 # One condition and some modes per process (write to a file, filter for [OCC]):
 #   <godot> --headless --path . --script res://tests/sim/occupation_check.gd -- --conditions=ordinary --modes=existing,both > occ.log
-# Options: --years=N (6, with a year-3 snapshot), --sites=N (12), --priority=investment|food|...,
+# Options: --years=N (6, with a year-3 snapshot), --sites=N (12), --from=K (only towns K to N-1 of
+# those, to split a comparison across processes), --priority=investment|food|...,
 # --leave-out=herder,hunter (trades families may not choose, to tell their effects apart).
 # Conditions as in wisdom_check: ordinary sites; the same with the first winter's stores lost;
 # naturally difficult sites (cached in user://wisdom_difficult_seeds.txt by wisdom_check).
@@ -49,6 +50,7 @@ func _init() -> void:
 func run() -> void:
 	var years: int = 6
 	var site_count: int = 12
+	var first: int = 0
 	var conditions: Array[String] = ["ordinary", "stressed", "difficult"]
 	var modes: Array[String] = ["existing", "occupations", "shortage", "both"]
 	for argument: String in OS.get_cmdline_user_args():
@@ -56,6 +58,8 @@ func run() -> void:
 			years = int(argument.trim_prefix("--years="))
 		elif argument.begins_with("--sites="):
 			site_count = int(argument.trim_prefix("--sites="))
+		elif argument.begins_with("--from="):
+			first = int(argument.trim_prefix("--from="))
 		elif argument.begins_with("--conditions="):
 			conditions.assign(argument.trim_prefix("--conditions=").split(","))
 		elif argument.begins_with("--modes="):
@@ -67,6 +71,8 @@ func run() -> void:
 	var ordinary: Array = TownBuildingCheck.collect_sites().slice(0, site_count)
 	for condition: String in conditions:
 		var sites: Array = get_difficult_sites() if condition == "difficult" else ordinary
+		# A share of the towns per process (--from), so one comparison can use every core.
+		sites = sites.slice(first, site_count)
 		for mode: String in modes:
 			var started: int = Time.get_ticks_msec()
 			var snapshots: Dictionary = {SNAPSHOT_YEAR: [], years: []}
