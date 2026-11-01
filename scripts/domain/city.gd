@@ -923,6 +923,7 @@ func add_building(building: Building, household: Household = null):
 	logistics.mark_layout_changed()
 	if building.is_production_building() and household != null:
 		building.assign_household(household, Building.ASSIGNMENT_AUTO)
+		OccupationReview.on_workplace_added(self, household, building)
 	if building.is_house():
 		if household != null:
 			household.move_to_house(building.id)
@@ -962,6 +963,7 @@ func tick():
 		FamilyInitiative.advance(self)
 	social.advance_day()
 	land.advance_day()
+	HouseholdEconomy.plan_day(self)
 
 	for building: Building in buildings:
 		if building.is_house():
@@ -973,6 +975,7 @@ func tick():
 				update_building_maintenance(building)
 		if building.can_produce():
 			apply_building_production(building)
+	HouseholdEconomy.work_day(self)
 	logistics.advance_day()
 	woodland.advance_day()
 	farmland.advance_day()
@@ -1292,6 +1295,9 @@ func consume_food():
 	var population: int = get_total_population()
 	var consumption_rate: int = get_food_consumption_for_population(population)
 	resources["food_consumption_rate"] = consumption_rate
+	if HouseholdEconomy.is_on(self):
+		HouseholdEconomy.feed(self, consumption_rate)
+		return
 
 	var consumed_food: int = consume_need_bucket(GoodsNeedBucketHelperScript.BUCKET_FOOD, consumption_rate)
 	if consumed_food >= consumption_rate:
@@ -1306,8 +1312,18 @@ func should_skip_for_food_shortage() -> bool:
 	# Hungry families lose about a quarter of their working days.
 	return int(resources["production_tick_count"]) % FOOD_SHORTAGE_SKIP_TICK_INTERVAL == 0
 
+# Whether a family loses today's work to hunger. With household larders (HouseholdEconomy) only a
+# family that went short today does; otherwise every family when the town goes short.
+func skips_work_today(household_id: int) -> bool:
+	if not should_skip_for_food_shortage():
+		return false
+	if not HouseholdEconomy.is_on(self):
+		return true
+	var household: Household = get_household_by_id(household_id) if household_id >= 0 else null
+	return household == null or household.short_today
+
 func apply_building_production(building: Building):
-	if should_skip_for_food_shortage():
+	if skips_work_today(building.assigned_household_id):
 		return
 
 	var building_type: String = building.type
@@ -1387,7 +1403,10 @@ func get_base_building_output_amount(building_type: String) -> float:
 	return 0.0
 
 func apply_building_output_modifiers(base_output: float, tick_count: int, building: Building) -> int:
-	var family_output: float = base_output * get_family_labor_factor(get_household_by_id(building.assigned_household_id)) * get_work_time_factor(building)
+	var household: Household = get_household_by_id(building.assigned_household_id)
+	var family_output: float = base_output * get_family_labor_factor(household) * get_work_time_factor(building)
+	# A family new to its work makes less until it learns it (HouseholdEconomy).
+	family_output *= HouseholdEconomy.get_output_factor(self, household, building.type)
 	# A field people walk through loses some of its harvest underfoot; the land and season decide
 	# the rest (TownLand).
 	family_output *= 1.0 - logistics.get_field_trample_loss(building)
@@ -1399,10 +1418,12 @@ func apply_building_output_modifiers(base_output: float, tick_count: int, buildi
 	return apply_older_child_support_output_modifier(output_amount, tick_count, building)
 
 # Share of a family's day left for its holding after travel (hauling goods to and from the
-# nearest store, walking from home) and any spare time it gave a building site today.
+# nearest store, walking from home), any spare time it gave a building site today, and any it gave
+# to secondary work (HouseholdEconomy).
 func get_work_time_factor(building: Building) -> float:
 	var spare: float = float(construction.spare_time_today.get(building.assigned_household_id, 0.0)) if building.assigned_household_id >= 0 else 0.0
-	return maxf(0.0, 1.0 - logistics.get_travel_share(building) - spare)
+	var secondary: float = float(influence._secondary_today.get(building.assigned_household_id, 0.0)) if building.assigned_household_id >= 0 else 0.0
+	return maxf(0.0, 1.0 - logistics.get_travel_share(building) - spare - secondary)
 
 # Balance outputs assume a two-adult family; a family with one working adult works at half.
 # Workplaces without a household (starter neutral workers) work at full rate.
@@ -1721,7 +1742,10 @@ func update_building_maintenance(building: Building):
 		return
 
 	building.maintenance_timer = 0
-	if building.receives_maintenance and int(resources["tools"]) >= cost:
+	# Mending its family did itself takes the place of a tool from the store (HouseholdEconomy).
+	if building.receives_maintenance and HouseholdEconomy.mend(self, building):
+		building.maintenance_level = min(100, building.maintenance_level + 25)
+	elif building.receives_maintenance and int(resources["tools"]) >= cost:
 		resources["tools"] = int(resources["tools"]) - cost
 		building.maintenance_level = min(100, building.maintenance_level + 25)
 	else:

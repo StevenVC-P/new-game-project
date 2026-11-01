@@ -52,6 +52,8 @@ var builders_today: Array[int] = []
 var recent_completions: Array[Dictionary] = []
 # Families who wanted to build a home last month but found no open residential plot.
 var families_without_plot: int = 0
+# Whether the town has had its starting residential land (HomeSites.ensure_starting_land).
+var starting_land_given: bool = false
 # Bumped when a road is finished, so views redraw the ground.
 var roads_version: int = 0
 # Homes families asked for themselves and finished (FamilyDevelopment), for balance tools.
@@ -87,10 +89,21 @@ func validate(building_type: String, origin: Vector2i) -> Dictionary:
 		if not is_roadable(origin):
 			return placement.make_result(false, "Roads need open ground", footprint)
 		return placement.make_result(true, "Valid placement", footprint)
-	if BuildingTiers.get_base_type(building_type) == Building.BUILDING_HOUSE and get_open_plot_at(origin) != null:
+	var is_home: bool = BuildingTiers.get_base_type(building_type) == Building.BUILDING_HOUSE
+	if is_home and get_open_plot_at(origin) != null:
 		return placement.make_result(true, "On a residential plot", footprint)
+	# Residential land takes homes and what serves a neighbourhood, never a private workplace
+	# (HomeSites.is_compatible). What already stands there is left alone.
+	if not HomeSites.is_compatible(building_type) and is_on_residential_land(footprint):
+		return placement.make_result(false, "That land is set aside for homes and shared works", footprint)
 	var rule_type: String = Building.BUILDING_HOUSE if building_type == PLOT else building_type
 	return placement.validate(city, city.local_map, rule_type, origin, false)
+
+func is_on_residential_land(footprint: Array[Vector2i]) -> bool:
+	for tile: Vector2i in footprint:
+		if is_inside(tile) and HomeSites.get_land(city, tile) != HomeSites.LAND_NONE:
+			return true
+	return false
 
 # Plans a new building. Returns the project, or null when the land does not allow it.
 func request_building(building_type: String, origin: Vector2i, requested_by: String = ConstructionProject.REQUESTED_BY_PLAYER, requester_household_id: int = -1, claimant_household_id: int = -1) -> ConstructionProject:
@@ -349,7 +362,8 @@ func assign_claimants() -> void:
 		if project.is_home():
 			if claimant == null:
 				project.claimant_household_id = find_family_needing_home(project)
-		elif claimant == null or claimant.assigned_workers > 0:
+		# A family changing its work keeps the site it opened while it still works its old one.
+		elif claimant == null or (claimant.assigned_workers > 0 and claimant.work_change_from < 0):
 			project.claimant_household_id = find_family_for_workplace(project)
 
 # The household id a workplace site is being built for (it will work it), or -1.
@@ -443,8 +457,9 @@ func advance_day() -> void:
 	for project: ConstructionProject in projects:
 		project.crew_household_ids.clear()
 		project.blocked_reason = ""
-	# Hungry families lose working days on sites as on their holdings.
-	var hungry_day: bool = city.should_skip_for_food_shortage()
+	# Hungry families lose working days on sites as on their holdings: all of them when the town goes
+	# short, or with household larders only those who went short (City.skips_work_today).
+	var hungry_day: bool = city.should_skip_for_food_shortage() and not HouseholdEconomy.is_on(city)
 	var workable: Array[ConstructionProject] = []
 	for project: ConstructionProject in projects:
 		if can_progress(project):
@@ -465,7 +480,10 @@ func advance_day() -> void:
 			project.blocked_reason = "builders hungry today"
 		return
 
-	var free_families: Array[Household] = get_free_families()
+	var free_families: Array[Household] = []
+	for household: Household in get_free_families():
+		if not city.skips_work_today(household.id):
+			free_families.append(household)
 	for project: ConstructionProject in workable:
 		if free_families.is_empty():
 			break
@@ -479,7 +497,7 @@ func advance_day() -> void:
 				break
 
 	for household: Household in city.households:
-		if household.labor_capacity <= 0 or household.assigned_workers <= 0:
+		if household.labor_capacity <= 0 or household.assigned_workers <= 0 or city.skips_work_today(household.id):
 			continue
 		var target: ConstructionProject = get_spare_time_project(household, workable)
 		if target == null:
@@ -616,7 +634,9 @@ func complete(project: ConstructionProject) -> void:
 			var claimant: Household = city.get_household_by_id(project.claimant_household_id)
 			if claimant != null and building.is_house() and not wants_to_move_in(claimant, building):
 				claimant = null
-			if claimant != null and building.is_production_building() and claimant.assigned_workers > 0:
+			# A family that already works takes on no second workplace, unless this is the new work it is
+			# changing to; it then leaves its old one (OccupationReview.on_workplace_added).
+			if claimant != null and building.is_production_building() and claimant.assigned_workers > 0 and claimant.work_change_from < 0:
 				claimant = null
 			city.add_building(building, claimant)
 	if project.requested_by == ConstructionProject.REQUESTED_BY_HOUSEHOLD:

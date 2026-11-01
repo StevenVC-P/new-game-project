@@ -55,6 +55,36 @@ var held_back_by_stores: int = 0
 # Experiment (influence check, growth bottleneck): this many families without a holding stay free
 # to build while any site is planned, instead of taking up work. 0: families take up work at once.
 var reserved_builders: int = 0
+# Families reconsidering their work (OccupationReview); off only for comparison.
+var reconsider_work: bool = true
+var work_reviews: int = 0
+var work_changes: int = 0
+var work_deferred: int = 0
+var work_triggers: Dictionary = {}
+var work_stay_reasons: Dictionary = {}
+var work_change_reasons: Dictionary = {}
+var workplaces_left_proper: int = 0
+var workplaces_left_empty: int = 0
+# Every review this session, for checks (not saved).
+var _work_review_log: Array = []
+# Household self-sufficiency and proficiency (HouseholdEconomy); off only for comparison. The day it
+# started in this town, and for balance tools: share-days of work, what secondary work made, what
+# holdings gave up for it, larders eaten, families' short days, gifts of food.
+var self_sufficiency: bool = true
+var economy_started_day: int = -1
+var primary_share_days: float = 0.0
+var secondary_share_days: Dictionary = {}
+var secondary_output: Dictionary = {}
+var lost_primary_output: Dictionary = {}
+var wood_to_own_projects: int = 0
+var mended_upkeep: int = 0
+var larder_eaten_own: float = 0.0
+var larder_eaten_short: float = 0.0
+var household_short_days: int = 0
+var food_gifts: int = 0
+var food_gift_units: float = 0.0
+# Today's share of each family's day given to secondary work (recomputed every day; not saved).
+var _secondary_today: Dictionary = {}
 
 func _init(owner: City) -> void:
 	_city_ref = weakref(owner)
@@ -72,12 +102,27 @@ func toggle_encouraged(activity: String) -> void:
 	set_encouraged(activity, not is_encouraged(activity))
 
 # Sets the community's priority and the asks it makes; each family's view of it is recorded.
+# Setting the priority already set still replaces asks of other kinds: a town saved under the four
+# separate work asks keeps them until a priority (or none) is chosen.
 func set_priority(new_priority: String) -> void:
-	if new_priority == priority:
+	var asks: Array = CommunityPriority.ACTIVITIES.get(new_priority, [])
+	if new_priority == priority and encouraged.size() == asks.size() and asks.all(is_encouraged):
 		return
+	var changed: bool = new_priority != priority
 	priority = new_priority
-	encouraged.assign(CommunityPriority.ACTIVITIES.get(new_priority, []))
-	CommunityPriority.record_responses(city)
+	encouraged.assign(asks)
+	if changed:
+		CommunityPriority.record_responses(city)
+
+# Asks standing from before the community priority (a town saved under the four work asks) that
+# the current priority does not make.
+func get_earlier_asks() -> Array[String]:
+	var asks: Array = CommunityPriority.ACTIVITIES.get(priority, [])
+	var earlier: Array[String] = []
+	for activity: String in encouraged:
+		if not asks.has(activity):
+			earlier.append(activity)
+	return earlier
 
 # What the stores always keep back from families' own projects: wood for the town's homes and
 # workshops, and tools for the upkeep of every proper workplace for a while, so families investing

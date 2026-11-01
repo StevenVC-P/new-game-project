@@ -353,21 +353,21 @@ func get_building_screen_rect(building: Building) -> Rect2:
 	var pos: Vector2 = Vector2(tile_pos.x * city_tile_size, city_view_top + tile_pos.y * city_tile_size)
 	return Rect2(pos, Vector2(size.x * city_tile_size - 1, size.y * city_tile_size - 1))
 
-# With the household social prototype on, a house's card shows who its family is, how it stands
-# with its neighbours, what it did lately and why (HouseholdRosterHelper), wrapped to the card.
-const FAMILY_CARD_WIDTH: float = 470.0
-const FAMILY_LINE_CHARS: int = 66
+# With the household social prototype on, a family's character, ties, memories, and the reasons for
+# its decisions are in the sidebar's Families page, which opens on the family whose house is
+# selected (docs/TOWN_UI.md); the card on the map stays small and only points there.
+const FAMILY_CARD_WIDTH: float = 300.0
+const FAMILY_LINE_CHARS: int = 40
 
 func get_house_family_lines(city: City, building_index: int) -> Array[String]:
 	var lines: Array[String] = []
 	var household: Household = city.get_household_for_building_id(building_index)
 	if household == null or not city.social.enabled:
 		return lines
-	var raw: Array[String] = HouseholdRosterHelper.get_card_lines(city, household)
-	if household.initiative_note != "":
-		raw.append("Work: " + household.initiative_note)
-	for line: String in raw:
-		lines.append_array(wrap_line(line, FAMILY_LINE_CHARS))
+	var brief: String = HouseholdCharacter.describe_briefly(household)
+	if brief != "":
+		lines.append_array(wrap_line(brief, FAMILY_LINE_CHARS))
+	lines.append("Why it acts as it does: Families (L)")
 	return lines
 
 static func wrap_line(line: String, max_chars: int) -> Array[String]:

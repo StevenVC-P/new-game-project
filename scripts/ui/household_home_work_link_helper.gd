@@ -62,7 +62,7 @@ static func _add_home_links(lines: Array[String], city: City, house_index: int) 
 	if city.social.enabled:
 		lines.append_array(HouseholdRosterHelper.get_card_lines(city, household))
 	# Families developing their own work say what they decided and why (influence prototype).
-	if city.influence.enabled and household.initiative_note != "":
+	if city.influence.enabled and household.initiative_note != "" and FamilyDevelopment.is_note_current(city, household, household.initiative_note):
 		lines.append("Decided: " + household.initiative_note)
 		var outlook: Dictionary = FamilyInitiative.predict_improvement(city, household, true)
 		if str(outlook["outlook"]) != "":

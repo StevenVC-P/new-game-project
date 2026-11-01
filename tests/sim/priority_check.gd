@@ -19,8 +19,11 @@ extends SceneTree
 #                show them: the priority the town backs most, the stores kept for it only when that
 #                warns of nothing more than leaving them open; "seasonal" is step 1's informed rules
 #                (food before winter, homes while founders lack them, investment when stores are
-#                comfortable) with the stores open. Both change at most twice in any 90 days;
-# - uninformed:  changes on exactly the days the preview strategy changed on the same town, to a
+#                comfortable) with the stores open; "tool_aware" weighs the production chain (owner,
+#                2026-10-31): tools before anything that needs them, food only once someone makes
+#                tools, homes when their sites wait for hands, otherwise cooperation. All three change
+#                at most twice in any 90 days;
+# - uninformed:  changes on exactly the days the tool-aware strategy changed on the same town, to a
 #                priority and a stores rule picked without regard to the town, so the number and
 #                timing of policy changes are the same;
 # - poor:        fickle (a new priority picked without regard every month: the trust penalty is in
@@ -37,12 +40,15 @@ extends SceneTree
 #
 # The informed, uninformed and wrong-headed rules were written before this step's results were seen
 # and are not tuned to them.
+# "--layout=" sets the residential land every town starts with (residential_layouts.gd; default
+# "starting"), to cross land planning with leadership.
 # Run: <godot> --headless --path . --script res://tests/sim/priority_check.gd > priority.log; filter
 # for [PRI] (write to a file: a shell pipe stalls Godot on Windows).
-# "-- --years=N --sites=N --conditions=ordinary,stressed,difficult --strategies=none,preview"
+# "-- --years=N --sites=N --conditions=ordinary,stressed,difficult --strategies=none,tool_aware --layout=compact"
 
 const TownBuildingCheck = preload("res://tests/sim/town_building_check.gd")
 const StandInPlayerScript = preload("res://tests/sim/stand_in_player.gd")
+const Layouts = preload("res://tests/sim/residential_layouts.gd")
 
 # The stand-in player builds nothing: "house" is never planned (no plots), and nothing is "planned".
 const BASE: Dictionary = {"hand_method": true, "families_develop": true, "homes_on_plots": true, "social": true, "land_food": false, "never": ["herder", "fisher", "hunter", "house"]}
@@ -61,6 +67,7 @@ const STRATEGIES: Array = [
 	{"name": "cooperation_pf", "kind": "fixed", "priority": CommunityPriority.COOPERATION, "rule": FIRST},
 	{"name": "preview", "kind": "informed"},
 	{"name": "seasonal", "kind": "informed"},
+	{"name": "tool_aware", "kind": "informed"},
 	{"name": "uninformed", "kind": "uninformed"},
 	{"name": "fickle", "kind": "poor"},
 	{"name": "wrong_headed", "kind": "poor"},
@@ -114,6 +121,10 @@ class Plan extends RefCounted:
 			"seasonal":
 				if day % DECIDE_DAYS == 0:
 					change_if_allowed(city, choose_by_season(city, day, player), OPEN, day)
+			"tool_aware":
+				if day % DECIDE_DAYS == 0:
+					var chosen: String = choose_by_production(city, day, player)
+					change_if_allowed(city, chosen, rule_by_warnings(city, chosen), day)
 			"uninformed":
 				if day == 0 or replay_days.has(day):
 					set_policy(city, pick_blindly(city, day), FIRST if absi(hash([city.founding_seed, day, "rule"])) % 2 == 0 else OPEN, day)
@@ -143,6 +154,29 @@ class Plan extends RefCounted:
 		if priority == CommunityPriority.NONE:
 			return OPEN
 		return FIRST if CommunityPriority.get_warnings(city, priority, FIRST).size() <= CommunityPriority.get_warnings(city, priority, OPEN).size() else OPEN
+
+	# Written before its results (owner, 2026-10-31: weigh food, toolmaking, upkeep and labour; do not
+	# follow the town's backing). Every proper workplace wears tools, so tools come first while no one
+	# makes them; food is asked for only once someone does, since asking for food draws families
+	# choosing their work away from tools; homes when their sites stand waiting for hands; otherwise
+	# cooperation, the priority whose warnings name no cost in production.
+	func choose_by_production(city: City, day: int, player) -> String:
+		var toolmakers: int = FamilyInitiative.count_producers(city, TownInfluence.ACTIVITY_TOOLS)
+		var proper: int = city.buildings.filter(func(b: Building) -> bool: return b.needs_maintenance()).size()
+		var reserve: int = int(city.influence.get_protected_reserve()["tools"])
+		var food_days: float = FamilyInitiative.get_food_days(city)
+		var short_of_food: bool = food_days < 60.0 or FamilyInitiative.get_food_ratio(city) < 1.0
+		if toolmakers == 0 and (int(city.resources["tools"]) < reserve + 6 or proper >= 2 or short_of_food):
+			return CommunityPriority.INVESTMENT
+		if short_of_food:
+			return CommunityPriority.FOOD
+		var of_year: int = day % 360
+		if of_year >= 150 and of_year < 270 and food_days < 150.0:
+			return CommunityPriority.FOOD
+		var homes_waiting: bool = city.construction.projects.any(func(p: ConstructionProject) -> bool: return p.is_home() and p.blocked_reason == "no builders free")
+		if homes_waiting and not player.founders_housed(city):
+			return CommunityPriority.HOUSING
+		return CommunityPriority.COOPERATION
 
 	# Step 1's informed rules: food when the town is short or autumn is near with less than half a
 	# year in store; homes while founders are still without one; better work when the stores are
@@ -189,6 +223,9 @@ class Plan extends RefCounted:
 func _init() -> void:
 	call_deferred("run")
 
+# The residential land every town starts with (residential_layouts.gd).
+var layout: String = "starting"
+
 func run() -> void:
 	var years: int = 3
 	var site_count: int = 12
@@ -203,6 +240,8 @@ func run() -> void:
 			conditions.assign(argument.trim_prefix("--conditions=").split(","))
 		elif argument.begins_with("--strategies="):
 			only.assign(argument.trim_prefix("--strategies=").split(","))
+		elif argument.begins_with("--layout="):
+			layout = argument.trim_prefix("--layout=")
 	var ordinary: Array = TownBuildingCheck.collect_sites().slice(0, site_count)
 	var difficult: Array = []
 	if conditions.has("difficult"):
@@ -210,13 +249,13 @@ func run() -> void:
 	for condition: String in conditions:
 		var sites: Array = difficult if condition == "difficult" else ordinary
 		var stress: bool = condition == "stressed"
-		_report("== %s: %d towns, %d years, six founding families%s" % [condition, sites.size(), years, ", first winter's stores lost (test-only stressor)" if stress else ""])
+		_report("== %s: %d towns, %d years, six founding families, %s residential land%s" % [condition, sites.size(), years, layout, ", first winter's stores lost (test-only stressor)" if stress else ""])
 		var by_strategy: Dictionary = {}
 		var informed_changes: Array = []
 		for strategy: Dictionary in STRATEGIES:
 			var name: String = strategy["name"]
-			# The uninformed strategy needs the preview strategy's change days on each town.
-			if not only.is_empty() and not only.has(name) and not (name == "preview" and only.has("uninformed")):
+			# The uninformed strategy needs the tool-aware strategy's change days on each town.
+			if not only.is_empty() and not only.has(name) and not (name == "tool_aware" and only.has("uninformed")):
 				continue
 			var started: int = Time.get_ticks_msec()
 			var results: Array[Dictionary] = []
@@ -224,7 +263,7 @@ func run() -> void:
 				var replay: Array = informed_changes[index] if name == "uninformed" and index < informed_changes.size() else []
 				var result: Dictionary = play(sites[index], strategy, stress, years, replay)
 				results.append(result)
-				if name == "preview":
+				if name == "tool_aware":
 					informed_changes.append(result["change_days"])
 			by_strategy[name] = results
 			if only.is_empty() or only.has(name):
@@ -236,7 +275,7 @@ func play(site: Dictionary, strategy: Dictionary, stress: bool, years: int, repl
 	var city: City = City.new("Player Town", Vector2(site["site"]), City.ROLE_PLAYER, EconomyBalance.FOUNDING_FAMILIES, int(site["seed"]))
 	city.site_profile = site["profile"]
 	city.local_map = (site["map"] as Array).duplicate(true)
-	HomeSites.set_aside_starting_land(city)
+	Layouts.set_aside(city, layout)
 	var scenario: Dictionary = BASE.duplicate(true)
 	scenario["hard_winter"] = stress
 	scenario["unfair"] = strategy.get("unfair", false)
