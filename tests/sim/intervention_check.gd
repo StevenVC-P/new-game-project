@@ -12,12 +12,16 @@ extends SceneTree
 #   season: no priority), and once hunters and woodcutters share the woods, marks woods for
 #   clearing far from the hunting grounds so the woodcutters fell there;
 # - late: the same answers, only once food has run out or tools are running out (no woods marked);
-# - inappropriate: puts productive investment first from founding and keeps it.
+# - inappropriate: puts productive investment first from founding and keeps it;
+# - informed_priority, informed_commission, informed_woods: the informed player's three answers one
+#   at a time (the priority alone; commissioning alone; marking woods alone), to tell them apart.
 #
 # Records when each warning first showed (could the player see it in time?), what the player did
 # and when, and what families decided (takeups, reviews, changes, decisions the priority tipped).
 #   <godot> --headless --path . --script res://tests/sim/intervention_check.gd -- --conditions=stressed --policies=none,informed > int.log
-# Options: --years=N (6), --sites=N (12), --from=K, --mode=all|shortage_survival|existing (the rules).
+# Options: --years=N (6), --sites=N (12), --from=K, --mode=all|shortage_survival|existing (the rules),
+# --seed=N (only that town) with --trace (its timeline: warnings, the player's acts, every family's
+# choice and review of its work with reasons, and the town each month; filter for [TRACE]).
 
 const TownBuildingCheck = preload("res://tests/sim/town_building_check.gd")
 const StandInPlayerScript = preload("res://tests/sim/stand_in_player.gd")
@@ -42,6 +46,8 @@ const HUNTING_MARGIN: int = EconomyBalance.HUNTER_REACH + 3
 const MARK_GAP_DAYS: int = 60
 
 var mode: String = "all"
+var only_seed: int = -1
+var trace: bool = false
 
 func _init() -> void:
 	call_deferred("run")
@@ -65,11 +71,17 @@ func run() -> void:
 			policies.assign(argument.trim_prefix("--policies=").split(","))
 		elif argument.begins_with("--mode="):
 			mode = argument.trim_prefix("--mode=")
+		elif argument.begins_with("--seed="):
+			only_seed = int(argument.trim_prefix("--seed="))
+		elif argument == "--trace":
+			trace = true
 	var ordinary: Array = TownBuildingCheck.collect_sites().slice(0, site_count)
 	for condition: String in conditions:
-		var sites: Array = (get_difficult_sites() if condition == "difficult" else ordinary).slice(first, site_count)
+		var sites: Array = (get_difficult_sites() if condition == "difficult" else ordinary).slice(first, site_count) if only_seed < 0 else (get_difficult_sites() if condition == "difficult" else TownBuildingCheck.collect_sites())
 		for policy: String in policies:
 			for site: Dictionary in sites:
+				if only_seed >= 0 and int(site["seed"]) != only_seed:
+					continue
 				var result: Dictionary = play(site, policy, condition == "stressed", years)
 				_report("TOWN %s | %s | seed %d | %s" % [condition, policy, int(site["seed"]), JSON.stringify(result)])
 	quit()
@@ -95,6 +107,8 @@ func play(site: Dictionary, policy: String, stress: bool, years: int) -> Diction
 		for building: Building in town.buildings:
 			if building.assigned_household_id >= 0 and not (state["takeups"] as Dictionary).has(building.type):
 				state["takeups"][building.type] = day
+		if trace:
+			trace_day(town, day, state)
 		if day % 7 != 0:
 			return
 		var titles: Array[String] = []
@@ -103,15 +117,17 @@ func play(site: Dictionary, policy: String, stress: bool, years: int) -> Diction
 		for name: String in CARDS:
 			if titles.any(func(t: String) -> bool: return t.contains(name)) and not (state["first_card"] as Dictionary).has(name):
 				state["first_card"][name] = day
-		if policy == "informed" or policy == "late":
-			respond(town, state, day, titles, policy == "late")
-		if policy == "informed":
+				if trace:
+					print("[TRACE] day %d | WARNING SHOWN: %s" % [day, name])
+		if policy in ["informed", "late", "informed_priority", "informed_commission"]:
+			respond(town, state, day, titles, policy == "late", policy != "informed_commission", policy != "informed_priority")
+		if policy == "informed" or policy == "informed_woods":
 			protect_hunting_grounds(town, state, day)
 	var result: Dictionary = StandInPlayerScript.new().play(city, scenario, years * Calendar.DAYS_PER_YEAR)
 	return measure(city, state, bool(result["off_the_ground"]))
 
 # Answers the warnings on the cards with the cards' own buttons: a priority and a commission.
-func respond(city: City, state: Dictionary, day: int, titles: Array[String], late: bool) -> void:
+func respond(city: City, state: Dictionary, day: int, titles: Array[String], late: bool, priorities: bool = true, commissions: bool = true) -> void:
 	var food_out: bool = titles.has("Food has run out")
 	var food_falling: bool = titles.has("Food stores are falling")
 	var tools_out: bool = titles.has("Tools are running out")
@@ -120,14 +136,15 @@ func respond(city: City, state: Dictionary, day: int, titles: Array[String], lat
 	var tools_warning: bool = tools_out or (tools_low and not late)
 	if food_warning:
 		state["calm_since"] = day
-		if city.influence.priority != CommunityPriority.FOOD:
+		if priorities and city.influence.priority != CommunityPriority.FOOD:
 			act(city, state, day, "priority food", func() -> void: city.influence.set_priority(CommunityPriority.FOOD))
-		commission(city, state, day, "farm", "forager_garden")
+		if commissions:
+			commission(city, state, day, "farm", "forager_garden")
 	elif tools_warning:
 		state["calm_since"] = day
-		if city.influence.priority != CommunityPriority.INVESTMENT:
+		if priorities and city.influence.priority != CommunityPriority.INVESTMENT:
 			act(city, state, day, "priority investment", func() -> void: city.influence.set_priority(CommunityPriority.INVESTMENT))
-		if FamilyInitiative.count_producers(city, TownInfluence.ACTIVITY_TOOLS) == 0:
+		if commissions and FamilyInitiative.count_producers(city, TownInfluence.ACTIVITY_TOOLS) == 0:
 			commission(city, state, day, "tool_mender", "tool_mender")
 	elif city.influence.priority != CommunityPriority.NONE and day - int(state["calm_since"]) >= CALM_DAYS:
 		act(city, state, day, "no priority", func() -> void: city.influence.set_priority(CommunityPriority.NONE))
@@ -186,6 +203,38 @@ func protect_hunting_grounds(city: City, state: Dictionary, day: int) -> void:
 func act(_city: City, state: Dictionary, day: int, what: String, do: Callable) -> void:
 	do.call()
 	(state["actions"] as Array).append({"day": day, "action": what})
+	if trace:
+		print("[TRACE] day %d | PLAYER: %s" % [day, what])
+
+# One town's day for the trace: families' new choices of work and reviews with their reasons, and
+# the town each month.
+func trace_day(city: City, day: int, state: Dictionary) -> void:
+	var seen: Dictionary = state.get("notes", {})
+	for household: Household in city.households:
+		var note: String = household.initiative_note
+		if (note.begins_with("Took up") or note.begins_with("It is leaving")) and seen.get(household.id, "") != note:
+			print("[TRACE] day %d | family %d (%s) %s" % [day, household.id, "/".join(CultureEffects.get_callings(household.values)), note.substr(0, 260)])
+		seen[household.id] = note
+	state["notes"] = seen
+	var log: Array = city.influence._work_review_log
+	var reviewed: int = int(state.get("reviewed", 0))
+	while reviewed < log.size():
+		var entry: Dictionary = log[reviewed]
+		if not entry.has("deferred"):
+			var who: Household = city.get_household_by_id(int(entry["household"]))
+			var blocked: String = ""
+			if who != null and not bool(entry["changed"]) and float(entry["margin"]) >= OccupationReview.CHANGE_MARGIN and who.work_review_note.contains("found no free land"):
+				blocked = " (BLOCKED: it found no free land)"
+			print("[TRACE] day %d | REVIEW family %d on %s, triggers %s -> best %s, margin %.2f, %s%s | for: %s | stays for: %s" % [int(entry["day"]), int(entry["household"]), entry["from"], str(entry["triggers"]), entry["to"], float(entry["margin"]), "CHANGED" if bool(entry["changed"]) else "stayed", blocked, "; ".join(entry["for"]), "; ".join(entry["against"])])
+		reviewed += 1
+	state["reviewed"] = reviewed
+	if day % 60 == 0:
+		var work: Dictionary = {}
+		for building: Building in city.buildings:
+			if building.is_production_building():
+				var key: String = building.type + ("" if building.assigned_household_id >= 0 else "(empty)")
+				work[key] = int(work.get(key, 0)) + 1
+		print("[TRACE] day %d | TOWN food %d (%.0f days, grows %.2f of what it eats, outlook shortfall %.2f) | tools %d (shortage %.2f) | families %d, people %d | priority '%s' | work %s" % [day, int(city.resources["food"]), FamilyInitiative.get_food_days(city), FamilyInitiative.get_food_ratio(city), FamilyInitiative.get_food_outlook(city), int(city.resources["tools"]), FamilyInitiative.get_shortage(city, TownInfluence.ACTIVITY_TOOLS), city.households.size(), city.get_total_population(), city.influence.priority, str(work)])
 
 func measure(city: City, state: Dictionary, off_the_ground: bool) -> Dictionary:
 	var influence: TownInfluence = city.influence
