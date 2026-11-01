@@ -65,6 +65,10 @@ static func restore(main: Node, state: Dictionary) -> String:
 	var cities: Array[City] = []
 	for city_data: Dictionary in state["cities"]:
 		cities.append(restore_city(city_data))
+	# A town where families lead, saved before residential land existed, gets its starting land
+	# (HomeSites.ensure_starting_land: only once, and never over land the player marked).
+	for city: City in cities:
+		HomeSites.ensure_starting_land(city)
 	main.cities = cities
 	main.roads = state["roads"]
 	# The player's spur road is marked on the neighbourhood's tiles, as founding marked it.
@@ -121,6 +125,7 @@ static func capture_city(city: City) -> Dictionary:
 		"settlement": SaveCodec.capture(city.settlement),
 		"influence": SaveCodec.capture(city.influence),
 		"social": SaveCodec.capture(city.social),
+		"errands": city.errands.get_saved(),
 	}
 
 static func restore_city(data: Dictionary) -> City:
@@ -140,6 +145,10 @@ static func restore_city(data: Dictionary) -> City:
 		SaveCodec.restore(household, household_data)
 		households.append(household)
 	city.households = households
+	# Saves from before obstacles were recorded apart: the obstacle is in the note's words.
+	for household: Household in households:
+		if household.home_site_obstacle == "" and household.home_site_note.contains(" cannot build a home: "):
+			household.home_site_obstacle = household.home_site_note.get_slice(" cannot build a home: ", 1)
 	city.site_profile = SettlementSiteProfile.new()
 	SaveCodec.restore(city.site_profile, data["site_profile"])
 	SaveCodec.restore(city.logistics, data["logistics"])
@@ -153,6 +162,12 @@ static func restore_city(data: Dictionary) -> City:
 	SaveCodec.restore(city.settlement, data.get("settlement", {}))
 	SaveCodec.restore(city.influence, data.get("influence", {}))
 	SaveCodec.restore(city.social, data.get("social", {}))
+	# Saves from before the guiding wisdoms: the two expectations they add, and the gathering's
+	# earlier asks taken up as the town's wisdoms.
+	city.social.ensure_norms()
+	GuidingWisdom.adopt_earlier_asks(city)
+	# Saves from before errands were saved find their routes again (a month of slightly different wear).
+	city.errands.restore_saved(data.get("errands", {}))
 	var projects: Array[ConstructionProject] = []
 	for project_data: Dictionary in data["projects"]:
 		var project: ConstructionProject = ConstructionProject.new()

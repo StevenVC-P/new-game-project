@@ -75,6 +75,44 @@ var improve_decision_day: int = -1
 # Why the family chose its home's site, or what kept it from building (HomeSites), and when.
 var home_site_note: String = ""
 var home_site_day: int = -1
+# What kept it from building then ("" when it chose a site); whether that still holds is
+# FamilyDevelopment.is_home_site_blocked.
+var home_site_obstacle: String = ""
+# Its conduct toward each of the town's guiding wisdoms since it last drew a lesson from it
+# (wisdom -> [followed, declined]), and when that was (GuidingWisdom.review).
+var wisdom_conduct: Dictionary = {}
+var wisdom_lesson_day: Dictionary = {}
+# Its work as OccupationReview sees it: the workplace and since when, the share of its day spent
+# travelling then, months each reason to reconsider has held, when it last reconsidered, the
+# workplace it is leaving once its new work is built, and the activities it has changed to.
+var work_building_id: int = -1
+var work_since: int = -1
+var work_start_travel: float = 0.0
+var work_strain: Dictionary = {}
+var work_review_day: int = -1
+var work_change_from: int = -1
+var work_history: Array = []
+var work_review_note: String = ""
+var work_review_note_day: int = -1
+# Its household economy (HouseholdEconomy): proficiency by trade (0-1) and whether it has been
+# given its starting knowledge; the share of its day it gives to secondary work and which, the
+# garden ground or woods it has for it, and what it has gathered or mended toward a whole unit;
+# its larder of food, the days of its own eating it keeps back, and its days short this month.
+var proficiency: Dictionary = {}
+var proficiency_seeded: bool = false
+var secondary_activity: String = ""
+var secondary_share: float = 0.0
+var garden_land: float = 0.0
+var woods_land: float = 0.0
+var gathered_wood: float = 0.0
+var mending: float = 0.0
+var larder: float = 0.0
+var larder_target_days: int = 0
+var short_today: bool = false
+var short_days_this_month: int = 0
+var economy_note: String = ""
+var economy_note_day: int = -1
+var larder_note: String = ""
 
 # The household's character and social life (docs/HOUSEHOLD_SOCIAL_MODEL.md; HouseholdCharacter,
 # TownSocial). Empty until the social model or influence prototype gives the household one.
@@ -123,6 +161,9 @@ var civic_acts: int = 0
 var inspired_by: String = ""
 var inspired_by_household: int = -1
 var inspired_until: int = -1
+# The highest of each kind of contribution the town has noticed (TownRegard), so the same
+# achievement is recognised once.
+var noticed_merit: Dictionary = {}
 
 func _init(household_id: int = -1, building_id: int = -1, work_preference: String = WORK_PREF_NEUTRAL, population: int = 4, residence_status: String = RESIDENCE_TEMPORARY):
 	id = household_id

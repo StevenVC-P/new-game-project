@@ -40,15 +40,44 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # only (passive, each priority under both stores rules, informed, uninformed with matched policy changes, poor,
 # destructive) on ordinary towns, the same towns with the first winter's stores lost, and naturally difficult sites
 # (write to a file, filter for [PRI]; about an hour a condition: run one per process with "-- --conditions=ordinary"
-# etc.; also "--years=N --sites=N --strategies=a,b")
+# etc.; also "--years=N --sites=N --strategies=a,b --layout=compact" for the residential land towns start with)
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/community_priority_validation.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/priority_check.gd > priority.log
 
+# Guiding wisdom (docs/GUIDING_WISDOM.md): leadership and fixed choices, no change without a wisdom, one expectation each,
+# conflicting wisdoms, conduct becoming experience, counter-qualities, a level a year, framed lessons, the page, saves;
+# then no wisdom against the six pairs, two priority stacks, and a pair given a third wisdom by the village's Elder
+# (endure+respect>pride, endure+respect>prepare), six years with a year-3 snapshot (one condition and
+# strategy per process; "--prepare-difficult" caches the difficult sites first; filter for [WIS])
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/guiding_wisdom_validation.gd
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/wisdom_check.gd -- --conditions=ordinary --strategies=none,endure+respect > wis.log
+
+# Families reconsidering their work (docs/OCCUPATION_RECONSIDERATION.md): the rules; then the wisdom check's towns with
+# reconsideration on and off ("-- --no-reconsider"), and with the monthly limit lifted ("-- --change-limit=0")
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/occupation_review_validation.gd
+
+# Emergent recognition and the Speaker of the Gathering (docs/EMERGENT_RECOGNITION_AND_LEADERSHIP.md): the rules; then the
+# same towns under three priority/wisdom strategies, one branch per process: existing, emergent, speaker0/1/2 (the first,
+# second or third most influential household appointed at Village), replace01/12/20 (appointed, then replaced 540 days
+# later); filter for [SPK]
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_regard_validation.gd
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/speaker_check.gd -- --conditions=ordinary --strategies=food --branch=speaker0 > spk.log
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/wisdom_check.gd -- --conditions=ordinary --strategies=none,food --no-reconsider > occ_off.log
+
+# Household self-sufficiency and proficiency (docs/HOUSEHOLD_SELF_SUFFICIENCY.md): the rules; then the wisdom check's towns with the
+# system on and off ("-- --no-self-sufficiency"), with one part at a time ("--no-proficiency-effects", "--no-secondary"), and
+# with a disruption in the second autumn ("--disrupt=specialist" or "--disrupt=stores")
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/household_economy_validation.gd
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/wisdom_check.gd -- --conditions=difficult --strategies=none --no-self-sufficiency > hse_off.log
+
 # Home sites (docs/HOME_SITES.md): families choosing their own sites on land set aside, preferred land, no land, no
-# overlap, explanations, starting land; then starting land, plots, and equal-capacity compact, dispersed, poor, far and
+# overlap, explanations, starting land, land reserved from work, shared works among homes, preferred land between equal sites, explanations
+# that no longer hold; then starting land, plots, and equal-capacity compact, dispersed, poor, far and
 # preferred-far land on the same towns (write to a file, filter for [HOME]; "-- --years=N --sites=N --layouts=a,b")
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/home_site_validation.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/home_site_check.gd > homes.log
+# Preferred land between two equal places (two blocks on opposite sides, plain, then one preferred):
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/home_site_check.gd -- --layouts=twin,twin_preferred > twin.log
 
 # Multi-year settlement run, yearly report (filter output for [SIM])
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/settlement_growth_run.gd
@@ -86,6 +115,19 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # Town map: generator (determinism, follows the region, floors) and the view in the real flow (fit, coordinates, click/drag/wheel)
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_map_validation.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_map_view_validation.gd
+
+# Town sidebar (docs/TOWN_UI.md): layout, every page from a new and a grown town without changing it, attention from state,
+# tabs, wheel, buttons and family focus by real clicks, the footer, every shortcut the Planning page lists, starting land at
+# founding, choosing and withdrawing the community priority, and marking and clearing residential land
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_sidebar_validation.gd
+
+# Community play in the real game: founding with starting land and no tool in hand, marking preferred land by clicks on
+# the map, families building their own homes on it, choosing a priority, a family's reasons, answering a warning, save/load
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/community_play_validation.gd
+
+# Town interface screenshots at 1920x1080 and 1366x768: each page, a family selected, a tool placed, the community priority,
+# residential land, alerts, families finding nowhere to build (needs a window)
+& (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/town_ui_capture.gd -- <output_dir>
 
 # What town maps hold over 160 real sites, and generation time (filter for [TOWN]); the survey's thresholds come from it
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/town_map_probe.gd

@@ -102,6 +102,10 @@ static func ensure_kin_ties(city: City, household: Household) -> void:
 # lessons drawn (their words).
 static func experience(city: City, household: Household, kind: String, text: String, other: Household = null, facets: Dictionary = {}) -> Array[String]:
 	var lessons: Array[Dictionary] = get_lessons(city, household, kind, other, facets)
+	# The town's guiding wisdom makes the lessons that bear it out a little readier to hand.
+	for candidate: Dictionary in lessons:
+		if GuidingWisdom.frames(city, str(candidate["value"]), int(candidate["direction"])):
+			candidate["support"] = float(candidate["support"]) + GuidingWisdom.WISDOM_LESSON_SUPPORT
 	lessons.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["support"]) > float(b["support"]))
 	var chosen: Array[Dictionary] = []
 	if not lessons.is_empty():
@@ -139,6 +143,8 @@ static func get_lessons(city: City, household: Household, kind: String, other: H
 	var disposition: float = get_disposition(household, other.id) if other != null else 0.0
 	var s: Callable = func(value_id: String) -> float: return float(HouseholdCharacter.get_strength(household, value_id))
 	match kind:
+		"wisdom":
+			lessons = GuidingWisdom.get_lessons(household, str(facets["wisdom"]), bool(facets["followed"]))
 		"helped", "food_received":
 			lessons.append(lesson("neighbours can be trusted", "mutual_aid", 1, 1.0 + 0.5 * empathy + 0.5 * sociability + 0.3 * disposition + 0.3 * s.call("mutual_aid")))
 			lessons.append(lesson("we should help others in turn", "communal_labor" if kind == "helped" else "charitable", 1, 0.5 + 0.5 * diligence + 0.3 * empathy + 0.5 * s.call("communal_labor" if kind == "helped" else "charitable")))

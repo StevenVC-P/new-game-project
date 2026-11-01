@@ -7,12 +7,11 @@ extends SceneTree
 # - starting:      the modest starting land a passive player has (HomeSites.set_aside_starting_land);
 # - plots:         the stand-in player's plots, two homes ahead, nearest the stockpile (reference:
 #                  its homes come over time, not all at once);
-# - compact, dispersed, poor: the same housing capacity from the first day (CAPACITY spots a home can
-#                  stand on), around the stockpile, in four blocks well out, or in the map's far corner,
-#                  so layouts differ in where homes can go, not in how many;
-# - far_only:      CAPACITY spots in one block DISTANT tiles from the stockpile, on its roomiest side;
-# - preferred_far: CAPACITY spots around the stockpile, and CAPACITY more in the far block marked
-#                  preferred: the player's hope against families' wish to live near their work.
+# - compact, dispersed, poor, far_only, preferred_far: the same housing capacity from the first day,
+#                  placed differently (residential_layouts.gd); preferred_far sets the player's hope
+#                  against families' wish to live near their work;
+# - twin, twin_preferred (run with --layouts=twin,twin_preferred): two equal blocks on opposite
+#                  sides, plain, then the first preferred; homes on the first block, by temperament.
 #
 # Reports getting off the ground, people, when founders were all housed, homes families built,
 # the share of the working day lost to travel, site-days waiting for builders, and, where land is
@@ -22,13 +21,10 @@ extends SceneTree
 
 const TownBuildingCheck = preload("res://tests/sim/town_building_check.gd")
 const StandInPlayerScript = preload("res://tests/sim/stand_in_player.gd")
+const Layouts = preload("res://tests/sim/residential_layouts.gd")
 
 const BASE: Dictionary = {"hand_method": true, "families_develop": true, "homes_on_plots": true, "social": true, "land_food": false, "never": ["herder", "fisher", "hunter", "house"]}
 const LAYOUTS: Array[String] = ["starting", "plots", "compact", "dispersed", "poor", "far_only", "preferred_far"]
-const CAPACITY: int = 24
-const DISPERSED_OFFSET: int = 12
-const DISTANT: int = 12
-const DIRECTIONS: Array[Vector2i] = [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]
 
 func _init() -> void:
 	call_deferred("run")
@@ -46,9 +42,8 @@ func run() -> void:
 			only.assign(argument.trim_prefix("--layouts=").split(","))
 	var sites: Array = TownBuildingCheck.collect_sites().slice(0, site_count)
 	_report("%d towns on real town maps, %d years, six founding families choosing their own home sites" % [sites.size(), years])
-	for layout: String in LAYOUTS:
-		if not only.is_empty() and not only.has(layout):
-			continue
+	# --layouts= picks among LAYOUTS and the twin layouts, which only run when named.
+	for layout: String in (only if not only.is_empty() else LAYOUTS):
 		var results: Array[Dictionary] = []
 		for site: Dictionary in sites:
 			results.append(play(site, layout, years))
@@ -64,92 +59,37 @@ func play(site: Dictionary, layout: String, years: int) -> Dictionary:
 	if layout == "plots":
 		(scenario["never"] as Array).erase("house")
 	else:
-		set_aside(city, layout)
+		Layouts.set_aside(city, layout)
 	var room: int = HomeSites.count_room(city)
+	var sides: Array[Vector2i] = Layouts.get_twin_centres(city, Layouts.get_heart(city)) if layout.begins_with("twin") else ([] as Array[Vector2i])
 	var result: Dictionary = StandInPlayerScript.new().play(city, scenario, years * Calendar.DAYS_PER_YEAR)
 	result["room"] = room
 	result["blocked_notes"] = city.households.filter(func(h: Household) -> bool: return h.home_site_note.contains("cannot build")).size()
-	result["homes_by_group"] = count_homes_by_group(city)
+	result["homes_by_group"] = count_homes_by_group(city, sides)
+	result["land_under_work"] = count_land_under_other_buildings(city)
 	return result
 
-func get_heart(city: City) -> Vector2i:
-	return TownLogistics.center_tile(city.logistics.stockpile_tile, TownLogistics.STOCKPILE_SIZE)
-
-func set_aside(city: City, layout: String) -> void:
-	var heart: Vector2i = get_heart(city)
-	var size: Vector2i = city.logistics.map_size()
-	match layout:
-		"starting":
-			HomeSites.set_aside_starting_land(city)
-		"compact":
-			mark_block(city, heart, 6, HomeSites.LAND_PERMITTED)
-			trim(city, HomeSites.LAND_PERMITTED, [heart], CAPACITY)
-		"dispersed":
-			var centres: Array[Vector2i] = []
-			for offset: Vector2i in [Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1)]:
-				centres.append(heart + offset * DISPERSED_OFFSET)
-				mark_block(city, centres.back(), 3, HomeSites.LAND_PERMITTED)
-			trim(city, HomeSites.LAND_PERMITTED, centres, CAPACITY)
-		"poor":
-			var corner: Vector2i = Vector2i(5 if heart.x > size.x / 2 else size.x - 6, 5 if heart.y > size.y / 2 else size.y - 6)
-			mark_block(city, corner, 6, HomeSites.LAND_PERMITTED)
-			trim(city, HomeSites.LAND_PERMITTED, [corner], CAPACITY)
-		"far_only":
-			var far: Vector2i = get_far_centre(city, heart)
-			mark_block(city, far, 6, HomeSites.LAND_PERMITTED)
-			trim(city, HomeSites.LAND_PERMITTED, [far], CAPACITY)
-		"preferred_far":
-			mark_block(city, heart, 6, HomeSites.LAND_PERMITTED)
-			trim(city, HomeSites.LAND_PERMITTED, [heart], CAPACITY)
-			var far: Vector2i = get_far_centre(city, heart)
-			mark_block(city, far, 6, HomeSites.LAND_PREFERRED)
-			trim(city, HomeSites.LAND_PREFERRED, [far], CAPACITY)
-
-func mark_block(city: City, centre: Vector2i, radius: int, level: int) -> void:
-	for y in range(centre.y - radius, centre.y + radius + 1):
-		for x in range(centre.x - radius, centre.x + radius + 1):
-			var tile: Vector2i = Vector2i(x, y)
-			if city.construction.is_inside(tile) and HomeSites.get_land(city, tile) == HomeSites.LAND_NONE:
-				(city.local_map[y][x] as Dictionary)[HomeSites.RESIDENTIAL_KEY] = level
-
-# Keeps the `count` spots of a level a home could stand on nearest any of the centres (ties in row
-# order) and clears the rest of that level, so every layout offers the same capacity.
-func trim(city: City, level: int, centres: Array, count: int) -> void:
-	var spots: Array[Dictionary] = []
-	var size: Vector2i = city.logistics.map_size()
-	for y in range(size.y):
-		for x in range(size.x):
-			var tile: Vector2i = Vector2i(x, y)
-			if HomeSites.get_land(city, tile) != level:
-				continue
-			if city.construction.validate(Building.BUILDING_HOUSE, tile)["is_valid"] != true:
-				(city.local_map[y][x] as Dictionary).erase(HomeSites.RESIDENTIAL_KEY)
-				continue
-			spots.append({"tile": tile, "distance": HomeSites.nearest(Vector2(tile), centres), "index": spots.size()})
-	spots.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["distance"]) < float(b["distance"]) or (float(a["distance"]) == float(b["distance"]) and int(a["index"]) < int(b["index"])))
-	for spot: Dictionary in spots.slice(count):
-		var tile: Vector2i = spot["tile"]
-		(city.local_map[tile.y][tile.x] as Dictionary).erase(HomeSites.RESIDENTIAL_KEY)
-
-# DISTANT tiles from the stockpile on the side with most open ground for homes.
-func get_far_centre(city: City, heart: Vector2i) -> Vector2i:
-	var best: Vector2i = heart + DIRECTIONS[0] * DISTANT
-	var best_room: int = -1
-	for direction: Vector2i in DIRECTIONS:
-		var centre: Vector2i = heart + direction * DISTANT
-		var room: int = 0
-		for y in range(centre.y - 6, centre.y + 7):
-			for x in range(centre.x - 6, centre.x + 7):
-				if city.construction.is_inside(Vector2i(x, y)) and city.construction.validate(Building.BUILDING_HOUSE, Vector2i(x, y))["is_valid"] == true:
-					room += 1
-		if room > best_room:
-			best_room = room
-			best = centre
-	return best
+# Residential tiles that ended up under something other than a home (workplaces, fields, stores,
+# their sites): nothing reserves residential land for homes alone.
+func count_land_under_other_buildings(city: City) -> int:
+	var count: int = 0
+	var footprints: Array = []
+	for building: Building in city.buildings:
+		if not building.is_house():
+			footprints.append(TownLogistics.footprint(building.tile, building.size))
+	for project: ConstructionProject in city.construction.projects:
+		if not project.is_home() and project.kind == ConstructionProject.KIND_BUILDING:
+			footprints.append(project.get_footprint())
+	for footprint: Array in footprints:
+		for tile: Vector2i in footprint:
+			if city.construction.is_inside(tile) and HomeSites.get_land(city, tile) != HomeSites.LAND_NONE:
+				count += 1
+	return count
 
 # Homes standing at the end, by the land under them and how readily the family heeds the gathering:
-# {"heeds" | "self_governing" | "other": {"preferred": n, "other": n}}.
-func count_homes_by_group(city: City) -> Dictionary:
+# {"heeds" | "self_governing" | "other": {"preferred": n, "other": n}}. With twin `sides`, "preferred"
+# is the first side (nearer its centre), plain or preferred, so both twin layouts count alike.
+func count_homes_by_group(city: City, sides: Array[Vector2i] = []) -> Dictionary:
 	var groups: Dictionary = {}
 	for household: Household in city.households:
 		if household.residence_building_id < 0 or household.residence_building_id >= city.buildings.size():
@@ -163,6 +103,8 @@ func count_homes_by_group(city: City) -> Dictionary:
 		if not groups.has(group):
 			groups[group] = {"preferred": 0, "other": 0}
 		var on_preferred: bool = HomeSites.get_land(city, home.tile) == HomeSites.LAND_PREFERRED
+		if not sides.is_empty():
+			on_preferred = Vector2(home.tile).distance_to(Vector2(sides[0])) < Vector2(home.tile).distance_to(Vector2(sides[1]))
 		groups[group]["preferred" if on_preferred else "other"] += 1
 	return groups
 
@@ -174,7 +116,7 @@ func summarize(layout: String, results: Array[Dictionary]) -> void:
 	var groups: Dictionary = {}
 	for result: Dictionary in results:
 		made_it += 1 if result["off_the_ground"] else 0
-		for key: String in ["population", "households", "homes_by_families", "travel_share", "stalled_site_days", "room", "blocked_notes"]:
+		for key: String in ["population", "households", "homes_by_families", "travel_share", "stalled_site_days", "room", "blocked_notes", "land_under_work"]:
 			totals[key] = float(totals.get(key, 0.0)) + float(result[key])
 		if int(result["founders_housed_day"]) >= 0:
 			housed.append(int(result["founders_housed_day"]))
@@ -185,10 +127,10 @@ func summarize(layout: String, results: Array[Dictionary]) -> void:
 				groups[group][key] += int(result["homes_by_group"][group][key])
 	housed.sort()
 	var avg: Callable = func(key: String) -> float: return float(totals.get(key, 0.0)) / n
-	_report("%-13s %2d/%d off the ground | people %5.1f | families %4.1f | founders housed by day %s (%d/%d) | homes families built %.1f | travel %.1f%% of the day | site-days with no builder %.0f | spots at the start %.0f | families blocked at the end %.1f" % [
+	_report("%-13s %2d/%d off the ground | people %5.1f | families %4.1f | founders housed by day %s (%d/%d) | homes families built %.1f | travel %.1f%% of the day | site-days with no builder %.0f | spots at the start %.0f | families blocked at the end %.1f | residential tiles under other buildings %.1f" % [
 		layout, made_it, results.size(), avg.call("population"), avg.call("households"), str(housed[housed.size() / 2]) if not housed.is_empty() else "-", housed.size(), results.size(),
-		avg.call("homes_by_families"), avg.call("travel_share") * 100.0, avg.call("stalled_site_days"), avg.call("room"), avg.call("blocked_notes")])
-	if layout == "preferred_far":
+		avg.call("homes_by_families"), avg.call("travel_share") * 100.0, avg.call("stalled_site_days"), avg.call("room"), avg.call("blocked_notes"), avg.call("land_under_work")])
+	if layout == "preferred_far" or layout.begins_with("twin"):
 		var words: Array[String] = []
 		for group: String in ["heeds", "other", "self_governing"]:
 			if groups.has(group):

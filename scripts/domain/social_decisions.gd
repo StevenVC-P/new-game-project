@@ -109,8 +109,9 @@ static func get_hours_desire(city: City, household: Household, project: Construc
 	if household.long_weeks_this_month >= 2:
 		add(terms, -0.75 * (household.long_weeks_this_month - 1), "it is weary")
 	add_own_security(city, household, terms, "it cannot afford to wear itself out")
+	var pride: float = GuidingWisdom.add_appeal(city, household, GuidingWisdom.PRIDE, terms) if own else 0.0
 	var appeal: float = CommunityPriority.add_hours_appeal(city, household, project, terms)
-	return {"score": sum(terms), "terms": terms, "appeal": appeal}
+	return {"score": sum(terms), "terms": terms, "appeal": appeal, "pride": pride}
 
 # --- Sharing in a shortage ------------------------------------------------------------------------
 
@@ -127,6 +128,7 @@ static func get_share_desire(city: City, donor: Household, recipient: Household)
 	add_strength(terms, donor, "acquisitive", -0.75, "it holds on to what it has")
 	add_strength(terms, donor, "each_to_their_own", -0.75, "it holds that each family fends for itself")
 	add_strength(terms, donor, "thrifty", -0.25, "it is thrifty")
+	GuidingWisdom.add_appeal(city, donor, GuidingWisdom.PREPARE, terms, -1.0)
 	var after: int = TownSocial.get_margin_after_giving(donor)
 	if after <= HouseholdMigration.DEPARTURE_WARNING_MARGIN:
 		add(terms, -6.0, "it lacks reserves of its own")
@@ -317,13 +319,15 @@ static func add_own_security(city: City, household: Household, terms: Array, rea
 
 # What the household sees its neighbours do about a norm, and the community's appeal if it promotes
 # it. Conformity is scaled by sociability; the appeal by receptiveness and trust (FamilyInitiative).
-static func add_norm(city: City, household: Household, norm_id: String, terms: Array) -> void:
+# `toward` is -1 where keeping to the norm means not doing what is weighed (keeping something back
+# rather than sharing it).
+static func add_norm(city: City, household: Household, norm_id: String, terms: Array, toward: float = 1.0) -> void:
 	var norm: Dictionary = city.social.norms[norm_id]
 	var conformity: float = (float(norm["acceptance"]) - 0.5) * 2.0 * (1.0 + 0.25 * axis(household, HouseholdCharacter.SOCIABILITY))
 	if absf(conformity) >= 0.2:
-		add(terms, conformity, ("most neighbours " if conformity > 0.0 else "few neighbours ") + str(TownSocial.NORM_PHRASES[norm_id]))
+		add(terms, toward * conformity, ("most neighbours " if conformity > 0.0 else "few neighbours ") + str(TownSocial.NORM_PHRASES[norm_id]))
 	if str(norm["status"]) == TownSocial.STATUS_CUSTOM:
-		add(terms, 0.5, "it is the custom here")
+		add(terms, toward * 0.5, "it is the custom here to " + str(TownSocial.NORM_PHRASES[norm_id]) if toward < 0.0 else "it is the custom here")
 	if bool(norm["promoted"]):
 		var receptive: Dictionary = FamilyInitiative.get_receptiveness(household, city)
-		add(terms, NORM_APPEAL_WEIGHT * float(receptive["factor"]), "the gathering asks families to " + str(TownSocial.NORM_ASKS[norm_id]) + str(receptive["note"]))
+		add(terms, toward * NORM_APPEAL_WEIGHT * float(receptive["factor"]), "the gathering asks families to " + str(TownSocial.NORM_ASKS[norm_id]) + str(receptive["note"]))
