@@ -133,6 +133,9 @@ static func take_up_work(city: City, household: Household) -> ConstructionProjec
 		var building_type: String = BuildingTiers.get_hand_work_type(choice["occupation"])
 		var site: Vector2i = choice["site"] if choice.has("site") else choose_site(city, household, building_type)
 		if site.x < 0:
+			# Its first choice has no free land: something the player can see and answer.
+			if choice == choices[0]:
+				note_blocked(city, household, building_type)
 			continue
 		var project: ConstructionProject = city.construction.request_building(building_type, site, ConstructionProject.REQUESTED_BY_HOUSEHOLD, household.id, household.id)
 		if project == null:
@@ -913,6 +916,11 @@ static func get_noise(city: City, household: Household, what: String) -> float:
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash([city.founding_seed, household.id, city.construction.day / INTERVAL_DAYS, what])
 	return rng.randf_range(-NOISE, NOISE)
+
+# The family wanted work it could find no free land for (SidebarOverviewPage, Needs attention).
+static func note_blocked(city: City, household: Household, building_type: String) -> void:
+	household.blocked_work_type = building_type
+	household.blocked_work_day = city.construction.day
 
 static func note(city: City, household: Household, text: String) -> void:
 	household.initiative_note = text

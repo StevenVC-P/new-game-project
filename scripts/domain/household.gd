@@ -94,6 +94,10 @@ var work_change_from: int = -1
 var work_history: Array = []
 var work_review_note: String = ""
 var work_review_note_day: int = -1
+# Work the family chose but could find no free land for (a hand-work type), and when: what the town's
+# Needs attention tells the player (SidebarOverviewPage). "" when it has not been blocked.
+var blocked_work_type: String = ""
+var blocked_work_day: int = -1
 # Its household economy (HouseholdEconomy): proficiency by trade (0-1) and whether it has been
 # given its starting knowledge; the share of its day it gives to secondary work and which, the
 # garden ground or woods it has for it, and what it has gathered or mended toward a whole unit;

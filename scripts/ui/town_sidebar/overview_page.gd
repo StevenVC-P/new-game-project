@@ -258,7 +258,104 @@ static func get_attention(city: City, context: Dictionary = {}) -> Array[Diction
 	if bool(clothing.get("active", false)) and str(clothing.get("status", "")) == "unmet" and not has_working(city, Building.BUILDING_HERDER):
 		cards.append(make_card(25, SP.TONE_INFO, "No clothing to be had", ["A herder's fold gives wool for clothing."], [{"text": "Plan a herder's fold (H)", "action": {"action": "select_tool", "tool": Building.BUILDING_HERDER}}]))
 
+	if families_lead:
+		cards.append_array(get_no_land_cards(city))
+		cards.append_array(get_failing_livelihood_cards(city))
+
 	cards.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["priority"]) > int(b["priority"]))
+	return cards
+
+# Families who chose work in the last two months and could find no free land for it, and still do not
+# have it (Household.blocked_work_type): what they want, why the land fails them, and the land tools
+# that make such land.
+const NO_LAND_DAYS: int = 60
+const NO_LAND_REASONS: Dictionary = {
+	"farm": "A field needs fertile land, and the fertile land within reach of their homes is taken.",
+	"fisher": "A weir needs a bank with water beside it, and the banks within reach are taken.",
+	"hunter": "A snare line needs woods close by, and none are free within reach.",
+	"herder": "A pen needs open ground, and none is free within reach.",
+}
+const NO_LAND_TOOLS: Dictionary = {
+	"farm": [{"text": "Till land into farmland (F)", "action": {"action": "select_tool", "tool": TownFarmland.TILL}}, {"text": "Clear woods (C)", "action": {"action": "select_tool", "tool": TownWoodland.CLEAR}}],
+	"herder": [{"text": "Clear woods (C)", "action": {"action": "select_tool", "tool": TownWoodland.CLEAR}}],
+}
+
+static func get_no_land_cards(city: City) -> Array[Dictionary]:
+	var wanting: Dictionary = {}
+	for household: Household in city.households:
+		if household.blocked_work_type == "" or city.construction.day - household.blocked_work_day > NO_LAND_DAYS:
+			continue
+		var holding: Building = FamilyInitiative.get_holding(city, household)
+		if holding != null and BuildingTiers.get_base_type(holding.type) == BuildingTiers.get_base_type(household.blocked_work_type):
+			continue
+		var list: Array = wanting.get(household.blocked_work_type, [])
+		list.append(household)
+		wanting[household.blocked_work_type] = list
+	var cards: Array[Dictionary] = []
+	for building_type: String in wanting.keys():
+		var families: Array = wanting[building_type]
+		var base: String = BuildingTiers.get_base_type(building_type)
+		var hungry: int = families.filter(func(h: Household) -> bool: return h.short_days_this_month > 0).size()
+		var lines: Array = ["%d famil%s want to take up %s, but find no free land for it near their homes." % [families.size(), "y" if families.size() == 1 else "ies", FamilyInitiative.describe_type(building_type)]]
+		lines.append(str(NO_LAND_REASONS.get(base, "The land it needs is taken within reach of their homes.")))
+		if hungry > 0:
+			lines.append("%d of them %s going hungry." % [hungry, "is" if hungry == 1 else "are"])
+		cards.append(make_card(72 if hungry > 0 else 48, SP.TONE_ALERT if hungry > 0 else SP.TONE_CAUTION, "Families find no land for their work", lines, NO_LAND_TOOLS.get(base, [])))
+	return cards
+
+# Work that lives off the land whose yield has fallen to two thirds of the best it gave, or less:
+# its water, woods or pasture are going (TownLand), with what is taking them.
+const FAILING_SHARE: float = 0.67
+const FAILING_MIN_PEAK: float = 0.5
+
+static func get_failing_livelihood_cards(city: City) -> Array[Dictionary]:
+	var failing: Dictionary = {}
+	for building: Building in city.buildings:
+		var kind: String = TownLand.get_reach_kind(building.type)
+		if kind == "" or building.assigned_household_id < 0 or building.peak_land_yield < FAILING_MIN_PEAK:
+			continue
+		var now: float = city.land.get_reach_factor(building)
+		if now <= building.peak_land_yield * FAILING_SHARE:
+			var row: Array = failing.get(kind, [0, 0.0, 0.0, 0])
+			row[0] = int(row[0]) + 1
+			row[1] = float(row[1]) + now
+			row[2] = float(row[2]) + building.peak_land_yield
+			var family: Household = city.get_household_by_id(building.assigned_household_id)
+			row[3] = int(row[3]) + (1 if family != null and family.short_days_this_month > 0 else 0)
+			failing[kind] = row
+	var cards: Array[Dictionary] = []
+	for kind: String in failing.keys():
+		var row: Array = failing[kind]
+		var count: int = int(row[0])
+		var share: int = roundi(100.0 * float(row[1]) / maxf(0.01, float(row[2])))
+		var plural: String = "" if count == 1 else "s"
+		var title: String = ""
+		var lines: Array = []
+		var buttons: Array = []
+		match kind:
+			"woods":
+				title = "Hunting grounds are being felled"
+				lines.append("The woods round %d hunting workplace%s now give %d%% of the game they did." % [count, plural, share])
+				var felling: Array[String] = []
+				if city.buildings.any(func(b: Building) -> bool: return BuildingTiers.get_base_type(b.type) == "woodcutter" and b.assigned_household_id >= 0):
+					felling.append("the town's woodcutters fell the trees nearest them")
+				if not city.woodland.marked.is_empty():
+					felling.append("woods are marked for clearing")
+				if not felling.is_empty():
+					var cause: String = " and ".join(felling)
+					lines.append(cause.substr(0, 1).to_upper() + cause.substr(1) + ".")
+				lines.append("Woodcutters fell woods marked for clearing before any others.")
+				buttons.append({"text": "Mark woods to fell elsewhere (C)", "action": {"action": "select_tool", "tool": TownWoodland.CLEAR}})
+			"pasture":
+				title = "Grazing land is being lost"
+				lines.append("The open ground round %d grazing workplace%s now feeds %d%% of the flock it did." % [count, plural, share])
+				lines.append("Buildings, fields and spreading woods take the open ground.")
+			_:
+				title = "Fishing water is thinning"
+				lines.append("The water round %d fishing workplace%s now gives %d%% of the catch it did." % [count, plural, share])
+		if int(row[3]) > 0:
+			lines.append("%d of their families %s going hungry." % [int(row[3]), "is" if int(row[3]) == 1 else "are"])
+		cards.append(make_card(68 if int(row[3]) > 0 else 46, SP.TONE_ALERT if int(row[3]) > 0 else SP.TONE_CAUTION, title, lines, buttons))
 	return cards
 
 const LAND_BUTTON: Dictionary = {"text": "Set aside residential land (N)", "action": {"action": "select_tool", "tool": HomeSites.TOOL_LAND}}

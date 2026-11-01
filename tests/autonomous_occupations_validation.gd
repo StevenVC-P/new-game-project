@@ -28,6 +28,8 @@ func run_all() -> void:
 	test_food_judged_by_work_done()
 	test_holding_worth_what_it_yields()
 	test_hunger_counted_once()
+	test_warning_no_land()
+	test_warning_failing_livelihood()
 	if failure_count > 0:
 		push_error("Autonomous occupations validation failed: " + str(failure_count) + " failure(s)")
 		quit(1)
@@ -410,6 +412,45 @@ func test_hunger_counted_once() -> void:
 	var fed: City = town()
 	busy_everyone_else(fed, fed.households[0])
 	_check(has_reason(FamilyInitiative.get_work_desire(fed, fed.households[0], "farm")["terms"], "plenty of food in store and coming"), "years of food in store is plenty, looking ahead")
+
+func card_titled(city: City, title: String) -> Dictionary:
+	for card: Dictionary in SidebarOverviewPage.get_attention(city):
+		if str(card["title"]) == title:
+			return card
+	return {}
+
+# 16. Families who chose work and found no land for it are shown to the player, with the land tools
+# that make such land; and only while it is so.
+func test_warning_no_land() -> void:
+	var map: Array = ConstructionTest.make_map()
+	for row: Array in map:
+		for tile: Dictionary in row:
+			tile["is_fertile"] = false
+	var city: City = town(map)
+	var family: Household = city.households[0]
+	busy_everyone_else(city, family)
+	_check(card_titled(city, "Families find no land for their work").is_empty(), "no warning before any family is blocked")
+	FamilyInitiative.note_blocked(city, family, "forager_garden")
+	family.short_days_this_month = 4
+	var card: Dictionary = card_titled(city, "Families find no land for their work")
+	_check(not card.is_empty() and str(card["lines"]).contains("fertile land") and str(card["lines"]).contains("going hungry"), "a blocked, hungry family is a warning that says why: %s" % str(card.get("lines", [])))
+	_check(not card.is_empty() and (card["buttons"] as Array).any(func(b: Dictionary) -> bool: return b["action"]["tool"] == TownFarmland.TILL), "with the tool to till land")
+	city.construction.day += SidebarOverviewPage.NO_LAND_DAYS + 1
+	_check(card_titled(city, "Families find no land for their work").is_empty(), "and it passes when the family has not been blocked for two months")
+
+# 17. Hunting whose woods are being felled is shown to the player, measured against the best the
+# woods gave; a lodge that was always thin is not a failing livelihood.
+func test_warning_failing_livelihood() -> void:
+	var city: City = town()
+	var family: Household = city.households[0]
+	busy_everyone_else(city, family)
+	var lodge: Building = give(city, family, "hunter", Vector2i(30, 20))
+	lodge.peak_land_yield = 0.3
+	_check(card_titled(city, "Hunting grounds are being felled").is_empty(), "a lodge that never had much woods is not failing")
+	lodge.peak_land_yield = 1.0
+	var card: Dictionary = card_titled(city, "Hunting grounds are being felled")
+	_check(not card.is_empty() and str(card["lines"]).contains("of the game they did"), "a lodge whose woods are going is: %s" % str(card.get("lines", [])))
+	_check(not card.is_empty() and (card["buttons"] as Array).any(func(b: Dictionary) -> bool: return b["action"]["tool"] == TownWoodland.CLEAR), "with the tool to steer felling elsewhere")
 
 func _check(condition: bool, message: String) -> void:
 	if condition:

@@ -98,6 +98,8 @@ static func advance_month(city: City) -> void:
 			household.work_start_travel = city.logistics.get_travel_share(holding)
 			household.work_strain.clear()
 		update_strain(city, household, holding)
+		if TownLand.get_reach_kind(holding.type) != "":
+			holding.peak_land_yield = maxf(holding.peak_land_yield, city.land.get_reach_factor(holding))
 		if is_due(city, household) and not get_triggers(city, household, holding).is_empty():
 			candidates.append(household)
 		elif is_due_in_danger(city, household) and is_urgent(get_triggers(city, household, holding)):
@@ -295,6 +297,7 @@ static func change_work(city: City, household: Household, holding: Building, dec
 	var site: Vector2i = decision["site"] if decision.has("site") else FamilyInitiative.choose_site(city, household, building_type)
 	if site.x < 0:
 		decision["blocked"] = "it found no free land for %s" % FamilyInitiative.describe_type(building_type)
+		FamilyInitiative.note_blocked(city, household, building_type)
 		return false
 	var project: ConstructionProject = city.construction.request_building(building_type, site, ConstructionProject.REQUESTED_BY_HOUSEHOLD, household.id, household.id)
 	if project == null:

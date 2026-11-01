@@ -7,14 +7,15 @@ extends SceneTree
 # marked for clearing). No player orders a family.
 #
 # - none: never intervenes;
-# - informed: answers each warning when it first shows (food falling or out: food first, and a
-#   field commissioned; tools low: investment first, and a tool mender commissioned; both calm for a
-#   season: no priority), and once hunters and woodcutters share the woods, marks woods for
-#   clearing far from the hunting grounds so the woodcutters fell there;
-# - late: the same answers, only once food has run out or tools are running out (no woods marked);
+# - informed: answers each warning when it shows, with the card's own buttons (food falling or out:
+#   food first, and a field commissioned; tools low: investment first, and a tool mender
+#   commissioned; both calm for a season: no priority; families finding no land for their work:
+#   land near their homes marked to till; hunting grounds being felled: a stand of woods far from
+#   them marked for clearing, so the woodcutters fell there);
+# - late: the same answers, only once food has run out or tools are running out;
 # - inappropriate: puts productive investment first from founding and keeps it;
-# - informed_priority, informed_commission, informed_woods: the informed player's three answers one
-#   at a time (the priority alone; commissioning alone; marking woods alone), to tell them apart.
+# - informed_priority, informed_commission, informed_land: the informed player's answers one kind at
+#   a time (the priority; commissioning; the land tools), to tell them apart.
 #
 # Records when each warning first showed (could the player see it in time?), what the player did
 # and when, and what families decided (takeups, reviews, changes, decisions the priority tipped).
@@ -35,7 +36,11 @@ const MODES: Dictionary = {
 }
 const DIFFICULT_POOL_REGIONS: int = 30
 const DIFFICULT_CACHE: String = "user://wisdom_difficult_seeds.txt"
-const CARDS: Array[String] = ["Food stores are falling", "Food has run out", "Tools are low", "Tools are running out", "Workplaces are wearing down", "thinking of leaving"]
+const CARDS: Array[String] = ["Food stores are falling", "Food has run out", "Tools are low", "Tools are running out", "Workplaces are wearing down", "thinking of leaving", "Families find no land for their work", "Hunting grounds are being felled"]
+const NO_LAND: String = "Families find no land for their work"
+const FELLED: String = "Hunting grounds are being felled"
+# A block of land marked to till, tiles per side, and how often the player marks again.
+const TILL_SIDE: int = 4
 const CALM_DAYS: int = 90
 const COMMISSION_GAP_DAYS: int = 90
 # Woods kept for hunting: the player marks woods for clearing at least this far from any hunting
@@ -121,8 +126,12 @@ func play(site: Dictionary, policy: String, stress: bool, years: int) -> Diction
 					print("[TRACE] day %d | WARNING SHOWN: %s" % [day, name])
 		if policy in ["informed", "late", "informed_priority", "informed_commission"]:
 			respond(town, state, day, titles, policy == "late", policy != "informed_commission", policy != "informed_priority")
-		if policy == "informed" or policy == "informed_woods":
-			protect_hunting_grounds(town, state, day)
+		var acute: bool = titles.has("Food has run out") or titles.has("Tools are running out")
+		if policy == "informed" or policy == "informed_land" or (policy == "late" and acute):
+			if titles.has(NO_LAND):
+				till_near_blocked(town, state, day)
+			if titles.has(FELLED):
+				protect_hunting_grounds(town, state, day)
 	var result: Dictionary = StandInPlayerScript.new().play(city, scenario, years * Calendar.DAYS_PER_YEAR)
 	return measure(city, state, bool(result["off_the_ground"]))
 
@@ -161,8 +170,34 @@ func commission(city: City, state: Dictionary, day: int, proper: String, hand: S
 		state["last_commission"] = day
 		(state["actions"] as Array).append({"day": day, "action": "commission " + building_type})
 
-# Once hunters and woodcutters share the woods, and nothing is marked, marks a block of woods for
-# clearing as far as the woodcutters reach from any hunting ground, so they fell there.
+# Families find no land for their work: marks open ground nearest the first blocked family's home to
+# till; the families on fields till it as part of their work (TownFarmland).
+func till_near_blocked(city: City, state: Dictionary, day: int) -> void:
+	if not city.farmland.marked.is_empty() or day - int(state.get("last_till", -MARK_GAP_DAYS)) < MARK_GAP_DAYS:
+		return
+	var anchor: Vector2i = Vector2i(-1, -1)
+	for household: Household in city.households:
+		if household.blocked_work_type != "" and day - household.blocked_work_day <= SidebarOverviewPage.NO_LAND_DAYS:
+			anchor = FamilyInitiative.get_anchor(city, household)
+			break
+	if anchor.x < 0:
+		return
+	var best: Vector2i = Vector2i(-1, -1)
+	var best_distance: float = INF
+	for y in range(city.local_map.size()):
+		for x in range((city.local_map[y] as Array).size()):
+			if TownFarmland.can_till(city.local_map[y][x]):
+				var distance: float = Vector2(x, y).distance_to(Vector2(anchor))
+				if distance < best_distance:
+					best_distance = distance
+					best = Vector2i(x, y)
+	if best.x < 0:
+		return
+	state["last_till"] = day
+	act(city, state, day, "till land %s" % str(best), func() -> void: city.farmland.mark_block(best, best + Vector2i(TILL_SIDE - 1, TILL_SIDE - 1)))
+
+# Hunting grounds are being felled, and nothing is marked: marks a block of woods for clearing as far
+# as the woodcutters reach from any hunting ground, so they fell there.
 func protect_hunting_grounds(city: City, state: Dictionary, day: int) -> void:
 	if not city.woodland.marked.is_empty() or day - int(state.get("last_mark", -MARK_GAP_DAYS)) < MARK_GAP_DAYS:
 		return
