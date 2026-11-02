@@ -317,7 +317,7 @@ static func act_as_player(city: City, day: int, policy: String, state: Dictionar
 				titles.append(str(card["title"]))
 			var food_short: bool = titles.any(func(t: String) -> bool: return t.begins_with("Food") or t.contains("less food"))
 			var tools_short: bool = titles.any(func(t: String) -> bool: return t.begins_with("Tools")) and FamilyInitiative.count_producers(city, TownInfluence.ACTIVITY_TOOLS) == 0
-			var wood_short: bool = titles.any(func(t: String) -> bool: return t.begins_with("Wood") or t == "Timber is running out")
+			var wood_short: bool = titles.any(func(t: String) -> bool: return t.begins_with("Wood") or t == "Timber is running out" or t == SidebarOverviewPage.FUEL_COLD_TITLE or t == SidebarOverviewPage.FUEL_SHORT_TITLE)
 			for want: Array in [[food_short, TownInfluence.ACTIVITY_FOOD], [tools_short, TownInfluence.ACTIVITY_TOOLS], [wood_short, TownInfluence.ACTIVITY_WOOD]]:
 				if bool(want[0]) and not FocusedAppeal.is_active(city, str(want[1])):
 					FocusedAppeal.make(city, str(want[1]))
@@ -391,6 +391,9 @@ func measure(city: City, state: Dictionary, off_the_ground: bool) -> Dictionary:
 	m["arrived"] = int(city.resources.get("arrived_households", 0))
 	m["old_age"] = int(state["old_age"])
 	m["short_days"] = int(state["short_days"])
+	# Winter fuel (TownFuel, sprint S3).
+	m["fuel_burned"] = city.fuel_burned
+	m["fuel_short_days"] = city.fuel_short_days
 	m["first_year_short_days"] = int(state["first_year_short_days"])
 	m["household_short_days"] = city.influence.household_short_days
 	m["tools_out_days"] = int(state["tools_out_days"])

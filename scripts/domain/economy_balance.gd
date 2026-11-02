@@ -41,6 +41,23 @@ const WOODCUTTER_WOOD_PER_DAY: float = 6.0
 # wood: twice the other seasons' pace in winter, the year's total unchanged (spring, summer, autumn,
 # winter).
 const WOOD_SEASON_YIELD: Array[float] = [0.8, 0.8, 0.8, 1.6]
+
+# --- Winter fuel (TownFuel, sprint S3) ---
+# A season's warmth is the site's climate temperature (0 to 1; temperate is about 0.55) plus
+# SEASON_TEMPERATURE_OFFSET (spring, summer, autumn, winter). Below HEATING_BELOW_TEMPERATURE a
+# hearth burns wood: FUEL_PER_PERSON_DAY at full cold (0 warmth), less the milder it is. So a
+# temperate town heats in winter only, a cold one from autumn to spring, a tropical one never: a
+# family of four burns about 0.4 wood a day in a temperate winter and 0.9 in a cold one. Families
+# in temporary shelter or a hut burn ROUGH_SHELTER_FUEL_FACTOR as much. A family short of fuel
+# loses one working day in COLD_SKIP_TICK_INTERVAL (on other days than hunger's), and
+# HARDSHIP_COLD_DAYS cold days in a month are COLD_HARDSHIP_POINTS of hardship, half of hunger's.
+const SEASON_TEMPERATURE_OFFSET: Array[float] = [0.0, 0.2, 0.0, -0.25]
+const HEATING_BELOW_TEMPERATURE: float = 0.5
+const FUEL_PER_PERSON_DAY: float = 0.25
+const ROUGH_SHELTER_FUEL_FACTOR: float = 1.5
+const COLD_SKIP_TICK_INTERVAL: int = 4
+const HARDSHIP_COLD_DAYS: int = 10
+const COLD_HARDSHIP_POINTS: int = 1
 const TOOLMAKER_TOOLS_PER_DAY: float = 1.0
 # Wood the toolmaker consumes for each tool it makes.
 const TOOLMAKER_WOOD_PER_TOOL: int = 2

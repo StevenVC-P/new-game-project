@@ -69,6 +69,8 @@ const IMPROVE_THRESHOLD: float = 2.0
 const NOISE: float = 0.75
 const ENCOURAGE_WEIGHT: float = 2.0
 const SECURE_FOOD_DAYS: float = 180.0
+# Wood is at risk when the store holds less than the hearths will burn over this many days (TownFuel).
+const FUEL_RISK_DAYS: int = 90
 # How far a family looks for workplace sites, and how many valid ones it compares.
 const SITE_SEARCH_RADIUS: int = 30
 const SITE_CANDIDATES: int = 8
@@ -473,6 +475,9 @@ static func get_use(city: City, good: String, days: int) -> float:
 	var use: float = 0.0
 	if good == TownInfluence.ACTIVITY_FOOD:
 		use += float(city.get_food_consumption_for_population(city.get_total_population())) * days
+	# The hearths' wood over the coming days, season by season (TownFuel).
+	if good == TownInfluence.ACTIVITY_WOOD:
+		use += TownFuel.get_need_over(city, days)
 	for building: Building in city.buildings:
 		if good == TownInfluence.ACTIVITY_TOOLS and building.needs_maintenance() and building.receives_maintenance:
 			var working_days: int = days - building.upkeep_grace_days
@@ -621,7 +626,9 @@ static func get_waiting_risk(city: City, activity: String) -> float:
 				risk += 0.5
 			return risk
 		TownInfluence.ACTIVITY_WOOD:
-			return 0.75 if int(city.resources["wood"]) < 20 else 0.0
+			# Little wood in store, or less than the hearths will burn this coming season (TownFuel).
+			var wood: float = float(int(city.resources["wood"]))
+			return 0.75 if wood < 20.0 or wood < TownFuel.get_need_over(city, FUEL_RISK_DAYS) else 0.0
 		TownInfluence.ACTIVITY_TOOLS:
 			return 0.75 if int(city.resources["tools"]) < 10 else 0.0
 	return 0.0

@@ -114,6 +114,10 @@ var larder: float = 0.0
 var larder_target_days: int = 0
 var short_today: bool = false
 var short_days_this_month: int = 0
+# Winter fuel (TownFuel, sprint S3): whether the family's hearth went short today, and on how many
+# days this month.
+var cold_today: bool = false
+var cold_days_this_month: int = 0
 var economy_note: String = ""
 var economy_note_day: int = -1
 var larder_note: String = ""

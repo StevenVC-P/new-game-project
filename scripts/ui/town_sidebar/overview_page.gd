@@ -240,6 +240,10 @@ static func get_attention(city: City, context: Dictionary = {}) -> Array[Diction
 			buttons = get_tool_responses(city, lines)
 		cards.append(make_card(75 if danger else 50, SP.TONE_ALERT if danger else SP.TONE_CAUTION, "Tools are running out" if danger else "Tools are low", lines, buttons))
 
+	var fuel: Dictionary = get_fuel_card(city)
+	if not fuel.is_empty():
+		cards.append(fuel)
+
 	var upkeep: Dictionary = pressure["maintenance"]
 	if upkeep["severity"] == "danger":
 		cards.append(make_card(65, SP.TONE_ALERT, "Workplaces are wearing down", ["%d workplaces are below half their upkeep and lose output." % int(upkeep["values"]["critical"]), "Select a workplace to see its upkeep."], []))
@@ -575,6 +579,34 @@ static func get_tool_responses(city: City, lines: Array) -> Array:
 	if city.influence.priority != CommunityPriority.INVESTMENT:
 		lines.append("Putting investment first would draw families toward tools and better work, and away from food.")
 	return buttons
+
+# Winter fuel (TownFuel, sprint S3): hearths going cold now, or a cold season ahead that will burn
+# more wood than the store holds and the town's wood work brings in. Empty otherwise.
+const FUEL_COLD_TITLE: String = "Hearths are going cold"
+const FUEL_SHORT_TITLE: String = "Firewood will run short"
+
+static func get_fuel_card(city: City) -> Dictionary:
+	if not TownFuel.is_on(city):
+		return {}
+	var horizon: int = FamilyInitiative.FUEL_RISK_DAYS
+	var need: float = TownFuel.get_need_over(city, horizon)
+	if need <= 0.0:
+		return {}
+	var cold: int = city.households.filter(func(h: Household) -> bool: return h.cold_today).size()
+	var wood: int = int(city.resources.get("wood", 0))
+	var coming: float = FamilyInitiative.get_working_output(city, TownInfluence.ACTIVITY_WOOD) * horizon
+	if cold == 0 and float(wood) + coming >= need:
+		return {}
+	var lines: Array = []
+	if cold > 0:
+		lines.append("%d famil%s no firewood. A cold hearth costs working days, and hardship builds." % [cold, "y has" if cold == 1 else "ies have"])
+	lines.append("The hearths will burn about %d wood in the coming season; the store holds %d." % [roundi(need), wood])
+	var makers: int = FamilyInitiative.count_producers(city, TownInfluence.ACTIVITY_WOOD)
+	lines.append("No one cuts wood." if makers == 0 else "%d famil%s cut wood; building and toolmaking use it too." % [makers, "y" if makers == 1 else "ies"])
+	var buttons: Array = []
+	if city.influence.enabled:
+		add_appeal_response(city, TownInfluence.ACTIVITY_WOOD, "Ask families for wood", lines, buttons)
+	return make_card(88 if cold > 0 else 58, SP.TONE_ALERT if cold > 0 else SP.TONE_CAUTION, FUEL_COLD_TITLE if cold > 0 else FUEL_SHORT_TITLE, lines, buttons)
 
 static func has_free_family(city: City) -> bool:
 	return city.households.any(func(h: Household) -> bool: return h.labor_capacity > 0 and FamilyInitiative.get_holding(city, h) == null and not city.construction.is_promised_to_workplace(h.id))

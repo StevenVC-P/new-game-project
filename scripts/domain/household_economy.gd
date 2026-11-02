@@ -463,6 +463,13 @@ static func get_secondary_desire(city: City, household: Household, holding: Buil
 			if land < 1.0:
 				FamilyInitiative.add(terms, -(1.0 - land), "its garden ground is poor or small")
 		"wood":
+			# A hearth gone cold this month, or a cold season ahead with little wood in store (TownFuel).
+			if household.cold_days_this_month > 0:
+				own_need = true
+				FamilyInitiative.add(terms, OWN_NEED_WEIGHT, "its hearth went cold")
+			elif TownFuel.get_need_over(city, FamilyInitiative.FUEL_RISK_DAYS) > float(int(city.resources.get("wood", 0))):
+				own_need = true
+				FamilyInitiative.add(terms, OWN_NEED_WEIGHT * 0.5, "the cold season will burn more wood than the town holds")
 			if land < 1.0:
 				FamilyInitiative.add(terms, -(1.0 - land), "few trees near its home")
 		"tools":

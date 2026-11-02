@@ -71,6 +71,11 @@ var founding_seed: int = 0
 # moved it (tests/sim/economy_invariants.gd). Nothing in play reads it; the underscore keeps it out
 # of saves.
 var _flows: Dictionary = {}
+# Winter fuel (TownFuel): the day's fraction of a unit carried over, wood burned in hearths so far,
+# and days the hearths went short.
+var fuel_carry: float = 0.0
+var fuel_burned: int = 0
+var fuel_short_days: int = 0
 # Value counts of the region newcomers come from; generated on first arrival.
 var regional_value_counts: Dictionary = {}
 # Producing buildings by type, refreshed each tick; read by Communal Labor.
@@ -959,6 +964,8 @@ func tick():
 	consume_food()
 	refresh_operating_building_counts()
 	construction.advance_day()
+	# By today's date (the founding day would otherwise count as a winter's day).
+	TownFuel.burn(self)
 	if construction.day % FamilyDevelopment.INTERVAL_DAYS == 0:
 		FamilyDevelopment.advance(self)
 	# A day after families look at their homes, and from the first day, so founders take up work
@@ -1322,11 +1329,14 @@ func should_skip_for_food_shortage() -> bool:
 # Whether a family loses today's work to hunger. With household larders (HouseholdEconomy) only a
 # family that went short today does; otherwise every family when the town goes short.
 func skips_work_today(household_id: int) -> bool:
+	var household: Household = get_household_by_id(household_id) if household_id >= 0 else null
+	# A family whose hearth went cold loses some days too (TownFuel).
+	if TownFuel.skips_work(self, household):
+		return true
 	if not should_skip_for_food_shortage():
 		return false
 	if not HouseholdEconomy.is_on(self):
 		return true
-	var household: Household = get_household_by_id(household_id) if household_id >= 0 else null
 	return household == null or household.short_today
 
 func apply_building_production(building: Building):
