@@ -96,7 +96,8 @@ func test_founders_take_up_work() -> void:
 			activities[FamilyInitiative.get_activity(holding.type)] = true
 	_check(activities.size() >= 2, "families of different callings take up different work: %s" % str(activities.keys()))
 	var forest_holding: Building = FamilyInitiative.get_holding(city, forest_family)
-	_check(forest_holding != null and FamilyInitiative.get_activity(forest_holding.type) == TownInfluence.ACTIVITY_WOOD, "the family of the forest cuts wood: %s" % forest_family.initiative_note)
+	# Its calling draws it to woodcutting and to hunting alike; the town's needs choose between them.
+	_check(forest_holding != null and forest_family.get_match_quality(forest_holding.type) == CultureEffects.MATCH_GOOD, "the family of the forest works its calling (wood or game): %s" % forest_family.initiative_note)
 	_check(city.influence.workplaces_opened >= city.households.size(), "the town counts the workplaces families opened")
 
 # The owner's example: given the same call, a daring family improves at once, while a cautious,

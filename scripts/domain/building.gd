@@ -55,6 +55,9 @@ var fenced: bool = false
 # A proper workplace short of tools keeps its building and works by hand, at tier 0's pace, instead
 # of standing idle (influence prototype; City.set_hand_method_fallback). Off: today's rules.
 var works_by_hand_without_tools: bool = false
+# For work that lives off the land (TownLand): the best share of a full yield its water, woods or
+# pasture has given while worked, so a failing livelihood can be told apart from a poor site.
+var peak_land_yield: float = 0.0
 
 func _init(building_id: int = -1, building_type: String = BUILDING_HOUSE, tile_pos: Vector2i = Vector2i.ZERO, footprint_size: Vector2i = Vector2i(2, 2)):
 	id = building_id

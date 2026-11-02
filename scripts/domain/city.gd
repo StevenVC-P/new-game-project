@@ -961,6 +961,8 @@ func tick():
 	# at once.
 	if influence.enabled and construction.day % FamilyInitiative.INTERVAL_DAYS == 1:
 		FamilyInitiative.advance(self)
+	if influence.enabled and not influence.appeals.is_empty():
+		FocusedAppeal.advance_day(self)
 	social.advance_day()
 	land.advance_day()
 	HouseholdEconomy.plan_day(self)

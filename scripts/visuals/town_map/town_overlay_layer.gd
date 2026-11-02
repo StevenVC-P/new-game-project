@@ -21,6 +21,7 @@ const COLOR_WORK: Color = Color(0.96, 0.80, 0.36)
 const COLOR_HAUL_ROUTE: Color = Color(0.96, 0.72, 0.30, 0.9)
 const COLOR_COMMUTE_ROUTE: Color = Color(0.70, 0.86, 0.98, 0.9)
 const COLOR_CLEARING: Color = Color(0.95, 0.56, 0.22)
+const COLOR_KEPT_WOODS: Color = Color(0.35, 0.8, 0.95)
 const COLOR_TILLING: Color = Color(0.62, 0.42, 0.22)
 # Ground the player opened for families' workplaces (influence prototype).
 const COLOR_WORK_GROUND: Color = Color(0.48, 0.66, 0.92)
@@ -336,6 +337,8 @@ func draw_residential(city: City) -> void:
 func draw_clearing(city: City) -> void:
 	for tile: Vector2i in city.woodland.marked.keys():
 		draw_marked_tile(tile, float(city.woodland.marked[tile]) / EconomyBalance.CLEAR_DAYS_PER_TILE, COLOR_CLEARING)
+	for tile: Vector2i in city.woodland.protected.keys():
+		draw_marked_tile(tile, 0.0, COLOR_KEPT_WOODS)
 	for tile: Vector2i in city.farmland.marked.keys():
 		draw_marked_tile(tile, float(city.farmland.marked[tile]) / EconomyBalance.TILL_DAYS_PER_TILE, COLOR_TILLING)
 	for tile: Vector2i in city.influence.get_work_ground():

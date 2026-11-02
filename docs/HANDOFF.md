@@ -2,11 +2,33 @@
 
 Snapshot for whoever picks the project up next. Update it when a milestone closes; durable detail lives in the linked docs, not here.
 
-*Last updated: 2026-11-01. Everything below "Merged 2026-11-01" is on `develop` and `main`. No feature branch is waiting.*
+*Last updated: 2026-11-02. `feature/autonomous-occupations` is merged into `develop` (Priority 5 closed); `main` is unchanged since "Merged 2026-11-01" below and awaits the owner's review.*
 
 ## Current Objective
 
-The owner is about to give the next piece of work. Until then, the open owner decisions below stand. None has been acted on.
+**Next milestone (owner, 2026-11-02): household property, private exchange, communal contributions and treasury allocations.** It has its own architectural plan on branch `docs/property-and-communal-resources` (not merged), and the earlier audit `docs/TREASURY_AUDIT.md`. Nothing of it is built yet. A founding allocation is the intended lever on the first weeks.
+
+**Priority 5 is closed** (`docs/IMPLEMENTATION_ROADMAP.md`, "Autonomous Occupations and Priority 5"; detail in `docs/AUTONOMOUS_OCCUPATIONS.md`, sixth round; agency in `docs/PLAYER_AGENCY_AUDIT.md`, round 6). On `develop`:
+- **Occupations:** families choose every trade with a hand-work stage, by scored terms with reasons and seeded noise. Survival comes before a calling as hunger nears; for wool work the calling fades fully (the herding adjustment).
+- **Shared land:** woods, fishing water and pasture are divided among the workplaces of their kind that are in use, so no land is counted twice.
+- **The tool trap is fixed:** the reserve no longer blocks projects that draw nothing from it.
+- **The hunting card:** it comes early and gives both sides as a choice. Kept woods are binding.
+- **The founding regression:** it pins a viable founding (20261102) and a failed one (20261101).
+
+**Previous behaviour stays reproducible:** `--meta=comfort_calling_kept,water_not_shared,pasture_not_shared` on `tests/sim/intervention_check.gd` reproduces the earlier defaults town for town.
+
+**Accepted and open:**
+- **Fishing:** honest counting lowers fishing towns' catch, by as much as 45% where huts share a lake. The owner accepted this; fishing balance may be revisited.
+- **Early foundings:** they are still decided by a few first-week work choices. The first three trades alone still do somewhat better on hard sites, and extra founding food does not help. No further occupation tuning is planned.
+
+**Worktrees** beside the main folder (all detached, safe to remove when no longer wanted):
+- `ngg-occupations`: the merged branch;
+- `ngg-p5-runs`: the final batches' commit;
+- `ngg-p5-base`: the Priority 5 baseline, 7bf9d34;
+- `ngg-occ-runs` to `ngg-occ-runs11`: earlier comparison commits;
+- `ngg-baseline`: `develop` before the merge.
+
+Diagnostics: `--leave-out`, `--veto`, `--meta`, `--trace`, `--trace-tools`, `--provisions` (`docs/TESTING.md`).
 
 **Merged 2026-11-01 (owner-approved: `develop`, then `develop` into `main`).** Each item has a design doc with its owner decisions, how it was built, validation results and open decisions:
 - **Step 3 interface** (community priority and residential land in the game; `docs/TOWN_UI.md`, `docs/HOME_SITES.md`, `docs/COMMUNITY_PRIORITIES.md`).
@@ -139,6 +161,7 @@ In rough priority order; details in each doc's "Remaining Work" section.
 
 ## Risks And Gotchas
 
+- **Flaky test (fixed on `feature/autonomous-occupations`, still on `develop`):** `tests/town_sidebar_validation.gd` founds its town at random and checks there is no hunger card after a year, so on `develop` it fails when that town happens to be short of food that day (2 of 4 runs, 2026-11-01). The branch fixes the founding seed, and the gameplay check moves to `tests/founded_town_regression.gd`.
 - **Flaky test:** `tests/world_map_flow_validation.gd`, "wheel zoom on the regional map should keep the point under the cursor", failed 2 of 8 runs on the milestone 6 branch (drift 0.51 and 0.55 against a 0.5 limit) and 0 of 5 on `develop`. The zoom animates over the 30 frames the test waits, so a busy machine leaves it unfinished; nothing in milestones 1-6 touches the regional map. Not loosened here: worth a look (wait for the animation to end, not a frame count).
 
 - **Anything kept across days that steers play must be saved,** even if it looks like a cache: errand routes were kept a month and not saved, so loaded towns drifted (fixed 2026-10-31). `tests/save_game_validation.gd` only catches such state once the test town exercises it.

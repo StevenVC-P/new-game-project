@@ -83,6 +83,12 @@ var larder_eaten_short: float = 0.0
 var household_short_days: int = 0
 var food_gifts: int = 0
 var food_gift_units: float = 0.0
+# Focused appeals standing (FocusedAppeal): good -> {"day", "producers"}; and for balance tools, how
+# many were made, answered, and decisions they tipped.
+var appeals: Dictionary = {}
+var appeals_made: int = 0
+var appeals_answered: int = 0
+var appeals_tipped: int = 0
 # Today's share of each family's day given to secondary work (recomputed every day; not saved).
 var _secondary_today: Dictionary = {}
 

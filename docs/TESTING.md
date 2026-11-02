@@ -53,7 +53,9 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/wisdom_check.gd -- --conditions=ordinary --strategies=none,endure+respect > wis.log
 
 # Families reconsidering their work (docs/OCCUPATION_RECONSIDERATION.md): the rules; then the wisdom check's towns with
-# reconsideration on and off ("-- --no-reconsider"), and with the monthly limit lifted ("-- --change-limit=0")
+# reconsideration on and off ("-- --no-reconsider"), and with the monthly limit lifted ("-- --change-limit=0").
+# Every work decision traced (docs/WORKPLACE_CHOICE_INVESTIGATION.md; filter for [WPC]):
+# res://tests/sim/workplace_choice_check.gd -- --conditions=ordinary > wpc.log
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/occupation_review_validation.gd
 
 # Emergent recognition and the Speaker of the Gathering (docs/EMERGENT_RECOGNITION_AND_LEADERSHIP.md): the rules; then the
@@ -69,6 +71,50 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # with a disruption in the second autumn ("--disrupt=specialist" or "--disrupt=stores")
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/household_economy_validation.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/wisdom_check.gd -- --conditions=difficult --strategies=none --no-self-sufficiency > hse_off.log
+
+# Autonomous occupations and survival-aware work decisions (docs/AUTONOMOUS_OCCUPATIONS.md): the rules; then the wisdom
+# check's towns under four modes, one per process: existing (today's game), shortage (narrow recognition), occupations
+# (fishing, hunting, herding, with survival awareness), both; diagnostics survival_only and occupations_blind
+# (filter for [OCC]; "-- --years=N --sites=N --from=K --priority=investment"); and a copy of a saved game's town replayed under a
+# mode, every work decision traced with the priority's part ("--no-priority" clears it; filter for [REPLAY])
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/autonomous_occupations_validation.gd
+# Player agency (docs/PLAYER_AGENCY_AUDIT.md): the towns under kinds of player acting only on what the game shows, through its
+# controls (none, informed, informed_priority/_commission/_woods, late, inappropriate); "--seed=N --trace" prints one town's
+# timeline (warnings, the player's acts, every family's choice and review with reasons; filter for [TRACE], else [INT])
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/intervention_check.gd -- --conditions=stressed --policies=none,informed > int.log
+# Gameplay regression: a viable founding (seed 20261102) must come through its year, and the sidebar test's founding
+# (20261101) must fail for hunger, families leaving only after the stores ran out; both stay consistent day by day, and the
+# failing town saved mid-decline loads and plays on identically (own save folder). "-- --probe=1,2,3" prints seeds' years.
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/founded_town_regression.gd
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/occupation_check.gd -- --conditions=ordinary --modes=both > occ.log
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/autosave_replay.gd -- --save=C:/path/to/copy.save --mode=all --days=360 > replay.log
+# (replay options: --no-priority clears the town's priority; --appeal=tools|food|wood makes a focused appeal at the start)
+# Intervention check, priority 5 diagnostics (comparison only): --leave-out=hunter,herder,fisher [--leave-out-until=DAY];
+# --veto=HOUSEHOLD:OCCUPATION:UNTIL[;...] (one family may not choose one trade until a day); --meta=a,b (comparison metas,
+# e.g. known_work_yields_to_survival, familiar_comfort_yields); --trace also prints each first choice ranked ("CHOICE").
+# Policies added: informed_appeal_once, keep_hunting, keep_lodges, informed_appeal, informed_land, priority_switcher, overprotect.
+# Save-using tests (save_game_validation, community_play_validation) write to a folder of their own process and found a fixed
+# town, so they may run side by side and pass or fail the same way every run.
+# Fifth round (docs/AUTONOMOUS_OCCUPATIONS.md): policy keep_on_warning answers the early hunting-grounds card with its keep
+# button; keep_hunting now keeps only once a lodge has lost a third of its best yield (the late rule). Metas:
+# comfort_calling_kept (the old calling rule; the fading adjustment is the default since the sixth round), woods_not_shared,
+# water_not_shared, pasture_not_shared (the old double-counted land), late_hunting_card. Previous defaults (before the sixth
+# round): --meta=comfort_calling_kept,water_not_shared,pasture_not_shared. Results also carry "made" (fish, game, wool).
+# --provisions=food:N,wood:N,tools:N sets the starting stores (founding-provisions diagnostic); --trace-tools (with --seed=N)
+# prints the tool and wood stores, reserve, upkeep and every family's word on improving its work ([TOOLS]).
+# Results now carry people at years 1 and 3, first-year shortage days, work taken up, founding herders, the candidate's
+# changed decisions (fade_changed, fade_cases), woodcutter-days lost to kept woods and the early card's first showing.
+
+# Hunting grounds (fifth round): woods shared among lodges (seven cases), the early warning's timing, no false warnings,
+# keeping binding and its cost to woodcutters, reading changes nothing, clearing obstacles, and the card answered by real
+# clicks at 1920x1080 and 1366x768; then its screenshots (needs a window)
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/hunting_grounds_validation.gd
+& (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/hunting_warning_capture.gd -- <output_dir>
+
+# Shared land (sixth round): fishing water and pasture divided among workplaces of their kind like woods, the shares of
+# overlapping workplaces adding up to the land once, families' expectations, kinds not competing, only workplaces in use
+# sharing (empty, abandoned and idle ones take nothing; neutral-worked ones count), the old counting by meta
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/shared_land_validation.gd
 
 # Home sites (docs/HOME_SITES.md): families choosing their own sites on land set aside, preferred land, no land, no
 # overlap, explanations, starting land, land reserved from work, shared works among homes, preferred land between equal sites, explanations

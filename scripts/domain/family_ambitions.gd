@@ -15,8 +15,10 @@ extends RefCounted
 # makes the family endure a little less. Families act on their own where the player has
 # set the frame: they build homes on the player's plots (FamilyDevelopment) and fence their own
 # trampled fields when the stores can spare the wood, and move to a free workplace of their calling
-# when one stands empty. Work for their calling is a wish the player answers, not something
-# families build themselves. Values will shape all of this later.
+# when one stands empty. Where families lead, work of their calling with a hand-work stage
+# (fishing, hunting, herding as much as farming) is something they can take up themselves, as one
+# reason among others (FamilyInitiative, OccupationReview); other work for their calling is a wish
+# the player answers. Values will shape all of this later.
 # Numbers in EconomyBalance (Ambitions).
 
 const HOME: String = "home"

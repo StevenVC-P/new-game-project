@@ -600,7 +600,7 @@ func scarce_land_city() -> City:
 func food_first() -> Array[Dictionary]:
 	var choices: Array[Dictionary] = []
 	for activity: String in FamilyInitiative.ACTIVITIES:
-		choices.append({"activity": activity, "score": 5.0 if activity == TownInfluence.ACTIVITY_FOOD else 0.0, "terms": []})
+		choices.append({"occupation": FamilyInitiative.PROPER_WORK[activity], "score": 5.0 if activity == TownInfluence.ACTIVITY_FOOD else 0.0, "terms": []})
 	return choices
 
 func garden_claim(city: City, household: Household, origin: Vector2i = Vector2i(20, 2)) -> ConstructionProject:
