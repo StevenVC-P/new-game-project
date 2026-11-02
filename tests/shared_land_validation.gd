@@ -35,6 +35,7 @@ func run_all() -> void:
 	test_never_more_than_the_land()
 	test_families_judge_shared_land()
 	test_kinds_do_not_compete()
+	test_only_workplaces_in_use_share()
 	if failure_count > 0:
 		push_error("Shared land validation failed: " + str(failure_count) + " failure(s)")
 		quit(1)
@@ -200,6 +201,33 @@ func test_families_judge_shared_land() -> void:
 	var whole_food: float = FamilyInitiative.get_working_output(city, "food")
 	city.remove_meta("water_not_shared")
 	_check(is_equal_approx(shared_food, whole_food * 0.5), "the food the town's fishing brings in is the shares, half of counting the lake twice (%.2f, %.2f)" % [shared_food, whole_food])
+
+# Only workplaces in use share the land (owner, 2026-11-02): an empty hut, one its family left when
+# it departed, and one held but idle (worn to nothing, with no hand work to fall back on) take no
+# share from a working neighbour; a hut worked by a neutral starter worker, with no family, does.
+func test_only_workplaces_in_use_share() -> void:
+	var city: City = town([LAKE])
+	var a: Building = give(city, city.households[0], "fisher", HUT)
+	var b: Building = give(city, city.households[1], "fisher", HUT + Vector2i(1, 0))
+	_check(is_equal_approx(city.land.get_reach_factor(a), 0.5), "two working huts: half a catch each")
+	city.unassign_building_worker(city.buildings.find(b))
+	_check(city.land.get_reach_factor(a) == 1.0, "an empty hut beside it takes nothing: a full catch (%.2f)" % city.land.get_reach_factor(a))
+	var c: Building = give(city, city.households[2], "fisher", HUT + Vector2i(2, 0))
+	HouseholdMigration.release_departing_household_work(city, city.households[2], 0)
+	_check(c.assigned_household_id < 0 and city.land.get_reach_factor(a) == 1.0, "nor does one its family left on departing (%.2f)" % city.land.get_reach_factor(a))
+	# A workplace left on departing is open to any family with labor to spare; kept empty here.
+	city.unassign_building_worker(city.buildings.find(c))
+	var d: Building = give(city, city.households[3], "fisher", HUT + Vector2i(-1, 0))
+	_check(is_equal_approx(city.land.get_reach_factor(a), 0.5), "a family takes up a hut there again: half each")
+	d.works_by_hand_without_tools = false
+	d.maintenance_level = 0
+	_check(not d.can_produce() and city.land.get_reach_factor(a) == 1.0, "held but idle, worn to nothing, it takes no share (%.2f)" % city.land.get_reach_factor(a))
+	d.maintenance_level = 100
+	_check(d.can_produce() and is_equal_approx(city.land.get_reach_factor(a), 0.5), "mended, it works and shares again (%.2f)" % city.land.get_reach_factor(a))
+	city.unassign_building_worker(city.buildings.find(d))
+	var neutral: Building = give(city, city.households[4], "fisher", HUT + Vector2i(2, 0))
+	neutral.assign_neutral_worker()
+	_check(neutral.can_produce() and is_equal_approx(city.land.get_reach_factor(a), 0.5) and is_equal_approx(city.land.get_reach_factor(neutral), 0.5), "a hut a neutral worker fishes shares the lake too: half each (%.2f, %.2f)" % [city.land.get_reach_factor(a), city.land.get_reach_factor(neutral)])
 
 # Only workplaces of the same kind share: a hut beside a fold and a lodge loses nothing to them.
 func test_kinds_do_not_compete() -> void:

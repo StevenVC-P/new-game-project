@@ -184,16 +184,17 @@ static func get_reach_rect(building_type: String, origin: Vector2i, size: Vector
 	var reach: int = get_reach_distance(get_reach_kind(building_type))
 	return Rect2i(origin - Vector2i(reach, reach), size + Vector2i(reach, reach) * 2)
 
-# The reaches of the other workplaces sharing the same kind of land: the ones families work, and with
-# `planned`, those a family is setting up. A workplace at `origin` itself (an improvement of it) is
-# not its own rival.
+# The reaches of the other workplaces sharing the same kind of land: the ones in use (worked, by a
+# family or a neutral worker, and able to work: Building.can_produce), and with `planned`, those a
+# family is setting up. An empty workplace, one its family left, or one held but idle takes no share
+# (owner, 2026-11-02). A workplace at `origin` itself (an improvement of it) is not its own rival.
 func get_rival_reaches(building_type: String, origin: Vector2i, planned: bool) -> Array[Rect2i]:
 	var rivals: Array[Rect2i] = []
 	var kind: String = get_reach_kind(building_type)
 	if not is_shared(kind):
 		return rivals
 	for building: Building in city.buildings:
-		if building.assigned_household_id >= 0 and building.tile != origin and get_reach_kind(building.type) == kind:
+		if building.can_produce() and building.tile != origin and get_reach_kind(building.type) == kind:
 			rivals.append(get_reach_rect(building.type, building.tile, building.size))
 	if planned:
 		for project: ConstructionProject in city.construction.projects:
@@ -201,12 +202,12 @@ func get_rival_reaches(building_type: String, origin: Vector2i, planned: bool) -
 				rivals.append(get_reach_rect(project.building_type, project.tile, project.size))
 	return rivals
 
-# Which workplaces of a kind families work, as one number: a standing one's share changes when it does.
+# Which workplaces of a kind are in use, as one number: a standing one's share changes when it does.
 func get_rivals_key(building_type: String) -> int:
 	var worked: Array = []
 	var kind: String = get_reach_kind(building_type)
 	for building: Building in city.buildings:
-		if building.assigned_household_id >= 0 and get_reach_kind(building.type) == kind:
+		if building.can_produce() and get_reach_kind(building.type) == kind:
 			worked.append(building.id)
 	return hash(worked)
 
