@@ -87,6 +87,10 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/occupation_check.gd -- --conditions=ordinary --modes=both > occ.log
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/autosave_replay.gd -- --save=C:/path/to/copy.save --mode=all --days=360 > replay.log
 # (replay options: --no-priority clears the town's priority; --appeal=tools|food|wood makes a focused appeal at the start)
+# Intervention check, priority 5 diagnostics (comparison only): --leave-out=hunter,herder,fisher [--leave-out-until=DAY];
+# --veto=HOUSEHOLD:OCCUPATION:UNTIL[;...] (one family may not choose one trade until a day); --meta=a,b (comparison metas,
+# e.g. known_work_yields_to_survival, familiar_comfort_yields); --trace also prints each first choice ranked ("CHOICE").
+# Policies added: informed_appeal_once, keep_hunting, keep_lodges, informed_appeal, informed_land, priority_switcher, overprotect.
 # Save-using tests (save_game_validation, community_play_validation) write to a folder of their own process and found a fixed
 # town, so they may run side by side and pass or fail the same way every run.
 

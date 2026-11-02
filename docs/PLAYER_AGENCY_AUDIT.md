@@ -1,5 +1,49 @@
 # Player Agency Audit
 
+## Round 4 (2026-11-01): one appeal against many; keeping hunting grounds
+
+**Appeals, single against repeated.**
+- **Repeated:** round 3's appeals-only player asks again whenever an appeal has ended and the card still shows: 6–18 appeals per town.
+- **Single (`informed_appeal_once`):** asks for each good at most once in the town's life, in practice one food appeal at founding: 1.1–1.4 appeals per town.
+
+| People at year 6 | None | Single appeal | Repeated appeals |
+|---|---|---|---|
+| recommended, ordinary | 60.0 | **68.7** | 68.0 |
+| recommended, stressed | 59.8 | 62.8 | **63.2** |
+| recommended, difficult | 60.2 | 58.2 | **64.5** |
+| all, ordinary | 49.3 | **57.2** | 56.7 |
+| all, stressed | 45.6 | 43.9 | **51.1** |
+| all, difficult | 39.6 | 47.8 | **49.1** |
+
+- **On ordinary sites, one appeal at founding gives the whole benefit.** It tips 0.3–1.0 decisions per town, and the founding is where a single decision decides a town (`docs/AUTONOMOUS_OCCUPATIONS.md`, phase 3).
+- **On stressed and difficult sites, repeated appeals add more** (+0.4 to +7.2 people over one appeal). The later famines get their own answer.
+- **So most of the appeals' value is one well-timed request at founding.** The rest is a standing pull, which the owner judged too close to a hidden command; appeals are kept for comparison only.
+
+**Kept hunting grounds (all rules), where hunting and woodcutting compete:**
+
+| People at year 6 | None | Keep on the card ("Hunting grounds are being felled") | Keep round each lodge from the week it is worked |
+|---|---|---|---|
+| ordinary | 49.3 | 49.3 | **56.1** (+2 towns better, none worse) |
+| stressed | 45.6 | 46.7 | **59.4** (+3 / −1) |
+| difficult | 39.6 | 40.8 | 40.7 |
+
+**Towns where it mattered:**
+
+| Town | None | Keep on the card | Keep early |
+|---|---|---|---|
+| ordinary 880325585 | 12 | 12 | **87** |
+| stressed 880325585 | 10 | 37 | **82** |
+| stressed 2860120474 | 9 | 9 (no card) | **108** |
+| difficult 3849992342 | 54 | **67** | 65 |
+| ordinary 3831173803 | 89 | 89 | **98** |
+
+**Where it cost people:**
+- ordinary 2860120474: 90 → 87;
+- difficult and lake towns: little hunting, so little effect.
+
+- **Protecting hunting grounds is a real, situational advantage.** It is large where lodges and woodcutters share the woods, absent elsewhere, and a cost where kept too widely (round 3's overprotect: about −20).
+- **The card comes too late** to show it (day 651–2,156, or never). The earlier warning is proposed in `docs/AUTONOMOUS_OCCUPATIONS.md`, phase 3.
+
 ## Round 3 (2026-11-01): early food warning, cards without priorities, focused appeals, kept woods
 
 The players (`tests/sim/intervention_check.gd`) act only on cards they can see:

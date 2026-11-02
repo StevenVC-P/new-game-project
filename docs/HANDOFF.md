@@ -6,16 +6,20 @@ Snapshot for whoever picks the project up next. Update it when a milestone close
 
 ## Current Objective
 
-**Waiting for owner review: `feature/autonomous-occupations`** (from `develop`, not merged). Fourth round, priorities 1–4 done; stopped before priority 5 (the new trades reevaluated) on the owner's instruction. Docs:
-- `docs/AUTONOMOUS_OCCUPATIONS.md` (fourth round, phases 1–2 at the top: hunger counted once, warnings, kept woods, focused appeals, decisions for the owner);
+**Waiting for owner review: `feature/autonomous-occupations`** (from `develop`, not merged). Fourth round, priorities 1–5 investigated. The latest brief made a direction change: **the player's tangible lever is to be a town treasury of binding allocations** (proposal only: `docs/TREASURY_AUDIT.md`, nothing built), and focused appeals stay for comparison only. Docs:
+- `docs/AUTONOMOUS_OCCUPATIONS.md` (fourth round at the top: phase 3 is Priority 5, why the new trades cost towns, single decisions that decide a town, decisions for the owner; phases 1–2: hunger counted once, warnings, kept woods, focused appeals);
 - `docs/PLAYER_AGENCY_AUDIT.md` (round 3: an informed player now helps on average, by about +4 to +18 people, mostly through focused appeals; keeping every wood and investing from founding are the harmful misuses).
 
-**Owner decisions open from phase 2:**
-- the "Food will run short" card shows on every founding day;
-- repeated food appeals come close to a standing ask;
-- the value of keeping woods round hunting lodges is not yet measured.
+**Owner decisions open** (details in the docs):
+- the calling's pull under hunger, for herding at founding;
+- an earlier hunting-grounds warning;
+- shared woods counted per lodge;
+- the low-tool trap;
+- the treasury foundation and its own decisions.
 
-**Latest validation worktree:** `ngg-occ-runs10` (commit 2244655).
+The founding food warning is decided and built ("Food supply not yet established"). Appeals are kept, not expanded.
+
+**Latest validation worktree:** `ngg-occ-runs11`. Diagnostics for this kind of question: `--leave-out`, `--veto`, `--meta`, `--trace` on `tests/sim/intervention_check.gd` (`docs/TESTING.md`).
 
 What it adds:
 - **The new trades:** fishing, hunting and herding (hand work first) as families' own choice.

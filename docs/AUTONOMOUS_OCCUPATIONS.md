@@ -16,9 +16,149 @@ Tests:
 
 Comparison: `tests/sim/occupation_check.gd`. Owner's town: `tests/sim/autosave_replay.gd`. Commands in `docs/TESTING.md`.
 
+## Fourth Round, Phase 3 (2026-11-01): Priority 5, the New Trades Investigated
+
+The owner's brief "Decisions on Priority 4; the Town Treasury; Priority 5". It covers:
+- the founding food warning;
+- appeals, single against repeated;
+- kept hunting grounds;
+- the treasury audit (`docs/TREASURY_AUDIT.md`);
+- why hunting, fishing and herding cost towns people.
+
+Nothing in the rules families decide by was changed. Two candidate changes were measured as comparison metas only.
+
+### The founding food warning (owner decision 1, built)
+
+**While no food workplace is yet worked and most families are still setting up their first work, the card is "Food supply not yet established".**
+- **It says:** the forecast is provisional; how many families are setting up food work (or that none has); how long the stores carry the town.
+- **It does not hide a danger:** if, counting the food work being set up at its families' real pace, food runs out first, it says when.
+- **Tone:** an alert when stores carry the town under 30 days or no family has taken up food work.
+- **Once food work runs** (or most families have settled into other work) it is the forecast from real production, as before (`SidebarOverviewPage.is_food_unproven`).
+- **Test:** `tests/autonomous_occupations_validation.gd` (18b).
+- **The intervention players answer it as they did the old card.** Rerun, they played identically in all 24 towns checked, so the card changes nothing in play.
+
+### How the investigation was done
+
+- **The same 12 towns per condition and seeds** as every earlier comparison, under all rules with no player, against the recommended rules (the first three trades).
+- **Diagnostics, comparison only** (`docs/TESTING.md`):
+  - trades left out (`--leave-out`), for the whole game or only the first year (`--leave-out-until`);
+  - one family barred from one trade for its first year (`--veto`), to see what that single decision did;
+  - a trace of every first choice of work, its options ranked with scores, reasons and the town's food as the family saw it (`--trace`, meta `trace_choices`).
+- **Fifteen towns traced** under both rule sets: those the new trades changed most, both ways.
+
+### Where the losses come from
+
+**People at year 6** (ordinary / stressed / difficult):
+
+| | People |
+|---|---|
+| first three trades (recommended) | 60.0 / 59.8 / 60.2 |
+| all (the new trades) | 49.3 / 45.6 / 39.6 |
+| all, but no new trade in the first year | **55.2 / 55.3 / 59.5** |
+| all, no herding | 55.6 / 53.4 / 58.4 |
+| all, no hunting | 50.9 / 44.3 / 39.2 |
+| all, no fishing | 45.1 / 46.9 / 40.2 |
+
+1. **Most of the loss is decided in the first year.** Keeping the new trades out of the first year alone recovers 6 / 10 / 20 people. Later, they cost 4.8 / 4.5 / 0.7.
+2. **Herding is the costly trade** (+6 / +8 / +19 without it). It makes only wool (owner decision), so a founding herder is a family off food in the founding famine.
+3. **Hunting cuts both ways.**
+   - **It saves towns:** without it, difficult 2743973461 dies (91 → 0), and difficult 3849992342 falls from 54 to 33.
+   - **It ruins others:** ordinary 880325585 (12 people; 72 without hunting).
+
+   On average it is about neutral.
+4. **Fishing helps.** Without it, ordinary towns lose 4.2 people (lake town 4078261073: 83 → 36).
+
+### Single decisions that decide a town (one family barred from one trade in its first year)
+
+| Town | The family's decision | People: as played → without that decision |
+|---|---|---|
+| difficult 655683252 | family 1 (loom) herds on day 1, hardship 0.8 | **0 → 115** |
+| difficult 655683252 | family 5 (loom) herds on day 15 | 0 → 110 |
+| difficult 3151458409 | family 3 (loom) herds on day 8, hardship 1.0 | **0 → 67** |
+| ordinary 2487541759 | family 4 (loom) herds on day 8 | **0 → 63** |
+| ordinary 2487541759 | family 2 (loom) herds on day 1 | 0 → 32 |
+| difficult 854598335 | families 1 and 5 (loom) herd (either alone: 0 or 22) | 0 → 46 |
+| difficult 1193181149 | family 5 herds on day 15 | 28 → 39 |
+| ordinary 880325585 | family 5 (forest) hunts on day 15 | **12 → 88** |
+| difficult 3849992342 | family 3 or family 5 (forest) hunts | **54 → 0** (either) |
+| stressed 2860120474 | family 1 or 5 hunts; family 9 herds | 9 → 0 (each) |
+
+**A founding town hangs on single decisions.** One family of six choosing a grazing pen in the first week turns a town of 60–115 into an empty one. One hunting family can save a town or ruin it. The stressed lake town (2860120474) is not decided by any one choice: it fails either way.
+
+### Why families enter these trades when food is fragile
+
+**Herding at founding.** Across the 15 traced towns:
+- **How often:** 8 of 85 founding choices made under hardship ≥ 0.6 were herding, all by loom families.
+- **How it wins, at full hardship:**
+  - **Herding:** the calling keeps half its pull (+1.5) and "it knows the work" is untouched (up to +2), against a small land deterrent.
+  - **Farming, for a family whose calling it is not:** "not its calling" (−1.0) and the survival reason, 4 × hardship × relief. Relief is only about 0.55: a novice's pace (60%) on spring land.
+- **The margins:** herding led the best food work by 0.3–1.3 in seven of eight choices. That is inside the bounded unknown (±0.75 on each option), so these are close calls the unknown tipped, each time in a town that could not afford it.
+
+**Hunting and fishing at founding** are food work. They get the survival reason by what the land in reach would yield, and forest, shield and water families take them on wooded or lake sites. They are reasonable choices on what the family knows:
+- hunting yields 3.5 against a farm's 4, more in autumn and winter;
+- fishing yields 4 all year.
+
+**Later entries** were made in fed towns (hardship under 0.3): 11 herding, 13 hunting, 3 fishing among 71 choices. These are prosperity choices, as designed.
+
+### Reasonable decisions, missing opportunities, or incomplete systems?
+
+1. **The founding food economy has no slack (an incomplete system, in every mode).**
+   - **The numbers:**
+     - A founding town holds 26–29 days of food.
+     - Hand work makes a third of a proper workplace's output. A novice's garden in spring feeds about 1.3 people, against a family of about 3.3.
+     - So even with every family in food work, a founding town grows a fraction of what it eats (8–60% in the traces) until fields are improved (4 wood, 1 tool, 6 days).
+   - **What follows:** every family off food work lengthens the famine. That is why one herding choice is decisive. The new trades widen the choices that take a family off food, and herding is the only one that takes it off food entirely.
+2. **Herding at founding is a defensible but systematic choice.**
+   - **It follows the approved design:** "a family of the loom … would rather grow food, but may still herd".
+   - **What happens instead:** loom families with the skill herd in most hard foundings, not rarely, because the calling and the familiar keep pulling while the farm they would work as novices relieves hunger only by half.
+   - **Two candidate corrections were measured (comparison metas, not defaults), and neither is a clean fix:**
+
+     | Candidate | Ordinary | Stressed | Difficult |
+     |---|---|---|---|
+     | **the familiar yields to hunger as the calling does, for any work but food** (`known_work_yields_to_survival`) | **+10.7** (49.3 → 60.0) | −4.2 | +6.2 |
+     | **the same for comfort goods only, like wool** (`familiar_comfort_yields`) | +5.3 | −3.0 | +2.3 |
+
+     - **The first candidate's cost:** it also weakens toolmaking, and days without tools double on stressed sites.
+     - **The second:** it changes few towns (3 → 3 and 8 → 7 towns with first-year herding), because the calling's half pull still decides.
+   - **So** the lever is the calling's pull under hunger (`CALLING_YIELD`), an owner-approved weight. Not changed (decision below).
+3. **Hunting fails where woodcutters fell its woods (a missing opportunity the player now has).**
+   - **Unkept woods:** woodcutters fell the trees nearest them, and lodges in the same woods lose their game: 880325585, and stressed 2860120474.
+   - **Keeping the woods round each lodge from the week it is worked:**
+     - **880325585:** 12 → 87 people (ordinary), 10 → 82 (stressed);
+     - **2860120474 stressed:** 9 → 108.
+   - **The cost:** woodcutters walk farther.
+   - **The warning comes too late** to show this. "Hunting grounds are being felled" shows once a lodge has lost a third of its best yield: day 651–2,156, or never. Acting on the card changed little (below).
+4. **The low-tool trap (an incomplete system).**
+   - **The stressed lake town:** it spends five years with 0–15 tools, almost all work by hand, and one hand tool mender that never improves.
+   - **Improvements are blocked** because the protected tool reserve (4 + 2 per workplace) exceeds the store.
+   - **Hungry families never change work.** "The family itself is going hungry" counts the same for staying and for every other food work, and the master's skill keeps them.
+
+   Seen in the new-trade towns. Not investigated further (decision below).
+5. **Known limitation, confirmed:** several lodges in the same woods each count the whole woods, so each family expects more game than the woods can give two.
+
+### How much player guidance helps (Round 4 of `docs/PLAYER_AGENCY_AUDIT.md`)
+
+- **Informed play** (appeals and land) under all rules: +7.4 / +6.6 / +18.4 people.
+- **Keeping the woods round lodges early:** +6.8 / +13.8 / +1.1. The card's late timing gives almost nothing: 0 / +1.1 / +1.2.
+- **A single appeal against repeated ones:** below.
+- **Resource-backed subsidies (untested; `docs/TREASURY_AUDIT.md`).** The founding fragility is about how fast food work becomes proper work, and whether a family off food work can be carried. An allocation of wood and tools for field improvements at founding acts on exactly that, through families' existing affordability reasoning. So would, later, food set aside for a family establishing food work. Both should be measured with the treasury's first version on these seeds.
+
+### For the owner (Priority 5)
+
+1. **The calling's pull under hunger** (`CALLING_YIELD`, 0.5: half the calling's pull survives full hardship). Choose one:
+   - keep it: founding herders are part of the loom culture's risk, and the player's answers are treasury support for food work and the warnings;
+   - for work making goods the town only goes without (wool), let the calling fade with hunger as those goods' need terms already do (`1 − hardship`), leaving food, wood and tools as now;
+   - measure first.
+
+   Not built. Recommended: the second, measured on these seeds before deciding.
+2. **The hunting-grounds warning should come earlier** (interface only, recommended): when woodcutters begin felling within a worked lodge's reach, not after a third of its yield is gone. The evidence: keeping early saves the hunting towns; keeping on today's card does not.
+3. **Shared woods counted per lodge:** a correctness fix to what families expect from hunting (each lodge's share of the woods it shares). It changes what lodges are judged to yield, not production numbers. Approval wanted.
+4. **The low-tool trap:** the protected reserve can block every improvement in a town that makes tools by hand only. Investigate before changing.
+5. **The treasury foundation:** `docs/TREASURY_AUDIT.md`, decisions listed there.
+
 ## Fourth Round, Phase 2 (2026-11-01): Early Food Warning, Cards, Kept Woods, Focused Appeals
 
-The owner's brief "Finish player warnings, then proceed to priority 4". It stops for review before priority 5 (the new trades reevaluated). Agency results: `docs/PLAYER_AGENCY_AUDIT.md`, "Round 3".
+The owner's brief "Finish player warnings, then proceed to priority 4" (its decisions on this phase are in phase 3). It stops for review before priority 5 (the new trades reevaluated). Agency results: `docs/PLAYER_AGENCY_AUDIT.md`, "Round 3".
 
 ### Warnings
 
