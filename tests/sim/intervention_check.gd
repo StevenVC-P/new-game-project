@@ -155,7 +155,7 @@ func play(site: Dictionary, policy: String, stress: bool, years: int) -> Diction
 	var scenario: Dictionary = BASE.duplicate(true)
 	scenario["hard_winter"] = stress
 	var state: Dictionary = {"first_card": {}, "actions": [], "calm_since": 0, "last_commission": -COMMISSION_GAP_DAYS, "food_short_days": 0, "tools_out_days": 0, "first_departure": -1, "takeups": {},
-		"years": {}, "first_year_food_short_days": 0, "first_year_tools_out_days": 0, "work_history": {}, "founders": [], "woodcutter_days_lost": 0.0, "hunting_warning": {}}
+		"years": {}, "first_year_food_short_days": 0, "first_year_tools_out_days": 0, "work_history": {}, "founders": [], "woodcutter_days_lost": 0.0, "hunting_warning": {}, "made": {}}
 	scenario["each_day"] = func(town: City, day: int, _player) -> void:
 		if day == 0 and policy == "inappropriate":
 			act(town, state, day, "priority investment", func() -> void: town.influence.set_priority(CommunityPriority.INVESTMENT))
@@ -393,6 +393,14 @@ func record_day(city: City, day: int, state: Dictionary) -> void:
 		if list.is_empty() or str((list[list.size() - 1] as Array)[1]) != trade:
 			list.append([day, trade])
 			history[household.id] = list
+	# What the land trades bring in (about: each worked workplace at its family's pace, with its land
+	# and season, as FamilyInitiative counts it), summed over the game.
+	var made: Dictionary = state["made"]
+	for building: Building in city.buildings:
+		var base: String = BuildingTiers.get_base_type(building.type)
+		if building.assigned_household_id >= 0 and building.can_produce() and base in [Building.BUILDING_FISHER, Building.BUILDING_HUNTER, Building.BUILDING_HERDER]:
+			var reach: float = city.land.get_reach_factor(building)
+			made[base] = float(made.get(base, 0.0)) + FamilyInitiative.get_building_output(city, building) / maxf(reach, 0.0001) * city.land.get_output_factor(building)
 	if not city.woodland.protected.is_empty():
 		for woodcutter: Building in city.woodland.get_woodcutters():
 			state["woodcutter_days_lost"] = float(state["woodcutter_days_lost"]) + (1.0 - city.woodland.get_felling_factor(woodcutter))
@@ -552,7 +560,7 @@ func measure(city: City, state: Dictionary, off_the_ground: bool) -> Dictionary:
 		"swayed": influence.swayed.duplicate(), "swayed_total": swayed,
 		"appeals_made": influence.appeals_made, "appeals_answered": influence.appeals_answered, "appeals_tipped": influence.appeals_tipped, "kept_woods": city.woodland.protected.size(), "first_card": state["first_card"], "actions": state["actions"], "takeups": state["takeups"],
 		"years": state["years"], "first_year_food_short_days": state["first_year_food_short_days"], "first_year_tools_out_days": state["first_year_tools_out_days"],
-		"work": summarize_work(state), "woodcutter_days_lost": snappedf(float(state["woodcutter_days_lost"]), 0.1), "hunting_warning": state["hunting_warning"], "felled": city.woodland.felled_count,
+		"work": summarize_work(state), "woodcutter_days_lost": snappedf(float(state["woodcutter_days_lost"]), 0.1), "made": (state["made"] as Dictionary).keys().reduce(func(acc: Dictionary, k: String) -> Dictionary: acc[k] = roundi(float(state["made"][k])); return acc, {}), "hunting_warning": state["hunting_warning"], "felled": city.woodland.felled_count,
 		"fade_changed": city.get_meta("comfort_calling_changed", {}), "fade_cases": city.get_meta("comfort_calling_cases", []),
 	}
 
