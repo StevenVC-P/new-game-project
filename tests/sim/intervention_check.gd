@@ -21,8 +21,12 @@ extends SceneTree
 # - (earlier rounds) informed_priority, informed_commission, late;
 # - informed_appeal_once: the appeals only, each good asked for once in the town's life (owner,
 #   2026-11-01: the benefit of one appeal apart from repeated ones);
-# - keep_hunting: only keeps the woods round lodges whose land is failing, when the card shows;
-#   keep_lodges: keeps the woods round every hunting workplace as soon as a family works it.
+# - keep_hunting: only keeps the woods round lodges whose land is failing (two thirds of their best
+#   yield or less: the late card before 2026-11-02, kept as "late" preservation);
+#   keep_lodges: keeps the woods round every hunting workplace as soon as a family works it;
+# - keep_on_warning: keeps the woods round the lodges the early hunting-grounds card names, with the
+#   card's own buttons, the week it shows (owner, 2026-11-02). The informed players answer that card
+#   the same way.
 #
 # Records when each warning first showed (could the player see it in time?), what the player did
 # and when, and what families decided (takeups, reviews, changes, decisions the priority tipped).
@@ -47,7 +51,7 @@ const MODES: Dictionary = {
 }
 const DIFFICULT_POOL_REGIONS: int = 30
 const DIFFICULT_CACHE: String = "user://wisdom_difficult_seeds.txt"
-const CARDS: Array[String] = ["Food supply not yet established", "Food will run short", "The town grows less food than it eats", "Food stores are falling", "Food has run out", "Tools are low", "Tools are running out", "Workplaces are wearing down", "thinking of leaving", "Families find no land for their work", "Hunting grounds are being felled"]
+const CARDS: Array[String] = ["Food supply not yet established", "Food will run short", "The town grows less food than it eats", "Food stores are falling", "Food has run out", "Tools are low", "Tools are running out", "Workplaces are wearing down", "thinking of leaving", "Families find no land for their work", "Hunting grounds are being felled", SidebarOverviewPage.HUNTING_GROUNDS_TITLE]
 const NO_LAND: String = "Families find no land for their work"
 const FELLED: String = "Hunting grounds are being felled"
 # A block of land marked to till, tiles per side, and how often the player marks again.
@@ -134,13 +138,19 @@ func play(site: Dictionary, policy: String, stress: bool, years: int) -> Diction
 		city.set_meta("trace_choices", [])
 	var scenario: Dictionary = BASE.duplicate(true)
 	scenario["hard_winter"] = stress
-	var state: Dictionary = {"first_card": {}, "actions": [], "calm_since": 0, "last_commission": -COMMISSION_GAP_DAYS, "food_short_days": 0, "tools_out_days": 0, "first_departure": -1, "takeups": {}}
+	var state: Dictionary = {"first_card": {}, "actions": [], "calm_since": 0, "last_commission": -COMMISSION_GAP_DAYS, "food_short_days": 0, "tools_out_days": 0, "first_departure": -1, "takeups": {},
+		"years": {}, "first_year_food_short_days": 0, "first_year_tools_out_days": 0, "work_history": {}, "founders": [], "woodcutter_days_lost": 0.0, "hunting_warning": {}}
 	scenario["each_day"] = func(town: City, day: int, _player) -> void:
 		if day == 0 and policy == "inappropriate":
 			act(town, state, day, "priority investment", func() -> void: town.influence.set_priority(CommunityPriority.INVESTMENT))
 		state["food_short_days"] = int(state["food_short_days"]) + (1 if town.resources["food_shortage"] == true else 0)
+		if day < Calendar.DAYS_PER_YEAR and town.resources["food_shortage"] == true:
+			state["first_year_food_short_days"] = int(state["first_year_food_short_days"]) + 1
 		if int(town.resources["tools"]) == 0 and town.buildings.any(func(b: Building) -> bool: return b.needs_maintenance()):
 			state["tools_out_days"] = int(state["tools_out_days"]) + 1
+			if day < Calendar.DAYS_PER_YEAR:
+				state["first_year_tools_out_days"] = int(state["first_year_tools_out_days"]) + 1
+		record_day(town, day, state)
 		if int(state["first_departure"]) < 0 and int(town.resources.get("departed_households", 0)) > 0:
 			state["first_departure"] = day
 		for building: Building in town.buildings:
@@ -162,8 +172,10 @@ func play(site: Dictionary, policy: String, stress: bool, years: int) -> Diction
 			respond(town, state, day, titles, policy == "late", policy != "informed_commission", policy != "informed_priority")
 		if policy in ["informed", "informed_appeal", "informed_land", "informed_appeal_once"]:
 			answer_with_cards(town, state, day, titles, policy != "informed_land", policy != "informed_appeal" and policy != "informed_appeal_once", policy == "informed_appeal_once")
-		if policy == "keep_hunting" and titles.has(FELLED):
+		if policy == "keep_hunting":
 			keep_hunting_grounds(town, state, day)
+		if policy == "keep_on_warning" and titles.has(SidebarOverviewPage.HUNTING_GROUNDS_TITLE):
+			keep_as_card_offers(town, state, day)
 		if policy == "keep_lodges":
 			keep_lodge_woods(town, state, day)
 		if policy == "overprotect" and day == 7:
@@ -210,6 +222,8 @@ func answer_with_cards(city: City, state: Dictionary, day: int, titles: Array[St
 			till_near_blocked(city, state, day)
 		if titles.has(FELLED):
 			keep_hunting_grounds(city, state, day)
+		if titles.has(SidebarOverviewPage.HUNTING_GROUNDS_TITLE):
+			keep_as_card_offers(city, state, day)
 
 # Hunting grounds are being felled: keeps the woods within a lodge's reach, round each lodge whose
 # land is failing (as the card shows), so no woodcutter fells there.
@@ -225,6 +239,17 @@ func keep_hunting_grounds(city: City, state: Dictionary, day: int) -> void:
 		if city.woodland.get_wooded_in_block(from, to).all(func(tile: Vector2i) -> bool: return city.woodland.is_protected(tile)):
 			continue
 		act(city, state, day, "keep woods %s" % str(building.tile), func() -> void: city.woodland.protect_block(from, to))
+
+# The early hunting-grounds card answered with its own buttons: the woods round each lodge it names
+# kept, as a click on its keep button does (main.gd, keep_hunting_ground).
+func keep_as_card_offers(city: City, state: Dictionary, day: int) -> void:
+	for card: Dictionary in SidebarOverviewPage.get_hunting_ground_cards(city):
+		for button: Dictionary in card["buttons"]:
+			if str(button["action"]["action"]) != "keep_hunting_ground":
+				continue
+			for building: Building in city.buildings:
+				if building.id == int(button["action"]["building"]):
+					act(city, state, day, "keep hunting ground %s" % str(building.tile), func() -> void: city.woodland.keep_hunting_ground(building))
 
 # Keeping early: the woods within reach of every hunting workplace a family works, from the week it
 # works it, before any felling shows.
@@ -330,6 +355,54 @@ func protect_hunting_grounds(city: City, state: Dictionary, day: int) -> void:
 	state["last_mark"] = day
 	act(city, state, day, "mark woods %s" % str(best), func() -> void: city.woodland.mark_block(best - Vector2i.ONE, best + Vector2i.ONE))
 
+# What the comparison follows each day: the town at the end of years 1 and 3; every family's work as it
+# changes (which trades families take up, and the founding families' first year); what kept woods
+# cost the woodcutters (days of woodcutting lost to the walk); and, the first time the early
+# hunting-grounds card would show, how much of their bag the lodges it names still had.
+func record_day(city: City, day: int, state: Dictionary) -> void:
+	if day == 0:
+		for household: Household in city.households:
+			(state["founders"] as Array).append(household.id)
+	if day == Calendar.DAYS_PER_YEAR - 1 or day == 3 * Calendar.DAYS_PER_YEAR - 1:
+		state["years"][str((day + 1) / Calendar.DAYS_PER_YEAR)] = {"people": city.get_total_population(), "households": city.households.size(), "food": int(city.resources["food"]), "tools": int(city.resources["tools"])}
+	var history: Dictionary = state["work_history"]
+	for household: Household in city.households:
+		var holding: Building = FamilyInitiative.get_holding(city, household)
+		if holding == null:
+			continue
+		var trade: String = BuildingTiers.get_base_type(holding.type)
+		var list: Array = history.get(household.id, [])
+		if list.is_empty() or str((list[list.size() - 1] as Array)[1]) != trade:
+			list.append([day, trade])
+			history[household.id] = list
+	if not city.woodland.protected.is_empty():
+		for woodcutter: Building in city.woodland.get_woodcutters():
+			state["woodcutter_days_lost"] = float(state["woodcutter_days_lost"]) + (1.0 - city.woodland.get_felling_factor(woodcutter))
+	if day % 7 == 0 and (state["hunting_warning"] as Dictionary).is_empty():
+		var threats: Array[Dictionary] = city.woodland.get_hunting_threats()
+		if not threats.is_empty():
+			var factors: Array = []
+			for threat: Dictionary in threats:
+				var lodge: Building = threat["building"]
+				factors.append({"lodge": lodge.id, "factor": snappedf(float(threat["factor"]), 0.01), "peak": snappedf(maxf(lodge.peak_land_yield, float(threat["factor"])), 0.01), "after": snappedf(float(threat["after"]), 0.01), "days": roundi(minf(9999.0, float(threat["days"])))})
+			state["hunting_warning"] = {"day": day, "lodges": factors}
+
+# Which trades families took up over the game (each change counted), and how the founding families
+# worked in their first year: how many herded at some point, and each one's trades.
+static func summarize_work(state: Dictionary) -> Dictionary:
+	var taken: Dictionary = {}
+	var founding_herders: int = 0
+	var founding_first_year: Dictionary = {}
+	for id in state["work_history"].keys():
+		var list: Array = state["work_history"][id]
+		for entry: Array in list:
+			taken[entry[1]] = int(taken.get(entry[1], 0)) + 1
+		if (state["founders"] as Array).has(id):
+			var first_year: Array = list.filter(func(e: Array) -> bool: return int(e[0]) < Calendar.DAYS_PER_YEAR).map(func(e: Array) -> String: return str(e[1]))
+			founding_first_year[str(id)] = first_year
+			founding_herders += 1 if first_year.has(Building.BUILDING_HERDER) else 0
+	return {"taken": taken, "founding_herders": founding_herders, "founding_first_year": founding_first_year}
+
 func act(_city: City, state: Dictionary, day: int, what: String, do: Callable) -> void:
 	do.call()
 	(state["actions"] as Array).append({"day": day, "action": what})
@@ -404,6 +477,9 @@ func measure(city: City, state: Dictionary, off_the_ground: bool) -> Dictionary:
 		"reviews": influence.work_reviews, "changes": influence.work_changes, "triggers": triggers, "changed_for": changed_for,
 		"swayed": influence.swayed.duplicate(), "swayed_total": swayed,
 		"appeals_made": influence.appeals_made, "appeals_answered": influence.appeals_answered, "appeals_tipped": influence.appeals_tipped, "kept_woods": city.woodland.protected.size(), "first_card": state["first_card"], "actions": state["actions"], "takeups": state["takeups"],
+		"years": state["years"], "first_year_food_short_days": state["first_year_food_short_days"], "first_year_tools_out_days": state["first_year_tools_out_days"],
+		"work": summarize_work(state), "woodcutter_days_lost": snappedf(float(state["woodcutter_days_lost"]), 0.1), "hunting_warning": state["hunting_warning"], "felled": city.woodland.felled_count,
+		"fade_changed": city.get_meta("comfort_calling_changed", {}), "fade_cases": city.get_meta("comfort_calling_cases", []),
 	}
 
 func get_difficult_sites() -> Array:
