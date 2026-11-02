@@ -56,7 +56,7 @@ All eight are resolved. Routine design details are made in sprint and recorded i
 
 ## 3. Sequencing
 
-1. **Measure first, in the first sprint, not as a sprint of its own.** S1 extends `tests/sim/site_variety_check.gd` (which already classifies real sites by their land) into a divergence report, runs it on `develop`, then lands the first mechanic.
+1. **Measure first.** S1a builds the test framework (`docs/ECONOMIC_FOUNDATIONS_TEST_PLAN.md`) on the existing checks and records baseline B0 on `develop`; S1b lands the first mechanic against it. (The owner's testing mandate, 2026-11-02, puts the framework before substantial mechanics, so it is its own small sprint.)
 2. **Make geography bite: Track A (S1–S5).** Stone, finite forests, fuel, materials in construction and grounded clay give sites real advantages, scarcity and sinks, and give settlements their first visible identity. It closes F1–F4 and some of F6, and makes property worth having.
 3. **Ownership and exchange: Track B (S6–S9).** The ledger (behaviour-neutral), player-set contributions, redistribution and survival-seeking, and the market day. S6 touches nothing Track A changes in behaviour and may move earlier if convenient.
 4. **The land's year: Track C (S10–S14).** Food kinds, seasonal crops, soil, fish and game stocks, livestock and draft animals.
@@ -69,8 +69,8 @@ All eight are resolved. Routine design details are made in sprint and recorded i
 
 | Epic | Covers (brief part) | Sprints |
 |---|---|---|
-| E1 Measurement | Evaluation across sites and seeds (9.4) | S1, then every sprint |
-| E2 Geology and deposits | Stone, clay, limestone, iron, copper, tin, coal, salt (3) | S1, S5, S15, B-items |
+| E1 Measurement | Evaluation across sites and seeds (9.4); the test plan | S1a, then every sprint |
+| E2 Geology and deposits | Stone, clay, limestone, iron, copper, tin, coal, salt (3) | S1b, S5, S15, B-items |
 | E3 Forests and timber | Finite timber, regrowth, fuel, species (3) | S2, S3, S17 |
 | E4 Construction and settlement identity | Materials in buildings, durability, family choice, appearance (5) | S4, S5 |
 | E5 Ownership and the commons | Ledger, contributions, redistribution (6) | S6, S7, S8 |
@@ -89,7 +89,8 @@ Status: Planned, Active, Complete, Blocked. Complexity: S (days), M (about a wee
 | Sprint | Epic | Status | Depends on | Acceptance (short) | Validation | Commit | Follow-up |
 |---|---|---|---|---|---|---|---|
 | S0 Roadmap and decisions | — | **Complete** | — | Owner answers D1–D8 | Approved 2026-11-02 | — | — |
-| S1 Stone that matters, divergence report | E1, E2 | Planned | S0 | Quarry only on stone; output by deposit grade; stone only where the land has it | Divergence report, baseline vs S1 | — | — |
+| S1a Test framework and baseline | E1 | Planned | S0 | Suite runner, flow counters, invariant checker, founder sets, divergence check; baseline B0 recorded | Test plan §9; a repeated run identical | — | — |
+| S1b Stone quarries | E2 | Planned | S1a | Quarry only on stone; output by deposit grade; stone only where the land has it | Divergence check, B0 vs S1b | — | — |
 | S2 Living forests | E3 | Planned | S1 (report) | Woodcutting thins the woods and slows with them; regrowth over years; families weigh woods for woodcutting | Report on forest and sparse sites; hunting coupling | — | — |
 | S3 Winter fuel | E3 | Planned | S2 | Households burn firewood in the cold season; shortage has real cost; wood surplus falls | Report; first-winter stress | — | — |
 | S4 Materials in construction ◆ | E4, E10 | Planned | S1 | Timber and stone versions of homes and workplaces; families choose; masonry and paving get uses | Report: share of stone buildings by site | — | — |
@@ -113,17 +114,22 @@ Status: Planned, Active, Complete, Blocked. Complexity: S (days), M (about a wee
 
 ## 6. Sprint Cards: Track A
 
-### S1: Stone that matters, and the divergence report (M)
+### S1a: Test framework and baseline (M)
 
-- **Objective:** the first real mineral advantage, and the yardstick every later sprint reports against.
+- **Objective:** the yardstick every later sprint reports against, before any mechanic changes.
+- **Scope:** `docs/ECONOMIC_FOUNDATIONS_TEST_PLAN.md` section 9: suite runner, per-good flow counters, the invariant checker, founder sets independent of the tile, and the divergence check over five environments (fertile valley, forested, rocky highland, balanced, marginal; test-side groupings only). Then baseline B0 on `develop` at `fcfc0fc`, and the benchmark.
+- **Acceptance:** test plan section 10. No change in play: the gameplay regression and the full suite pass unchanged.
+
+### S1b: Stone quarries (M)
+
+- **Objective:** the first real mineral advantage.
 - **Scope:**
-  1. Extend `site_variety_check.gd` (or a sibling reusing its site classifier) into a family-led divergence report: real generated sites grouped into archetypes (river or lake valley, forest, rocky highland, open plain, dry), several seeds each, six years. Per archetype: survival, people at years 1/3/6, occupations held, goods made and used, stocks and depletion, departures, and a specialisation measure (share of households outside food work). Run it on `develop` first and keep the numbers in this doc.
-  2. The 2026-10-25 access rule: a quarry's footprint must include stone-deposit tiles, which may now be built on by a quarry only. Output scales with the deposit tiles in the footprint and a deposit **grade** read from the town map (a pure function of the tile, so no new randomness).
-  3. Deposits are large but finite (a per-tile amount). An exhausted quarry says so and its family reconsiders its work through the existing `OccupationReview`.
-  4. The site survey and the placement hint name the stone and its grade.
+  1. The 2026-10-25 access rule: a quarry's footprint must include stone-deposit tiles, which may now be built on by a quarry only. Output scales with the deposit tiles in the footprint and a deposit **grade** read from the town map (a pure function of the tile, so no new randomness).
+  2. Deposits are large but finite (a per-tile amount). An exhausted quarry says so and its family reconsiders its work through the existing `OccupationReview`.
+  3. The site survey and the placement hint name the stone and its grade.
 - **Visible behaviour:** quarries cluster on rock; towns without stone can't quarry (stone only by trade); a good-grade deposit outproduces a poor one.
 - **Acceptance:** placement refuses a quarry off stone with a reason; output follows grade; matched towns that never build a quarry are unchanged day for day; old saves load (their maps have the deposits already; an existing quarry off stone keeps working until it closes, so no building vanishes under the player).
-- **Tests:** a rules test (placement, output, exhaustion, saves); the divergence report before and after.
+- **Tests:** a rules test (placement, output, exhaustion, saves); the divergence check against B0.
 - **Risks:** rough tiles currently block placement everywhere; opening them to quarries touches `building_placement.gd` validation and route grid passability. Stone has few uses until S4, so S1 alone barely moves outcomes (the report should show stone appearing only on stone sites, and little else).
 - **Autonomy:** quarrying stays player-built in S1; families take it up through a hand-work stage in S4 (D6).
 
@@ -170,10 +176,7 @@ Mechanism from `docs/PROPERTY_AND_COMMUNAL_RESOURCES.md`, revised by D1.
 
 ## 8. Evaluating Results
 
-- **Every sprint reports** the divergence report against its base, same seeds, mechanic on and off (a switch on the check, like the existing `--no-…` flags), plus the existing checks its files touch (`TESTING.md`).
-- **Intended versus broken.** A difficult site doing worse is intended when the cause is its land and families responded sensibly. It is broken when families ignore an available means of survival, a stock goes negative or never recovers, output appears without its input, two systems count the same land twice, or a loaded game diverges from the original.
-- **Don't tune to equalise.** If a result looks wrong, isolate the cause with switches and report options (`owner-milestone-workflow`).
-- **Performance.** Note the daily tick's cost in each report; stocks are per tile or per site, never per animal or tree.
+**`docs/ECONOMIC_FOUNDATIONS_TEST_PLAN.md` governs:** the four test levels, environments and founder sets, invariants, metrics, the intended-versus-defect rule, stopping rules, the Definition of Done and the sprint report format. Sprint reports live in `docs/economic_foundations/`. In short: every economic sprint runs the divergence check against its base and B0, mechanic on and off; unequal outcomes are reported, not equalised; a failing invariant stops the affected work.
 
 ## 9. Constraints Carried Into Every Sprint
 
@@ -183,10 +186,11 @@ From `AGENTS.md`, `HANDOFF.md` and the brief: `main.gd` gets no simulation logic
 
 - **Completed:** this roadmap; D1–D8 approved. Nothing built or tested.
 - **Branch:** `docs/economic-foundations-roadmap` (from `develop` at `fcfc0fc`).
-- **Next, when the owner says start:** create `feature/economic-foundations` from `develop` (it should carry this doc), then S1 on its own sprint branch.
+- **Next, when the owner says start:** create `feature/economic-foundations` from `develop` (it should carry this doc and the test plan), then S1a on its own sprint branch.
 - **Open housekeeping:** the unmerged `docs/property-and-communal-resources` holds the superseded §4.3; when S6 begins, bring its doc in with a note that D1 replaces §4.3, rather than leave it to mislead.
 
 ## Log
 
 - 2026-11-02: roadmap written from the owner's brief and the resource audit. No code.
 - 2026-11-02: owner approved D1–D8 with additions (an initial contribution choice in new games, voluntary contributions, exchange outside market day, firewood by housing and household size, families choosing their own building materials). Recorded; work not started.
+- 2026-11-02: owner's testing mandate → `docs/ECONOMIC_FOUNDATIONS_TEST_PLAN.md`. S1 split into S1a (framework and baseline) and S1b (quarries). Not started.
