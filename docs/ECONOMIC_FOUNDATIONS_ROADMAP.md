@@ -1,6 +1,6 @@
 # Economic Foundations and Geographic Diversity: Roadmap
 
-**Status: plan only (2026-11-02). Decisions D1–D8 approved by the owner (2026-11-02); nothing is built, and work starts only when the owner says so.** Branch `docs/economic-foundations-roadmap`, from `develop` at `fcfc0fc`. This is the living backlog for the initiative: update the tracking table after every sprint, and reorder freely when a sprint's results say so.
+**Status: authorized and in progress (2026-11-02).** Decisions D1–D8 and working terms Q1–Q6 approved by the owner. Work happens on `feature/economic-foundations` in its own worktree; nothing merges into `develop` without the owner. This is the living backlog for the initiative: update the tracking table after every sprint, and reorder freely when a sprint's results say so.
 
 **Sources.** The owner's brief "Economic Foundations and Geographic Diversity" (2026-11-02; summarised below), `docs/GAME_VISION.md` (wins on conflict), the baseline `docs/RESOURCE_AND_PRODUCTION_AUDIT.md` (on `develop` since `ebb632d`), `docs/ECONOMY_MODEL.md`, and the unmerged `docs/PROPERTY_AND_COMMUNAL_RESOURCES.md` on branch `docs/property-and-communal-resources`. Where this roadmap and the code disagree about what exists, the code wins.
 
@@ -52,6 +52,15 @@ All eight are resolved. Routine design details are made in sprint and recorded i
 - **D7. Branching: approved.** One integration branch for the initiative, `feature/economic-foundations` from `develop`. Each sprint has identifiable changes, validation results and commits, and merges into the integration branch once validated. **Nothing reaches `develop` or `main` without the owner's authorization.**
 - **D8. Difficulty and balance: approved.** Report differences honestly; don't compensate difficult sites or equalise settlements. Some sites should be substantially less viable to found on; others hard early but strong industrially later. Tell intended disadvantage from defects, and keep fixing bugs, numerical instability and unintended regressions. Evaluate with deterministic sims across several seeds.
 
+### Working terms (approved 2026-11-02)
+
+- **Q1 Pausing:** continue through S1–S5 while each sprint passes its validation; report at every ◆ without stopping. Stop only for serious correctness failures, architectural blockers, or conflicts with the design principles.
+- **Q2 Machine time:** unattended runs allowed, **at most four concurrent Godot processes**; watch memory and load and reduce concurrency if the machine struggles. Eight starts for some on/off comparisons is acceptable when documented; baselines and review comparisons keep twelve.
+- **Q3 Pushing:** the integration and sprint branches may be pushed to `origin`. No merges into `develop` or `main`, no force-push, no changes to unrelated branches.
+- **Q4 Interface:** small, necessary additions to existing pages (deposit quality, forest resources, fuel warnings, material choice, household resources). No broad redesign; focused changes to high-risk UI files, verified by the sidebar tests and screenshots.
+- **Q5 Mortality: severe, sustained hunger or cold can kill.** Families first try what they can (own reserves, the commons, trade, other work, other fuel or shelter, leaving), and none of it is guaranteed. Death follows sustained, severe conditions, never one missed day; housing, resources and environment shape the risk; no arbitrary mortality and no artificial protection. Uses the existing household member counts and lifecycle removal, as its own bounded sprint (S3b).
+- **Q6 Worktree:** the initiative runs in a separate `git worktree`; the main folder stays on `develop` for playtesting.
+
 **Sequencing approved:** geography and scarcity (S1–S5) before property and markets; Track B follows by dependencies and findings. Each sprint should still move toward the eventual joining of geography, autonomous production, ownership, exchange and culture.
 
 ## 3. Sequencing
@@ -93,6 +102,7 @@ Status: Planned, Active, Complete, Blocked. Complexity: S (days), M (about a wee
 | S1b Stone quarries | E2 | Planned | S1a | Quarry only on stone; output by deposit grade; stone only where the land has it | Divergence check, B0 vs S1b | — | — |
 | S2 Living forests | E3 | Planned | S1 (report) | Woodcutting thins the woods and slows with them; regrowth over years; families weigh woods for woodcutting | Report on forest and sparse sites; hunting coupling | — | — |
 | S3 Winter fuel | E3 | Planned | S2 | Households burn firewood in the cold season; shortage has real cost; wood surplus falls | Report; first-winter stress | — | — |
+| S3b Fatal hardship | E3, E11 | Planned | S3 | Sustained severe hunger or cold can kill members, then a household; risk follows severity, housing and season; families tried what they could first | Rules test; deaths by cause vs B0 | — | — |
 | S4 Materials in construction ◆ | E4, E10 | Planned | S1 | Timber and stone versions of homes and workplaces; families choose; masonry and paving get uses | Report: share of stone buildings by site | — | — |
 | S5 Clay and limestone | E2, E4 | Planned | S4 | Brickworks needs clay, lime kiln needs limestone; brick and tile have building uses | Report | — | — |
 | S6 Ownership ledger | E5 | Planned | S0 | Household shares, building funders, treasury view; play unchanged under the migration-only 100% setting | Matched snapshots identical to the base; saves | — | — |
@@ -148,7 +158,14 @@ Status: Planned, Active, Complete, Blocked. Complexity: S (days), M (about a wee
 - **Scope:** each household burns firewood daily in the cold months, by season and climate (longer and more in colder places) and by household size; housing enters as unsheltered versus housed now, and through materials once S4 lands (D5). Its own gathering goes to its hearth first; then the commons. A shortage costs workdays and adds to hardship, below hunger. Fuel becomes a need bucket like food. Kilns and brickworks already burn wood.
 - **Visible behaviour:** autumn wood work; stores fall over winter; cold sites without woods struggle; wood surplus of later years shrinks.
 - **Acceptance:** survival-first holds (a cold family gathers or takes up wood work when it can); a matched first-winter stress shows fuel shortages only where wood is short.
-- **Risks:** adds a hard-ish need: the owner should see first-year survival on stressed sites before S3 merges.
+- **Risks:** adds a hard-ish need; first-year survival on stressed sites is reported at the next ◆. S3 itself adds no deaths: those come in S3b.
+
+### S3b: Fatal hardship (M)
+
+- **Objective:** Q5. Environmental hardship can be fatal; behaviour stays survival-driven.
+- **Scope:** a monthly risk to a household's members once hunger or cold has been both severe and sustained (weeks, not days), rising with severity and duration, higher without shelter or in a poor home, in the cold season, and for the young and old. Seeded rolls as elsewhere in `City`. A death lowers the member counts (children first by vulnerability, then adults); a household with no adults left is removed through the existing lifecycle path (work succession, house freed). Deaths are logged with their cause and shown to the player as a chronicle line and a family card note.
+- **Acceptance:** no death without sustained severe conditions; a family with an available response took it before the risk began (traced); risk falls when conditions lift; departures still happen for those who can leave.
+- **Risks:** changes hunger's consequences in every town, so B0 comparisons will move; reported honestly, not offset.
 
 ### S4: Materials in construction (L) ◆
 
@@ -184,9 +201,9 @@ From `AGENTS.md`, `HANDOFF.md` and the brief: `main.gd` gets no simulation logic
 
 ## 10. Handoff
 
-- **Completed:** this roadmap; D1–D8 approved. Nothing built or tested.
-- **Branch:** `docs/economic-foundations-roadmap` (from `develop` at `fcfc0fc`).
-- **Next, when the owner says start:** create `feature/economic-foundations` from `develop` (it should carry this doc and the test plan), then S1a on its own sprint branch.
+- **Completed:** this roadmap and the test plan; D1–D8 and Q1–Q6 approved.
+- **Branches:** planning on `docs/economic-foundations-roadmap` (from `develop` at `fcfc0fc`); `feature/economic-foundations` from it, worktree `../ngg-economic-foundations`; sprints on `feature/ef-<sprint>` merged into it.
+- **Next:** S1a.
 - **Open housekeeping:** the unmerged `docs/property-and-communal-resources` holds the superseded §4.3; when S6 begins, bring its doc in with a note that D1 replaces §4.3, rather than leave it to mislead.
 
 ## Log
@@ -194,3 +211,4 @@ From `AGENTS.md`, `HANDOFF.md` and the brief: `main.gd` gets no simulation logic
 - 2026-11-02: roadmap written from the owner's brief and the resource audit. No code.
 - 2026-11-02: owner approved D1–D8 with additions (an initial contribution choice in new games, voluntary contributions, exchange outside market day, firewood by housing and household size, families choosing their own building materials). Recorded; work not started.
 - 2026-11-02: owner's testing mandate → `docs/ECONOMIC_FOUNDATIONS_TEST_PLAN.md`. S1 split into S1a (framework and baseline) and S1b (quarries). Not started.
+- 2026-11-02: owner approved Q1–Q6 and authorized the work. Mortality from sustained hunger and cold added as S3b.

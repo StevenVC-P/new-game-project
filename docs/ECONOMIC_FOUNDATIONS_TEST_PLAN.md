@@ -1,6 +1,6 @@
 # Economic Foundations: Test Plan
 
-**Status: plan only (2026-11-02). Nothing below is built yet unless marked "exists".** This is the standing test and validation plan for `docs/ECONOMIC_FOUNDATIONS_ROADMAP.md`, from the owner's "Testing and Validation Mandate" (2026-11-02). It changes with the roadmap: when a sprint adds a mechanic, add its tests, invariants and metrics here in the same change.
+**Status: in force (2026-11-02); framework built in S1a. Items not yet built are marked by the sprint that adds them.** This is the standing test and validation plan for `docs/ECONOMIC_FOUNDATIONS_ROADMAP.md`, from the owner's "Testing and Validation Mandate" (2026-11-02). It changes with the roadmap: when a sprint adds a mechanic, add its tests, invariants and metrics here in the same change.
 
 **Rule zero:** a sprint is not done because it compiles or its unit tests pass. It is done when the evidence below shows that it does what it should, breaks nothing that worked, and changes the simulation in ways that can be explained.
 
@@ -86,6 +86,7 @@ Hard requirements (mandate §3). A failing invariant stops the affected work unt
 | I6 | **Shared reach:** each tile's shares among workplaces of one kind sum to at most 1; empty, abandoned and idle workplaces take none; a neutral-worked one does (the fixed bugs must stay fixed) | now (`shared_land_validation` cases), daily from S1a |
 | I7 | Materials delivered to a building equal its cost; the protected reserve is never spent by families | now |
 | I8 | Fuel burned ≤ fuel held; no household heats from wood it doesn't have access to | S3 |
+| I14 | Member counts never go negative and sum to the household's population; a death has a recorded cause and follows the cause's sustained conditions (never a single short day) | S3b |
 
 **Added with ownership and trade** (S6–S9), as stated in the mandate:
 - I9: household shares plus the community's goods equal the physical store; no good belongs to two owners or is eaten twice.
@@ -96,6 +97,7 @@ Hard requirements (mandate §3). A failing invariant stops the affected work unt
 
 **Behaviour invariants** (checked in Level 2 scenarios and traced in Level 3):
 - **Survival first:** when food or fuel runs short, or a family's work fails, its land is lost, the commons can't help or a trade fails, the family responds (changes or adds work, gathers, asks for help, leaves) within a bounded time if any means exists. Values may change *which* response; they never prevent one. A family not choosing the economic optimum is fine.
+- **Fatal hardship (S3b):** every death is traced back to sustained severe conditions, and the trace shows what the family tried. A death where a response was available but untried is a survival-first defect; a death where none was available is intended hardship. No rule prevents a death that the conditions make likely.
 - **Player authority:** no new automation changes a player control (priority, stores rule, kept woods, land set aside, commissions, later contribution and redistribution rules). A test sets each control, runs the new system, and checks the control still holds.
 - **Determinism:** the same seeds give the same town, day for day (fingerprint of stores, households and buildings each month), on a repeated run and after save and load.
 
@@ -107,6 +109,7 @@ Per sprint, alongside the full suite:
 |---|---|
 | S1 Quarries | The quarry rule works with land set aside, kept woods, plots and paths; rough tiles open to quarries only; route grid stays correct; old saves with a quarry off stone load and keep working |
 | S2 Forests | Felling lowers hunting yield as before; shared woods (I6) unchanged; kept woods binding; woods spreading and paths holding land unchanged; families judge woodcutting land correctly |
+| S3b Fatal hardship | Member counts and the lifecycle path stay consistent when a member or a household dies; succession and the freed house behave as for old couples; deaths appear in the chronicle |
 | S3 Firewood | Heating and eating draw on separate stores without double use; a family short of both chooses by survival; gathering for the hearth doesn't starve construction silently (it is reported); the first winter of a viable seed is still survivable |
 | S4 Materials | Families' homes on plots choose a viable material; the player's communal buildings keep the player's choice; the one pipeline still never deadlocks at tier 0; stone shortage delays, never freezes, a queue |
 | S5 Clay and lime | Brickworks and kilns refuse sites without clay or limestone; the downstream goods have consumers; `map_luck_check` and `town_map_probe` re-run; regional fingerprints unchanged |
@@ -117,7 +120,7 @@ Reported per environment as **towns surviving (of 12), median, range, and named 
 
 | Category | Metrics | From |
 |---|---|---|
-| Survival | Towns alive and off the ground, people, households, deaths, departures, hunger days | now |
+| Survival | Towns alive and off the ground, people, households, deaths (by cause from S3b), departures, hunger days | now |
 | Resources | Woods tiles, deposit units left; starting vs remaining; regrowth per year | S1b, S2; fish and game S13 |
 | Production | Per good: made, used, stored, (spoiled S10) | S1a |
 | Food security | Days of food in store, larder totals, shortage days, first-year shortage | now |
@@ -164,7 +167,9 @@ Built before S1b's mechanic, so the baseline exists first. Each item extends wha
 5. **The divergence check** `tests/sim/divergence_check.gd`: reuses `collect_sites`, a classifier built on `site_variety_check`'s land measures, and `wisdom_check`'s family-led play and measures. Options in the existing style: `--environments=`, `--starts=N`, `--years=N`, `--conditions=`, `--policies=`, `--meta=` (mechanic switches), `--seed=N --trace`, `--repeat` (runs each town twice and compares monthly fingerprints). Prints `[DIV]` lines.
 6. **Baseline B0:** the divergence check on `develop` at `fcfc0fc`, every environment, 12 starts, 6 years, ordinary and stressed; plus the benchmark. Recorded in the S1a report and used by every later sprint.
 
-**Runtime and adjustments.** Today 12 towns over 6 years take 20–60 minutes per process. A full comparison (5 environments × 12 starts, on and off) is about 10 such runs: run one environment per process in parallel from fixed-commit `git worktree`s (`HANDOFF.md`). If it is still too slow, starts drop to 8 for on/off sprint comparisons and stay at 12 for baselines and review points; any reduction is written in the sprint report.
+**Runtime and adjustments.** Today 12 towns over 6 years take 20–60 minutes per process. A full comparison (5 environments × 12 starts, on and off) is about 10 such runs: run them from fixed-commit `git worktree`s (`HANDOFF.md`), **at most four Godot processes at once** (owner, Q2), checking free memory and load before starting more and dropping concurrency if the machine struggles. Starts may drop to 8 for on/off sprint comparisons; baselines and review points keep 12; any reduction is written in the sprint report.
+
+**Interface changes** (Q4) are verified by `town_sidebar_validation`, `founding_ui_validation` where the survey changes, and the windowed screenshot captures in `tests/visual/`.
 
 ## 10. Sprint Acceptance
 
@@ -176,6 +181,7 @@ Every sprint meets the **Definition of Done** (mandate §10): mechanic implement
 | S1b Quarries | Placement needs stone; grade changes output; nothing extracts from no deposit; exhaustion ends output; stone output differs by environment; same seeds reproduce |
 | S2 Forests | Felling reduces standing timber; sustained over-cutting creates scarcity; regrowth under its conditions; different forests support different output; hunting and shared woods unchanged. Includes a sustainable vs unsustainable cutting scenario (a woodcutter count or kept-woods policy held fixed) |
 | S3 Firewood | Demand follows season, climate and household size; wood is truly burned; families respond to shortage; fuel competes with building and tools; timber-poor sites pay for it. Winter survival and fuel days reported |
+| S3b Fatal hardship | A town with no fuel or food and no way out loses members after sustained weeks, not days; housing and season change the risk; deaths stop when conditions lift; heirs and houses handled by the existing lifecycle; saves keep the counts |
 | S4 Materials | Materials consumed correctly; availability changes choices; families pick viable materials for their homes; the player's choice holds for communal buildings; stone and timber differ in cost, labour, durability, upkeep and heating. Run where each material is abundant and scarce, and with the values profiles |
 | S5 Clay and lime | Brickworks need clay, kilns limestone; deposits cap output; the products have consumers; opportunities differ by geography |
 | S6–S9 | The ownership and trade invariants I9–I13; contribution policies compared; reserves and redistribution in shortage; barter; families choosing among own work, commons and trade; survival-driven change; culture's response. Tests written with the sprint, never results imagined ahead of it |
@@ -203,3 +209,4 @@ The roadmap's tracking table links each report.
 ## Log
 
 - 2026-11-02: plan written from the owner's testing mandate. Nothing built.
+- 2026-11-02: owner's working terms: four processes at most, mortality (I14, S3b), interface verification.
