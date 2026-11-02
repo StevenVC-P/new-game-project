@@ -226,6 +226,9 @@ static func weigh(city: City, household: Household, holding: Building) -> Dictio
 	var best: Dictionary = {"terms": []}
 	var best_activity: String = ""
 	var best_score: float = -INF
+	# The same without the candidate (meta "comfort_calling_fades"), to count what it changed.
+	var unfaded_activity: String = ""
+	var unfaded_score: float = -INF
 	for occupation: String in FamilyInitiative.get_occupations(city):
 		if occupation == current or FamilyInitiative.is_vetoed(city, household, occupation):
 			continue
@@ -237,7 +240,13 @@ static func weigh(city: City, household: Household, holding: Building) -> Dictio
 			best_score = score
 			best = desire
 			best_activity = occupation
+		if score + float(desire.get("calling_faded", 0.0)) > unfaded_score:
+			unfaded_score = score + float(desire.get("calling_faded", 0.0))
+			unfaded_activity = occupation
 	var margin: float = best_score - stay_score
+	if city.has_meta("comfort_calling_fades"):
+		var unfaded_margin: float = unfaded_score - stay_score - float(staying.get("calling_faded", 0.0))
+		FamilyInitiative.count_fade_changed(city, household, "review", best_activity if margin >= CHANGE_MARGIN else current, unfaded_activity if unfaded_margin >= CHANGE_MARGIN else current)
 	var decision: Dictionary = {"change": margin >= CHANGE_MARGIN, "activity": best_activity, "margin": margin, "stay_terms": staying["terms"], "alternative_terms": best["terms"], "appeal": float(best.get("appeal", 0.0)), "stay_appeal": float(staying.get("appeal", 0.0)), "focused": float(best.get("focused", 0.0))}
 	if best.has("site"):
 		decision["site"] = best["site"]
@@ -273,7 +282,7 @@ static func get_stay_desire(city: City, household: Household, holding: Building)
 	var travel: float = city.logistics.get_travel_share(holding)
 	if travel >= TRAVEL_NOTICED:
 		FamilyInitiative.add(terms, -TRAVEL_WEIGHT * travel, "its work is a long way from home (%d%% of its day)" % roundi(travel * 100.0))
-	return {"score": FamilyInitiative.sum(terms), "terms": terms, "appeal": desire["appeal"]}
+	return {"score": FamilyInitiative.sum(terms), "terms": terms, "appeal": desire["appeal"], "calling_faded": float(desire.get("calling_faded", 0.0))}
 
 # How much of what a workplace was built for it still yields, 0 to 1: the water, woods or pasture in
 # its reach (TownLand). Fields, woodcutters and workshops are judged by their land elsewhere.

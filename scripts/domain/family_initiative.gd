@@ -131,6 +131,8 @@ static func take_up_work(city: City, household: Household) -> ConstructionProjec
 		desire["score"] = float(desire["score"]) + get_noise(city, household, get_choice_key(occupation))
 		choices.append(desire)
 	choices.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["score"]) > float(b["score"]))
+	if city.has_meta("comfort_calling_fades") and not choices.is_empty():
+		count_fade_changed(city, household, "first_choice", choices[0]["occupation"], get_unfaded_best(choices))
 	if city.has_meta("trace_choices"):
 		record_choices(city, household, choices)
 	if city.social.enabled and not choices.is_empty() and contest_for_land(city, household, choices):
@@ -235,9 +237,18 @@ static func get_work_desire(city: City, household: Household, occupation: String
 	var level: float = float(hardship["level"])
 	var prosperity: float = 1.0 - CALLING_YIELD * level
 	var hard_times: String = ", though survival comes first now" if level >= 0.3 else ""
+	var essential: bool = activity in [TownInfluence.ACTIVITY_FOOD, TownInfluence.ACTIVITY_WOOD, TownInfluence.ACTIVITY_TOOLS]
 	var match_quality: String = household.get_match_quality(occupation)
 	if match_quality == CultureEffects.MATCH_GOOD:
-		add(terms, 3.0 * prosperity, "it is the family's calling" + hard_times)
+		# Candidate under evaluation (Priority 5, comparison only; meta "comfort_calling_fades"): for
+		# work making what the town only goes without (wool), the calling yields to hunger fully, as
+		# that good's own need terms do. Food, wood and tools keep half the calling's pull, as before.
+		# "calling_faded" is what the candidate took away, so its effect on decisions can be counted.
+		var pull: float = prosperity
+		if city.has_meta("comfort_calling_fades") and not essential:
+			pull = 1.0 - level
+			result["calling_faded"] = 3.0 * (prosperity - pull)
+		add(terms, 3.0 * pull, "it is the family's calling" + hard_times)
 	elif match_quality == CultureEffects.MATCH_POOR:
 		add(terms, -2.0 * prosperity, "it is not the family's calling")
 	var cautious: bool = HouseholdCharacter.get_axis(household, HouseholdCharacter.RISK) < 0
@@ -325,7 +336,6 @@ static func get_work_desire(city: City, household: Household, occupation: String
 			# Candidates under evaluation (Priority 5, comparison only): the familiar pulls as the calling
 			# does, less as hunger nears, on any work but food (meta "known_work_yields_to_survival"), or
 			# only on work for what the town merely goes without, like wool (meta "familiar_comfort_yields").
-			var essential: bool = activity in [TownInfluence.ACTIVITY_FOOD, TownInfluence.ACTIVITY_WOOD, TownInfluence.ACTIVITY_TOOLS]
 			var familiar: float = prosperity if (city.has_meta("known_work_yields_to_survival") and activity != TownInfluence.ACTIVITY_FOOD) or (city.has_meta("familiar_comfort_yields") and not essential) else 1.0
 			add(terms, HouseholdEconomy.KNOWN_WORK_WEIGHT * familiar * minf(1.0, knows / HouseholdEconomy.ESTABLISHED), "it knows the work (%s)" % HouseholdEconomy.describe_level(knows))
 	var appeal: float = add_encouragement(city, household, activity, terms, "the gathering asks for " + TownInfluence.get_activity_name(activity))
@@ -903,6 +913,30 @@ static func record_choices(city: City, household: Household, choices: Array[Dict
 	for choice: Dictionary in choices.slice(0, 4):
 		ranked.append({"occupation": choice["occupation"], "score": snappedf(float(choice["score"]), 0.01), "for": get_reasons(choice["terms"], true, 4), "against": get_reasons(choice["terms"], false, 2)})
 	(city.get_meta("trace_choices") as Array).append({"day": city.construction.day, "household": household.id, "hardship": snappedf(float(get_hardship(city, household)["level"]), 0.01), "coverage": snappedf(get_food_coverage(city), 0.01), "ratio": snappedf(get_food_ratio(city), 0.01), "ranked": ranked})
+
+# The candidate's decisions (meta "comfort_calling_fades"): the choice that would have come first
+# without it, from choices carrying "calling_faded".
+static func get_unfaded_best(choices: Array) -> String:
+	var best: String = ""
+	var best_score: float = -INF
+	for choice: Dictionary in choices:
+		var score: float = float(choice["score"]) + float(choice.get("calling_faded", 0.0))
+		if score > best_score:
+			best_score = score
+			best = choice["occupation"]
+	return best
+
+# Counts (meta "comfort_calling_changed": {kind: count}) and lists (meta "comfort_calling_cases")
+# the decisions the candidate changed: what the family did against what it would have done.
+static func count_fade_changed(city: City, household: Household, kind: String, chosen: String, unfaded: String) -> void:
+	if chosen == unfaded:
+		return
+	var counts: Dictionary = city.get_meta("comfort_calling_changed", {})
+	counts[kind] = int(counts.get(kind, 0)) + 1
+	city.set_meta("comfort_calling_changed", counts)
+	var cases: Array = city.get_meta("comfort_calling_cases", [])
+	cases.append({"day": city.construction.day, "household": household.id, "kind": kind, "chose": chosen, "instead_of": unfaded, "hardship": snappedf(float(get_hardship(city, household)["level"]), 0.01)})
+	city.set_meta("comfort_calling_cases", cases)
 
 # What a decision about a trade is called in its unknown (get_noise).
 static func get_choice_key(occupation: String) -> String:
