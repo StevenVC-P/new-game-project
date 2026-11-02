@@ -34,6 +34,7 @@ func run_all() -> void:
 	test_kept_woods_are_binding()
 	test_focused_appeal()
 	test_food_warning_provisional_at_founding()
+	test_reserve_blocks_only_what_draws_on_it()
 	if failure_count > 0:
 		push_error("Autonomous occupations validation failed: " + str(failure_count) + " failure(s)")
 		quit(1)
@@ -565,6 +566,25 @@ func test_focused_appeal() -> void:
 	city.construction.day += FocusedAppeal.APPEAL_DAYS
 	FocusedAppeal.advance_day(city)
 	_check(not FocusedAppeal.is_active(city, "food"), "an unanswered appeal lapses after its season")
+
+# 21. The protected reserve keeps tools back only from what would spend them (the tool trap, fifth
+# round): with tools below the reserve, an improvement costing a tool waits, but a toolmaker, which
+# costs wood and no tools, is funded, and nothing is promised that the stores do not hold.
+func test_reserve_blocks_only_what_draws_on_it() -> void:
+	var city: City = tool_short_town(3)
+	var family: Household = city.households[0]
+	city.unassign_building_worker(city.buildings.find(FamilyInitiative.get_holding(city, family)))
+	var mender: Building = give(city, family, "tool_mender", Vector2i(40, 20))
+	var reserve: int = int(city.influence.get_protected_reserve()["tools"])
+	_check(reserve > int(city.resources["tools"]), "the reserve (%d) is more than the store holds (%d)" % [reserve, int(city.resources["tools"])])
+	_check(city.influence.get_funding_block(EconomyBalance.get_build_cost("farm"), ["food", TownInfluence.ACTIVITY_IMPROVE] as Array[String]).contains("kept back"), "an improvement costing a tool waits for the reserve")
+	_check(int(EconomyBalance.get_build_cost("toolmaker").get("tools", -1)) == 0 and city.influence.get_funding_block(EconomyBalance.get_build_cost("toolmaker"), ["tools", TownInfluence.ACTIVITY_IMPROVE] as Array[String]) == "", "a toolmaker draws no tools, so the tools reserve does not refuse it")
+	_check(city.construction.can_supply({"wood": 6, "tools": 0}, {"wood": 10, "tools": 50}), "nor does any reserve of a material a cost lists at nothing")
+	_check(not city.construction.can_supply({"wood": 600}, {}), "a cost the stores cannot meet is still refused")
+	FamilyInitiative.consider_improving(city, family, mender)
+	_check(not family.initiative_note.contains("kept back"), "the family on the tool mender is not told the stores hold too little: %s" % family.initiative_note)
+	var committed: Dictionary = city.construction.get_committed_materials()
+	_check(int(committed.get("tools", 0)) == 0 and int(committed.get("wood", 0)) <= int(city.resources["wood"]) and int(city.resources["tools"]) == 3, "and nothing is promised the stores do not hold (tools %d, committed %s)" % [int(city.resources["tools"]), str(committed)])
 
 func _check(condition: bool, message: String) -> void:
 	if condition:
