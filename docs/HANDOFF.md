@@ -2,66 +2,33 @@
 
 Snapshot for whoever picks the project up next. Update it when a milestone closes; durable detail lives in the linked docs, not here.
 
-*Last updated: 2026-11-02. Everything below "Merged 2026-11-01" is on `develop` and `main`. One feature branch is waiting for review: `feature/autonomous-occupations`.*
+*Last updated: 2026-11-02. `feature/autonomous-occupations` is merged into `develop` (Priority 5 closed); `main` is unchanged since "Merged 2026-11-01" below and awaits the owner's review.*
 
 ## Current Objective
 
-**Ready for merge review: `feature/autonomous-occupations`** (from `develop`, not merged). Priority 5 is complete (sixth round, 2026-11-02):
-- the herding adjustment is on by default;
-- fishing water, pasture and woods are shared among workplaces (no land counted twice);
-- the tool-trap bug is fixed;
-- the hunting-grounds card gives both sides as a choice;
-- the founding regression pins a viable and a failed founding.
+**Next milestone (owner, 2026-11-02): household property, private exchange, communal contributions and treasury allocations.** It has its own architectural plan on branch `docs/property-and-communal-resources` (not merged), and the earlier audit `docs/TREASURY_AUDIT.md`. Nothing of it is built yet. A founding allocation is the intended lever on the first weeks.
 
-**Next milestone** (owner, 2026-11-02): household property and the communal treasury, from the separate architectural plan (`docs/TREASURY_AUDIT.md` is the earlier audit). Nothing of it is built here.
+**Priority 5 is closed** (`docs/IMPLEMENTATION_ROADMAP.md`, "Autonomous Occupations and Priority 5"; detail in `docs/AUTONOMOUS_OCCUPATIONS.md`, sixth round; agency in `docs/PLAYER_AGENCY_AUDIT.md`, round 6). On `develop`:
+- **Occupations:** families choose every trade with a hand-work stage, by scored terms with reasons and seeded noise. Survival comes before a calling as hunger nears; for wool work the calling fades fully (the herding adjustment).
+- **Shared land:** woods, fishing water and pasture are divided among the workplaces of their kind that are in use, so no land is counted twice.
+- **The tool trap is fixed:** the reserve no longer blocks projects that draw nothing from it.
+- **The hunting card:** it comes early and gives both sides as a choice. Kept woods are binding.
+- **The founding regression:** it pins a viable founding (20261102) and a failed one (20261101).
 
-Docs:
-- `docs/AUTONOMOUS_OCCUPATIONS.md` (sixth round at the top: what changed, the final comparison against the previous defaults, what each change did);
-- `docs/PLAYER_AGENCY_AUDIT.md` (round 6: with families founding better on their own, a player's average gain is small; keeping every wood stays the harmful misuse; the card now leaves keeping a judged choice).
+**Previous behaviour stays reproducible:** `--meta=comfort_calling_kept,water_not_shared,pasture_not_shared` on `tests/sim/intervention_check.gd` reproduces the earlier defaults town for town.
 
-**Owner decisions open:**
-- **Fishing yield per lake.** Honest counting lowers fishing towns' catch, by as much as 45%; rates were deliberately not changed.
-- **The treasury's founding allocation.** The first weeks' work choices still decide most failed foundings.
+**Accepted and open:**
+- **Fishing:** honest counting lowers fishing towns' catch, by as much as 45% where huts share a lake. The owner accepted this; fishing balance may be revisited.
+- **Early foundings:** they are still decided by a few first-week work choices. The first three trades alone still do somewhat better on hard sites, and extra founding food does not help. No further occupation tuning is planned.
 
-The decided points (the founding food warning, the earlier hunting card, the herding adjustment, shared land, the regression's structure) are in the sixth round. Appeals are kept, not expanded.
+**Worktrees** beside the main folder (all detached, safe to remove when no longer wanted):
+- `ngg-occupations`: the merged branch;
+- `ngg-p5-runs`: the final batches' commit;
+- `ngg-p5-base`: the Priority 5 baseline, 7bf9d34;
+- `ngg-occ-runs` to `ngg-occ-runs11`: earlier comparison commits;
+- `ngg-baseline`: `develop` before the merge.
 
-**Previous defaults stay reproducible:** `--meta=comfort_calling_kept,water_not_shared,pasture_not_shared` reproduces the fifth round town for town.
-
-**Latest validation worktrees:**
-- `ngg-p5-runs`: the fixed commit for the final batches;
-- `ngg-p5-base`: the baseline, 7bf9d34.
-
-Diagnostics: `--leave-out`, `--veto`, `--meta`, `--trace`, `--trace-tools`, `--provisions` on `tests/sim/intervention_check.gd` (`docs/TESTING.md`).
-
-What it adds:
-- **The new trades:** fishing, hunting and herding (hand work first) as families' own choice.
-- **Narrow shortage recognition:** owner-approved.
-- **Survival awareness:** owner-approved.
-- **A hungry family looks at its work again.**
-- **Two reasoning corrections:**
-  - the food judgement from work actually done;
-  - a holding worth what its land still yields.
-- **Tests:** a deterministic sidebar test, and a separate gameplay regression.
-
-Each part switches off with a comparison meta. With all of them off, the branch plays exactly as `develop` (96/96 snapshots).
-
-Results (six years, ordinary/stressed/difficult, people):
-
-| Mode | People |
-|---|---|
-| today | 57.8 / 63.2 / 42.8 |
-| narrow recognition with the corrections | 61.9 / 62.8 / 45.9 |
-| everything | 57.6 / 49.0 / 51.2 |
-
-- **The food correction makes towns worse without shortage recognition.** Families then neglect tools.
-- **The agency finding:** warnings come in time, but a player answering them as the cards suggest does worse than none.
-
-Open decisions are listed in both docs.
-
-**Worktrees** beside the main folder:
-- `ngg-occupations`: the branch;
-- `ngg-occ-runs` to `ngg-occ-runs5`: the fixed commits the comparisons ran from (`runs4` and `runs5` are the latest);
-- `ngg-baseline`: `develop`, detached.
+Diagnostics: `--leave-out`, `--veto`, `--meta`, `--trace`, `--trace-tools`, `--provisions` (`docs/TESTING.md`).
 
 **Merged 2026-11-01 (owner-approved: `develop`, then `develop` into `main`).** Each item has a design doc with its owner decisions, how it was built, validation results and open decisions:
 - **Step 3 interface** (community priority and residential land in the game; `docs/TOWN_UI.md`, `docs/HOME_SITES.md`, `docs/COMMUNITY_PRIORITIES.md`).

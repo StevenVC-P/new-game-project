@@ -112,7 +112,8 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 & (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/hunting_warning_capture.gd -- <output_dir>
 
 # Shared land (sixth round): fishing water and pasture divided among workplaces of their kind like woods, the shares of
-# overlapping workplaces adding up to the land once, families' expectations, kinds not competing, the old counting by meta
+# overlapping workplaces adding up to the land once, families' expectations, kinds not competing, only workplaces in use
+# sharing (empty, abandoned and idle ones take nothing; neutral-worked ones count), the old counting by meta
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/shared_land_validation.gd
 
 # Home sites (docs/HOME_SITES.md): families choosing their own sites on land set aside, preferred land, no land, no

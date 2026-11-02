@@ -54,6 +54,16 @@ The owner approved the fifth round's direction and decided its open points. This
   - different kinds not competing;
   - the old counting behind its metas.
 
+**Only workplaces in use share (closing check).**
+- **The question:** before the merge, the owner asked whether shares go only to workplaces actually using the land.
+- **Empty and abandoned workplaces:** they already took no share. A family leaving clears its assignment, though the workplace stays open to another family with labor to spare.
+- **Two cases were wrong:**
+  - a workplace held but idle (worn to nothing, with no hand work to fall back on) still took a share;
+  - one worked by a neutral starter worker, with no family, was not counted as a rival, so it and a family's hut each drew the whole lake.
+- **The fix:** rivals are now the workplaces that can produce (`Building.can_produce`).
+- **Test:** `shared_land_validation`, `test_only_workplaces_in_use_share`.
+- **Effect on the comparison:** none. All 52 matched towns rerun identically, so the results below stand.
+
 **The warning.**
 - **Title:** "Woodcutting and hunting share the same woods" (it was "Woodcutters are felling hunting grounds").
 - **Both sides, in parallel lines:**
