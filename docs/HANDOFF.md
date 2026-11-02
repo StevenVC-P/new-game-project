@@ -6,20 +6,32 @@ Snapshot for whoever picks the project up next. Update it when a milestone close
 
 ## Current Objective
 
-**Waiting for owner review: `feature/autonomous-occupations`** (from `develop`, not merged). Fifth round (overnight 2026-11-01/02): Priority 5 built. The player's tangible lever is still to be a town treasury of binding allocations (proposal only: `docs/TREASURY_AUDIT.md`, nothing built); focused appeals stay for comparison only. Docs:
-- `docs/AUTONOMOUS_OCCUPATIONS.md` (fifth round at the top: the early hunting-grounds warning, woods shared among lodges, the tool-trap bug fixed, the herding candidate measured, founding provisions; decisions for the owner);
-- `docs/PLAYER_AGENCY_AUDIT.md` (round 5: answering the early card helps ordinary and difficult sites a little and costs stressed ones; keeping every wood is the harmful misuse; appeals remain the largest lever).
+**Ready for merge review: `feature/autonomous-occupations`** (from `develop`, not merged). Priority 5 is complete (sixth round, 2026-11-02):
+- the herding adjustment is on by default;
+- fishing water, pasture and woods are shared among workplaces (no land counted twice);
+- the tool-trap bug is fixed;
+- the hunting-grounds card gives both sides as a choice;
+- the founding regression pins a viable and a failed founding.
 
-**Owner decisions open** (details in the fifth round's "For the owner"):
-- `founded_town_regression` fails on this branch: woods sharing tips its town's near-tie decision; re-pin, keep red, or other;
-- adopt the herding candidate (`comfort_calling_fades`, off by default, recommended);
-- approve woods sharing and the tool-trap fix (on by default);
-- fishing water and pasture overlap as woods did;
-- the treasury foundation and its own decisions.
+**Next milestone** (owner, 2026-11-02): household property and the communal treasury, from the separate architectural plan (`docs/TREASURY_AUDIT.md` is the earlier audit). Nothing of it is built here.
 
-The founding food warning is decided and built. The earlier hunting-grounds warning is built. Appeals are kept, not expanded.
+Docs:
+- `docs/AUTONOMOUS_OCCUPATIONS.md` (sixth round at the top: what changed, the final comparison against the previous defaults, what each change did);
+- `docs/PLAYER_AGENCY_AUDIT.md` (round 6: with families founding better on their own, a player's average gain is small; keeping every wood stays the harmful misuse; the card now leaves keeping a judged choice).
 
-**Latest validation worktrees:** `ngg-p5-runs` (fixed commit for the fifth round's batches), `ngg-p5-base` (the baseline, 7bf9d34). Diagnostics: `--leave-out`, `--veto`, `--meta`, `--trace`, `--trace-tools`, `--provisions` on `tests/sim/intervention_check.gd` (`docs/TESTING.md`).
+**Owner decisions open:**
+- **Fishing yield per lake.** Honest counting lowers fishing towns' catch, by as much as 45%; rates were deliberately not changed.
+- **The treasury's founding allocation.** The first weeks' work choices still decide most failed foundings.
+
+The decided points (the founding food warning, the earlier hunting card, the herding adjustment, shared land, the regression's structure) are in the sixth round. Appeals are kept, not expanded.
+
+**Previous defaults stay reproducible:** `--meta=comfort_calling_kept,water_not_shared,pasture_not_shared` reproduces the fifth round town for town.
+
+**Latest validation worktrees:**
+- `ngg-p5-runs`: the fixed commit for the final batches;
+- `ngg-p5-base`: the baseline, 7bf9d34.
+
+Diagnostics: `--leave-out`, `--veto`, `--meta`, `--trace`, `--trace-tools`, `--provisions` on `tests/sim/intervention_check.gd` (`docs/TESTING.md`).
 
 What it adds:
 - **The new trades:** fishing, hunting and herding (hand work first) as families' own choice.

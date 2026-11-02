@@ -1,5 +1,49 @@
 # Player Agency Audit
 
+## Round 6 (2026-11-02): the final Priority 5 rules
+
+**The rules:**
+- the herding adjustment, now on by default;
+- water, pasture and woods shared;
+- the tool-trap fix;
+- the two-sided hunting-grounds card.
+
+Same 12 towns per condition, six years, paired against no player on the same rules (`docs/AUTONOMOUS_OCCUPATIONS.md`, sixth round).
+
+| People at year 6 (paired change; towns saved / lost) | Ordinary | Stressed | Difficult |
+|---|---|---|---|
+| no player | 55.3 | 55.4 | 49.7 |
+| answers the hunting card by keeping (`keep_on_warning`) | +0.7 (0/0) | −0.9 (0/1) | **+6.6** (1/0) |
+| keeps late, once a lodge has lost a third (`keep_hunting`) | −0.4 (0/0) | −3.4 (0/1) | +0.7 (0/0) |
+| keeps every wood at founding (`overprotect`) | **−19.2** (0/2) | **−11.0** (0/1) | **−22.5** (1/2) |
+| informed, land and cards, no appeals (`informed_land`) | −5.2 (0/1) | −5.7 (0/2) | +3.8 (1/0) |
+| informed, with repeated appeals (`informed`; comparison only) | +1.5 (0/1) | +2.0 (0/1) | +2.5 (2/0) |
+| appeals only (`informed_appeal`; comparison only) | −0.2 (0/1) | −4.7 (0/1) | +0.1 (2/0) |
+
+**What changed from Round 5:**
+- **The no-player baseline rose** (ordinary 48.6 → 55.3, difficult 34.8 → 49.7). The towns a player used to rescue now mostly found themselves:
+  - ordinary 880325585 lives without a player (67 people);
+  - difficult 655683252 and 3151458409 found their towns.
+- **So the player's average gain shrank:** informed play +8.4 / +1.6 / +18.1 → +1.5 / +2.0 / +2.5. That is the intended direction: survival comes from families' credible choices, not from a player correcting them.
+
+**Successes:**
+- Keeping on the card saves difficult 3849992342 (0 → 71) and raises stressed 880325585 (55 → 70).
+- The informed player saves difficult 854598335 (0 → 46) and 3849992342 (0 → 75).
+
+**Harmful choices:**
+- Keeping every wood costs 11–23 people and loses towns in every condition.
+- Keeping woods where the town needs the lumber also hurts:
+  - ordinary 880325585 falls 67 → 21 under `informed_land`, which keeps the lodges' woods and works the land;
+  - stressed 2610263185 (14 → 0) and 2860120474 (93 → 75) under the card's answer.
+
+**What the card now gives a player to judge by:** it states both sides, and what the town has of wood and of food from those lodges. The simulated players do not read it; they keep whenever it shows. That is why `keep_on_warning` measures the cost of always keeping, not of a judged choice.
+
+**Failures despite reasonable intervention:** ordinary and stressed 2316526815 and difficult 4185861261 still die in their first year with every player.
+
+**Opportunity cost:** answering the card costs the woodcutters 700–855 days of walking per town; keeping everything costs 1,650–1,860.
+
+**Appeals** are compared, not expanded. Under the final rules they add little on average and harm about as many towns as they help (difficult: two towns saved, four made worse).
+
 ## Round 5 (2026-11-02): the early hunting-grounds card; the fifth round's rules
 
 Rules: all trades, with tonight's defaults (woods shared among lodges, the tool-trap fix; `docs/AUTONOMOUS_OCCUPATIONS.md`, fifth round). Same 12 towns per condition, six years. Paired against no player on the same rules.

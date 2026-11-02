@@ -18,7 +18,133 @@ Tests:
 
 Comparison: `tests/sim/occupation_check.gd`, `tests/sim/intervention_check.gd`. Owner's town: `tests/sim/autosave_replay.gd`. Commands in `docs/TESTING.md`.
 
+## Sixth Round (2026-11-02): Priority 5 Completed
+
+The owner approved the fifth round's direction and decided its open points. This round carries those decisions out. It does not start household property, private exchange, contributions or the treasury; those are the next milestone.
+
+### What changed
+
+| Change | Default | Comparison switch (old behaviour) |
+|---|---|---|
+| A calling for wool work fades fully with coming hunger (`FamilyInitiative.is_comfort_calling_faded`) | **on** (owner decision) | meta `comfort_calling_kept` |
+| Fishing water and pasture shared among workplaces, as woods are (`TownLand.count_share`) | on (correctness fix) | metas `water_not_shared`, `pasture_not_shared` |
+| Woods shared among lodges; the tool-trap fix (fifth round) | on | `woods_not_shared`; none for the fix (it was a bug) |
+| Hunting-grounds card gives both sides as a choice | on | none (information only) |
+| `founded_town_regression` pins a viable and a failed founding | | |
+
+**The calling.** For food, wood and tools half the calling's pull still survives full hardship, as before. For wool it falls to nothing as hardship reaches 1. Production is unchanged and no trade is forbidden. Test 22 in `autonomous_occupations_validation` checks five things:
+- the loom family's pull fades under severe hunger, by exactly the faded amount;
+- toolmaking is weighed exactly as before;
+- herding stays available, however hungry;
+- a fed loom family takes up herding as its founding work;
+- in a town growing nine tenths of what it eats, a loom family that knows herding still prefers it to farming, an unfortunate choice the rules allow.
+
+**Fishing water and pasture (investigated, fixed).**
+- **What was wrong:** both had the woods' fault, in real output (`TownLand.get_output_factor`) and in what families expect. Two huts on the same 12-tile lake each made a full catch; two folds on overlapping pasture each grazed all of it.
+- **Where it applies:** secondary work does not draw on reach land, so only workplaces were affected.
+- **The fix:** every tile in reach is now divided among the worked workplaces of its kind whose reach holds it; a hill tile's double worth is divided the same way.
+- **What is not shared:** only workplaces of the same kind share. A fold beside a hut takes none of its water.
+- **Unchanged:** rates. Herding still makes wool only.
+- **Tests (`tests/shared_land_validation.gd`):**
+  - uncontested, the same land, partial overlap and separate land, for both kinds;
+  - hill pasture;
+  - three overlapping workplaces of each kind (woods too) whose shares add up exactly to the land in their reaches, each tile counted once;
+  - families judging a third hut at a third of a catch;
+  - the town's food outlook counting the shares;
+  - different kinds not competing;
+  - the old counting behind its metas.
+
+**The warning.**
+- **Title:** "Woodcutting and hunting share the same woods" (it was "Woodcutters are felling hunting grounds").
+- **Both sides, in parallel lines:**
+  - "If felling goes on": which woodcutters fell inside which lodge's reach, when its bag starts to fall and how far;
+  - "If the woods are kept": no one may fell them, whatever the families want, until the player marks them for clearing; the woodcutters fell farther off and bring in a stated share of their wood.
+- **The facts to weigh:** the share of the food the town's work brings in that these lodges provide, and the wood the town holds.
+- **No recommendation:** "Neither is always right."
+- **Unchanged:** nothing is kept automatically, and keeping is binding.
+
+**The founding regression.**
+- **The viable founding (seed 20261102)** comes through its year:
+  - no food shortage; 13 families, 39 people;
+  - every founder at work it opened itself, food work among it;
+  - families built; a family in a proper home.
+- **The failed founding (20261101, the original):**
+  - food runs short from day 33;
+  - three founding families leave on days 119, 149 and 179, after 87, 114 and 144 hungry days;
+  - the town ends its year with 4 families and 15 people, declined but not emptied.
+- **Its cause:** the forest family's near tie between a second snare line and woodcutting (4.23 against 4.27) now goes to wood, because the woods it would hunt are partly the first lodge's.
+- **The test checks:**
+  - departures come only after the stores ran out and after at least 20 hungry days;
+  - the state stays consistent day by day in both towns: no negative stores, no workplace held by a family that is gone, no family at two workplaces, no empty family;
+  - the failing town, saved on day 150 (mid-decline) and loaded, comes back exactly and plays on identically for 60 days.
+- **Isolation:** saves go to a folder of the process's own, removed afterwards.
+
+### Final comparison (same 12 towns per condition, six years, no player)
+
+**Reproducibility:**
+- The previous defaults, run through the switches (`comfort_calling_kept,water_not_shared,pasture_not_shared`), reproduce the fifth round's current rules town for town (36/36).
+- The adjustment alone reproduces the fifth round's candidate (36/36).
+- Reruns are identical.
+
+**People at years 1 / 3 / 6, towns alive:**
+
+| Condition | Previous defaults | Final rules | Paired (final − previous) | First three trades (reference) |
+|---|---|---|---|---|
+| ordinary | 21.9 / 25.1 / 48.6, 9 alive | 22.1 / 29.0 / **55.3**, 10 alive | **+6.8** (saved 1, lost 0; 2 better, 1 worse) | 58.8 |
+| stressed | 21.0 / 29.2 / 56.0, 11 alive | 21.2 / 29.3 / 55.4, 11 alive | −0.6 (0 / 0; 0 better, 1 worse) | 59.8 |
+| difficult | 16.8 / 21.5 / 34.8, 6 alive | 18.2 / 26.2 / **49.7**, 8 alive | **+14.8** (saved 2, lost 0; 3 better, 1 worse) | 57.5 |
+| held-out ordinary (8) | 33.9 | 33.6 | −0.2 | |
+| held-out stressed (8) | 23.9 | 24.0 | +0.1 | |
+
+"Better" and "worse" mean more than 5 people of difference.
+
+**Shortages:**
+- First-year food-short days: 75 / 82 / 93 → 68 / 73 / 81.
+- All six years: 176 / 176 / 191 → 118 / 149 / 105.
+- Days without tools: 420 / 195 / 571 → 263 / 175 / 583.
+
+**Founding occupations** (the founders' first work, summed over 12 towns):
+- Founding herders: 2 / 2 / 10 → 1 / 1 / 5 (first choice; 6 on difficult at any time in the first year).
+- Farms: 34 / 34 / 29 → 35 / 35 / 34.
+- Toolmaking: unchanged (11 / 11 / 10).
+
+**Decisions changed by the adjustment:** 2 / 1 / 8 (first choices and reviews), all a loom family's choice under hardship 0.3–1.0.
+
+**What the land trades bring in** (per town over six years, about):
+
+| | Fish | Game | Wool |
+|---|---|---|---|
+| ordinary (previous → final) | 4,924 → 3,703 | 2,023 → 2,501 | 536 → 737 |
+| stressed | 4,845 → 3,713 | 2,663 → 2,635 | 628 → 621 |
+| difficult | 5,998 → 4,158 | 1,228 → 2,706 | 711 → 625 |
+
+The fishing loss is the double count removed. Game rises where towns survive that did not.
+
+**Each change's own part** (paired, people at year 6):
+- **The adjustment:** +7.6 / +0.2 / +15.5. It saves ordinary 2487541759 (0 → 35) and difficult 655683252 (0 → 108) and 3151458409 (0 → 67), and helps ordinary 880325585 (11 → 67).
+- **Water and pasture shared:** −0.9 / −0.8 / −0.6, no town lost. It costs towns that lived on several huts at one lake:
+  - ordinary and stressed 4078261073: 83 → 75 (fish −18%);
+  - 1248683505: 99 → 97 (fish −45%);
+  - difficult 947619655: 63 → 52;
+  - held-out 450314079: from no food shortage to 102–118 short days, 23 → 16–21 people.
+
+  Fishing rates were not raised: the owner asked for no balance changes. Whether one lake should feed fewer families than it did is a balance question for later, now asked of honest numbers.
+
+**New systematic failures: none found.**
+- No town lost under the final rules against the previous ones, in 52.
+- The one systematic shift is fishing towns' smaller catch.
+- The first three trades still do better on stressed and difficult sites, by 4–8 people. Most of that is families off food work in the first weeks, which the treasury's founding allocation is meant to answer.
+
+**Player agency** under the final rules: `docs/PLAYER_AGENCY_AUDIT.md`, Round 6.
+
+### Remaining for the owner
+
+- **Fishing yield per lake:** now honest, and lower in fishing towns. A balance decision, not made here.
+- **Early-game fragility:** it remains decided by a few first-week choices. The founding allocation in the treasury plan is the intended lever.
+
 ## Fifth Round (2026-11-02): Priority 5 Built; the Tool Trap; Provisions
+
+*Its open decisions were made in the sixth round (above).*
 
 The owner's overnight brief on Priority 5 and the remaining founding-economy problems. It authorized the scoped changes below on this branch, no merge. Ownership, communal contributions, markets and treasury spending are untouched; the treasury roadmap (`docs/TREASURY_AUDIT.md`) stands.
 

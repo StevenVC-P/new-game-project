@@ -78,11 +78,13 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # (filter for [OCC]; "-- --years=N --sites=N --from=K --priority=investment"); and a copy of a saved game's town replayed under a
 # mode, every work decision traced with the priority's part ("--no-priority" clears it; filter for [REPLAY])
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/autonomous_occupations_validation.gd
-# Gameplay regression: the town the sidebar test founds (fixed seed), played a year, must keep its families, be fed and house one
 # Player agency (docs/PLAYER_AGENCY_AUDIT.md): the towns under kinds of player acting only on what the game shows, through its
 # controls (none, informed, informed_priority/_commission/_woods, late, inappropriate); "--seed=N --trace" prints one town's
 # timeline (warnings, the player's acts, every family's choice and review with reasons; filter for [TRACE], else [INT])
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/intervention_check.gd -- --conditions=stressed --policies=none,informed > int.log
+# Gameplay regression: a viable founding (seed 20261102) must come through its year, and the sidebar test's founding
+# (20261101) must fail for hunger, families leaving only after the stores ran out; both stay consistent day by day, and the
+# failing town saved mid-decline loads and plays on identically (own save folder). "-- --probe=1,2,3" prints seeds' years.
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/founded_town_regression.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/occupation_check.gd -- --conditions=ordinary --modes=both > occ.log
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/autosave_replay.gd -- --save=C:/path/to/copy.save --mode=all --days=360 > replay.log
@@ -95,7 +97,9 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # town, so they may run side by side and pass or fail the same way every run.
 # Fifth round (docs/AUTONOMOUS_OCCUPATIONS.md): policy keep_on_warning answers the early hunting-grounds card with its keep
 # button; keep_hunting now keeps only once a lodge has lost a third of its best yield (the late rule). Metas:
-# comfort_calling_fades (the candidate, off by default), woods_not_shared (the old double-counted woods), late_hunting_card.
+# comfort_calling_kept (the old calling rule; the fading adjustment is the default since the sixth round), woods_not_shared,
+# water_not_shared, pasture_not_shared (the old double-counted land), late_hunting_card. Previous defaults (before the sixth
+# round): --meta=comfort_calling_kept,water_not_shared,pasture_not_shared. Results also carry "made" (fish, game, wool).
 # --provisions=food:N,wood:N,tools:N sets the starting stores (founding-provisions diagnostic); --trace-tools (with --seed=N)
 # prints the tool and wood stores, reserve, upkeep and every family's word on improving its work ([TOOLS]).
 # Results now carry people at years 1 and 3, first-year shortage days, work taken up, founding herders, the candidate's
@@ -106,6 +110,10 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # clicks at 1920x1080 and 1366x768; then its screenshots (needs a window)
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/hunting_grounds_validation.gd
 & (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/hunting_warning_capture.gd -- <output_dir>
+
+# Shared land (sixth round): fishing water and pasture divided among workplaces of their kind like woods, the shares of
+# overlapping workplaces adding up to the land once, families' expectations, kinds not competing, the old counting by meta
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/shared_land_validation.gd
 
 # Home sites (docs/HOME_SITES.md): families choosing their own sites on land set aside, preferred land, no land, no
 # overlap, explanations, starting land, land reserved from work, shared works among homes, preferred land between equal sites, explanations
