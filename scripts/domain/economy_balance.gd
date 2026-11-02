@@ -418,11 +418,56 @@ static func get_fence_cost(size: Vector2i) -> Dictionary:
 static func get_fence_work_days(size: Vector2i) -> float:
 	return float(2 * (size.x + size.y)) * FENCE_WORK_DAYS_PER_EDGE_TILE
 
-static func get_build_cost(building_type: String) -> Dictionary:
-	return (BUILD_COSTS.get(building_type, {}) as Dictionary).duplicate()
+# --- Building materials (sprint S4) ---
+# Homes and proper buildings may be built of timber (the costs above), of rough stone, or of dressed
+# stone (masonry). Stone keeps a third of the wood (for roof and floors) and replaces the rest:
+# STONE_PER_WOOD stone blocks, or MASONRY_PER_WOOD masonry, for each wood. Rough stone is slow to
+# raise (STONE_WORK_FACTOR of the work); dressed stone, cut and mortared beforehand, less so. A
+# stone building lasts longer between repairs (STONE_UPKEEP_FACTOR times the upkeep interval) and a
+# stone home holds its warmth (STONE_HOME_FUEL_FACTOR of a timber home's firewood). Fields, hand work
+# and anything costing under STONE_MIN_WOOD wood are timber or nothing.
+const MATERIAL_TIMBER: String = "timber"
+const MATERIAL_STONE: String = "stone"
+const MATERIAL_DRESSED: String = "dressed_stone"
+const MATERIALS: Array[String] = [MATERIAL_TIMBER, MATERIAL_STONE, MATERIAL_DRESSED]
+const STONE_PER_WOOD: float = 1.5
+const MASONRY_PER_WOOD: float = 0.5
+const STONE_MIN_WOOD: int = 4
+const STONE_WORK_FACTOR: float = 1.6
+const DRESSED_WORK_FACTOR: float = 1.25
+const STONE_UPKEEP_FACTOR: float = 1.5
+const STONE_HOME_FUEL_FACTOR: float = 0.75
 
-static func get_build_work_days(building_type: String) -> float:
-	return float(BUILD_WORK_DAYS.get(building_type, BUILD_WORK_DEFAULT_DAYS))
+static func can_be_stone(building_type: String) -> bool:
+	if building_type == "farm" or BuildingTiers.is_tier0(building_type):
+		return false
+	return int((BUILD_COSTS.get(building_type, {}) as Dictionary).get("wood", 0)) >= STONE_MIN_WOOD
+
+static func is_stone_material(material: String) -> bool:
+	return material == MATERIAL_STONE or material == MATERIAL_DRESSED
+
+static func get_build_cost(building_type: String, material: String = MATERIAL_TIMBER) -> Dictionary:
+	var cost: Dictionary = (BUILD_COSTS.get(building_type, {}) as Dictionary).duplicate()
+	if not is_stone_material(material) or not can_be_stone(building_type):
+		return cost
+	var wood: int = int(cost.get("wood", 0))
+	var kept: int = int(ceil(float(wood) / 3.0))
+	cost["wood"] = kept
+	if material == MATERIAL_STONE:
+		cost["stone_blocks"] = int(ceil(float(wood - kept) * STONE_PER_WOOD))
+	else:
+		cost["masonry"] = int(ceil(float(wood - kept) * MASONRY_PER_WOOD))
+	return cost
+
+static func get_build_work_days(building_type: String, material: String = MATERIAL_TIMBER) -> float:
+	var days: float = float(BUILD_WORK_DAYS.get(building_type, BUILD_WORK_DEFAULT_DAYS))
+	if can_be_stone(building_type):
+		match material:
+			MATERIAL_STONE:
+				days *= STONE_WORK_FACTOR
+			MATERIAL_DRESSED:
+				days *= DRESSED_WORK_FACTOR
+	return days
 
 static func get_maintenance_interval(building_type: String) -> int:
 	return int(MAINTENANCE_INTERVAL_DAYS.get(building_type, MAINTENANCE_INTERVAL_DEFAULT_DAYS))

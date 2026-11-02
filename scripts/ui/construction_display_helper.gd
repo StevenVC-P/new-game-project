@@ -103,6 +103,8 @@ static func get_travel_lines(city: City, building: Building) -> Array[String]:
 	if trodden > 0.0:
 		lines.append("  %d%% of the way on paths or roads" % int(round(trodden * 100.0)))
 	var base: String = BuildingTiers.get_base_type(building.type)
+	if building.is_stone():
+		lines.append("Built of %s: upkeep every %d days" % [building.material.replace("_", " "), building.get_maintenance_interval()])
 	if base == Building.BUILDING_FISHER:
 		lines.append("Catch: %d%% of a full one (water in reach)" % int(round(city.land.get_reach_factor(building) * 100.0)))
 	elif base == Building.BUILDING_HUNTER:

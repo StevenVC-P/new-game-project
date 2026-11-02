@@ -12,10 +12,20 @@ extends RefCounted
 
 const SHADOW: Color = RegionMapStyle.COLOR_SHADOW
 const WEATHER_COLOR: Color = Color(0.46, 0.43, 0.39)
+# Walls of a building built of stone (state "material", sprint S4): rough grey fieldstone, or the
+# paler, even grey of dressed stone. Timber keeps its profile's wall.
+const STONE_WALL: Color = Color(0.56, 0.55, 0.52)
+const DRESSED_WALL: Color = Color(0.72, 0.70, 0.66)
 
 static func draw(c: CanvasItem, rect: Rect2, profile: Dictionary, state: Dictionary) -> void:
 	var roof: Color = tint(profile["roof"], state, true)
-	var wall: Color = tint(profile["wall"], state, false)
+	var wall_color: Color = profile["wall"]
+	match str(state.get("material", "timber")):
+		"stone":
+			wall_color = STONE_WALL
+		"dressed_stone":
+			wall_color = DRESSED_WALL
+	var wall: Color = tint(wall_color, state, false)
 	match str(profile["drawing"]):
 		"house":
 			draw_house(c, rect, state, roof, wall)

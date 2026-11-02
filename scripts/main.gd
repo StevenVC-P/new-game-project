@@ -1259,6 +1259,8 @@ func apply_city_action(option_data: Dictionary) -> void:
 				city.woodland.keep_hunting_ground(building)
 	elif action == "set_store_rule":
 		city.influence.store_rule = str(option_data["rule"])
+	elif action == "set_build_material":
+		city.influence.build_material = str(option_data["material"])
 	elif action == "choose_wisdom":
 		GuidingWisdom.choose(city, str(option_data["wisdom"]))
 	elif action == "appoint_speaker":

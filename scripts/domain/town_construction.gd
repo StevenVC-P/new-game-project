@@ -106,7 +106,9 @@ func is_on_residential_land(footprint: Array[Vector2i]) -> bool:
 	return false
 
 # Plans a new building. Returns the project, or null when the land does not allow it.
-func request_building(building_type: String, origin: Vector2i, requested_by: String = ConstructionProject.REQUESTED_BY_PLAYER, requester_household_id: int = -1, claimant_household_id: int = -1) -> ConstructionProject:
+# `material` (sprint S4): what to build it of; left empty, the player's own projects take the material
+# the player has chosen for what they plan (TownInfluence.build_material) and everything else timber.
+func request_building(building_type: String, origin: Vector2i, requested_by: String = ConstructionProject.REQUESTED_BY_PLAYER, requester_household_id: int = -1, claimant_household_id: int = -1, material: String = "") -> ConstructionProject:
 	if validate(building_type, origin)["is_valid"] != true:
 		return null
 	var project: ConstructionProject = make_project(ConstructionProject.KIND_BUILDING, building_type, requested_by, requester_household_id)
@@ -115,8 +117,9 @@ func request_building(building_type: String, origin: Vector2i, requested_by: Str
 	project.claimant_household_id = claimant_household_id
 	if claimant_household_id < 0 and not project.is_home():
 		project.claimant_household_id = find_family_for_workplace(project)
-	project.materials_needed = EconomyBalance.get_build_cost(building_type)
-	project.work_required = EconomyBalance.get_build_work_days(building_type)
+	project.material = resolve_material(building_type, requested_by, material)
+	project.materials_needed = EconomyBalance.get_build_cost(building_type, project.material)
+	project.work_required = EconomyBalance.get_build_work_days(building_type, project.material)
 	var plot: Variant = get_open_plot_at(origin) if project.is_home() else null
 	if plot != null:
 		plot["project_id"] = project.id
@@ -126,7 +129,7 @@ func request_building(building_type: String, origin: Vector2i, requested_by: Str
 	return add_project(project)
 
 # Plans upgrading a tier 0 building in place. It keeps working until the upgrade is done.
-func request_upgrade(building_id: int, requested_by: String = ConstructionProject.REQUESTED_BY_PLAYER, requester_household_id: int = -1) -> ConstructionProject:
+func request_upgrade(building_id: int, requested_by: String = ConstructionProject.REQUESTED_BY_PLAYER, requester_household_id: int = -1, material: String = "") -> ConstructionProject:
 	if building_id < 0 or building_id >= city.buildings.size():
 		return null
 	var building: Building = city.buildings[building_id]
@@ -137,8 +140,9 @@ func request_upgrade(building_id: int, requested_by: String = ConstructionProjec
 	project.tile = building.tile
 	project.size = building.size
 	project.target_building_id = building_id
-	project.materials_needed = EconomyBalance.get_build_cost(upgrade_type)
-	project.work_required = EconomyBalance.get_build_work_days(upgrade_type) * EconomyBalance.UPGRADE_WORK_FRACTION
+	project.material = resolve_material(upgrade_type, requested_by, material)
+	project.materials_needed = EconomyBalance.get_build_cost(upgrade_type, project.material)
+	project.work_required = EconomyBalance.get_build_work_days(upgrade_type, project.material) * EconomyBalance.UPGRADE_WORK_FRACTION
 	# The family living or working there takes the upgrade on as its own.
 	if building.is_house():
 		var resident: Household = city.get_household_for_building_id(building_id)
@@ -230,6 +234,16 @@ func is_roadable(tile: Vector2i) -> bool:
 		return false
 	var data: Dictionary = city.local_map[tile.y][tile.x]
 	return LocalCityMapGenerator.is_buildable(data) and data["occupied"] != true and data.get("has_road", false) != true
+
+# The material a project is built of: the one asked for, else the player's chosen material for the
+# player's own projects (the player decides communal construction, owner D6), else timber; always
+# timber for what can't be built of stone.
+func resolve_material(building_type: String, requested_by: String, material: String) -> String:
+	if not EconomyBalance.can_be_stone(building_type):
+		return EconomyBalance.MATERIAL_TIMBER
+	if material == "" and requested_by == ConstructionProject.REQUESTED_BY_PLAYER:
+		material = city.influence.build_material
+	return material if EconomyBalance.MATERIALS.has(material) else EconomyBalance.MATERIAL_TIMBER
 
 func make_project(kind: String, building_type: String, requested_by: String, requester_household_id: int) -> ConstructionProject:
 	var project: ConstructionProject = ConstructionProject.new()
@@ -627,6 +641,7 @@ func complete(project: ConstructionProject) -> void:
 			logistics().mark_layout_changed()
 		ConstructionProject.KIND_UPGRADE:
 			city.complete_upgrade(project.target_building_id)
+			city.buildings[project.target_building_id].material = project.material
 			move_claimant_in(project, project.target_building_id)
 		ConstructionProject.KIND_FENCE:
 			city.buildings[project.target_building_id].fenced = true
@@ -636,6 +651,7 @@ func complete(project: ConstructionProject) -> void:
 				var plot: Dictionary = get_plot(project.plot_id)
 				plots.erase(plot)
 			var building: Building = Building.new(-1, project.building_type, project.tile, project.size)
+			building.material = project.material
 			var claimant: Household = city.get_household_by_id(project.claimant_household_id)
 			if claimant != null and building.is_house() and not wants_to_move_in(claimant, building):
 				claimant = null

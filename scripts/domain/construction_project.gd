@@ -43,6 +43,8 @@ var plot_id: int = -1
 
 var materials_needed: Dictionary = {}
 var materials_delivered: Dictionary = {}
+# What the building will be built of (EconomyBalance, Building materials; sprint S4).
+var material: String = EconomyBalance.MATERIAL_TIMBER
 # Family-days spent carrying toward the next unit of each material, carried between days.
 var haul_progress: float = 0.0
 var work_required: float = 1.0

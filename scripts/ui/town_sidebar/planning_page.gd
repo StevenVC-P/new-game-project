@@ -43,6 +43,8 @@ static func build(context: Dictionary) -> Array:
 			continue
 		blocks.append(get_designation_card(city, designation, placing and tool == designation))
 
+	blocks.append(get_material_card(city))
+
 	if city.influence.enabled:
 		# Families lead: land and what the community holds in common come first; placing a family's
 		# building directly stays possible, folded away as an optional commission.
@@ -73,6 +75,22 @@ static func build(context: Dictionary) -> Array:
 	blocks.append({"kind": "gap", "size": 6.0})
 	blocks.append({"kind": "expander", "id": "planning_keys", "title": "Keyboard shortcuts", "blocks": keys})
 	return blocks
+
+# What the buildings the player plans are built of (sprint S4; owner D6: the player chooses for
+# communal construction, families for their own). Fields and hand work are timber whatever is chosen.
+const MATERIAL_NAMES: Dictionary = {"timber": "Timber", "stone": "Stone", "dressed_stone": "Dressed stone"}
+
+static func get_material_card(city: City) -> Dictionary:
+	var chosen: String = city.influence.build_material
+	var house: Array[String] = []
+	for material: String in EconomyBalance.MATERIALS:
+		house.append("%s %s" % [MATERIAL_NAMES[material], cost_text(EconomyBalance.get_build_cost(Building.BUILDING_HOUSE, material))])
+	var lines: Array = ["What the buildings you plan are built of. Stone takes longer to raise but needs fewer tools to keep up, and a stone home less firewood. Families choose for their own homes and work."]
+	var muted: Array = ["A house: " + "; ".join(house), "In store: %d stone blocks, %d masonry" % [int(city.resources.get("stone_blocks", 0)), int(city.resources.get("masonry", 0))]]
+	var buttons: Array = []
+	for material: String in EconomyBalance.MATERIALS:
+		buttons.append({"text": MATERIAL_NAMES[material], "toggle": true, "active": chosen == material, "action": {"action": "set_build_material", "material": material}})
+	return {"kind": "card", "title": "Building material", "lines": lines, "muted": muted, "buttons": buttons, "columns": 3}
 
 # Land set aside for homes (HomeSites): families choose their own sites on it, by what they value;
 # preferred land is the community's hope, which receptive families heed more. No workplace may be
@@ -107,7 +125,7 @@ static func get_catalog_rows(city: City, tool: String, placing: bool, include: C
 			current_category = category
 			blocks.append({"kind": "gap", "size": 4.0})
 			blocks.append({"kind": "text", "text": category, "muted": true})
-		var cost: Dictionary = EconomyBalance.get_build_cost(id)
+		var cost: Dictionary = EconomyBalance.get_build_cost(id, city.construction.resolve_material(id, ConstructionProject.REQUESTED_BY_PLAYER, ""))
 		var ready: bool = city.construction.can_supply(cost)
 		var row: Dictionary = {"kind": "row", "label": str(entry["display_name"]), "value": cost_text(cost), "tone": SP.TONE_GOOD if ready else SP.TONE_CAUTION, "action": {"action": "select_tool", "tool": id}, "selected": placing and tool == id}
 		if TOOL_KEYS.has(id):

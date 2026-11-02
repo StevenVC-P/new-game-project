@@ -68,6 +68,7 @@ func building_state(building: Building) -> Dictionary:
 		"lod": lod,
 		"weathered": 1.0 - float(TownMapView.upkeep_band(building)) / 10.0 if building.needs_maintenance() else 0.0,
 		"idle": building.is_production_building() and building.assigned_workers <= 0,
+		"material": building.material,
 	}
 
 func draw_camp(city: City) -> void:

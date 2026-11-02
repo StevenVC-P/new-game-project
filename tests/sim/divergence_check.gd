@@ -441,6 +441,13 @@ func measure(city: City, state: Dictionary, off_the_ground: bool) -> Dictionary:
 	for building: Building in city.buildings:
 		kinds[building.type] = int(kinds.get(building.type, 0)) + 1
 	m["buildings"] = kinds
+	# What the town is built of (sprint S4): buildings by material, homes apart.
+	var materials: Dictionary = {}
+	for building: Building in city.buildings:
+		if EconomyBalance.can_be_stone(building.type):
+			var key: String = ("home_" if building.is_house() else "work_") + building.material
+			materials[key] = int(materials.get(key, 0)) + 1
+	m["materials"] = materials
 	m["projects_open"] = city.construction.projects.size()
 	m["homes_by_families"] = city.construction.completed_by_households
 	m["improvements"] = city.influence.improvements_started

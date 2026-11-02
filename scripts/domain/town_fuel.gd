@@ -29,6 +29,9 @@ static func get_household_need(city: City, household: Household, season: int) ->
 	var need: float = float(household.total_population) * EconomyBalance.FUEL_PER_PERSON_DAY * get_coldness(city, season)
 	if household.housing_status != Household.RESIDENCE_HOUSED or city.is_household_in_rough_housing(household):
 		need *= EconomyBalance.ROUGH_SHELTER_FUEL_FACTOR
+	elif household.residence_building_id >= 0 and household.residence_building_id < city.buildings.size() and city.buildings[household.residence_building_id].is_stone():
+		# A stone home holds its warmth (sprint S4).
+		need *= EconomyBalance.STONE_HOME_FUEL_FACTOR
 	return need
 
 static func get_daily_need(city: City, season: int = -1) -> float:

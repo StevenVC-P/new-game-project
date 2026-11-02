@@ -505,13 +505,16 @@ static func consider_improving(city: City, household: Household, holding: Buildi
 			GuidingWisdom.record_if_at_stake(city, household, GuidingWisdom.PREPARE, true, score, IMPROVE_THRESHOLD, float(desire["prepare"]))
 		note(city, household, "Keeps to hand work at its %s (%s)" % [name, "; ".join(get_reasons(desire["terms"], false))])
 		return null
-	var block: String = city.influence.get_funding_block(EconomyBalance.get_build_cost(proper), [get_activity(proper), TownInfluence.ACTIVITY_IMPROVE] as Array[String], household)
+	# What it builds the proper workplace of (MaterialChoice, sprint S4).
+	var material_choice: Dictionary = MaterialChoice.choose(city, household, proper)
+	var material: String = str(material_choice["material"])
+	var block: String = city.influence.get_funding_block(EconomyBalance.get_build_cost(proper, material), [get_activity(proper), TownInfluence.ACTIVITY_IMPROVE] as Array[String], household)
 	if block != "":
 		city.influence.held_back_by_stores += 1
 		city.social.on_held_back(household)
 		note(city, household, "Wants to improve its %s, but %s" % [name, block])
 		return null
-	var project: ConstructionProject = city.construction.request_upgrade(holding.id, ConstructionProject.REQUESTED_BY_HOUSEHOLD, household.id)
+	var project: ConstructionProject = city.construction.request_upgrade(holding.id, ConstructionProject.REQUESTED_BY_HOUSEHOLD, household.id, material)
 	if project == null:
 		return null
 	use_first_claim(city, household, project)
@@ -523,7 +526,8 @@ static func consider_improving(city: City, household: Household, holding: Buildi
 		CommunityPriority.record_swayed(city, household, "improve")
 	if household.improve_decision_day < 0:
 		household.improve_decision_day = city.construction.day
-	note(city, household, "Improving its %s into %s (%s)" % [name, describe_type(proper), "; ".join(get_reasons(desire["terms"], true))])
+	var of_stone: String = "" if material == EconomyBalance.MATERIAL_TIMBER else ", of %s (%s)" % [material.replace("_", " "), "; ".join(get_reasons(material_choice["terms"], true))]
+	note(city, household, "Improving its %s into %s (%s)%s" % [name, describe_type(proper), "; ".join(get_reasons(desire["terms"], true)), of_stone])
 	return project
 
 # How much a family wants to improve work into a proper holding of this type: {"score", "terms"}.
