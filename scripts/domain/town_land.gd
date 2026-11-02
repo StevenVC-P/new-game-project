@@ -31,6 +31,9 @@ var springs_seen: int = 0
 # worked out at: water and woods change only with the layout (felling, spreading).
 var _reach: Dictionary = {}
 var _reach_version: int = -1
+# The same for land that is shared (woods), for the layout and the lodges families work.
+var _shared_reach: Dictionary = {}
+var _shared_reach_key: int = 0
 var _has_flowing_water: int = -1
 
 func _init(owner: City) -> void:
@@ -101,15 +104,24 @@ func is_wolf_exposed(building: Building) -> bool:
 	return exposed and count_near(building.tile, building.size, EconomyBalance.WOLF_WOODS_DISTANCE, "woods") > 0
 
 # The share of a full catch (fisher: water in reach) or bag (hunter: woods in reach) a workplace
-# can make, from LAND_YIELD_FLOOR up to 1.
+# can make, from LAND_YIELD_FLOOR up to 1. This is what it really brings in (get_output_factor), and
+# what its family judges it by: woods it shares are shared with the other lodges families work.
 func get_reach_factor(building: Building) -> float:
 	if not has_map():
 		return 1.0
+	if is_shared(get_reach_kind(building.type)):
+		var key: int = hash([city.logistics.layout_version, get_rivals_key(building.type)])
+		if _shared_reach_key != key:
+			_shared_reach_key = key
+			_shared_reach.clear()
+		if not _shared_reach.has(building.id):
+			_shared_reach[building.id] = get_reach_factor_at(building.type, building.tile, building.size, false)
+		return float(_shared_reach[building.id])
 	if _reach_version != city.logistics.layout_version:
 		_reach_version = city.logistics.layout_version
 		_reach.clear()
 	if not _reach.has(building.id):
-		_reach[building.id] = get_reach_factor_at(building.type, building.tile, building.size)
+		_reach[building.id] = get_reach_factor_at(building.type, building.tile, building.size, false)
 	return float(_reach[building.id])
 
 # What a workplace's yield depends on in its reach ("water", "woods", "pasture"), or "" when the
@@ -124,22 +136,87 @@ static func get_reach_kind(building_type: String) -> String:
 			return "pasture"
 	return ""
 
-func get_reach_factor_at(building_type: String, origin: Vector2i, size: Vector2i) -> float:
+# What a workplace of this type would make at `origin`. Where its land is shared (woods, by
+# hunting lodges), every tile in reach of other lodges counts only its share: two lodges in the same
+# woods take half the game each (owner, 2026-11-02; until then each counted the whole woods, which
+# the comparison can restore with meta "woods_not_shared"). A workplace already standing shares with
+# the lodges families work (that is what it brings in); a place still being judged or built shares
+# also with the lodges families are setting up, since those will hunt there too (`planned`).
+func get_reach_factor_at(building_type: String, origin: Vector2i, size: Vector2i, planned: bool = true) -> float:
 	var base: String = BuildingTiers.get_base_type(building_type)
-	var found: int = 0
+	var found: float = 0.0
 	var full: int = 1
 	if base == Building.BUILDING_FISHER:
 		found = count_near(origin, size, EconomyBalance.FISHER_REACH, "water")
 		full = EconomyBalance.FISHER_FULL_WATER_TILES
 	elif base == Building.BUILDING_HUNTER:
-		found = count_near(origin, size, EconomyBalance.HUNTER_REACH, "woods")
+		found = count_woods_share(origin, size, get_rival_reaches(building_type, origin, planned))
 		full = EconomyBalance.HUNTER_FULL_WOODS_TILES
 	elif base == Building.BUILDING_HERDER:
 		found = count_near(origin, size, EconomyBalance.HERDER_REACH, "pasture")
 		full = EconomyBalance.HERDER_FULL_PASTURE_TILES
 	else:
 		return 1.0
-	return clampf(float(found) / float(full), EconomyBalance.LAND_YIELD_FLOOR, 1.0)
+	return clampf(found / float(full), EconomyBalance.LAND_YIELD_FLOOR, 1.0)
+
+# --- Shared hunting grounds ------------------------------------------------------------------------
+
+# Land whose yield is divided among the workplaces that share it. Only woods: fishing water and
+# pasture overlap too, but are left as they were (docs/AUTONOMOUS_OCCUPATIONS.md, fifth round).
+func is_shared(kind: String) -> bool:
+	return kind == "woods" and not city.has_meta("woods_not_shared")
+
+# The reach of a workplace on the town map: its footprint and the land around it it lives off.
+static func get_reach_rect(building_type: String, origin: Vector2i, size: Vector2i) -> Rect2i:
+	var reach: int = EconomyBalance.HUNTER_REACH
+	match BuildingTiers.get_base_type(building_type):
+		Building.BUILDING_FISHER:
+			reach = EconomyBalance.FISHER_REACH
+		Building.BUILDING_HERDER:
+			reach = EconomyBalance.HERDER_REACH
+	return Rect2i(origin - Vector2i(reach, reach), size + Vector2i(reach, reach) * 2)
+
+# The reaches of the other workplaces sharing the same kind of land: the ones families work, and with
+# `planned`, those a family is setting up. A workplace at `origin` itself (an improvement of it) is
+# not its own rival.
+func get_rival_reaches(building_type: String, origin: Vector2i, planned: bool) -> Array[Rect2i]:
+	var rivals: Array[Rect2i] = []
+	var kind: String = get_reach_kind(building_type)
+	if not is_shared(kind):
+		return rivals
+	for building: Building in city.buildings:
+		if building.assigned_household_id >= 0 and building.tile != origin and get_reach_kind(building.type) == kind:
+			rivals.append(get_reach_rect(building.type, building.tile, building.size))
+	if planned:
+		for project: ConstructionProject in city.construction.projects:
+			if project.kind == ConstructionProject.KIND_BUILDING and project.claimant_household_id >= 0 and project.tile != origin and get_reach_kind(project.building_type) == kind:
+				rivals.append(get_reach_rect(project.building_type, project.tile, project.size))
+	return rivals
+
+# Which lodges families work, as one number: a standing lodge's share changes when it does.
+func get_rivals_key(building_type: String) -> int:
+	var worked: Array = []
+	var kind: String = get_reach_kind(building_type)
+	for building: Building in city.buildings:
+		if building.assigned_household_id >= 0 and get_reach_kind(building.type) == kind:
+			worked.append(building.id)
+	return hash(worked)
+
+# Wooded tiles within a hunter's reach of a footprint, each counting 1 divided among the lodges whose
+# reach it lies in.
+func count_woods_share(origin: Vector2i, size: Vector2i, rivals: Array[Rect2i]) -> float:
+	var map_size: Vector2i = city.logistics.map_size()
+	var reach: int = EconomyBalance.HUNTER_REACH
+	var found: float = 0.0
+	for y in range(maxi(0, origin.y - reach), mini(map_size.y, origin.y + size.y + reach)):
+		for x in range(maxi(0, origin.x - reach), mini(map_size.x, origin.x + size.x + reach)):
+			if city.local_map[y][x]["has_trees"] != true:
+				continue
+			var sharing: int = 1
+			for rival: Rect2i in rivals:
+				sharing += 1 if rival.has_point(Vector2i(x, y)) else 0
+			found += 1.0 / float(sharing)
+	return found
 
 # Tiles of a kind ("water", "flowing_water", "woods", "pasture") within `reach` tiles of a
 # footprint (pasture counts hill tiles double).
