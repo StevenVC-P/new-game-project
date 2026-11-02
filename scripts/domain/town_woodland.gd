@@ -189,6 +189,135 @@ func nearest_wooded(building: Building) -> Vector2i:
 	_any_targets[building.id] = best
 	return best
 
+# --- Hunting grounds under the axe ----------------------------------------------------------------
+
+# How far ahead felling is judged a threat to a lodge's game: within this many days at today's pace,
+# its woods fall below what gives a full bag (owner, 2026-11-02: warn before much is lost).
+const THREAT_HORIZON_DAYS: float = 180.0
+
+# The hunting workplaces families work whose woods the town's felling is taking, or will take within
+# THREAT_HORIZON_DAYS: woodcutters cutting inside their reach, or woods marked for clearing there.
+# Each: {"building", "woodcutters" (felling inside its reach), "wooded" (its share of the woods in
+# reach), "full" (what gives a full bag), "factor" (its bag now), "after" (its bag at the horizon),
+# "days" (until its bag starts to fall; 0 when it already falls with each tree), "marked" (tiles
+# marked for clearing in its reach), "kept" (wooded tiles in its reach already kept), "rect"}.
+# Reads only: the felling it predicts is what fell_woods would do.
+func get_hunting_threats() -> Array[Dictionary]:
+	var threats: Array[Dictionary] = []
+	if not has_map():
+		return threats
+	var targets: Dictionary = {}
+	for woodcutter: Building in get_woodcutters():
+		var target: Dictionary = get_felling_target(woodcutter)
+		if not target.is_empty():
+			targets[woodcutter] = target
+	for building: Building in city.buildings:
+		if building.assigned_household_id < 0 or TownLand.get_reach_kind(building.type) != "woods":
+			continue
+		var rect: Rect2i = TownLand.get_reach_rect(building.type, building.tile, building.size)
+		var rate: float = 0.0
+		var cutters: Array[Building] = []
+		for woodcutter: Building in targets.keys():
+			if rect.has_point(targets[woodcutter]["tile"]):
+				rate += float(targets[woodcutter]["rate"])
+				cutters.append(woodcutter)
+		var marked_here: int = 0
+		var kept: int = 0
+		var wooded_tiles: Array[Vector2i] = get_wooded_in_rect(rect)
+		for tile: Vector2i in wooded_tiles:
+			marked_here += 1 if marked.has(tile) else 0
+			kept += 1 if protected.has(tile) else 0
+		if rate <= 0.0 and marked_here == 0:
+			continue
+		var full: float = float(EconomyBalance.HUNTER_FULL_WOODS_TILES)
+		# Its share of the woods in reach (shared woods count their share), and what one tree felled
+		# there takes from it on average.
+		var wooded: float = city.land.count_woods_share(building.tile, building.size, city.land.get_rival_reaches(building.type, building.tile, false))
+		var per_tile: float = wooded / maxf(1.0, float(wooded_tiles.size()))
+		var lost: float = minf(float(wooded_tiles.size() - kept), rate * THREAT_HORIZON_DAYS + float(marked_here)) * per_tile
+		if wooded - lost >= full:
+			continue
+		var days: float = 0.0 if wooded <= full else maxf(0.0, wooded - full - float(marked_here) * per_tile) / maxf(0.0001, rate * per_tile)
+		var after: float = clampf((wooded - lost) / full, EconomyBalance.LAND_YIELD_FLOOR, 1.0)
+		threats.append({"building": building, "woodcutters": cutters, "wooded": wooded, "full": full, "factor": city.land.get_reach_factor(building), "after": after, "days": days, "marked": marked_here, "kept": kept, "rect": rect})
+	return threats
+
+# Wooded tiles in a rectangle, within the map (no limit on its size, unlike block_rect).
+func get_wooded_in_rect(rect: Rect2i) -> Array[Vector2i]:
+	var tiles: Array[Vector2i] = []
+	if not has_map():
+		return tiles
+	var inside: Rect2i = rect.intersection(Rect2i(Vector2i.ZERO, city.logistics.map_size()))
+	for y in range(inside.position.y, inside.end.y):
+		for x in range(inside.position.x, inside.end.x):
+			if tile_data(Vector2i(x, y))["has_trees"] == true:
+				tiles.append(Vector2i(x, y))
+	return tiles
+
+# Where a woodcutter fells now and how fast, as fell_woods does it: {"tile", "rate" (tiles a day,
+# a winter's faster felling spread over the year)}; empty when it fells nothing.
+func get_felling_target(building: Building) -> Dictionary:
+	var work: float = city.get_work_time_factor(building)
+	if building.is_tier0():
+		work *= EconomyBalance.TIER0_OUTPUT_FRACTION
+	work *= 1.0 + (EconomyBalance.WINTER_FELLING_FACTOR - 1.0) / 4.0
+	var target: Vector2i = nearest_marked(building) if not marked.is_empty() else Vector2i(-1, -1)
+	if target.x < 0:
+		target = nearest_trees(building)
+		work *= EconomyBalance.UNMARKED_FELLING_SHARE
+	if target.x < 0:
+		return {}
+	return {"tile": target, "rate": work / EconomyBalance.CLEAR_DAYS_PER_TILE}
+
+# Keeps the woods within a hunting workplace's reach (the hunting-ground card's answer): every
+# wooded tile there, by the same binding designation as the Keep woods tool. Returns how many tiles
+# were newly kept; never lifts keeping that is already there.
+func keep_hunting_ground(building: Building) -> int:
+	var changed: int = 0
+	for tile: Vector2i in get_wooded_in_rect(TownLand.get_reach_rect(building.type, building.tile, building.size)):
+		if not protected.has(tile):
+			protected[tile] = true
+			marked.erase(tile)
+			cutting.erase(tile)
+			changed += 1
+	if changed > 0:
+		_cut_targets.clear()
+	return changed
+
+# What keeping a block would cost a woodcutter: the share of its wood it would still bring in, from
+# the nearest trees it could then fell (as get_felling_factor judges it, by straight distance).
+# Reads only.
+func estimate_felling_factor_if_kept(building: Building, rect: Rect2i) -> float:
+	var origin: Vector2i = TownLogistics.center_tile(building.tile, building.size)
+	var any: Vector2i = nearest_wooded(building)
+	if any.x < 0:
+		return 1.0
+	var size: Vector2i = city.logistics.map_size()
+	var best: int = 1 << 30
+	for y in range(size.y):
+		for x in range(size.x):
+			var tile: Vector2i = Vector2i(x, y)
+			if is_fellable(tile) and not rect.has_point(tile):
+				best = mini(best, (tile - origin).length_squared())
+	if best == 1 << 30:
+		return EconomyBalance.LAND_YIELD_FLOOR
+	var near: float = maxf(2.0, Vector2(any - origin).length())
+	var far: float = maxf(2.0, sqrt(float(best)))
+	return clampf(near / far, EconomyBalance.LAND_YIELD_FLOOR, 1.0)
+
+# Why woods marked for clearing are not being felled, or "" when they are (Planning page).
+func get_clearing_obstacle() -> String:
+	if marked.is_empty():
+		return ""
+	var woodcutters: Array[Building] = get_woodcutters()
+	if woodcutters.is_empty():
+		return "needs a working woodcutter"
+	if city.should_skip_for_food_shortage():
+		return "felling stops while the town is out of food"
+	if woodcutters.all(func(b: Building) -> bool: return nearest_marked(b).x < 0):
+		return "no woodcutter can reach them"
+	return ""
+
 # Working woodcutters of any tier: a gatherer's camp fells too, at its tier's pace.
 func get_woodcutters() -> Array[Building]:
 	var woodcutters: Array[Building] = []

@@ -263,6 +263,8 @@ static func get_attention(city: City, context: Dictionary = {}) -> Array[Diction
 	if families_lead:
 		cards.append_array(get_no_land_cards(city))
 		cards.append_array(get_failing_livelihood_cards(city))
+		if not city.has_meta("late_hunting_card"):
+			cards.append_array(get_hunting_ground_cards(city))
 
 	cards.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["priority"]) > int(b["priority"]))
 	return cards
@@ -314,6 +316,10 @@ static func get_failing_livelihood_cards(city: City) -> Array[Dictionary]:
 	var failing: Dictionary = {}
 	for building: Building in city.buildings:
 		var kind: String = TownLand.get_reach_kind(building.type)
+		# Woods have their own, earlier card (get_hunting_ground_cards), unless the comparison asks
+		# for the late one (meta "late_hunting_card").
+		if kind == "woods" and not city.has_meta("late_hunting_card"):
+			continue
 		if kind == "" or building.assigned_household_id < 0 or building.peak_land_yield < FAILING_MIN_PEAK:
 			continue
 		var now: float = city.land.get_reach_factor(building)
@@ -359,6 +365,72 @@ static func get_failing_livelihood_cards(city: City) -> Array[Dictionary]:
 			lines.append("%d of their families %s going hungry." % [int(row[3]), "is" if int(row[3]) == 1 else "are"])
 		cards.append(make_card(68 if int(row[3]) > 0 else 46, SP.TONE_ALERT if int(row[3]) > 0 else SP.TONE_CAUTION, title, lines, buttons))
 	return cards
+
+# Woodcutters felling inside the reach of a lodge a family hunts from, soon enough to cost it game
+# (TownWoodland.get_hunting_threats): shown before much is lost, with which lodges and woods, what
+# continued felling does, and the player's answer, keeping those woods, with what it costs the
+# woodcutters. Nothing is kept unless the player chooses it (owner, 2026-11-02).
+const HUNTING_GROUNDS_TITLE: String = "Woodcutters are felling hunting grounds"
+const HUNTING_LODGES_NAMED: int = 3
+
+static func get_hunting_ground_cards(city: City) -> Array[Dictionary]:
+	var threats: Array[Dictionary] = city.woodland.get_hunting_threats()
+	if threats.is_empty():
+		return []
+	var lines: Array = []
+	var buttons: Array = []
+	var hungry: int = 0
+	var cutters: Array[Building] = []
+	for threat: Dictionary in threats.slice(0, HUNTING_LODGES_NAMED):
+		var lodge: Building = threat["building"]
+		var family: Household = city.get_household_by_id(lodge.assigned_household_id)
+		var whose: String = city.get_household_label(lodge.assigned_household_id)
+		hungry += 1 if family != null and family.short_days_this_month > 0 else 0
+		var place: String = describe_place(city, TownLogistics.center_tile(lodge.tile, lodge.size))
+		lines.append("%s's %s%s hunts the woods within %d tiles of it: %d wooded tiles%s, %d%% of a full bag." % [whose, FamilyInitiative.describe_type(lodge.type, false), place, EconomyBalance.HUNTER_REACH, roundi(float(threat["wooded"])), " (its share of woods it shares)" if city.land.get_rival_reaches(lodge.type, lodge.tile, false).size() > 0 else "", roundi(100.0 * float(threat["factor"]))])
+		var felling: Array[String] = []
+		if not (threat["woodcutters"] as Array).is_empty():
+			felling.append("%s fell%s inside it" % [describe_woodcutters(city, threat["woodcutters"]), "s" if (threat["woodcutters"] as Array).size() == 1 else ""])
+		if int(threat["marked"]) > 0:
+			felling.append("%d of its wooded tiles are marked for clearing" % int(threat["marked"]))
+		var when: String = "each tree felled there now takes from its bag" if float(threat["days"]) <= 0.0 else "at this pace its bag starts to fall in about %d days" % roundi(float(threat["days"]))
+		var cause: String = " and ".join(felling)
+		lines.append("%s; %s, to about %d%% of a full bag in half a year." % [cause.substr(0, 1).to_upper() + cause.substr(1), when, roundi(100.0 * float(threat["after"]))])
+		buttons.append({"text": "Keep %s's hunting grounds" % whose, "action": {"action": "keep_hunting_ground", "building": lodge.id}})
+		for woodcutter: Building in threat["woodcutters"]:
+			if not cutters.has(woodcutter):
+				cutters.append(woodcutter)
+	if threats.size() > HUNTING_LODGES_NAMED:
+		lines.append("%d more hunting workplaces are threatened." % (threats.size() - HUNTING_LODGES_NAMED))
+	if hungry > 0:
+		lines.append("%d of their families %s going hungry." % [hungry, "is" if hungry == 1 else "are"])
+	lines.append("Kept woods are binding: no one fells them, and keeping lifts any clearing marks there.")
+	if not cutters.is_empty():
+		var rect: Rect2i = threats[0]["rect"]
+		var keeps: float = 1.0
+		for woodcutter: Building in cutters:
+			keeps = minf(keeps, city.woodland.estimate_felling_factor_if_kept(woodcutter, rect))
+		lines.append("The cost: the woodcutters would fell farther off, and bring in about %d%% of the wood they do now (the nearest trees they could fell are farther)." % roundi(100.0 * keeps) if keeps < 0.97 else "The cost: the woodcutters have other trees about as near, so they would lose little wood.")
+	buttons.append({"text": "Keep woods (V)", "action": {"action": "select_tool", "tool": TownWoodland.PROTECT}})
+	return [make_card(68 if hungry > 0 else 58, SP.TONE_ALERT if hungry > 0 else SP.TONE_CAUTION, HUNTING_GROUNDS_TITLE, lines, buttons)]
+
+# "the woodcutter" or "2 woodcutters", with whose they are when one family works them.
+static func describe_woodcutters(city: City, woodcutters: Array) -> String:
+	if woodcutters.size() == 1:
+		var woodcutter: Building = woodcutters[0]
+		return "%s's %s" % [city.get_household_label(woodcutter.assigned_household_id), FamilyInitiative.describe_type(woodcutter.type, false)] if woodcutter.assigned_household_id >= 0 else "a woodcutter"
+	return "%d woodcutters" % woodcutters.size()
+
+# Where a tile lies from the town's stores, for naming a place: " (north-east of the stores)".
+static func describe_place(city: City, tile: Vector2i) -> String:
+	var heart: Vector2i = city.logistics.stockpile_tile
+	if heart.x < 0:
+		return ""
+	var offset: Vector2 = Vector2(tile - heart)
+	if offset.length() < 3.0:
+		return " (by the stores)"
+	var names: Array[String] = ["east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"]
+	return " (%s of the stores)" % names[posmod(roundi(offset.angle() / (PI / 4.0)), 8)]
 
 const FARM_BUTTON: Dictionary = {"text": "Plan a farm (2)", "action": {"action": "select_tool", "tool": Building.BUILDING_FARM}}
 const TOOL_MENDER_BUTTON: Dictionary = {"text": "Plan a tool mender", "action": {"action": "select_tool", "tool": "tool_mender"}}
@@ -570,7 +642,7 @@ static func get_activity(city: City) -> Array:
 	if construction.families_without_plot > 0:
 		notices.append("%d famil%s want a home plot" % [construction.families_without_plot, "y" if construction.families_without_plot == 1 else "ies"])
 	if not city.woodland.marked.is_empty():
-		notices.append("Woods to clear: %d tiles%s" % [city.woodland.marked.size(), "" if not city.woodland.get_woodcutters().is_empty() else " (needs a working woodcutter)"])
+		notices.append("Woods to clear: %d tiles%s" % [city.woodland.marked.size(), "" if city.woodland.get_clearing_obstacle() == "" else " (%s)" % city.woodland.get_clearing_obstacle()])
 	if not city.farmland.marked.is_empty():
 		notices.append("Land to till: %d tiles%s" % [city.farmland.marked.size(), "" if not city.farmland.get_farms().is_empty() else " (needs a working field)"])
 	if not notices.is_empty():

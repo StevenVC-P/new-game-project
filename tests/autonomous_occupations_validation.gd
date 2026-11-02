@@ -448,9 +448,12 @@ func test_warning_no_land() -> void:
 	_check(card_titled(city, "Families find no land for their work").is_empty(), "and it passes when the family has not been blocked for two months")
 
 # 17. Hunting whose woods are being felled is shown to the player, measured against the best the
-# woods gave; a lodge that was always thin is not a failing livelihood.
+# woods gave; a lodge that was always thin is not a failing livelihood. Since 2026-11-02 woods have
+# an earlier card of their own (tests/hunting_grounds_validation.gd); this late one stays for
+# pasture and water, and for woods in the comparison (meta "late_hunting_card").
 func test_warning_failing_livelihood() -> void:
 	var city: City = town()
+	city.set_meta("late_hunting_card", true)
 	var family: Household = city.households[0]
 	busy_everyone_else(city, family)
 	var lodge: Building = give(city, family, "hunter", Vector2i(30, 20))

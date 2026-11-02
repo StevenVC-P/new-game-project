@@ -134,7 +134,10 @@ static func get_designation_card(city: City, designation: String, selected: bool
 		TownWoodland.CLEAR:
 			title = "Clear woods"
 			lines.append("Woods for the woodcutters to fell. Two corners.")
-			muted.append("%d tiles marked%s" % [city.woodland.marked.size(), "" if not city.woodland.get_woodcutters().is_empty() or city.woodland.marked.is_empty() else "; needs a working woodcutter"])
+			# Marked woods are a binding task: felled first, as labor and time allow; when they cannot be,
+			# the obstacle is said.
+			var obstacle: String = city.woodland.get_clearing_obstacle()
+			muted.append("%d tiles marked%s" % [city.woodland.marked.size(), "" if obstacle == "" else "; " + obstacle])
 		TownWoodland.PROTECT:
 			title = "Keep woods"
 			lines.append("Woods no one may fell: hunting grounds, the town's firewood, its shelter. Woodcutters go farther for timber and bring in less. Two corners; again to lift.")

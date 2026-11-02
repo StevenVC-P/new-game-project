@@ -1253,6 +1253,10 @@ func apply_city_action(option_data: Dictionary) -> void:
 		city.influence.set_priority(str(option_data["priority"]))
 	elif action == "make_appeal":
 		FocusedAppeal.make(city, str(option_data["good"]))
+	elif action == "keep_hunting_ground":
+		for building: Building in city.buildings:
+			if building.id == int(option_data["building"]):
+				city.woodland.keep_hunting_ground(building)
 	elif action == "set_store_rule":
 		city.influence.store_rule = str(option_data["rule"])
 	elif action == "choose_wisdom":
