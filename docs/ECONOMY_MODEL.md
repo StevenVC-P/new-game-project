@@ -1,6 +1,6 @@
 # Economy Model
 
-Firm owner decisions on money and the economy (2026-10-19). This is the authoritative economy direction. It supersedes the credit-to-currency path in `docs/MONEY_OBLIGATION_AND_CITY_CREDIT_MODEL.md` (see "Relationship To Earlier Docs"). It sits under `docs/GAME_VISION.md`.
+Firm owner decisions on money and the economy (2026-10-19). This is the authoritative economy direction. It supersedes the credit-to-currency path in `docs/archive/MONEY_OBLIGATION_AND_CITY_CREDIT_MODEL.md` (see "Relationship To Earlier Docs"). It sits under `docs/GAME_VISION.md`.
 
 Decisions marked **Default** were set during planning to make the model complete; the owner can change them without reopening the rest.
 
@@ -117,7 +117,7 @@ Each step should only start when the step before is stable and fun, consistent w
 
 ## Relationship To Earlier Docs
 
-`docs/MONEY_OBLIGATION_AND_CITY_CREDIT_MODEL.md` remains useful for:
+`docs/archive/MONEY_OBLIGATION_AND_CITY_CREDIT_MODEL.md` remains useful for:
 
 - the early Subsistence and Storehouse modes
 - the principle that money must not replace the survival economy
