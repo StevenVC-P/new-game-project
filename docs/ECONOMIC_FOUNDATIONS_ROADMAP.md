@@ -1,6 +1,6 @@
 # Economic Foundations and Geographic Diversity: Roadmap
 
-**Status: plan only (2026-11-02). Nothing is built, and no sprint is authorized.** Branch `docs/economic-foundations-roadmap`, from `develop` at `fcfc0fc`. This is the living backlog for the initiative: update the tracking table after every sprint, and reorder freely when a sprint's results say so.
+**Status: plan only (2026-11-02). Decisions D1–D8 approved by the owner (2026-11-02); nothing is built, and work starts only when the owner says so.** Branch `docs/economic-foundations-roadmap`, from `develop` at `fcfc0fc`. This is the living backlog for the initiative: update the tracking table after every sprint, and reorder freely when a sprint's results say so.
 
 **Sources.** The owner's brief "Economic Foundations and Geographic Diversity" (2026-11-02; summarised below), `docs/GAME_VISION.md` (wins on conflict), the baseline `docs/RESOURCE_AND_PRODUCTION_AUDIT.md` (on `develop` since `ebb632d`), `docs/ECONOMY_MODEL.md`, and the unmerged `docs/PROPERTY_AND_COMMUNAL_RESOURCES.md` on branch `docs/property-and-communal-resources`. Where this roadmap and the code disagree about what exists, the code wins.
 
@@ -34,18 +34,25 @@ The audit (sections 2–9) is the baseline. Seven findings set the order of work
 
 **Doc discrepancies to fix along the way** (each in the sprint that touches the doc): `HOUSEHOLD_SELF_SUFFICIENCY.md`'s "Not merged" header; `ECONOMY_MODEL.md` decision 4 (hamlet assignment, superseded by families leading) and its "no individual transactions between households" (D2); `IMPLEMENTATION_ROADMAP.md` M7 (superseded if D1 is agreed); `GAME_VISION.md` and `FIRST_STAGE_LOOP.md` not yet reconciled with family-led play; the property doc's §4.3 founding compact (superseded by the brief, D1).
 
-## 2. Decisions Needed Before Sprint 1
+## 2. Owner Decisions (approved 2026-11-02)
 
-The brief allows routine design choices to be made in sprint; these are larger, or conflict with an earlier agreed plan. Recommendations first.
+All eight are resolved. Routine design details are made in sprint and recorded in the sprint's card; anything that departs from these goes back to the owner.
 
-- **D1. The brief replaces the property doc's founding compact.** That doc (§4.3) has each family set its own share and the player set none early. The brief says the player sets a percentage per category, of total production, without approval. *Recommend:* adopt the brief; keep the property doc's ledger (P1), building rights (P2), commitments (Phase 3) and market day (Phase 4) as the mechanism. The founding default is **100% contribution, open redistribution**, which is today's game exactly, so nothing changes until the player changes it.
-- **D2. Trade between households.** `ECONOMY_MODEL.md` rules out individual transactions between households. *Recommend:* relax it to a monthly market day cleared in aggregate (property doc P4): barter priced in grain from the town's own scarcity, no credit, no debts.
-- **D3. Food kinds.** *Recommend:* one food **need** satisfied by several stored **goods** (grain, legumes, vegetables, fish, meat, dairy), each with its own season, storage and spoilage, using the need-bucket helper that already maps goods to needs. Diet variety is a later soft need. Old saves' `food` loads as a generic, slow-spoiling provisions good.
-- **D4. Living stocks.** *Recommend:* timber is finite per tile and regrows over years; fish and game are regenerating stocks per site (one number each, not per animal), shared among workplaces as now; pasture can be grazed down. Shared reach stays exactly as it is; stocks add time.
-- **D5. Winter fuel (gates S3).** A new need: households burn firewood in the cold months, and a shortage costs workdays and adds to the family's hardship, like hunger but milder. It is the main wood sink and ties forests to survival. *Recommend:* yes, with climate setting the length of the cold season.
-- **D6. Families take up stone and craft trades.** *Recommend:* yes, through hand-work stages (stone gathering on a deposit, a clay pit, a home loom), the same path as the six trades families choose today. The player keeps building proper workshops.
-- **D7. Branch and merge route for the initiative.** The brief authorises successive sprints without approval each time; `AGENTS.md` and the standing workflow say nothing reaches `develop` without the owner. *Recommend:* one integration branch `feature/economic-foundations` from `develop`; each sprint on its own branch from it, merged into it when the sprint's gate passes; `develop` only on the owner's word, after a review point (marked ◆ in the table).
-- **D8. Balance shifts are expected.** Each sprint will move survival and population figures, and difficult sites will get harder. *Recommend:* the owner accepts that sprints report these changes honestly rather than tune them away; tuning happens only in a sprint that says so, with the cause isolated by a switch first.
+- **D1. Ownership and contributions: the brief supersedes the property doc wherever they conflict** (its §4.3 founding compact, where families set their own share, is retired).
+  - The player sets communal contribution percentages **per resource category, of total production**. What remains belongs to the producing household. No automatic subsistence exemption. Families don't set or approve the mandatory rates.
+  - Households keep private inventories; the community keeps its own. The player controls communal reserves, redistribution and spending.
+  - Families may **contribute more voluntarily**, and their values shape how they react to the policy. They respond through economic behaviour, culture, loyalty, migration, and later crime or resistance.
+  - The property doc's mechanism still serves: the ledger over one store (P1), building rights (P2), commitments (Phase 3), the market day (Phase 4).
+  - **Migration only:** today's 100% pooling may stay temporarily so old saves and comparison sims keep working. It must **not** become the permanent default for new games: once ownership exists, a new game asks the player for an **initial contribution choice** at founding.
+- **D2. Trade between households: approved.** `ECONOMY_MODEL.md`'s prohibition is superseded. A monthly market day is the ordinary mechanism: real supply and demand, privately owned goods, specialisation, values and interests, no currency at founding. **The calendar never blocks emergency help or a necessary exchange.**
+- **D3. Food: approved.** One shared food need, met by several food goods that differ in production, season, storage, spoilage and value. No nutrition simulation for now.
+- **D4. Stocks: approved.** Timber, fish and game become stocks that deplete and recover; recovery depends on environmental conditions and remaining productive capacity (what's left to regrow or breed). Overharvesting has consequences. Shared-reach competition must stay correct.
+- **D5. Winter firewood: approved.** A heating need supplied by firewood, eventually responding to seasonal temperature, housing, household size, available fuel, and climate and geography. It must compete with timber's other uses. Families answer shortages by their survival priorities.
+- **D6. Stone and craft occupations: approved.** The split between family-chosen basic trades and player-assigned crafts is removed as development allows. Families judge accessible resources, skills and equipment, production requirements, expected benefit, household needs and values. The player keeps commissioning public works and communal projects. **Families choose the materials of their own buildings where viable; the player chooses for communal construction.**
+- **D7. Branching: approved.** One integration branch for the initiative, `feature/economic-foundations` from `develop`. Each sprint has identifiable changes, validation results and commits, and merges into the integration branch once validated. **Nothing reaches `develop` or `main` without the owner's authorization.**
+- **D8. Difficulty and balance: approved.** Report differences honestly; don't compensate difficult sites or equalise settlements. Some sites should be substantially less viable to found on; others hard early but strong industrially later. Tell intended disadvantage from defects, and keep fixing bugs, numerical instability and unintended regressions. Evaluate with deterministic sims across several seeds.
+
+**Sequencing approved:** geography and scarcity (S1–S5) before property and markets; Track B follows by dependencies and findings. Each sprint should still move toward the eventual joining of geography, autonomous production, ownership, exchange and culture.
 
 ## 3. Sequencing
 
@@ -56,7 +63,7 @@ The brief allows routine design choices to be made in sprint; these are larger, 
 5. **Metal and quality: Track D (S15–S17).** Iron with charcoal, tool tiers, wood species.
 6. **Threads through every sprint:** culture ↔ economy (a sprint states which values touch its decisions), autonomy (no new player micromanagement), saves, determinism and the cost of the tick.
 
-**Why not property first,** as `HANDOFF.md` had it planned: with no scarcity beyond the first year, a ledger, a contribution rate and a market move goods nobody lacks (F3). Track A makes those decisions matter. S6 can still go first if the owner prefers.
+**Why not property first,** as `HANDOFF.md` had it planned: with no scarcity beyond the first year, a ledger, a contribution rate and a market move goods nobody lacks (F3). Track A makes those decisions matter. The owner approved this order (2026-11-02).
 
 ## 4. Epics
 
@@ -81,17 +88,17 @@ Status: Planned, Active, Complete, Blocked. Complexity: S (days), M (about a wee
 
 | Sprint | Epic | Status | Depends on | Acceptance (short) | Validation | Commit | Follow-up |
 |---|---|---|---|---|---|---|---|
-| S0 Roadmap and decisions | — | **Active** (this doc) | — | Owner answers D1–D8 | — | — | — |
+| S0 Roadmap and decisions | — | **Complete** | — | Owner answers D1–D8 | Approved 2026-11-02 | — | — |
 | S1 Stone that matters, divergence report | E1, E2 | Planned | S0 | Quarry only on stone; output by deposit grade; stone only where the land has it | Divergence report, baseline vs S1 | — | — |
 | S2 Living forests | E3 | Planned | S1 (report) | Woodcutting thins the woods and slows with them; regrowth over years; families weigh woods for woodcutting | Report on forest and sparse sites; hunting coupling | — | — |
-| S3 Winter fuel | E3 | Planned | S2, D5 | Households burn firewood in the cold season; shortage has real cost; wood surplus falls | Report; first-winter stress | — | — |
+| S3 Winter fuel | E3 | Planned | S2 | Households burn firewood in the cold season; shortage has real cost; wood surplus falls | Report; first-winter stress | — | — |
 | S4 Materials in construction ◆ | E4, E10 | Planned | S1 | Timber and stone versions of homes and workplaces; families choose; masonry and paving get uses | Report: share of stone buildings by site | — | — |
 | S5 Clay and limestone | E2, E4 | Planned | S4 | Brickworks needs clay, lime kiln needs limestone; brick and tile have building uses | Report | — | — |
-| S6 Ownership ledger | E5 | Planned | S0 (D1) | Household shares, building funders, treasury view; play unchanged at the default policy | Matched snapshots identical to the base; saves | — | — |
-| S7 Contributions by category ◆ | E5 | Planned | S6 | Player sets % per category of total output; families keep the rest | Matched towns at 100/60/30/10% | — | — |
+| S6 Ownership ledger | E5 | Planned | S0 | Household shares, building funders, treasury view; play unchanged under the migration-only 100% setting | Matched snapshots identical to the base; saves | — | — |
+| S7 Contributions by category ◆ | E5 | Planned | S6 | Player sets % per category of total output; families keep the rest; new games ask for an initial choice | Matched towns at 100/60/30/10% | — | — |
 | S8 Redistribution and asking for help | E5, E11 | Planned | S7 | Player's reserve/redistribute rules; families in danger seek the commons and neighbours | Report: deaths and departures where goods existed | — | — |
-| S9 Market day ◆ | E6 | Planned | S7, D2 | Monthly barter among families; specialists live by exchange | Report: specialisation and wealth spread | — | — |
-| S10 Food kinds and spoilage | E7 | Planned | D3 | Several food goods meet one need; storage and spoilage differ | Saves; matched survival | — | — |
+| S9 Market day ◆ | E6 | Planned | S7 | Monthly barter among families; urgent exchange any day; specialists live by exchange | Report: specialisation and wealth spread | — | — |
+| S10 Food kinds and spoilage | E7 | Planned | — | Several food goods meet one need; storage and spoilage differ | Saves; matched survival | — | — |
 | S11 The farming year | E7 | Planned | S10 | Sowing and harvest seasons, labour peaks, winter stores; 2–3 grains, legumes, vegetables | Report by climate | — | — |
 | S12 Soil | E7 | Planned | S11 | Fertility tires and recovers (fallow, manure); suitability by soil and climate | Report over 10 years | — | — |
 | S13 Fish and game stocks ◆ | E8 | Planned | S2 | Over-fishing and over-hunting deplete; stocks recover | Report on water and forest sites | — | — |
@@ -118,21 +125,21 @@ Status: Planned, Active, Complete, Blocked. Complexity: S (days), M (about a wee
 - **Acceptance:** placement refuses a quarry off stone with a reason; output follows grade; matched towns that never build a quarry are unchanged day for day; old saves load (their maps have the deposits already; an existing quarry off stone keeps working until it closes, so no building vanishes under the player).
 - **Tests:** a rules test (placement, output, exhaustion, saves); the divergence report before and after.
 - **Risks:** rough tiles currently block placement everywhere; opening them to quarries touches `building_placement.gd` validation and route grid passability. Stone has few uses until S4, so S1 alone barely moves outcomes (the report should show stone appearing only on stone sites, and little else).
-- **Autonomy:** quarrying stays player-built in S1; families take it up through a hand-work stage if D6 is agreed (S4).
+- **Autonomy:** quarrying stays player-built in S1; families take it up through a hand-work stage in S4 (D6).
 
 ### S2: Living forests (M–L)
 
 - **Objective:** timber as a finite, regrowing stock (F2).
-- **Scope:** a woodcutter's output comes from felling trees within its reach, and its yield falls as nearby woods thin; felled tiles regrow through stages over several years (a stage per tile, no per-tree data) and the yearly spreading continues. Families judge woods in reach for woodcutting as they do for hunting, including shared reach. Gathering by families thins woods too. Kept woods stay binding.
+- **Scope:** a woodcutter's output comes from felling trees within its reach, and its yield falls as nearby woods thin; felled tiles regrow through stages over several years (a stage per tile, no per-tree data), and regrowth and the yearly spreading depend on standing woods nearby, so a clear-cut recovers slower than a thinned wood (D4). Families judge woods in reach for woodcutting as they do for hunting, including shared reach. Gathering by families thins woods too. Kept woods stay binding.
 - **Visible behaviour:** clearings widen around camps; on sparse sites wood work moves, slows or stops, and the tool chain feels it; forest sites can sustain cutting.
 - **Acceptance:** no wood from a woodcutter whose reach holds no trees; a forest cut slowly holds steady over six years, one cut hard recedes; hunting still falls with felling.
 - **Tests:** rules test for felling, regrowth and shared reach; the divergence report; `woodland` checks in `TESTING.md`.
 - **Risks:** the biggest balance risk in Track A: wood feeds tools, and tools feed every proper workplace. Expect the tool gap (HANDOFF decision 3) to widen on sparse sites. Report it; don't tune it away. Changes `TownWoodland` and `TownLand.get_output_factor` (production formulas, high risk).
 
-### S3: Winter fuel (M; needs D5)
+### S3: Winter fuel (M)
 
 - **Objective:** wood's main sink, and a reason forests matter to survival.
-- **Scope:** each household burns firewood daily in the cold months, longer in colder climates; its own gathering goes to its hearth first; then the commons. A shortage costs workdays and adds to hardship, below hunger. Fuel becomes a need bucket like food. Kilns and brickworks already burn wood.
+- **Scope:** each household burns firewood daily in the cold months, by season and climate (longer and more in colder places) and by household size; housing enters as unsheltered versus housed now, and through materials once S4 lands (D5). Its own gathering goes to its hearth first; then the commons. A shortage costs workdays and adds to hardship, below hunger. Fuel becomes a need bucket like food. Kilns and brickworks already burn wood.
 - **Visible behaviour:** autumn wood work; stores fall over winter; cold sites without woods struggle; wood surplus of later years shrinks.
 - **Acceptance:** survival-first holds (a cold family gathers or takes up wood work when it can); a matched first-winter stress shows fuel shortages only where wood is short.
 - **Risks:** adds a hard-ish need: the owner should see first-year survival on stressed sites before S3 merges.
@@ -140,7 +147,7 @@ Status: Planned, Active, Complete, Blocked. Complexity: S (days), M (about a wee
 ### S4: Materials in construction (L) ◆
 
 - **Objective:** buildings that show their town's materials, and uses for the stone chain's dead ends (F4).
-- **Scope:** homes and proper workplaces gain a timber and a stone version: stone costs stone (or masonry for the better home) and more labour, decays slower, and needs less upkeep. Families choose a version for their own projects by what's available, what it costs them, and their values (thrifty, ambitious, perfectionist, steady), with reasons like every other choice. The player's communal buildings take the player's choice. Paving stones make a paved road (lower travel cost, no trampling). Families can take up stone work through a hand-work stage (D6). Stone buildings are drawn differently.
+- **Scope:** homes and proper workplaces gain a timber and a stone version: stone costs stone (or masonry for the better home) and more labour, decays slower, and needs less upkeep. Families choose a version for their own projects by what's available, what it costs them, and their values (thrifty, ambitious, perfectionist, steady), with reasons like every other choice. The player chooses the material of communal buildings (D6). A home's material also sets how much firewood it needs (S3). Paving stones make a paved road (lower travel cost, no trampling). Families can take up stone work through a hand-work stage (D6). Stone buildings are drawn differently.
 - **Visible behaviour:** stone towns on rock, timber towns in forests; mixed towns where families differ.
 - **Acceptance:** the divergence report shows the share of stone buildings following deposits and values; the one construction pipeline is unchanged (tier 0 never deadlocks).
 - **Risks:** touches `TownConstruction`, `BUILD_COSTS`, `FamilyDevelopment`, building visuals and saves (a building records its material). Split into S4a (uses for masonry and paving, player side) and S4b (family choice) if it grows.
@@ -156,10 +163,10 @@ Status: Planned, Active, Complete, Blocked. Complexity: S (days), M (about a wee
 
 Mechanism from `docs/PROPERTY_AND_COMMUNAL_RESOURCES.md`, revised by D1.
 
-- **S6 Ownership ledger (M).** `city.resources` stays the one physical store; each household holds a share in it; the community's goods are the rest (computed, never stored). Buildings record who paid. The player trades only the community's goods; raid losses fall proportionally. **At the default policy (100%, open) play is identical:** matched snapshots must equal the base branch day for day. Saves: new dictionaries are domain fields.
-- **S7 Contributions by category (L) ◆.** The player sets a percentage per category (food, wood, stone, tools, goods…) of each holding's total output; the rest enters the household's share. Families eat and build from their own share first. Occupation choice, improvement cost and "can it pay" read the family's own share (property doc C3). No happiness modifier from the rate itself: families respond to what they actually have and receive. Matched towns at several rates on ordinary, stressed and difficult sites must show real, different outcomes, and both high and low rates must have a viable path.
+- **S6 Ownership ledger (M).** `city.resources` stays the one physical store; each household holds a share in it; the community's goods are the rest (computed, never stored). Buildings record who paid. The player trades only the community's goods; raid losses fall proportionally. **Under the 100%-pooled setting play is identical:** matched snapshots must equal the base branch day for day. That setting is for old saves and comparison sims only (D1). Saves: new dictionaries are domain fields.
+- **S7 Contributions by category (L) ◆.** The player sets a percentage per category (food, wood, stone, tools, goods…) of each holding's total output; the rest enters the household's share. **A new game asks the player for the initial rates at founding**; old saves keep 100% until the player changes it. Families may give more voluntarily, by their values. Families eat and build from their own share first. Occupation choice, improvement cost and "can it pay" read the family's own share (property doc C3). No happiness modifier from the rate itself: families respond to what they actually have and receive. Matched towns at several rates on ordinary, stressed and difficult sites must show real, different outcomes, and both high and low rates must have a viable path.
 - **S8 Redistribution and asking for help (M).** Player rules: reserve, redistribute (to whom, how much), supply public works, commitments (property doc Phase 3). Survival first: a family in danger asks the commons and neighbours (the existing sharing in shortage) before hunger, and the player's rules decide whether the commons answers. Fairness judged through `TownSocial.judge_distribution`.
-- **S9 Market day (L) ◆.** Monthly barter among families, prices in grain from the town's scarcity with the trader's friction, cleared in aggregate, no credit. Values decide who deals and how (Hagglers, Fair Dealers, Insular, Cosmopolitan). Wealth as a level.
+- **S9 Market day (L) ◆.** Monthly barter among families, prices in grain from the town's scarcity with the trader's friction, cleared in aggregate, no credit. Values decide who deals and how (Hagglers, Fair Dealers, Insular, Cosmopolitan). A family in danger may exchange or receive help on any day, not only on market day (D2). Wealth as a level.
 
 ## 8. Evaluating Results
 
@@ -174,11 +181,12 @@ From `AGENTS.md`, `HANDOFF.md` and the brief: `main.gd` gets no simulation logic
 
 ## 10. Handoff
 
-- **Completed:** this roadmap. Nothing built or tested.
+- **Completed:** this roadmap; D1–D8 approved. Nothing built or tested.
 - **Branch:** `docs/economic-foundations-roadmap` (from `develop` at `fcfc0fc`).
-- **Next:** the owner answers D1–D8; then S1 on `feature/economic-foundations` (per D7).
-- **Blockers:** D1–D8. The unmerged `docs/property-and-communal-resources` should be merged or retired once D1 is decided, so its superseded §4.3 doesn't mislead.
+- **Next, when the owner says start:** create `feature/economic-foundations` from `develop` (it should carry this doc), then S1 on its own sprint branch.
+- **Open housekeeping:** the unmerged `docs/property-and-communal-resources` holds the superseded §4.3; when S6 begins, bring its doc in with a note that D1 replaces §4.3, rather than leave it to mislead.
 
 ## Log
 
 - 2026-11-02: roadmap written from the owner's brief and the resource audit. No code.
+- 2026-11-02: owner approved D1–D8 with additions (an initial contribution choice in new games, voluntary contributions, exchange outside market day, firewood by housing and household size, families choosing their own building materials). Recorded; work not started.

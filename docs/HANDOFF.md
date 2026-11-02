@@ -8,7 +8,7 @@ What is true right now. Durable detail lives in the linked docs, and past milest
 
 **No implementation sprint is authorized.** The owner is reviewing the long-term vision and future features.
 
-- **Proposed initiative, awaiting decisions D1–D8:** economic foundations and geographic diversity, `docs/ECONOMIC_FOUNDATIONS_ROADMAP.md` (branch `docs/economic-foundations-roadmap`). It is the living backlog for the work below and puts geography and scarcity (stone, finite forests, fuel, building materials) before property.
+- **Approved initiative, not started (decisions D1–D8 approved 2026-11-02; begin only on the owner's word):** economic foundations and geographic diversity, `docs/ECONOMIC_FOUNDATIONS_ROADMAP.md` (branch `docs/economic-foundations-roadmap`). It is the living backlog for the work below and puts geography and scarcity (stone, finite forests, fuel, building materials) before property.
 - **Planned next, not authorized:** household property, private exchange, communal contributions and treasury allocations. The agreed plan is on branch `docs/property-and-communal-resources` (deliberately unmerged); the earlier audit is `docs/TREASURY_AUDIT.md`. A founding allocation is the intended lever on the first weeks. None of it is built.
 - **Design baseline for the economy and geography work:** `docs/RESOURCE_AND_PRODUCTION_AUDIT.md` (2026-11-02).
 
