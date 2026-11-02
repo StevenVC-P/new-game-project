@@ -367,10 +367,11 @@ static func get_failing_livelihood_cards(city: City) -> Array[Dictionary]:
 	return cards
 
 # Woodcutters felling inside the reach of a lodge a family hunts from, soon enough to cost it game
-# (TownWoodland.get_hunting_threats): shown before much is lost, with which lodges and woods, what
-# continued felling does, and the player's answer, keeping those woods, with what it costs the
-# woodcutters. Nothing is kept unless the player chooses it (owner, 2026-11-02).
-const HUNTING_GROUNDS_TITLE: String = "Woodcutters are felling hunting grounds"
+# (TownWoodland.get_hunting_threats): shown before much is lost. Both sides, as a choice and not a
+# recommendation (owner, 2026-11-02): which lodges and woods, what continued felling costs the
+# hunting, what keeping the woods costs the woodcutting, and what the town has of each now. Nothing
+# is kept unless the player chooses it; what the player keeps is binding.
+const HUNTING_GROUNDS_TITLE: String = "Woodcutting and hunting share the same woods"
 const HUNTING_LODGES_NAMED: int = 3
 
 static func get_hunting_ground_cards(city: City) -> Array[Dictionary]:
@@ -381,12 +382,14 @@ static func get_hunting_ground_cards(city: City) -> Array[Dictionary]:
 	var buttons: Array = []
 	var hungry: int = 0
 	var cutters: Array[Building] = []
+	var hunted: float = 0.0
 	for threat: Dictionary in threats.slice(0, HUNTING_LODGES_NAMED):
 		var lodge: Building = threat["building"]
 		var family: Household = city.get_household_by_id(lodge.assigned_household_id)
 		var whose: String = city.get_household_label(lodge.assigned_household_id)
 		hungry += 1 if family != null and family.short_days_this_month > 0 else 0
 		var place: String = describe_place(city, TownLogistics.center_tile(lodge.tile, lodge.size))
+		hunted += FamilyInitiative.get_building_output(city, lodge) if family != null else 0.0
 		lines.append("%s's %s%s hunts the woods within %d tiles of it: %d wooded tiles%s, %d%% of a full bag." % [whose, FamilyInitiative.describe_type(lodge.type, false), place, EconomyBalance.HUNTER_REACH, roundi(float(threat["wooded"])), " (its share of woods it shares)" if city.land.get_rival_reaches(lodge.type, lodge.tile, false).size() > 0 else "", roundi(100.0 * float(threat["factor"]))])
 		var felling: Array[String] = []
 		if not (threat["woodcutters"] as Array).is_empty():
@@ -395,7 +398,7 @@ static func get_hunting_ground_cards(city: City) -> Array[Dictionary]:
 			felling.append("%d of its wooded tiles are marked for clearing" % int(threat["marked"]))
 		var when: String = "each tree felled there now takes from its bag" if float(threat["days"]) <= 0.0 else "at this pace its bag starts to fall in about %d days" % roundi(float(threat["days"]))
 		var cause: String = " and ".join(felling)
-		lines.append("%s; %s, to about %d%% of a full bag in half a year." % [cause.substr(0, 1).to_upper() + cause.substr(1), when, roundi(100.0 * float(threat["after"]))])
+		lines.append("If felling goes on: %s; %s, to about %d%% of a full bag in half a year." % [cause, when, roundi(100.0 * float(threat["after"]))])
 		buttons.append({"text": "Keep %s's hunting grounds" % whose, "action": {"action": "keep_hunting_ground", "building": lodge.id}})
 		for woodcutter: Building in threat["woodcutters"]:
 			if not cutters.has(woodcutter):
@@ -404,13 +407,19 @@ static func get_hunting_ground_cards(city: City) -> Array[Dictionary]:
 		lines.append("%d more hunting workplaces are threatened." % (threats.size() - HUNTING_LODGES_NAMED))
 	if hungry > 0:
 		lines.append("%d of their families %s going hungry." % [hungry, "is" if hungry == 1 else "are"])
-	lines.append("Kept woods are binding: no one fells them, and keeping lifts any clearing marks there.")
+	var kept: String = "If the woods are kept: no one may fell them, whatever the families want (marking them for clearing lifts it; keeping lifts any clearing marks there)"
 	if not cutters.is_empty():
 		var rect: Rect2i = threats[0]["rect"]
 		var keeps: float = 1.0
 		for woodcutter: Building in cutters:
 			keeps = minf(keeps, city.woodland.estimate_felling_factor_if_kept(woodcutter, rect))
-		lines.append("The cost: the woodcutters would fell farther off, and bring in about %d%% of the wood they do now (the nearest trees they could fell are farther)." % roundi(100.0 * keeps) if keeps < 0.97 else "The cost: the woodcutters have other trees about as near, so they would lose little wood.")
+		kept += ", and the woodcutters fell farther off, bringing in about %d%% of the wood they do now." % roundi(100.0 * keeps) if keeps < 0.97 else ", and the woodcutters, with other trees about as near, lose little wood."
+	else:
+		kept += "."
+	lines.append(kept)
+	var food: float = FamilyInitiative.get_working_output(city, TownInfluence.ACTIVITY_FOOD)
+	var share: String = "about %d%% of the food the town's work brings in" % roundi(100.0 * hunted / food) if food > 0.0 else "food"
+	lines.append("Neither is always right: these lodges bring in %s, and the town holds %d wood. Lumber builds homes, fields and workshops; game feeds families." % [share, int(city.resources["wood"])])
 	buttons.append({"text": "Keep woods (V)", "action": {"action": "select_tool", "tool": TownWoodland.PROTECT}})
 	return [make_card(68 if hungry > 0 else 58, SP.TONE_ALERT if hungry > 0 else SP.TONE_CAUTION, HUNTING_GROUNDS_TITLE, lines, buttons)]
 

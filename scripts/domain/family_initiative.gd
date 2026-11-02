@@ -753,6 +753,14 @@ static func get_food_ratio(city: City) -> float:
 		return get_expected_output(city, TownInfluence.ACTIVITY_FOOD) / eats
 	return get_working_output(city, TownInfluence.ACTIVITY_FOOD) / eats
 
+# What one worked workplace really brings in a day, as get_working_output counts it.
+static func get_building_output(city: City, building: Building) -> float:
+	var family: Household = city.get_household_by_id(building.assigned_household_id)
+	var pace: float = city.get_family_labor_factor(family) * HouseholdEconomy.get_output_factor(city, family, building.type) * city.get_work_time_factor(building)
+	if building.is_working_by_hand():
+		pace *= EconomyBalance.TIER0_OUTPUT_FRACTION
+	return city.get_base_building_output_amount(building.type) * city.land.get_reach_factor(building) * pace
+
 # What the town's work in a good really brings in a day: only work a family does or has claimed, on
 # its land, at that family's pace (its hands, its skill, the share of its day left after walking,
 # spare time and secondary work), and at hand work's pace where a proper workplace stands short of
@@ -763,11 +771,7 @@ static func get_working_output(city: City, good: String, seasonal: bool = false)
 	for building: Building in city.buildings:
 		if building.assigned_household_id < 0 or get_activity(building.type) != good:
 			continue
-		var family: Household = city.get_household_by_id(building.assigned_household_id)
-		var pace: float = city.get_family_labor_factor(family) * HouseholdEconomy.get_output_factor(city, family, building.type) * city.get_work_time_factor(building)
-		if building.is_working_by_hand():
-			pace *= EconomyBalance.TIER0_OUTPUT_FRACTION
-		total += city.get_base_building_output_amount(building.type) * city.land.get_reach_factor(building) * pace * (get_season_days(city, building.type) if seasonal else 1.0)
+		total += get_building_output(city, building) * (get_season_days(city, building.type) if seasonal else 1.0)
 	for project: ConstructionProject in city.construction.projects:
 		if get_activity(project.building_type) != good:
 			continue

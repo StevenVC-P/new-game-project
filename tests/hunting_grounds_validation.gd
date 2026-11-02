@@ -221,7 +221,8 @@ func test_warning_before_loss() -> void:
 	_check(not shown.is_empty(), "the woodcutter starts felling inside the lodge's reach: the warning shows")
 	_check(lines.contains(city.get_household_label(city.households[0].id)) and lines.contains("44 wooded tiles") and lines.contains("100% of a full bag"), "it names the lodge and its woods, with its bag still full: %s" % lines)
 	_check(lines.contains("starts to fall in about") and lines.contains("in half a year"), "it says when its bag starts to fall, and where it would be in half a year: %s" % lines)
-	_check(lines.contains("binding") and lines.contains("The cost"), "it says keeping is binding and what it costs the woodcutters: %s" % lines)
+	_check(lines.contains("If felling goes on") and lines.contains("If the woods are kept") and lines.contains("whatever the families want") and lines.contains("of the wood they do now"), "it gives both sides: what felling costs the hunting, and that keeping is binding and costs the woodcutters: %s" % lines)
+	_check(lines.contains("Neither is always right") and lines.contains("of the food the town") and lines.contains("the town holds"), "and what the town has of each, without recommending either: %s" % lines)
 	_check((shown.get("buttons", []) as Array).any(func(b: Dictionary) -> bool: return b["action"]["action"] == "keep_hunting_ground" and int(b["action"]["building"]) == lodge.id), "with a button to keep that lodge's woods")
 	_check((shown.get("buttons", []) as Array).any(func(b: Dictionary) -> bool: return b["action"].get("tool", "") == TownWoodland.PROTECT), "and the Keep woods tool")
 	# Left alone: how long until the old card (two thirds of the lodge's best) would have shown.
