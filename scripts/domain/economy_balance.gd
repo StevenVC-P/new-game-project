@@ -228,6 +228,14 @@ const WOLF_WOODS_DISTANCE: int = 2
 const HERDER_WOOL_PER_DAY: float = 1.0
 const HERDER_REACH: int = 3
 const HERDER_FULL_PASTURE_TILES: int = 90
+# A quarry stands on stone (TownDeposits, sprint S1b): it cuts its full rate with
+# QUARRY_FULL_DEPOSIT_TILES of the best stone underfoot, less on fewer tiles or poorer stone. A
+# deposit tile's grade runs from DEPOSIT_GRADE_FLOOR (a lone tile at an outcrop's edge) to 1 (stone
+# all round it). Each tile holds STONE_DEPOSIT_UNITS_PER_TILE blocks: a quarry on four good tiles
+# works for about three years at its full rate.
+const QUARRY_FULL_DEPOSIT_TILES: int = 4
+const DEPOSIT_GRADE_FLOOR: float = 0.4
+const STONE_DEPOSIT_UNITS_PER_TILE: int = 600
 
 # --- Clothing (docs/FIRST_STAGE_LOOP.md, milestone 6) ---
 # A garment lasts CLOTHING_DAYS_PER_PERSON, so a town needs one for every that many people a day

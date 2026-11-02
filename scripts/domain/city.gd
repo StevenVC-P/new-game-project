@@ -1335,16 +1335,25 @@ func apply_building_production(building: Building):
 
 	var building_type: String = building.type
 	var output_amount: int = get_current_building_output_amount(building)
-	if output_amount <= 0:
-		return
+	# A quarry can't cut more than the stone left under it.
+	if output_amount > 0 and TownDeposits.is_quarry(building) and not local_map.is_empty():
+		output_amount = mini(output_amount, TownDeposits.get_stone_left(self, building))
+	if output_amount > 0:
+		# Tier 0 buildings produce the same goods as their tier 1 counterpart, at a lower rate.
+		var chain: Dictionary = EconomyBalanceScript.PRODUCTION.get(BuildingTiersScript.get_base_type(building_type), {})
+		if chain.is_empty():
+			return
+		var made: int = apply_input_output_production(str(chain["output"]), output_amount, chain["inputs"])
+		if TownDeposits.is_quarry(building):
+			TownDeposits.extract(self, building, made)
+	# A quarry with no stone left underfoot is worked out: its family is free for other work, and
+	# nobody is put to work there again (TownDeposits).
+	if TownDeposits.is_worked_out(self, building):
+		log_household_lifecycle_event(0, building.assigned_household_id, "QuarryWorkedOut", "building=" + str(building.id))
+		unassign_building_worker(buildings.find(building))
 
-	# Tier 0 buildings produce the same goods as their tier 1 counterpart, at a lower rate.
-	var chain: Dictionary = EconomyBalanceScript.PRODUCTION.get(BuildingTiersScript.get_base_type(building_type), {})
-	if chain.is_empty():
-		return
-	apply_input_output_production(str(chain["output"]), output_amount, chain["inputs"])
-
-func apply_input_output_production(output_key: String, output_amount: int, input_costs: Dictionary):
+# Returns what was made.
+func apply_input_output_production(output_key: String, output_amount: int, input_costs: Dictionary) -> int:
 	var capped_output: int = output_amount
 	for input_key: String in input_costs.keys():
 		var input_cost: int = int(input_costs[input_key])
@@ -1353,7 +1362,7 @@ func apply_input_output_production(output_key: String, output_amount: int, input
 		capped_output = min(capped_output, int(floor(float(int(resources[input_key])) / float(input_cost))))
 
 	if capped_output <= 0:
-		return
+		return 0
 
 	for input_key: String in input_costs.keys():
 		var input_cost: int = int(input_costs[input_key])
@@ -1363,6 +1372,7 @@ func apply_input_output_production(output_key: String, output_amount: int, input
 
 	resources[output_key] = int(resources[output_key]) + capped_output
 	record_flow(output_key, "made", capped_output)
+	return capped_output
 
 func get_current_building_output_amount(building: Building) -> int:
 	var maintenance_level: int = building.maintenance_level

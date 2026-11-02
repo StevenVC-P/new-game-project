@@ -11,6 +11,18 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # Run one test (tests extend SceneTree and quit with a non-zero code on failure)
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/founding_city_validation.gd
 
+# Every rules test in tests/, four at a time; one line each in test-logs/<time>/summary.txt ("-Filter quarry*" for some)
+.\scripts\run_tests.ps1
+
+# Economic foundations (docs/ECONOMIC_FOUNDATIONS_TEST_PLAN.md): the invariant checker's own test, quarries on stone
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/economy_invariants_validation.gd
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/quarry_deposit_validation.gd
+# Divergence check: the same founder sets on five kinds of land, daily invariants (filter for [DIV]; "-- --survey" lists
+# the site pool). Batches and tables: run_divergence.ps1 -Label X [-Extra "--commission=quarry@360"], then
+# compare_divergence.ps1 -Base X -New Y. Run batches from a fixed-commit worktree.
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/divergence_check.gd -- --environments=forested --starts=2 --years=1 > div.log
+.\scripts\run_divergence.ps1 -Label B0 -ProjectRoot ..\ngg-ef-runs
+
 # Opening check: can 20 different towns get off the ground in two years? (filter for [OPEN])
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/opening_check.gd
 

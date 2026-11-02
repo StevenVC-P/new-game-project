@@ -87,6 +87,8 @@ func get_output_factor(building: Building) -> float:
 	elif base == Building.BUILDING_WOODCUTTER:
 		# Woods the player keeps send woodcutters farther for their timber (TownWoodland).
 		factor *= city.woodland.get_felling_factor(building)
+	elif base == Building.BUILDING_QUARRY:
+		factor *= TownDeposits.get_quarry_factor(city, building)
 	if season == SEASON_WINTER and is_wolf_exposed(building):
 		factor *= EconomyBalance.WOLF_WINTER_YIELD
 	return factor

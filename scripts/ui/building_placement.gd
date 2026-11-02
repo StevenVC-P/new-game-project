@@ -37,6 +37,7 @@ func validate(city: City, local_map: Array, building_type: String, origin: Vecto
 	var size: Vector2i = get_building_size(building_type)
 	var footprint: Array[Vector2i] = get_footprint_tiles(origin, size)
 	var has_fertile_tile: bool = false
+	var has_stone_tile: bool = false
 	var cost: Dictionary = get_building_cost(building_type)
 
 	if check_cost and not city.can_afford_cost(cost):
@@ -49,7 +50,10 @@ func validate(city: City, local_map: Array, building_type: String, origin: Vecto
 		var tile: Dictionary = local_map[tile_pos.y][tile_pos.x] as Dictionary
 		if tile["type"] == "water":
 			return make_result(false, "Blocked terrain", footprint)
-		if tile["type"] == "rough":
+		# A quarry stands on stone, rough ground nothing else is built on (TownDeposits).
+		if rule_type == BUILDING_QUARRY and TownDeposits.is_stone(tile):
+			has_stone_tile = true
+		elif tile["type"] == "rough":
 			return make_result(false, "Blocked terrain", footprint)
 		if tile["has_trees"] == true:
 			return make_result(false, "Blocked terrain", footprint)
@@ -62,6 +66,8 @@ func validate(city: City, local_map: Array, building_type: String, origin: Vecto
 
 	if rule_type == BUILDING_FARM and not has_fertile_tile:
 		return make_result(false, "Requires fertile land", footprint)
+	if rule_type == BUILDING_QUARRY and not has_stone_tile:
+		return make_result(false, "Requires a stone deposit underfoot", footprint)
 	if rule_type == BUILDING_WOODCUTTER and not has_trees_near_building(local_map, origin, size, woodcutter_tree_radius):
 		return make_result(false, "Requires nearby trees", footprint)
 	if rule_type == Building.BUILDING_HUNTER and not has_trees_near_building(local_map, origin, size, HUNTER_TREE_RADIUS):

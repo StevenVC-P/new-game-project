@@ -10,7 +10,8 @@ param(
 	[string]$Extra = "",
 	# The worktree to run in (a fixed commit for a baseline); defaults to this one.
 	[string]$ProjectRoot = "",
-	[int]$Parallel = 4,
+	# Three by default, keeping the fourth of the owner's four Godot processes free for tests.
+	[int]$Parallel = 3,
 	# Don't start another Godot process with less free memory than this.
 	[int]$MinFreeMB = 3000,
 	[string]$GodotBin = $env:GODOT_BIN

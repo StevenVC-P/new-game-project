@@ -42,7 +42,11 @@ static func get_lines(local_map: Array, profile: SettlementSiteProfile) -> Array
 	lines.append("Water: " + _water_text(water_kinds))
 	lines.append("Rough ground: " + ("some" if rough > 0 else "none"))
 	if not deposits.is_empty():
-		lines.append("Stone/ore: " + _deposit_text(deposits) + " on the town map")
+		var text: String = "Stone/ore: " + _deposit_text(deposits) + " on the town map"
+		# How much a quarry on its best stone would cut (TownDeposits).
+		if deposits.has(TownDeposits.STONE):
+			text += " (%s quarry stone)" % TownDeposits.describe_quality(TownDeposits.get_best_quarry_factor(local_map))
+		lines.append(text)
 	elif profile != null and profile.nearest_resource_distance >= 0:
 		lines.append("Stone/ore: in the region, " + str(profile.nearest_resource_distance) + " tiles away")
 	else:
