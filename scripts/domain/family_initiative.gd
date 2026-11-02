@@ -131,7 +131,7 @@ static func take_up_work(city: City, household: Household) -> ConstructionProjec
 		desire["score"] = float(desire["score"]) + get_noise(city, household, get_choice_key(occupation))
 		choices.append(desire)
 	choices.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["score"]) > float(b["score"]))
-	if city.has_meta("comfort_calling_fades") and not choices.is_empty():
+	if is_comfort_calling_faded(city) and not choices.is_empty():
 		count_fade_changed(city, household, "first_choice", choices[0]["occupation"], get_unfaded_best(choices))
 	if city.has_meta("trace_choices"):
 		record_choices(city, household, choices)
@@ -240,12 +240,12 @@ static func get_work_desire(city: City, household: Household, occupation: String
 	var essential: bool = activity in [TownInfluence.ACTIVITY_FOOD, TownInfluence.ACTIVITY_WOOD, TownInfluence.ACTIVITY_TOOLS]
 	var match_quality: String = household.get_match_quality(occupation)
 	if match_quality == CultureEffects.MATCH_GOOD:
-		# Candidate under evaluation (Priority 5, comparison only; meta "comfort_calling_fades"): for
-		# work making what the town only goes without (wool), the calling yields to hunger fully, as
-		# that good's own need terms do. Food, wood and tools keep half the calling's pull, as before.
-		# "calling_faded" is what the candidate took away, so its effect on decisions can be counted.
+		# For work making what the town only goes without (wool), the calling yields to hunger fully,
+		# as that good's own need terms do (owner, 2026-11-02; is_comfort_calling_faded). Food, wood and
+		# tools keep half the calling's pull. "calling_faded" is what fading took away, so its effect on
+		# decisions can be counted.
 		var pull: float = prosperity
-		if city.has_meta("comfort_calling_fades") and not essential:
+		if is_comfort_calling_faded(city) and not essential:
 			pull = 1.0 - level
 			result["calling_faded"] = 3.0 * (prosperity - pull)
 		add(terms, 3.0 * pull, "it is the family's calling" + hard_times)
@@ -914,8 +914,13 @@ static func record_choices(city: City, household: Household, choices: Array[Dict
 		ranked.append({"occupation": choice["occupation"], "score": snappedf(float(choice["score"]), 0.01), "for": get_reasons(choice["terms"], true, 4), "against": get_reasons(choice["terms"], false, 2)})
 	(city.get_meta("trace_choices") as Array).append({"day": city.construction.day, "household": household.id, "hardship": snappedf(float(get_hardship(city, household)["level"]), 0.01), "coverage": snappedf(get_food_coverage(city), 0.01), "ratio": snappedf(get_food_ratio(city), 0.01), "ranked": ranked})
 
-# The candidate's decisions (meta "comfort_calling_fades"): the choice that would have come first
-# without it, from choices carrying "calling_faded".
+# Whether a calling for work the town only goes without fades fully with hunger (the default since
+# 2026-11-02). Meta "comfort_calling_kept" restores the old rule, half the pull surviving, for comparison.
+static func is_comfort_calling_faded(city: City) -> bool:
+	return not city.has_meta("comfort_calling_kept")
+
+# What fading changed: the choice that would have come first without it, from choices carrying
+# "calling_faded".
 static func get_unfaded_best(choices: Array) -> String:
 	var best: String = ""
 	var best_score: float = -INF
@@ -927,7 +932,7 @@ static func get_unfaded_best(choices: Array) -> String:
 	return best
 
 # Counts (meta "comfort_calling_changed": {kind: count}) and lists (meta "comfort_calling_cases")
-# the decisions the candidate changed: what the family did against what it would have done.
+# the decisions fading changed: what the family did against what it would have done.
 static func count_fade_changed(city: City, household: Household, kind: String, chosen: String, unfaded: String) -> void:
 	if chosen == unfaded:
 		return

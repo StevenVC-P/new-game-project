@@ -35,6 +35,7 @@ func run_all() -> void:
 	test_focused_appeal()
 	test_food_warning_provisional_at_founding()
 	test_reserve_blocks_only_what_draws_on_it()
+	test_comfort_calling_fades_with_hunger()
 	if failure_count > 0:
 		push_error("Autonomous occupations validation failed: " + str(failure_count) + " failure(s)")
 		quit(1)
@@ -585,6 +586,66 @@ func test_reserve_blocks_only_what_draws_on_it() -> void:
 	_check(not family.initiative_note.contains("kept back"), "the family on the tool mender is not told the stores hold too little: %s" % family.initiative_note)
 	var committed: Dictionary = city.construction.get_committed_materials()
 	_check(int(committed.get("tools", 0)) == 0 and int(committed.get("wood", 0)) <= int(city.resources["wood"]) and int(city.resources["tools"]) == 3, "and nothing is promised the stores do not hold (tools %d, committed %s)" % [int(city.resources["tools"]), str(committed)])
+
+# The calling's pull for a family's weight on a trade, from its terms.
+func calling_weight(desire: Dictionary) -> float:
+	for term: Dictionary in desire["terms"]:
+		if str(term["reason"]).begins_with("it is the family's calling"):
+			return float(term["weight"])
+	return 0.0
+
+# 22. For work making what the town only goes without (wool), the calling fades fully as hunger nears
+# (owner, 2026-11-02); food, wood and tools keep half its pull. Herding stays a founding choice, the
+# calling and the family's skill still count, and a family may still herd when it should not.
+func test_comfort_calling_fades_with_hunger() -> void:
+	# Severe hunger: the loom family's pull to herd is gone; under the old rule (meta
+	# comfort_calling_kept) half of it was left.
+	var city: City = hungry_town(0)
+	var loom: Household = city.households[0]
+	set_calling(loom, "loom")
+	var level: float = float(FamilyInitiative.get_hardship(city, loom)["level"])
+	var herd: Dictionary = FamilyInitiative.get_work_desire(city, loom, "herder")
+	city.set_meta("comfort_calling_kept", true)
+	var herd_kept: Dictionary = FamilyInitiative.get_work_desire(city, loom, "herder")
+	city.remove_meta("comfort_calling_kept")
+	_check(is_equal_approx(calling_weight(herd), 3.0 * (1.0 - level)) and is_equal_approx(calling_weight(herd_kept), 3.0 * (1.0 - FamilyInitiative.CALLING_YIELD * level)), "at hardship %.2f the calling to herd pulls %.2f, against %.2f under the old rule" % [level, calling_weight(herd), calling_weight(herd_kept)])
+	_check(float(herd["score"]) < float(herd_kept["score"]) and is_equal_approx(float(herd["calling_faded"]), calling_weight(herd_kept) - calling_weight(herd)), "so herding draws it less, by exactly what faded (%.2f -> %.2f)" % [float(herd_kept["score"]), float(herd["score"])])
+	_check(bool(herd["available"]), "herding stays a choice it can make, however hungry")
+	# Essential work keeps half the calling: a family of the forge weighs toolmaking exactly as before.
+	var forge: Household = city.households[0]
+	set_calling(forge, "forge_bench")
+	var tools: Dictionary = FamilyInitiative.get_work_desire(city, forge, "toolmaker")
+	city.set_meta("comfort_calling_kept", true)
+	var tools_kept: Dictionary = FamilyInitiative.get_work_desire(city, forge, "toolmaker")
+	city.remove_meta("comfort_calling_kept")
+	_check(is_equal_approx(float(tools["score"]), float(tools_kept["score"])) and calling_weight(tools) > 0.0 and not tools.has("calling_faded"), "toolmaking is weighed as before, the calling's half kept (%.2f, %.2f)" % [float(tools["score"]), float(tools_kept["score"])])
+	# A fed town: nothing fades, and the loom family takes up herding as its founding work.
+	var fed: City = town()
+	var fed_loom: Household = fed.households[0]
+	set_calling(fed_loom, "loom")
+	busy_everyone_else(fed, fed_loom)
+	_check(is_equal_approx(calling_weight(FamilyInitiative.get_work_desire(fed, fed_loom, "herder")), 3.0), "in a fed town the calling pulls fully")
+	var pen: ConstructionProject = FamilyInitiative.take_up_work(fed, fed_loom)
+	_check(pen != null and pen.building_type == "grazing_pen", "and the family takes up herding: %s" % fed_loom.initiative_note)
+	# A town growing nine tenths of what it eats: hunger coming, not here. The calling still counts,
+	# less; and a family that knows herding well may still herd, an unfortunate choice the rules allow.
+	var lean: City = town()
+	var x: int = 14
+	for other: Household in lean.households.slice(1):
+		give(lean, other, "farm" if x < 26 else "woodcutter", Vector2i(x, 4 if x < 26 else 20))
+		x += 4
+	lean.remove_meta("economy_no_proficiency_effects")
+	var skilled: Household = lean.households[0]
+	set_calling(skilled, "loom")
+	var lean_level: float = float(FamilyInitiative.get_hardship(lean, skilled)["level"])
+	var plain: Dictionary = FamilyInitiative.get_work_desire(lean, skilled, "herder")
+	HouseholdEconomy.ensure_seeded(lean, skilled)
+	skilled.proficiency["herder"] = HouseholdEconomy.ESTABLISHED
+	var practised: Dictionary = FamilyInitiative.get_work_desire(lean, skilled, "herder")
+	_check(lean_level > 0.0 and lean_level < 1.0 and calling_weight(plain) > 0.0 and calling_weight(plain) < 3.0, "with hunger only coming (%.2f) the calling still pulls, less (%.2f)" % [lean_level, calling_weight(plain)])
+	_check(has_reason(practised["terms"], "it knows the work") and float(practised["score"]) > float(plain["score"]), "knowing the work still counts (%.2f -> %.2f)" % [float(plain["score"]), float(practised["score"])])
+	var farm: Dictionary = FamilyInitiative.get_work_desire(lean, skilled, "farm")
+	_check(float(practised["score"]) > float(farm["score"]), "a skilled loom family would still rather herd than farm while the town runs short (herd %.2f, farm %.2f)" % [float(practised["score"]), float(farm["score"])])
 
 func _check(condition: bool, message: String) -> void:
 	if condition:

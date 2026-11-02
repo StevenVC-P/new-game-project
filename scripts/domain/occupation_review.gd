@@ -226,7 +226,7 @@ static func weigh(city: City, household: Household, holding: Building) -> Dictio
 	var best: Dictionary = {"terms": []}
 	var best_activity: String = ""
 	var best_score: float = -INF
-	# The same without the candidate (meta "comfort_calling_fades"), to count what it changed.
+	# The same as if the calling did not fade (FamilyInitiative.is_comfort_calling_faded), to count what that changed.
 	var unfaded_activity: String = ""
 	var unfaded_score: float = -INF
 	for occupation: String in FamilyInitiative.get_occupations(city):
@@ -244,7 +244,7 @@ static func weigh(city: City, household: Household, holding: Building) -> Dictio
 			unfaded_score = score + float(desire.get("calling_faded", 0.0))
 			unfaded_activity = occupation
 	var margin: float = best_score - stay_score
-	if city.has_meta("comfort_calling_fades"):
+	if FamilyInitiative.is_comfort_calling_faded(city):
 		var unfaded_margin: float = unfaded_score - stay_score - float(staying.get("calling_faded", 0.0))
 		FamilyInitiative.count_fade_changed(city, household, "review", best_activity if margin >= CHANGE_MARGIN else current, unfaded_activity if unfaded_margin >= CHANGE_MARGIN else current)
 	var decision: Dictionary = {"change": margin >= CHANGE_MARGIN, "activity": best_activity, "margin": margin, "stay_terms": staying["terms"], "alternative_terms": best["terms"], "appeal": float(best.get("appeal", 0.0)), "stay_appeal": float(staying.get("appeal", 0.0)), "focused": float(best.get("focused", 0.0))}
