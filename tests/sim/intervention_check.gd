@@ -38,6 +38,9 @@ extends SceneTree
 # not choose, until a day); --veto=HOUSEHOLD:OCCUPATION:UNTIL[;...] (one family may not choose one
 # trade until a day: what that one decision did); --meta=a,b (comparison metas). With --trace, each first choice of work is printed
 # ranked, with its reasons and the town's food as the family saw it.
+# Founding provisions (Phase 7 diagnostic, owner 2026-11-02; comparison only): --provisions=food:380,tools:6
+# sets what the expedition arrives with (default 300 food, 45 wood, 14 tools; worth 507.5 in grain
+# at EconomyBalance.VALUE_IN_GRAIN, by which equal-value cargoes are compared).
 
 const TownBuildingCheck = preload("res://tests/sim/town_building_check.gd")
 const StandInPlayerScript = preload("res://tests/sim/stand_in_player.gd")
@@ -72,6 +75,7 @@ var left_out: Array[String] = []
 var left_out_until: int = 1 << 30
 var vetoes: Array = []
 var extra_metas: Array[String] = []
+var provisions: Dictionary = {}
 
 func _init() -> void:
 	call_deferred("run")
@@ -103,6 +107,9 @@ func run() -> void:
 			left_out.assign(argument.trim_prefix("--leave-out=").split(","))
 		elif argument.begins_with("--leave-out-until="):
 			left_out_until = int(argument.trim_prefix("--leave-out-until="))
+		elif argument.begins_with("--provisions="):
+			for part: String in argument.trim_prefix("--provisions=").split(","):
+				provisions[part.get_slice(":", 0)] = int(part.get_slice(":", 1))
 		elif argument.begins_with("--meta="):
 			extra_metas.assign(argument.trim_prefix("--meta=").split(","))
 		elif argument.begins_with("--veto="):
@@ -125,6 +132,8 @@ func play(site: Dictionary, policy: String, stress: bool, years: int) -> Diction
 	city.site_profile = site["profile"]
 	city.local_map = (site["map"] as Array).duplicate(true)
 	Layouts.set_aside(city, "starting")
+	for good: String in provisions.keys():
+		city.resources[good] = int(provisions[good])
 	for meta: String in MODES[mode]:
 		city.set_meta(meta, true)
 	for meta: String in extra_metas:
