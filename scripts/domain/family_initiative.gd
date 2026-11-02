@@ -322,7 +322,10 @@ static func get_work_desire(city: City, household: Household, occupation: String
 	if HouseholdEconomy.is_on(city) and not city.has_meta("economy_no_proficiency_effects"):
 		var knows: float = HouseholdEconomy.get_level(household, occupation)
 		if knows >= HouseholdEconomy.FORGOTTEN_BELOW:
-			add(terms, HouseholdEconomy.KNOWN_WORK_WEIGHT * minf(1.0, knows / HouseholdEconomy.ESTABLISHED), "it knows the work (%s)" % HouseholdEconomy.describe_level(knows))
+			# Candidate under evaluation (Priority 5, meta "known_work_yields_to_survival", comparison
+			# only): the familiar pulls on work that is not food as the calling does, less as hunger nears.
+			var familiar: float = prosperity if city.has_meta("known_work_yields_to_survival") and activity != TownInfluence.ACTIVITY_FOOD else 1.0
+			add(terms, HouseholdEconomy.KNOWN_WORK_WEIGHT * familiar * minf(1.0, knows / HouseholdEconomy.ESTABLISHED), "it knows the work (%s)" % HouseholdEconomy.describe_level(knows))
 	var appeal: float = add_encouragement(city, household, activity, terms, "the gathering asks for " + TownInfluence.get_activity_name(activity))
 	# A focused appeal for this good, while it stands (FocusedAppeal): apart from the priority's ask.
 	result["focused"] = FocusedAppeal.add_appeal(city, household, activity, terms)

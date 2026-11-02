@@ -32,7 +32,7 @@ extends SceneTree
 # choice and review of its work with reasons, and the town each month; filter for [TRACE]).
 # Diagnostics (Priority 5): --leave-out=hunter,herder with --leave-out-until=DAY (trades families may
 # not choose, until a day); --veto=HOUSEHOLD:OCCUPATION:UNTIL[;...] (one family may not choose one
-# trade until a day: what that one decision did). With --trace, each first choice of work is printed
+# trade until a day: what that one decision did); --meta=a,b (comparison metas). With --trace, each first choice of work is printed
 # ranked, with its reasons and the town's food as the family saw it.
 
 const TownBuildingCheck = preload("res://tests/sim/town_building_check.gd")
@@ -67,6 +67,7 @@ var trace: bool = false
 var left_out: Array[String] = []
 var left_out_until: int = 1 << 30
 var vetoes: Array = []
+var extra_metas: Array[String] = []
 
 func _init() -> void:
 	call_deferred("run")
@@ -98,6 +99,8 @@ func run() -> void:
 			left_out.assign(argument.trim_prefix("--leave-out=").split(","))
 		elif argument.begins_with("--leave-out-until="):
 			left_out_until = int(argument.trim_prefix("--leave-out-until="))
+		elif argument.begins_with("--meta="):
+			extra_metas.assign(argument.trim_prefix("--meta=").split(","))
 		elif argument.begins_with("--veto="):
 			for veto: String in argument.trim_prefix("--veto=").split(";"):
 				var parts: PackedStringArray = veto.split(":")
@@ -119,6 +122,8 @@ func play(site: Dictionary, policy: String, stress: bool, years: int) -> Diction
 	city.local_map = (site["map"] as Array).duplicate(true)
 	Layouts.set_aside(city, "starting")
 	for meta: String in MODES[mode]:
+		city.set_meta(meta, true)
+	for meta: String in extra_metas:
 		city.set_meta(meta, true)
 	if not left_out.is_empty():
 		city.set_meta("occupations_left_out", left_out)
