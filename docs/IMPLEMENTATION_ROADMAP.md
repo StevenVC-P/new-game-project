@@ -381,6 +381,10 @@ Next implementation step: draw regional deposits onto town maps as resource tile
 2. Readability pass: tell tier 0 from tier 1, who works where, who is struggling, at a glance.
 3. Art direction decision (style, perspective, scope), then art, the UI overhaul, and audio replacing code-drawn shapes. `BuildingVisuals` profiles are the intended hook for sprites. (All three map scales now share the miniature style, so in practice the direction is set; sprites, UI, and audio remain.)
 
+## Economic Foundations And Geographic Diversity (proposed 2026-11-02, awaiting owner decisions)
+
+Backlog, sprints and tracking: `docs/ECONOMIC_FOUNDATIONS_ROADMAP.md`. Nothing built. It absorbs the property plan's phases (revised so the player sets contributions) and, if decision D1 there is agreed, supersedes M7.
+
 ## Future Feature Notes
 
 Ideas recorded for later design, not scheduled:
