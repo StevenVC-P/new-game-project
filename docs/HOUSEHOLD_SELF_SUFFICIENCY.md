@@ -1,6 +1,6 @@
 # Household Self-Sufficiency and Occupational Skills
 
-**Status: implemented as a prototype (2026-11-01). Branch `feature/household-self-sufficiency`, stacked on `feature/occupation-reconsideration`. Not merged: awaits owner review.**
+**Status: implemented (2026-11-01); merged into `develop` and `main` on the owner's approval (2026-11-01).**
 
 Code: `scripts/domain/household_economy.gd` (`HouseholdEconomy`). It hooks into:
 - `City`: `tick`, `consume_food`, `skips_work_today`, `get_work_time_factor`, output modifiers, upkeep;

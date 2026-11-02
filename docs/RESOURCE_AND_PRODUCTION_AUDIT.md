@@ -22,11 +22,11 @@ Evidence: **[code]** read in code; **[doc]** a document's claim; **[inferred]** 
 | `TOWN_MAP.md`, `REGIONAL_MAP.md`, `WORLD_MAP.md` | Map scales and tile data | **Current.** The world/regional maps carry geography only; their economic and political layers are Planned. |
 | `FAMILY_INFLUENCE_PROTOTYPE.md`, `COMMUNITY_PRIORITIES.md`, `GUIDING_WISDOM.md`, `HOME_SITES.md` | The player's levers and the commons-versus-own split | **Current, Implemented.** |
 | `TREASURY_AUDIT.md`, plus branch `docs/property-and-communal-resources` | Household property, private exchange, treasury | **Planned and agreed, not built or authorized.** |
-| `RESOURCE_HOUSEHOLD_LABOR_TRADE_MODEL.md` | Describes the code's resources, labor and trade | **Outdated** (last edited 2026-10-20). It predates land, trade, wool, larders and family choice. |
+| `archive/RESOURCE_HOUSEHOLD_LABOR_TRADE_MODEL.md` | Describes the code's resources, labor and trade | **Outdated** (last edited 2026-10-20). It predates land, trade, wool, larders and family choice. |
 | `GOODS_AND_PRODUCTION_EXPANSION_MODEL.md` | Planned goods (wheat, bread, fish, planks, clay, pottery…) | **Speculative/partial** (2026-05-30). Its stone and craft chain exists in code; most of its goods don't. |
 | `GOODS_DEMAND_AND_NEED_BUCKETS_MODEL.md`, `soft_need_consumption_model.md` | Need buckets | **Partially implemented** (May 2026). The buckets exist; only food, household goods and clothing are consumed. |
 | `goods_quality_preference_modifiers_plan.md`, `household_home_inventory_plan.md` | Quality grades, home inventories | **Planned only** (May 2026). Larders are the only household inventory built. |
-| `MONEY_OBLIGATION_AND_CITY_CREDIT_MODEL.md` | Credit and currency | **Mostly superseded** by `ECONOMY_MODEL.md`. |
+| `archive/MONEY_OBLIGATION_AND_CITY_CREDIT_MODEL.md` | Credit and currency | **Mostly superseded** by `ECONOMY_MODEL.md`. |
 | `CULTURE_AND_VALUES_MODEL.md` | Values and callings | **Current draft.** Its economic effects are partly built (section 6). |
 | `SETTLEMENT_GROWTH_SCALE_MODEL.md`, `SIMULATION_SCALE_MODEL.md`, `map_and_settlement_scale_audit.md` | Scale bands and aggregation | **Current direction, Planned** beyond one town. |
 
@@ -347,4 +347,4 @@ Stone, iron and the regional site tags (other than `crossroads`) contribute noth
    - whether timber, fish and game should deplete;
    - whether `food` should split into kinds;
    - how the planned household property (unmerged branch) changes "surplus goes to the commons".
-7. **Stale docs:** `GAME_VISION.md` and `FIRST_STAGE_LOOP.md` haven't been reconciled with family-led play; `RESOURCE_HOUSEHOLD_LABOR_TRADE_MODEL.md` and the May goods docs are out of date.
+7. **Stale docs:** `GAME_VISION.md` and `FIRST_STAGE_LOOP.md` haven't been reconciled with family-led play; `archive/RESOURCE_HOUSEHOLD_LABOR_TRADE_MODEL.md` and the May goods docs are out of date.
