@@ -33,6 +33,7 @@ func run_all() -> void:
 	test_warning_food_ahead()
 	test_kept_woods_are_binding()
 	test_focused_appeal()
+	test_food_warning_provisional_at_founding()
 	if failure_count > 0:
 		push_error("Autonomous occupations validation failed: " + str(failure_count) + " failure(s)")
 		quit(1)
@@ -481,6 +482,21 @@ func test_warning_food_ahead() -> void:
 	if tool_card.is_empty():
 		tool_card = card_titled(tools, "Tools are low")
 	_check(not tool_card.is_empty() and str(tool_card["lines"]).contains("No one makes tools") and not (tool_card["buttons"] as Array).any(func(b: Dictionary) -> bool: return b["action"]["action"] == "set_priority"), "the tools warning says who makes tools, without a priority button: %s" % str(tool_card.get("lines", [])))
+
+# 18b. At founding, before any food work runs, the food warning says its forecast is provisional,
+# without hiding a danger it sees; once a family works a field it is the forecast from real work.
+func test_food_warning_provisional_at_founding() -> void:
+	var city: City = town()
+	city.resources["food"] = 400
+	var card: Dictionary = card_titled(city, "Food supply not yet established")
+	_check(not card.is_empty() and str(card["lines"]).contains("provisional") and str(card["lines"]).contains("No family has taken up food work"), "at founding the forecast is provisional, and says no one has taken up food work: %s" % str(card.get("lines", [])))
+	_check(not card.is_empty() and card["tone"] == "alert", "with no food work planned, it is an alert")
+	_check(card_titled(city, "Food will run short").is_empty(), "and it is not yet called an established shortage")
+	give(city, city.households[0], "farm", Vector2i(14, 4))
+	_check(card_titled(city, "Food supply not yet established").is_empty(), "once a family works a field, the forecast is no longer provisional")
+	var settled: City = hungry_town(400)
+	settled.resources["food_shortage"] = false
+	_check(not card_titled(settled, "Food will run short").is_empty(), "a town whose families all settled into other work has an established shortage")
 
 # 19. Woods the player keeps are never felled; woodcutters fell elsewhere and bring in less for the
 # walk; the player's later designation replaces the earlier; woods marked for clearing are cleared

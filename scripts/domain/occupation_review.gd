@@ -227,7 +227,7 @@ static func weigh(city: City, household: Household, holding: Building) -> Dictio
 	var best_activity: String = ""
 	var best_score: float = -INF
 	for occupation: String in FamilyInitiative.get_occupations(city):
-		if occupation == current:
+		if occupation == current or FamilyInitiative.is_vetoed(city, household, occupation):
 			continue
 		var desire: Dictionary = FamilyInitiative.get_work_desire(city, household, occupation)
 		if not bool(desire["available"]):

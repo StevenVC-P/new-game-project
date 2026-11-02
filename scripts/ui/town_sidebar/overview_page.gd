@@ -368,7 +368,9 @@ const TILL_BUTTON: Dictionary = {"text": "Till land into farmland (F)", "action"
 
 # The town's food as its families judge it (FamilyInitiative: store, larders, and what the work
 # families actually do will bring in over the coming months, seasons included): a warning while
-# there is still time to act, with its causes. Reading it changes nothing.
+# there is still time to act, with its causes. Reading it changes nothing. While families are still
+# setting up their first work and no food work runs yet, the forecast is provisional and says so
+# (owner, 2026-11-01), but a danger it already sees is still shown.
 static func get_food_outlook_card(city: City) -> Dictionary:
 	var coverage: float = FamilyInitiative.get_food_coverage(city)
 	var ratio: float = FamilyInitiative.get_food_ratio(city)
@@ -383,7 +385,24 @@ static func get_food_outlook_card(city: City) -> Dictionary:
 	var title: String = ""
 	var priority: int = 0
 	var tone: String = SP.TONE_CAUTION
-	if coverage < 1.0:
+	if is_food_unproven(city):
+		var setting_up: int = 0
+		for project: ConstructionProject in city.construction.projects:
+			if project.claimant_household_id >= 0 and FamilyInitiative.get_activity(project.building_type) == TownInfluence.ACTIVITY_FOOD:
+				setting_up += 1
+		var stored: int = int(floor(held / maxf(0.1, eats)))
+		title = "Food supply not yet established"
+		lines.append("Families are still setting up their work, and no food work has brought anything in yet: this forecast is provisional.")
+		if setting_up > 0:
+			lines.append("%d famil%s setting up food work; until it runs, the town lives on its stores, about %d days." % [setting_up, "y is" if setting_up == 1 else "ies are", stored])
+		else:
+			lines.append("No family has taken up food work yet; the town lives on its stores, about %d days." % stored)
+		if coverage < 1.0:
+			var days: int = int(floor(held / maxf(0.1, eats - coming)))
+			lines.append("Counting the food work being set up, at the pace its families can manage, food runs out in about %d days, %s." % [days, "before the next harvest" if city.get_season_index() < 2 else "before the winter is out"])
+		priority = 78 if stored < 30 or setting_up == 0 else 70
+		tone = SP.TONE_ALERT if stored < 30 or setting_up == 0 else SP.TONE_CAUTION
+	elif coverage < 1.0:
 		var days: int = int(floor(held / maxf(0.1, eats - coming)))
 		title = "Food will run short"
 		lines.append("At this rate the town's food runs out in about %d days, %s." % [days, "before the next harvest" if city.get_season_index() < 2 else "before the winter is out"])
@@ -397,6 +416,17 @@ static func get_food_outlook_card(city: City) -> Dictionary:
 	lines.append_array(get_food_causes(city))
 	var buttons: Array = get_food_responses(city, lines)
 	return make_card(priority, tone, title, lines, buttons)
+
+# Food production is unproven while no food workplace is yet worked and most families are still
+# setting up their first work (the founding): the forecast then rests on plans, not on anything
+# brought in. Once most families have settled, a town without food work has a real shortage.
+static func is_food_unproven(city: City) -> bool:
+	for building: Building in city.buildings:
+		if building.assigned_household_id >= 0 and FamilyInitiative.get_activity(building.type) == TownInfluence.ACTIVITY_FOOD:
+			return false
+	var working: Array = city.households.filter(func(h: Household) -> bool: return h.labor_capacity > 0)
+	var settling: int = working.filter(func(h: Household) -> bool: return FamilyInitiative.get_holding(city, h) == null).size()
+	return settling * 2 > working.size()
 
 # Why the town's food falls short, from what the town holds: its work's share of what it eats, the
 # season ahead, fields standing empty or worked by hand for want of tools, families going hungry.

@@ -18,7 +18,11 @@ extends SceneTree
 #   first), as the cards suggested before, and commissions the workplace the card offered;
 # - inappropriate: puts productive investment first from founding and keeps it;
 # - overprotect: keeps every wood within reach of the town from its founding;
-# - (earlier rounds) informed_priority, informed_commission, late.
+# - (earlier rounds) informed_priority, informed_commission, late;
+# - informed_appeal_once: the appeals only, each good asked for once in the town's life (owner,
+#   2026-11-01: the benefit of one appeal apart from repeated ones);
+# - keep_hunting: only keeps the woods round lodges whose land is failing, when the card shows;
+#   keep_lodges: keeps the woods round every hunting workplace as soon as a family works it.
 #
 # Records when each warning first showed (could the player see it in time?), what the player did
 # and when, and what families decided (takeups, reviews, changes, decisions the priority tipped).
@@ -26,6 +30,10 @@ extends SceneTree
 # Options: --years=N (6), --sites=N (12), --from=K, --mode=all|shortage_survival|existing (the rules),
 # --seed=N (only that town) with --trace (its timeline: warnings, the player's acts, every family's
 # choice and review of its work with reasons, and the town each month; filter for [TRACE]).
+# Diagnostics (Priority 5): --leave-out=hunter,herder with --leave-out-until=DAY (trades families may
+# not choose, until a day); --veto=HOUSEHOLD:OCCUPATION:UNTIL[;...] (one family may not choose one
+# trade until a day: what that one decision did). With --trace, each first choice of work is printed
+# ranked, with its reasons and the town's food as the family saw it.
 
 const TownBuildingCheck = preload("res://tests/sim/town_building_check.gd")
 const StandInPlayerScript = preload("res://tests/sim/stand_in_player.gd")
@@ -39,7 +47,7 @@ const MODES: Dictionary = {
 }
 const DIFFICULT_POOL_REGIONS: int = 30
 const DIFFICULT_CACHE: String = "user://wisdom_difficult_seeds.txt"
-const CARDS: Array[String] = ["Food will run short", "The town grows less food than it eats", "Food stores are falling", "Food has run out", "Tools are low", "Tools are running out", "Workplaces are wearing down", "thinking of leaving", "Families find no land for their work", "Hunting grounds are being felled"]
+const CARDS: Array[String] = ["Food supply not yet established", "Food will run short", "The town grows less food than it eats", "Food stores are falling", "Food has run out", "Tools are low", "Tools are running out", "Workplaces are wearing down", "thinking of leaving", "Families find no land for their work", "Hunting grounds are being felled"]
 const NO_LAND: String = "Families find no land for their work"
 const FELLED: String = "Hunting grounds are being felled"
 # A block of land marked to till, tiles per side, and how often the player marks again.
@@ -56,6 +64,9 @@ const MARK_GAP_DAYS: int = 60
 var mode: String = "all"
 var only_seed: int = -1
 var trace: bool = false
+var left_out: Array[String] = []
+var left_out_until: int = 1 << 30
+var vetoes: Array = []
 
 func _init() -> void:
 	call_deferred("run")
@@ -83,6 +94,14 @@ func run() -> void:
 			only_seed = int(argument.trim_prefix("--seed="))
 		elif argument == "--trace":
 			trace = true
+		elif argument.begins_with("--leave-out="):
+			left_out.assign(argument.trim_prefix("--leave-out=").split(","))
+		elif argument.begins_with("--leave-out-until="):
+			left_out_until = int(argument.trim_prefix("--leave-out-until="))
+		elif argument.begins_with("--veto="):
+			for veto: String in argument.trim_prefix("--veto=").split(";"):
+				var parts: PackedStringArray = veto.split(":")
+				vetoes.append({"household": int(parts[0]), "occupation": parts[1], "until": int(parts[2])})
 	var ordinary: Array = TownBuildingCheck.collect_sites().slice(0, site_count)
 	for condition: String in conditions:
 		var sites: Array = (get_difficult_sites() if condition == "difficult" else ordinary).slice(first, site_count) if only_seed < 0 else (get_difficult_sites() if condition == "difficult" else TownBuildingCheck.collect_sites())
@@ -101,6 +120,13 @@ func play(site: Dictionary, policy: String, stress: bool, years: int) -> Diction
 	Layouts.set_aside(city, "starting")
 	for meta: String in MODES[mode]:
 		city.set_meta(meta, true)
+	if not left_out.is_empty():
+		city.set_meta("occupations_left_out", left_out)
+		city.set_meta("occupations_left_out_until", left_out_until)
+	if not vetoes.is_empty():
+		city.set_meta("occupation_vetoes", vetoes)
+	if trace:
+		city.set_meta("trace_choices", [])
 	var scenario: Dictionary = BASE.duplicate(true)
 	scenario["hard_winter"] = stress
 	var state: Dictionary = {"first_card": {}, "actions": [], "calm_since": 0, "last_commission": -COMMISSION_GAP_DAYS, "food_short_days": 0, "tools_out_days": 0, "first_departure": -1, "takeups": {}}
@@ -129,8 +155,12 @@ func play(site: Dictionary, policy: String, stress: bool, years: int) -> Diction
 					print("[TRACE] day %d | WARNING SHOWN: %s" % [day, name])
 		if policy in ["late", "informed_priority", "informed_commission", "priority_switcher"]:
 			respond(town, state, day, titles, policy == "late", policy != "informed_commission", policy != "informed_priority")
-		if policy in ["informed", "informed_appeal", "informed_land"]:
-			answer_with_cards(town, state, day, titles, policy != "informed_land", policy != "informed_appeal")
+		if policy in ["informed", "informed_appeal", "informed_land", "informed_appeal_once"]:
+			answer_with_cards(town, state, day, titles, policy != "informed_land", policy != "informed_appeal" and policy != "informed_appeal_once", policy == "informed_appeal_once")
+		if policy == "keep_hunting" and titles.has(FELLED):
+			keep_hunting_grounds(town, state, day)
+		if policy == "keep_lodges":
+			keep_lodge_woods(town, state, day)
 		if policy == "overprotect" and day == 7:
 			keep_all_woods(town, state, day)
 	var result: Dictionary = StandInPlayerScript.new().play(city, scenario, years * Calendar.DAYS_PER_YEAR)
@@ -160,12 +190,15 @@ func respond(city: City, state: Dictionary, day: int, titles: Array[String], lat
 		act(city, state, day, "no priority", func() -> void: city.influence.set_priority(CommunityPriority.NONE))
 
 # What the cards offer first: a focused appeal for what is short, land to till, woods to keep.
-func answer_with_cards(city: City, state: Dictionary, day: int, titles: Array[String], appeals: bool, land: bool) -> void:
-	var food_short: bool = titles.has("Food will run short") or titles.has("The town grows less food than it eats") or titles.has("Food has run out")
+func answer_with_cards(city: City, state: Dictionary, day: int, titles: Array[String], appeals: bool, land: bool, once: bool = false) -> void:
+	# The founding card ("not yet established") is answered as before it had its own title, so this
+	# round's players stay comparable with round 3's.
+	var food_short: bool = titles.has("Food supply not yet established") or titles.has("Food will run short") or titles.has("The town grows less food than it eats") or titles.has("Food has run out")
 	var tools_short: bool = (titles.has("Tools are low") or titles.has("Tools are running out")) and FamilyInitiative.count_producers(city, TownInfluence.ACTIVITY_TOOLS) == 0
-	if appeals and food_short and not FocusedAppeal.is_active(city, TownInfluence.ACTIVITY_FOOD):
+	var asked: Array = (state["actions"] as Array).map(func(a: Dictionary) -> String: return str(a["action"]))
+	if appeals and food_short and not FocusedAppeal.is_active(city, TownInfluence.ACTIVITY_FOOD) and not (once and asked.has("appeal food")):
 		act(city, state, day, "appeal food", func() -> void: FocusedAppeal.make(city, TownInfluence.ACTIVITY_FOOD))
-	if appeals and tools_short and not FocusedAppeal.is_active(city, TownInfluence.ACTIVITY_TOOLS):
+	if appeals and tools_short and not FocusedAppeal.is_active(city, TownInfluence.ACTIVITY_TOOLS) and not (once and asked.has("appeal tools")):
 		act(city, state, day, "appeal tools", func() -> void: FocusedAppeal.make(city, TownInfluence.ACTIVITY_TOOLS))
 	if land:
 		if titles.has(NO_LAND) or food_short:
@@ -180,6 +213,19 @@ func keep_hunting_grounds(city: City, state: Dictionary, day: int) -> void:
 		if TownLand.get_reach_kind(building.type) != "woods" or building.assigned_household_id < 0 or building.peak_land_yield < SidebarOverviewPage.FAILING_MIN_PEAK:
 			continue
 		if city.land.get_reach_factor(building) > building.peak_land_yield * SidebarOverviewPage.FAILING_SHARE:
+			continue
+		var reach: Vector2i = Vector2i(EconomyBalance.HUNTER_REACH, EconomyBalance.HUNTER_REACH)
+		var from: Vector2i = building.tile - reach
+		var to: Vector2i = building.tile + building.size - Vector2i.ONE + reach
+		if city.woodland.get_wooded_in_block(from, to).all(func(tile: Vector2i) -> bool: return city.woodland.is_protected(tile)):
+			continue
+		act(city, state, day, "keep woods %s" % str(building.tile), func() -> void: city.woodland.protect_block(from, to))
+
+# Keeping early: the woods within reach of every hunting workplace a family works, from the week it
+# works it, before any felling shows.
+func keep_lodge_woods(city: City, state: Dictionary, day: int) -> void:
+	for building: Building in city.buildings:
+		if TownLand.get_reach_kind(building.type) != "woods" or building.assigned_household_id < 0:
 			continue
 		var reach: Vector2i = Vector2i(EconomyBalance.HUNTER_REACH, EconomyBalance.HUNTER_REACH)
 		var from: Vector2i = building.tile - reach
@@ -288,6 +334,13 @@ func act(_city: City, state: Dictionary, day: int, what: String, do: Callable) -
 # One town's day for the trace: families' new choices of work and reviews with their reasons, and
 # the town each month.
 func trace_day(city: City, day: int, state: Dictionary) -> void:
+	var choices: Array = city.get_meta("trace_choices", [])
+	for entry: Dictionary in choices:
+		var ranked: Array[String] = []
+		for option: Dictionary in entry["ranked"]:
+			ranked.append("%s %.2f [%s | against: %s]" % [option["occupation"], float(option["score"]), "; ".join(option["for"]), "; ".join(option["against"])])
+		print("[TRACE] day %d | CHOICE family %d: hardship %.2f, food coverage %.2f, grows %.2f of what it eats | %s" % [int(entry["day"]), int(entry["household"]), float(entry["hardship"]), float(entry["coverage"]), float(entry["ratio"]), " >> ".join(ranked)])
+	choices.clear()
 	var seen: Dictionary = state.get("notes", {})
 	for household: Household in city.households:
 		var note: String = household.initiative_note

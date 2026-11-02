@@ -122,6 +122,8 @@ static func take_up_work(city: City, household: Household) -> ConstructionProjec
 			short.append(activity)
 	var choices: Array[Dictionary] = []
 	for occupation: String in get_occupations(city):
+		if is_vetoed(city, household, occupation):
+			continue
 		var desire: Dictionary = get_work_desire(city, household, occupation)
 		if not bool(desire["available"]):
 			continue
@@ -129,6 +131,8 @@ static func take_up_work(city: City, household: Household) -> ConstructionProjec
 		desire["score"] = float(desire["score"]) + get_noise(city, household, get_choice_key(occupation))
 		choices.append(desire)
 	choices.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["score"]) > float(b["score"]))
+	if city.has_meta("trace_choices"):
+		record_choices(city, household, choices)
 	if city.social.enabled and not choices.is_empty() and contest_for_land(city, household, choices):
 		return null
 	# Every workplace starts as hand work; improving it is a decision of its own, later.
@@ -869,12 +873,31 @@ static func get_occupations(city: City) -> Array[String]:
 		for activity: String in ACTIVITIES:
 			occupations.append(PROPER_WORK[activity])
 		return occupations
-	# Comparison only: trades left out, to tell their effects apart (meta "occupations_left_out").
+	# Comparison only: trades left out, to tell their effects apart (meta "occupations_left_out"),
+	# for the whole game or until a day (meta "occupations_left_out_until").
 	var left_out: Array = city.get_meta("occupations_left_out", [])
+	if city.construction.day >= int(city.get_meta("occupations_left_out_until", 1 << 30)):
+		left_out = []
 	for proper: String in BuildingTiers.TIER0_TO_TIER1.values():
 		if EconomyBalance.PRODUCTION.has(proper) and not left_out.has(proper):
 			occupations.append(proper)
 	return occupations
+
+# Comparison only (meta "occupation_vetoes": [{"household", "occupation", "until"}]): one family
+# may not choose one trade until a day, to tell what that one decision did to its town.
+static func is_vetoed(city: City, household: Household, occupation: String) -> bool:
+	for veto: Dictionary in city.get_meta("occupation_vetoes", []):
+		if int(veto["household"]) == household.id and str(veto["occupation"]) == occupation and city.construction.day < int(veto["until"]):
+			return true
+	return false
+
+# Comparison only (meta "trace_choices", an Array): a family's first choice of work, its options
+# ranked with their scores and strongest reasons, and the town's hardship as it saw it.
+static func record_choices(city: City, household: Household, choices: Array[Dictionary]) -> void:
+	var ranked: Array = []
+	for choice: Dictionary in choices.slice(0, 4):
+		ranked.append({"occupation": choice["occupation"], "score": snappedf(float(choice["score"]), 0.01), "for": get_reasons(choice["terms"], true, 4), "against": get_reasons(choice["terms"], false, 2)})
+	(city.get_meta("trace_choices") as Array).append({"day": city.construction.day, "household": household.id, "hardship": snappedf(float(get_hardship(city, household)["level"]), 0.01), "coverage": snappedf(get_food_coverage(city), 0.01), "ratio": snappedf(get_food_ratio(city), 0.01), "ranked": ranked})
 
 # What a decision about a trade is called in its unknown (get_noise).
 static func get_choice_key(occupation: String) -> String:
