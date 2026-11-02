@@ -6,9 +6,16 @@ Snapshot for whoever picks the project up next. Update it when a milestone close
 
 ## Current Objective
 
-**Waiting for owner review: `feature/autonomous-occupations`** (from `develop`, not merged). Docs:
-- `docs/AUTONOMOUS_OCCUPATIONS.md` (third round at the top: the corrections, the five-way comparison, decisions before merging);
-- `docs/PLAYER_AGENCY_AUDIT.md` (findings and five proposed controls, none built).
+**Waiting for owner review: `feature/autonomous-occupations`** (from `develop`, not merged). Fourth round, priorities 1–4 done; stopped before priority 5 (the new trades reevaluated) on the owner's instruction. Docs:
+- `docs/AUTONOMOUS_OCCUPATIONS.md` (fourth round, phases 1–2 at the top: hunger counted once, warnings, kept woods, focused appeals, decisions for the owner);
+- `docs/PLAYER_AGENCY_AUDIT.md` (round 3: an informed player now helps on average, by about +4 to +18 people, mostly through focused appeals; keeping every wood and investing from founding are the harmful misuses).
+
+**Owner decisions open from phase 2:**
+- the "Food will run short" card shows on every founding day;
+- repeated food appeals come close to a standing ask;
+- the value of keeping woods round hunting lodges is not yet measured.
+
+**Latest validation worktree:** `ngg-occ-runs10` (commit 2244655).
 
 What it adds:
 - **The new trades:** fishing, hunting and herding (hand work first) as families' own choice.

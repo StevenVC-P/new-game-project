@@ -1,5 +1,72 @@
 # Player Agency Audit
 
+## Round 3 (2026-11-01): early food warning, cards without priorities, focused appeals, kept woods
+
+The players (`tests/sim/intervention_check.gd`) act only on cards they can see:
+- **informed:** answers food cards with a food appeal and land to till near the families; tools short with no maker, with a toolmaking appeal; families finding no land, with land to till; hunting grounds felled, by keeping the woods round those lodges. No priorities, no commissions;
+- **appeals only** and **land only:** the informed player's two halves;
+- **priority switcher:** answers each warning with a whole-town priority and commissions the offered workplace, as the cards suggested before;
+- **investment from founding;**
+- **overprotect:** keeps every wood within reach of the town from its first week.
+
+**People at year 6, recommended rules** (narrow recognition + survival awareness). Towns more than 5 people worse/better than no player:
+
+| | None | Informed | Appeals only | Land only | Priority switcher | Investment from founding | Overprotect |
+|---|---|---|---|---|---|---|---|
+| ordinary | 60.0 | **68.2** (1/3) | 68.0 (1/2) | 59.2 (1/1) | 64.8 (3/3) | 46.2 (6/2) | 40.3 (6/2) |
+| stressed | 59.8 | **63.8** (2/3) | 63.2 (2/2) | 59.6 (1/1) | 60.0 (3/4) | 37.5 (6/0) | 41.4 (6/2) |
+| difficult | 60.2 | 64.2 (1/3) | **64.5** (0/2) | 61.3 (0/2) | 48.2 (4/1) | 53.4 (3/1) | 38.9 (7/0) |
+
+**People at year 6, all rules (the new trades):**
+
+| | None | Informed | Appeals only | Land only | Priority switcher | Investment from founding | Overprotect |
+|---|---|---|---|---|---|---|---|
+| ordinary | 49.3 | 56.7 (2/2) | 56.7 (2/2) | 47.0 (3/1) | **68.4** (2/5) | 51.7 (4/5) | 35.2 (5/1) |
+| stressed | 45.6 | **52.2** (2/3) | 51.1 (3/2) | 47.7 (3/1) | 50.4 (3/4) | 36.2 (9/2) | 41.7 (8/3) |
+| difficult | 39.6 | **58.0** (3/6) | 49.1 (3/5) | 40.9 (1/3) | 45.2 (2/4) | 24.8 (5/1) | 30.2 (4/2) |
+
+**What the informed player did, per town over six years:**
+- **food appeals:** 6–9 (recommended), 11–14 (all);
+- **tool appeals:** under 1, except 2 in ordinary towns under all;
+- **appeals answered:** 2.3–4.5;
+- **decisions tipped:** 0.8–3.2;
+- **land marked to till:** 5–12 times;
+- **woods kept round lodges:** about 0.5 times per town (all rules only).
+
+**Food-short days:** 107 / 127 / 92 → 86 / 115 / 81 under the recommended rules, and 192 / 232 / 172 → 117 / 152 / 103 under all.
+
+### Do the new information and controls improve the player's response?
+
+**Yes, on average, for the first time in these audits.**
+- **How much:** the informed player gains 8.2 / 4.0 / 4.0 people under the recommended rules and 7.4 / 6.6 / 18.4 under all. Towns helped outnumber towns harmed in every condition.
+- **Where it comes from:** the appeals. Appeals alone give nearly all of it, except on difficult sites under all, where informed play beats appeals alone by about 9.
+- **Land tools alone** are about neutral (−2 to +2).
+- **It is not a guarantee.** The informed player is still worse in 1–3 towns per condition, and 1–2 towns per condition still die. A few decisions tipped per town is a modest pull; the families still decide.
+
+### Controls that harm when misused
+
+1. **Keeping every wood (overprotect): −20 / −18 / −21 people** (recommended), and −14 / −4 / −9 (all). The most consistently harmful choice measured: 6–7 towns worse in every recommended condition, fewer finished workplaces (15 → 9), and more days without tools. The designation is binding and its cost is real: woodcutters walk far and bring in little.
+2. **Investment from founding:** unchanged from round 2 (−14 / −22 / −7 recommended).
+3. **The priority switcher is a gamble, not a fix.**
+   - **When it pays:** the best player in one condition (all, ordinary: +19).
+   - **When it costs:** −12 on difficult sites under the recommended rules, and the most towns harmed after the two misuses.
+   - **What this means:** taking it off the cards was the right call; it stays available on the Planning page for players who want it.
+
+### Is the information timely?
+
+- **Food:**
+  - **the founding famine:** "Food will run short" now shows from the founding day, before stores fall, in every town, so the founding famine is visible from the start. But because it shows everywhere at founding, it does not single out the towns in danger (see `docs/AUTONOMOUS_OCCUPATIONS.md`, phase 2, "For the owner");
+  - **a structural deficit:** "The town grows less food than it eats" shows a median of 129–248 days in.
+- **Tools, land, hunting grounds:** as in round 2.
+
+### Remaining gaps
+
+- **The founding-day food warning** (owner decision).
+- **Repeated food appeals** nearly amount to a standing ask (owner decision).
+- **Kept woods' targeted value:** too few hunting-ground cases to measure.
+- **No fast food lever for the founding famine:** still none beyond an appeal.
+- **Priority 5** (the new trades reevaluated) is next, on the owner's word.
+
 ## Round 2 (2026-11-01): after hunger is counted once, and with the new warnings
 
 Same towns, seeds and kinds of player as round 1 (below), with two changes:

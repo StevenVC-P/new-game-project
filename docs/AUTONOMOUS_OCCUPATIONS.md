@@ -6,6 +6,7 @@ Code:
 - `scripts/domain/building_tiers.gd`: the three new hand-work stages.
 - `scripts/domain/family_initiative.gd`: occupations, land in reach, shortages, hardship.
 - `scripts/domain/occupation_review.gd`: early reviews for a shortage or a family's own hunger.
+- `scripts/domain/focused_appeal.gd`: focused appeals; `scripts/domain/town_woodland.gd`: kept woods.
 - `scripts/domain/economy_balance.gd`: build cost and work for the new stages only.
 
 Tests:
@@ -14,6 +15,50 @@ Tests:
 - `tests/town_sidebar_validation.gd`: now deterministic, interface only.
 
 Comparison: `tests/sim/occupation_check.gd`. Owner's town: `tests/sim/autosave_replay.gd`. Commands in `docs/TESTING.md`.
+
+## Fourth Round, Phase 2 (2026-11-01): Early Food Warning, Cards, Kept Woods, Focused Appeals
+
+The owner's brief "Finish player warnings, then proceed to priority 4". It stops for review before priority 5 (the new trades reevaluated). Agency results: `docs/PLAYER_AGENCY_AUDIT.md`, "Round 3".
+
+### Warnings
+
+- **"Food will run short" / "The town grows less food than it eats"** (`SidebarOverviewPage.get_food_outlook_card`). Built on the outlook families use (`FamilyInitiative.get_food_coverage`, `get_food_ratio`): food in store and larders plus what the work actually done will bring in over 120 days, seasons included. It gives the days left, the causes (food work's share of what is eaten, winter coming, fields empty or worked by hand, hungry families) and the responses. Reading it changes nothing: an appeal's likely answers are computed by setting the appeal and taking it back.
+  - **Finding: it shows on the founding day in every town.** No family is working yet, so nothing is coming in. The forecast is right in most towns: food ran out in 9–10 of 12, around days 42–52. But it cannot tell a town in danger from a safe one at founding. The "lead time" reported earlier (35–112 days) was measured from this founding-day card. An owner decision (below).
+- **The cards no longer suggest a whole-town priority.** Food: ask families to grow food (a focused appeal, with who would likely answer and why), till land, plan a farm (its cost stated), and the priority's risk to other work as text, with no button. Tools: use this season, the makers, an appeal for toolmaking, a tool mender as an option with its cost, and the investment priority's risk as text.
+
+### Tests no longer share a save folder
+
+`save_game_validation` and `community_play_validation` each write to a folder named for their process, with fixed founding seeds, and remove it afterwards. They now run in parallel from several worktrees. Gameplay stays in `founded_town_regression`.
+
+### Kept woods (binding)
+
+- **What it does.** Tool "Keep woods" (key V, Planning). No woodcutter fells a kept tree, marked or not (`TownWoodland.is_fellable`). Marking a kept block for clearing takes the protection off, and keeping a block takes off its clearing marks. The player's word is final; families do not weigh it.
+- **What it costs.** Woodcutters walk to the nearest trees they may fell and bring in less the farther those trees are (`TownWoodland.get_felling_factor`, through `TownLand.get_output_factor`). Kept woods also still spread onto open land.
+
+### Focused appeals (`FocusedAppeal`)
+
+- **What it asks.** The gathering asks the community for one good: someone to take up toolmaking, families to grow food, someone to cut wood. The ask lasts up to 90 days, or until a family takes up the work.
+- **How families weigh it.** It weighs 2.0 × the family's receptiveness, in its first choice of work and in a review it already has its own reason for. It starts no review and forces no one.
+- **What it leaves alone.** The Community Priority, the stores rule and the wisdoms are unchanged.
+- **What the card shows before asking.** Which families would likely, might, or are not looking again yet, and their reasons.
+- **Counted for balance:** appeals made, answered, and decisions tipped (won only because of the appeal).
+
+### The owner's town (day-82 autosave, priority cleared)
+
+**With an appeal for toolmaking**, family 0 leaves its farm for a tool mender on day 112. The margin was 3.27; it is 1.27 without the appeal, under the 2.0 needed. The appeal is as decisive as the Investment priority was, but it pulls on tools only.
+
+### Validation (six years, 12 towns per condition)
+
+Seven kinds of player, under both rule sets: none; informed; appeals only; land only; priority switcher; investment from founding; keeping every wood from founding. Results and judgement: `docs/PLAYER_AGENCY_AUDIT.md`, "Round 3". All 44 tests pass.
+
+### For the owner (phase 2)
+
+1. **The founding-day food warning.** Choose one:
+   - keep it (the founding famine is real and nearly universal);
+   - show it only once families have chosen their first work, so it reflects their choices;
+   - word the founding case differently.
+2. **Repeated appeals.** An informed player asked for food 6–17 times in six years: each time an appeal ended, the card was still there. Each appeal stays temporary, but repeated ones come close to a standing food ask. A pause between appeals for the same good is possible; nothing like it was built.
+3. **Kept woods' targeted value is unmeasured.** Hunting-ground cards came rarely (in 3–4 towns, late). Only the harm of keeping too much is clear.
 
 ## Fourth Round, Phase 1 (2026-11-01): Hunger Counted Once; Warnings; Player Agency
 
