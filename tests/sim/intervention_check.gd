@@ -38,6 +38,10 @@ extends SceneTree
 # not choose, until a day); --veto=HOUSEHOLD:OCCUPATION:UNTIL[;...] (one family may not choose one
 # trade until a day: what that one decision did); --meta=a,b (comparison metas). With --trace, each first choice of work is printed
 # ranked, with its reasons and the town's food as the family saw it.
+# The tool trap (Phase 5 diagnostic): --trace-tools (with --seed=N) prints, every 30 days, the tool and
+# wood stores against what the queue has claimed and the protected reserve keeps back, the proper
+# workplaces' upkeep (paid from the store, mended by their families, or missed), toolmaking and its
+# output, and, whenever it changes, each family's word on improving its work (filter for [TOOLS]).
 # Founding provisions (Phase 7 diagnostic, owner 2026-11-02; comparison only): --provisions=food:380,tools:6
 # sets what the expedition arrives with (default 300 food, 45 wood, 14 tools; worth 507.5 in grain
 # at EconomyBalance.VALUE_IN_GRAIN, by which equal-value cargoes are compared).
@@ -71,6 +75,7 @@ const MARK_GAP_DAYS: int = 60
 var mode: String = "all"
 var only_seed: int = -1
 var trace: bool = false
+var trace_tools: bool = false
 var left_out: Array[String] = []
 var left_out_until: int = 1 << 30
 var vetoes: Array = []
@@ -103,6 +108,8 @@ func run() -> void:
 			only_seed = int(argument.trim_prefix("--seed="))
 		elif argument == "--trace":
 			trace = true
+		elif argument == "--trace-tools":
+			trace_tools = true
 		elif argument.begins_with("--leave-out="):
 			left_out.assign(argument.trim_prefix("--leave-out=").split(","))
 		elif argument.begins_with("--leave-out-until="):
@@ -167,6 +174,8 @@ func play(site: Dictionary, policy: String, stress: bool, years: int) -> Diction
 				state["takeups"][building.type] = day
 		if trace:
 			trace_day(town, day, state)
+		if trace_tools:
+			trace_tool_day(town, day, state)
 		if day % 7 != 0:
 			return
 		var titles: Array[String] = []
@@ -454,6 +463,62 @@ func trace_day(city: City, day: int, state: Dictionary) -> void:
 				var key: String = building.type + ("" if building.assigned_household_id >= 0 else "(empty)")
 				work[key] = int(work.get(key, 0)) + 1
 		print("[TRACE] day %d | TOWN food %d (%.0f days, grows %.2f of what it eats, outlook shortfall %.2f) | tools %d (shortage %.2f) | families %d, people %d | priority '%s' | work %s" % [day, int(city.resources["food"]), FamilyInitiative.get_food_days(city), FamilyInitiative.get_food_ratio(city), FamilyInitiative.get_food_outlook(city), int(city.resources["tools"]), FamilyInitiative.get_shortage(city, TownInfluence.ACTIVITY_TOOLS), city.households.size(), city.get_total_population(), city.influence.priority, str(work)])
+
+# One town's tools, day by day, summed and printed every 30 days (--trace-tools).
+func trace_tool_day(city: City, day: int, state: Dictionary) -> void:
+	var t: Dictionary = state.get("tools_trace", {"paid": 0, "mended": 0, "missed": 0, "levels": {}, "notes": {}, "mended_total": 0, "made": 0.0})
+	state["tools_trace"] = t
+	var levels: Dictionary = t["levels"]
+	var mended_now: int = city.influence.mended_upkeep
+	var mended_today: int = mended_now - int(t["mended_total"])
+	t["mended_total"] = mended_now
+	# An upkeep fell due where a workplace's timer started again: met if its level did not fall.
+	var paid_today: int = 0
+	for building: Building in city.buildings:
+		if not building.needs_maintenance():
+			continue
+		var before: Array = levels.get(building.id, [building.maintenance_timer, building.maintenance_level])
+		if building.maintenance_timer < int(before[0]):
+			if building.maintenance_level >= int(before[1]):
+				paid_today += 1
+			else:
+				t["missed"] = int(t["missed"]) + 1
+		levels[building.id] = [building.maintenance_timer, building.maintenance_level]
+	t["mended"] = int(t["mended"]) + mended_today
+	t["paid"] = int(t["paid"]) + maxi(0, paid_today - mended_today)
+	for building: Building in city.buildings:
+		if building.can_produce() and FamilyInitiative.get_activity(building.type) == TownInfluence.ACTIVITY_TOOLS:
+			var family: Household = city.get_household_by_id(building.assigned_household_id)
+			var pace: float = city.get_family_labor_factor(family) * HouseholdEconomy.get_output_factor(city, family, building.type) * city.get_work_time_factor(building) * (EconomyBalance.TIER0_OUTPUT_FRACTION if building.is_working_by_hand() else 1.0)
+			t["made"] = float(t["made"]) + city.get_base_building_output_amount(building.type) * pace
+	var notes: Dictionary = t["notes"]
+	for household: Household in city.households:
+		var note: String = household.initiative_note
+		if (note.begins_with("Wants to improve") or note.begins_with("Keeps to hand work") or note.begins_with("Improving")) and notes.get(household.id, "") != note:
+			print("[TOOLS] day %d | family %d (%s) %s" % [day, household.id, "/".join(CultureEffects.get_callings(household.values)), note.substr(0, 240)])
+		notes[household.id] = note
+	if day % 30 != 0:
+		return
+	var reserve: Dictionary = city.influence.get_protected_reserve()
+	var committed: Dictionary = city.construction.get_committed_materials()
+	var proper: int = 0
+	var by_hand: int = 0
+	var idle: int = 0
+	for building: Building in city.buildings:
+		if building.needs_maintenance():
+			proper += 1
+			by_hand += 1 if building.is_working_by_hand() else 0
+			idle += 1 if building.assigned_household_id >= 0 and not building.can_produce() else 0
+	var makers: Array[String] = []
+	for building: Building in city.buildings:
+		if FamilyInitiative.get_activity(building.type) == TownInfluence.ACTIVITY_TOOLS:
+			makers.append("%s%s%s" % [building.type, "" if building.assigned_household_id >= 0 else "(empty)", "(by hand)" if building.is_working_by_hand() else ""])
+	var hand_work: int = city.buildings.filter(func(b: Building) -> bool: return b.is_tier0() and b.assigned_household_id >= 0 and FamilyInitiative.get_activity(b.type) != "").size()
+	print("[TOOLS] day %d | tools %d, committed %d, reserve %d, free %d | wood %d, committed %d, reserve %d, free %d | proper workplaces %d (by hand %d, idle %d), hand work %d | last 30 days: upkeep paid %d, mended %d, missed %d; toolmaking made about %.1f | makers %s | food %d, families %d, people %d" % [day, int(city.resources["tools"]), int(committed.get("tools", 0)), int(reserve["tools"]), int(city.resources["tools"]) - int(committed.get("tools", 0)) - int(reserve["tools"]), int(city.resources["wood"]), int(committed.get("wood", 0)), int(reserve["wood"]), int(city.resources["wood"]) - int(committed.get("wood", 0)) - int(reserve["wood"]), proper, by_hand, idle, hand_work, int(t["paid"]), int(t["mended"]), int(t["missed"]), float(t["made"]), str(makers), int(city.resources["food"]), city.households.size(), city.get_total_population()])
+	t["paid"] = 0
+	t["mended"] = 0
+	t["missed"] = 0
+	t["made"] = 0.0
 
 func measure(city: City, state: Dictionary, off_the_ground: bool) -> Dictionary:
 	var influence: TownInfluence = city.influence
