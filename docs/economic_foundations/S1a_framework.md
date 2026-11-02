@@ -21,7 +21,23 @@
 
 ## Baseline B0
 
-Run from a fixed worktree at `e5410ba` (`../ngg-ef-runs`): every environment, 12 starts, 6 years, player `none`, ordinary; then the quarry commission (8 starts) and stressed (12 starts). Tables follow when the runs finish.
+Run from a fixed worktree at `e5410ba` (`../ngg-ef-runs`): every environment, 12 starts, 6 years, player `none`, ordinary (full tables: `B0_ordinary_y6.md`). The quarry commission (8 starts) and stressed (12 starts) follow. 60 towns, **no invariant violation**: every good's store matched its flows every day.
+
+| Year 6, ordinary | Housed and fed | People (median, range) | Departed | Food shortage days | Outside-food share | Woods left |
+|---|---|---|---|---|---|---|
+| Fertile valley | 9 / 12 | 51 [0–99] | 3 | 39 | 0.29 | 0.71 |
+| Forested | 8 / 12 | 48 [0–94] | 3 | 89 | 0.25 | 0.96 |
+| Balanced | 10 / 12 | 34 [0–106] | 3 | 44 | 0.29 | 0.56 |
+| Marginal | 7 / 12 | 32 [0–114] | 2 | 223 | 0.33 | 0.36 |
+| Rocky highland | 8 / 12 | 26 [0–72] | 4 | 207 | 0.33 | 0.61 |
+
+**What B0 says about today's game:**
+- **Land already shapes size and hunger:** fertile and forest towns grow to about 50 people; marginal and rocky towns go hungry five times as many days and stay near 30.
+- **Land doesn't shape what villages do.** Every environment holds the same mix of work (farms first, about one woodcutter, one toolmaker, a hunter or fisher where land allows) and only a quarter to a third of families work outside food. The audit's finding (section 7: "no industry is exclusive") is now measured.
+- **Woods are already being felled hard** (marginal towns keep 36% of their woods, rocky 61%) while wood output stays the same: the gap S2 closes.
+- **Every environment has towns that die out** (range down to 0 people) and towns that thrive, before any player acts: founding is still decided by a few first choices (as `HANDOFF.md` notes).
+- **Cost:** a simulated day takes 80–140 ms on average including the stand-in player's searching (the town's own tick wasn't timed separately yet; it is from S2's runs). The worst-day figures above 1 s are the owner's one-hour pause, inside one town each in marginal and balanced.
+- The success measure (test plan 10b) was added after B0 started, so B0's tables show 0 / 0 for it; "housed and fed" above is the stand-in's own end-of-run judgment, equivalent at year 6.
 
 **Process note.** For about half an hour a stray earlier runner and the S1b comparison ran beside the baseline, six Godot processes at the peak against the owner's limit of four. Both were stopped; the batch runner now records its own process id so a stop can't miss it. Batches run at three processes, keeping one for tests.
 

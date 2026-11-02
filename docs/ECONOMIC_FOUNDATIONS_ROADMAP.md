@@ -98,7 +98,7 @@ Status: Planned, Active, Complete, Blocked. Complexity: S (days), M (about a wee
 | Sprint | Epic | Status | Depends on | Acceptance (short) | Validation | Commit | Follow-up |
 |---|---|---|---|---|---|---|---|
 | S0 Roadmap and decisions | — | **Complete** | — | Owner answers D1–D8 | Approved 2026-11-02 | — | — |
-| S1a Test framework and baseline | E1 | **Active** (framework done; B0 running) | S0 | Suite runner, flow counters, invariant checker, founder sets, divergence check; baseline B0 recorded | Test plan §9; identical 6,101-line log against `fcfc0fc`; 47/47 tests; repeats identical | `e5410ba` | — |
+| S1a Test framework and baseline | E1 | **Complete** | S0 | Suite runner, flow counters, invariant checker, founder sets, divergence check; baseline B0 recorded | Test plan §9; identical 6,101-line log against `fcfc0fc`; 47/47 tests; repeats identical; B0 ordinary 60 towns, no violations ([report](economic_foundations/S1a_framework.md)) | `e5410ba` | B0 stressed and quarry runs to add |
 | S1b Stone quarries | E2 | **Active** (built `3ca6e31`; comparison queued) | S1a | Quarry only on stone; output by deposit grade; stone only where the land has it | Divergence check, B0 vs S1b | — | — |
 | S2 Living forests | E3 | **Active** (built `10c8745`; comparison and review queued) | S1 (report) | Woodcutting thins the woods and slows with them; regrowth over years; families weigh woods for woodcutting | Report on forest and sparse sites; hunting coupling | — | — |
 | S3 Winter fuel | E3 | **Active** (built; suite running) | S2 | Households burn firewood in the cold season; shortage has real cost; wood surplus falls | Report; first-winter stress | — | — |

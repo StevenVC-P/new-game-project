@@ -118,6 +118,12 @@ var short_days_this_month: int = 0
 # days this month.
 var cold_today: bool = false
 var cold_days_this_month: int = 0
+# Fatal hardship (HouseholdMortality, sprint S3b): severe months running of hunger and of cold, the
+# family's deaths from them, and the cause of the last.
+var severe_hunger_months: int = 0
+var severe_cold_months: int = 0
+var hardship_deaths: int = 0
+var last_death_cause: String = ""
 var economy_note: String = ""
 var economy_note_day: int = -1
 var larder_note: String = ""

@@ -58,6 +58,20 @@ const ROUGH_SHELTER_FUEL_FACTOR: float = 1.5
 const COLD_SKIP_TICK_INTERVAL: int = 4
 const HARDSHIP_COLD_DAYS: int = 10
 const COLD_HARDSHIP_POINTS: int = 1
+
+# --- Fatal hardship (HouseholdMortality, sprint S3b) ---
+# A month is severe when a family went hungry, or its hearth cold, on HARDSHIP_SEVERE_DAYS or more
+# of its days. After HARDSHIP_SUSTAINED_MONTHS severe months running, each further month risks a
+# death: HARDSHIP_DEATH_CHANCE_PER_MONTH for each month from then, for a family of
+# STARTING_HOUSEHOLD_POPULATION_FOR_RISK (more for a larger one), up to HARDSHIP_DEATH_CHANCE_MAX;
+# cold without a proper home is ROUGH_SHELTER_COLD_RISK as deadly. So a family of four starving
+# two months running risks 6% that month, 12% the next, and so on.
+const HARDSHIP_SEVERE_DAYS: int = 20
+const HARDSHIP_SUSTAINED_MONTHS: int = 2
+const HARDSHIP_DEATH_CHANCE_PER_MONTH: float = 0.06
+const HARDSHIP_DEATH_CHANCE_MAX: float = 0.35
+const STARTING_HOUSEHOLD_POPULATION_FOR_RISK: int = 4
+const ROUGH_SHELTER_COLD_RISK: float = 1.5
 const TOOLMAKER_TOOLS_PER_DAY: float = 1.0
 # Wood the toolmaker consumes for each tool it makes.
 const TOOLMAKER_WOOD_PER_TOOL: int = 2

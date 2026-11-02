@@ -76,6 +76,9 @@ var _flows: Dictionary = {}
 var fuel_carry: float = 0.0
 var fuel_burned: int = 0
 var fuel_short_days: int = 0
+# Deaths from sustained hunger or cold, by cause (HouseholdMortality), and families ended by them.
+var hardship_deaths: Dictionary = {}
+var households_ended_by_hardship: int = 0
 # Value counts of the region newcomers come from; generated on first arrival.
 var regional_value_counts: Dictionary = {}
 # Producing buildings by type, refreshed each tick; read by Communal Labor.
@@ -598,6 +601,18 @@ func complete_old_couple_lifecycle(household: Household, city_index: int = 0):
 		log_household_lifecycle_event(city_index, household.id, "HouseFreed", "house=" + str(house_id))
 	households.erase(household)
 	log_household_lifecycle_event(city_index, household.id, "HouseholdRemoved", "reason=old_couple_lifecycle_complete")
+
+# A family with no one left to keep it (HouseholdMortality) ends as an old couple's does: its work
+# passes to an heir or stands vacant, its house is freed.
+func end_household(household: Household, reason: String, city_index: int = 0):
+	var house_id: int = household.residence_building_id
+	cleanup_removed_household_assignments(household, city_index)
+	if house_id >= 0:
+		log_household_lifecycle_event(city_index, household.id, "HouseFreed", "house=" + str(house_id))
+	households.erase(household)
+	households_ended_by_hardship += 1
+	log_household_lifecycle_event(city_index, household.id, "HouseholdRemoved", "reason=" + reason)
+	update_shelter_counts()
 
 func cleanup_removed_household_assignments(household: Household, city_index: int = 0):
 	for building: Building in buildings:

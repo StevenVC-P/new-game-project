@@ -394,6 +394,10 @@ func measure(city: City, state: Dictionary, off_the_ground: bool) -> Dictionary:
 	# Winter fuel (TownFuel, sprint S3).
 	m["fuel_burned"] = city.fuel_burned
 	m["fuel_short_days"] = city.fuel_short_days
+	# Fatal hardship (HouseholdMortality, sprint S3b).
+	m["deaths_hunger"] = int(city.hardship_deaths.get("hunger", 0))
+	m["deaths_cold"] = int(city.hardship_deaths.get("cold", 0))
+	m["households_ended"] = city.households_ended_by_hardship
 	m["first_year_short_days"] = int(state["first_year_short_days"])
 	m["household_short_days"] = city.influence.household_short_days
 	m["tools_out_days"] = int(state["tools_out_days"])

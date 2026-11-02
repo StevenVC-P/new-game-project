@@ -62,6 +62,8 @@ static func advance_month(city, city_index: int = 0) -> void:
 	# Neighbours may share their rations before the shortage's hardship falls (TownSocial).
 	city.social.share_in_shortage()
 	update_hardship(city)
+	# Sustained, severe hunger or cold can kill (sprint S3b).
+	HouseholdMortality.advance_month(city, city_index)
 	city.social.review_month()
 	for household: Household in city.households:
 		household.shortage_hardship_adjust = 0

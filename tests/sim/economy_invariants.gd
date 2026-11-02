@@ -9,7 +9,8 @@ extends RefCounted
 # I6  shared land (woods, water, pasture): the shares of the workplaces in use add up to the land in
 #     their reach counted once (an idle or empty workplace taking a share, or a tile counted twice,
 #     breaks it);
-# I7  no construction site holds more of a material than it needs.
+# I7  no construction site holds more of a material than it needs;
+# I14 no family's members are negative, and its number is its members (sprint S3b).
 
 const SHARED_KINDS: Array[String] = ["woods", "water", "pasture"]
 # How many violations are kept word for word; the rest are only counted.
@@ -60,6 +61,9 @@ func check_day(city: City, day: int) -> void:
 	for household: Household in city.households:
 		if household.larder < -0.0001 or household.gathered_wood < -0.0001 or household.mending < -0.0001:
 			fail(day, "I1 household %d holds larder %.3f, gathered wood %.3f, mending %.3f" % [household.id, household.larder, household.gathered_wood, household.mending])
+		# I14: members never negative, and the family's number is its members.
+		if mini(mini(household.working_adults, household.young_children), mini(household.older_children, household.adult_children)) < 0 or household.total_population != household.working_adults + household.get_total_child_count():
+			fail(day, "I14 household %d: adults %d, children %d/%d/%d, population %d" % [household.id, household.working_adults, household.young_children, household.older_children, household.adult_children, household.total_population])
 	for project: ConstructionProject in city.construction.projects:
 		for material: String in project.materials_delivered.keys():
 			if int(project.materials_delivered[material]) > int(project.materials_needed.get(material, 0)):

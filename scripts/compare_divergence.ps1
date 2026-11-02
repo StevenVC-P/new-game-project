@@ -65,6 +65,7 @@ function Get-Summary($Towns) {
 	$Rows["first-year shortage days"] = Get-Spread @($Towns | ForEach-Object { [double]$_.m.first_year_short_days })
 	$Rows["days hearths went short (S3)"] = Get-Spread @($Towns | ForEach-Object { [double]$_.m.fuel_short_days })
 	$Rows["firewood burned (S3)"] = Get-Spread @($Towns | ForEach-Object { [double]$_.m.fuel_burned })
+	$Rows["deaths: hunger / cold / families ended (S3b)"] = "{0} / {1} / {2}" -f (($Towns | ForEach-Object { [int]$_.m.deaths_hunger }) | Measure-Object -Sum).Sum, (($Towns | ForEach-Object { [int]$_.m.deaths_cold }) | Measure-Object -Sum).Sum, (($Towns | ForEach-Object { [int]$_.m.households_ended }) | Measure-Object -Sum).Sum
 	$Rows["tools-out days"] = Get-Spread @($Towns | ForEach-Object { [double]$_.m.tools_out_days })
 	$Rows["food days in store"] = Get-Spread @($Towns | ForEach-Object { [double]$_.m.food_days })
 	$Rows["share of holdings outside food"] = Get-Spread @($Towns | ForEach-Object { [double]$_.m.outside_food_share }) "0.00"
