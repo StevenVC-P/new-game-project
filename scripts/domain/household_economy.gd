@@ -241,7 +241,7 @@ static func deliver_wood(city: City, household: Household) -> void:
 			project.materials_delivered["wood"] = int(project.materials_delivered.get("wood", 0)) + 1
 			city.influence.wood_to_own_projects += 1
 			return
-	city.add_resource("wood", 1)
+	city.add_resource("wood", 1, "gathered")
 
 # When its workplace's upkeep falls due, a unit of mending the family did itself takes the place
 # of a tool from the store (City.update_building_maintenance).

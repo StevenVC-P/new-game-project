@@ -113,7 +113,9 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 		if scenario.has("each_day"):
 			(scenario["each_day"] as Callable).call(city, day, self)
 		if scenario.get("hard_winter", false) and day == HARD_WINTER_DAY:
-			city.resources["food"] = mini(int(city.resources["food"]), int(city.resources["food_consumption_rate"]) * HARD_WINTER_FOOD_DAYS)
+			var food_before: int = int(city.resources["food"])
+			city.resources["food"] = mini(food_before, int(city.resources["food_consumption_rate"]) * HARD_WINTER_FOOD_DAYS)
+			city.record_flow("food", "disrupted", int(city.resources["food"]) - food_before)
 		if scenario.get("unfair", false) and day >= UNFAIR_FIRST_DAY and (day - UNFAIR_FIRST_DAY) % UNFAIR_INTERVAL_DAYS == 0:
 			if not scenario.get("brief", false) or day < BRIEF_UNFAIR_DAYS:
 				favour_least_deserving(city)

@@ -254,7 +254,7 @@ func cancel(project_id: int) -> bool:
 	if project == null:
 		return false
 	for material: String in project.materials_delivered.keys():
-		city.add_resource(material, int(project.materials_delivered[material]))
+		city.add_resource(material, int(project.materials_delivered[material]), "built")
 	if project.plot_id >= 0:
 		var plot: Dictionary = get_plot(project.plot_id)
 		if not plot.is_empty():
@@ -609,7 +609,7 @@ func apply_labor(project: ConstructionProject, labor: float) -> void:
 			return
 		left -= needed
 		project.haul_progress = 0.0
-		city.remove_resource(material, 1)
+		city.remove_resource(material, 1, "built")
 		project.materials_delivered[material] = int(project.materials_delivered.get(material, 0)) + 1
 		logistics().record_site_delivery(project.get_site_tile())
 	if project.has_all_materials():

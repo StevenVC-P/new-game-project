@@ -11,3 +11,6 @@
 docs/agent-runs/*
 !docs/agent-runs/README.md
 docs/AGENT_JSON_PROOF_OF_WORK.md
+
+# Test runner logs (scripts/run_tests.ps1) and divergence check output
+test-logs/

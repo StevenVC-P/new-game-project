@@ -150,6 +150,8 @@ func accept_lot(index: int) -> bool:
 	var get_good: String = lot["get"]
 	city.resources[give] = int(city.resources[give]) - int(lot["give_amount"])
 	city.resources[get_good] = int(city.resources.get(get_good, 0)) + int(lot["get_amount"])
+	city.record_flow(give, "traded", -int(lot["give_amount"]))
+	city.record_flow(get_good, "traded", int(lot["get_amount"]))
 	wants[give] = int(wants[give]) - int(lot["give_amount"])
 	taken[give] = int(taken.get(give, 0)) + int(lot["give_amount"])
 	offers[get_good] = int(offers[get_good]) - int(lot["get_amount"])

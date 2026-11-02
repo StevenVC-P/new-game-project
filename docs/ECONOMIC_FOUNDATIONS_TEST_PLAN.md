@@ -43,27 +43,29 @@ All commands are in `docs/TESTING.md`. Tests extend `SceneTree` and exit non-zer
 
 Categories for **grouping results only**. The game never learns these labels, and nothing in play reads them (mandate §7).
 
-| Environment | Classified by (town map, test side) | Expected pressure |
-|---|---|---|
-| Fertile valley | Farmland share in the top third, and water or high fertile density | Agricultural growth |
-| Forested | Woods share in the top third | Forestry |
-| Rocky highland | Rock and deposits in the top quarter, farmland in the bottom half | Food insecurity, extraction |
-| Balanced | Moderate (middle third) farmland and woods, some rock or water | Flexibility |
-| Marginal | Farmland and woods both in the bottom third, little water | Hard survival |
+Rules as built in S1a (`divergence_check.gd classify`), applied in this order (rarest first), each site in the first that fits. Shares are of all town-map tiles; "pool p" is that share's p-quantile over the whole pool.
 
-- **Thresholds** come from the real spread measured by `town_map_probe` (the quantiles `SiteSurvey` already uses), fixed in the classifier and recorded here when S1a sets them.
-- **Site pool:** deterministic regions and sites from `collect_sites`, then classified; the first 12 per environment in pool order. If an environment has fewer than 12 (rocky highland may be rare; the frontier skews tropical and dry), scan further regions and then further world seeds, and record what was used.
-- A site may fit two environments; it is counted in the first matching row above, so groups don't overlap.
+| Environment | Classified by (town map, test side) | Expected pressure | Pool sites |
+|---|---|---|---|
+| Rocky highland | Rough ground ≥ pool 0.75, some stone deposit, farmland ≤ pool 0.5 | Food insecurity, extraction | 24 |
+| Fertile valley | Farmland ≥ pool 2/3 | Agricultural growth | 80 |
+| Forested | Woods ≥ pool 2/3 | Forestry | 47 |
+| Marginal | Farmland ≤ pool 1/3, woods ≤ pool 0.5, water ≤ pool 0.5 | Hard survival | 52 |
+| Balanced | Farmland > pool 1/3, and woods > pool 1/3 or some water or stone | Flexibility | 17 |
+
+- **Site pool:** `collect_sites(60, 4)` on the authored test world (the same source as the other checks), duplicates removed: 240 sites, 20 fitting no group. Each group is taken a region at a time, so every environment's first 12 starts come from 12 different regions. `--survey` prints the pool, its classes and each site's land.
+- **Many marginal sites are cold** (the White Shelf regions: farmland at the generator's floor, thin woods).
 
 ### 3.2 Starts
 
 - **12 starts per environment.** Start *k* in every environment uses **founder set *k*** (the same families, values and callings), so differences between environments come from the land (mandate §3).
 - The rest of the town's randomness still follows its founding seed, as today; that's why the comparison is over 12 starts and not one.
+- **How:** founder set *k* is what a reference town (tile 0,0, seed 77000 + *k*) is founded with, copied into each site's town before its first day (`divergence_check.gd make_founders`). `City` rolls founders from the town's tile, so copying in the check avoids touching `city.gd`.
 
 ### 3.3 Conditions and policies
 
-- **Ordinary** (the town as founded), **stressed** (the existing `--disrupt=stores` in the second autumn), and, from S3, a **hard winter** disruption for fuel.
-- **Player:** `none` (never intervenes) as the yardstick, and `informed` (answers warnings with the cards' own offers) to see that the player's tools still work. The stand-in never orders a family.
+- **Ordinary** (the town as founded) and **stressed** (the stand-in's existing hard first winter: the food store cut to 8 days on day 270, as the other checks' "stressed" condition). From S3, a fuel disruption joins it.
+- **Player:** `none` (never intervenes) is the yardstick; `guided` uses the stand-in's existing `guide()` (stores kept for the priorities, asks for what is short). Neither orders a family. `--commission=type@day` adds a player commissioning one workplace on the spot with the most of its deposit underfoot (S1b: a quarry at the start of year 2), since families can't yet choose stone and craft work.
 - **Values profiles** (mandate §8, from S4): the same land with founders' values pushed toward one side (communal vs independent, thrifty vs quality-seeking, traditional vs open), then the same under the stressed condition to confirm survival wins.
 
 ### 3.4 Horizons
@@ -158,16 +160,20 @@ A difficult environment doing badly is not a reason to stop. Non-critical balanc
 
 ## 9. Framework Work (sprint S1a)
 
-Built before S1b's mechanic, so the baseline exists first. Each item extends what exists.
+Built in S1a, before S1b's mechanic, so the baseline exists first. Each item extends what exists.
 
-1. **Suite runner** `scripts/run_tests.ps1`: runs every `tests/*.gd` (and the `RefCounted` one through its wrapper) headless with a timeout, writes pass/fail per script to a file. Knows the known-flaky `world_map_flow_validation` and reruns it once before failing.
-2. **Flow counters:** per-good made / used / built with / traded / (spoiled) totals kept by `City` where goods already change hands. Measurement only: nothing in play reads them, so they need no save line. They feed I2 and the production metrics.
-3. **Invariant checker** `tests/sim/economy_invariants.gd`: a helper any check can call each day; collects violations with day, town seed and detail.
-4. **Founder sets:** a test-side way to found a town with founder set *k* regardless of tile: either copy founders from a reference town in the check, or a defaulted-off founders seed on `City` (only if copying proves fragile; `city.gd` is high-risk, so the smaller change wins).
-5. **The divergence check** `tests/sim/divergence_check.gd`: reuses `collect_sites`, a classifier built on `site_variety_check`'s land measures, and `wisdom_check`'s family-led play and measures. Options in the existing style: `--environments=`, `--starts=N`, `--years=N`, `--conditions=`, `--policies=`, `--meta=` (mechanic switches), `--seed=N --trace`, `--repeat` (runs each town twice and compares monthly fingerprints). Prints `[DIV]` lines.
-6. **Baseline B0:** the divergence check on `develop` at `fcfc0fc`, every environment, 12 starts, 6 years, ordinary and stressed; plus the benchmark. Recorded in the S1a report and used by every later sprint.
+1. **Suite runner** `scripts/run_tests.ps1`: every `tests/*.gd` that extends `SceneTree` (the `RefCounted` expanded-goods test runs through `tests/expanded_goods_production_run.gd`), four at a time, with a timeout; one line per script to a summary file. Reruns the known-flaky `world_map_flow_validation` once before it counts as failed. `-Filter shared_land*` runs a subset.
+2. **Flow counters:** `City._flows` (good → cause → signed amount), recorded where goods enter or leave the store: `made`, `used` (inputs), `need_<bucket>` (eaten, worn, used), `upkeep`, `built` (carried to sites; returned on cancel), `gathered`, `traded`, `raided`, `disrupted` (a check's own shocks). Measurement only: nothing in play reads them, and the leading underscore keeps them out of saves.
+3. **Invariant checker** `tests/sim/economy_invariants.gd`: I1, I2, I6 and I7 from section 4, called by any check each day and month; collects violations with day, town seed and detail. Its own rules test: `tests/economy_invariants_validation.gd`.
+4. **Founder sets:** copied from a reference town in the check (section 3.2).
+5. **The divergence check** `tests/sim/divergence_check.gd`: reuses `collect_sites`, the stand-in player and the family-led setup of `intervention_check` (`BASE`, the starting residential land). Options: `--survey`, `--environments=`, `--starts=N`, `--from=K`, `--years=N`, `--conditions=`, `--policies=`, `--meta=`, `--commission=type@day`, `--repeat`, `--seed=N`. Prints `[DIV]` lines (TOWN per town and snapshot as JSON, SUM per group, INV, REPEAT).
+6. **Baseline B0:** the divergence check on S1a's code, which plays exactly as `develop` at `fcfc0fc` (shown below), every environment, 12 starts, 6 years, ordinary and stressed; plus the quarry commission; plus the benchmark. Recorded in the S1a report.
 
-**Runtime and adjustments.** Today 12 towns over 6 years take 20–60 minutes per process. A full comparison (5 environments × 12 starts, on and off) is about 10 such runs: run them from fixed-commit `git worktree`s (`HANDOFF.md`), **at most four Godot processes at once** (owner, Q2), checking free memory and load before starting more and dropping concurrency if the machine struggles. Starts may drop to 8 for on/off sprint comparisons; baselines and review points keep 12; any reduction is written in the sprint report.
+**S1a changes no play.** `intervention_check` (4 sites, 2 years, ordinary and stressed, players none and informed) gives the same 6,101-line log, household lifecycle events included, at `fcfc0fc` and on S1a.
+
+**Tools:** `scripts/run_divergence.ps1 -Label X` (a batch of divergence runs, four processes at most, waiting while free memory is under 3 GB; logs in `test-logs/div/X/`, with the commit in `run.txt`), `scripts/compare_divergence.ps1 -Base X -New Y` (markdown tables, median [min-max] per environment). `test-logs/` is ignored by git; reports keep the tables.
+
+**Runtime and adjustments.** Measured in S1a: a family-led town costs about 7 s of wall time per simulated year in the divergence check, invariants included, so 12 towns over 6 years take about 8–9 minutes per process (the older checks quoted 20–60 minutes for 12 towns). A full comparison (5 environments × 12 starts, on and off) is about 10 such runs: run them from fixed-commit `git worktree`s (`HANDOFF.md`), **at most four Godot processes at once** (owner, Q2), checking free memory and load before starting more and dropping concurrency if the machine struggles. Starts may drop to 8 for on/off sprint comparisons; baselines and review points keep 12; any reduction is written in the sprint report.
 
 **Interface changes** (Q4) are verified by `town_sidebar_validation`, `founding_ui_validation` where the survey changes, and the windowed screenshot captures in `tests/visual/`.
 

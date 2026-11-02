@@ -67,6 +67,10 @@ var resource_history: Array = []
 var soft_need_results: Dictionary = {}
 # Mixed into every random roll the town makes (founders, values, newcomers, marriages).
 var founding_seed: int = 0
+# Goods into (+) and out of (-) the store, by good and cause, so a check can hold the store to what
+# moved it (tests/sim/economy_invariants.gd). Nothing in play reads it; the underscore keeps it out
+# of saves.
+var _flows: Dictionary = {}
 # Value counts of the region newcomers come from; generated on first arrival.
 var regional_value_counts: Dictionary = {}
 # Producing buildings by type, refreshed each tick; read by Communal Labor.
@@ -1238,6 +1242,7 @@ func consume_need_bucket(bucket_id: String, amount: int) -> int:
 
 		var consumed_good_amount: int = min(remaining_amount, available_good_amount)
 		resources[good_id] = available_good_amount - consumed_good_amount
+		record_flow(good_id, "need_" + bucket_id, -consumed_good_amount)
 		remaining_amount -= consumed_good_amount
 		consumed_amount += consumed_good_amount
 
@@ -1354,8 +1359,10 @@ func apply_input_output_production(output_key: String, output_amount: int, input
 		var input_cost: int = int(input_costs[input_key])
 		if input_cost > 0:
 			resources[input_key] = int(resources[input_key]) - capped_output * input_cost
+			record_flow(input_key, "used", -capped_output * input_cost)
 
 	resources[output_key] = int(resources[output_key]) + capped_output
+	record_flow(output_key, "made", capped_output)
 
 func get_current_building_output_amount(building: Building) -> int:
 	var maintenance_level: int = building.maintenance_level
@@ -1749,6 +1756,7 @@ func update_building_maintenance(building: Building):
 		building.maintenance_level = min(100, building.maintenance_level + 25)
 	elif building.receives_maintenance and int(resources["tools"]) >= cost:
 		resources["tools"] = int(resources["tools"]) - cost
+		record_flow("tools", "upkeep", -cost)
 		building.maintenance_level = min(100, building.maintenance_level + 25)
 	else:
 		building.maintenance_level = max(0, building.maintenance_level - 25)
@@ -2074,11 +2082,21 @@ func get_maintenance_tool_demand_estimate() -> int:
 func can_transfer(resource_name: String, amount: int) -> bool:
 	return int(resources[resource_name]) >= amount
 
-func remove_resource(resource_name: String, amount: int):
+func remove_resource(resource_name: String, amount: int, cause: String = "transfer"):
 	resources[resource_name] = int(resources[resource_name]) - amount
+	record_flow(resource_name, cause, -amount)
 
-func add_resource(resource_name: String, amount: int):
+func add_resource(resource_name: String, amount: int, cause: String = "transfer"):
 	resources[resource_name] = int(resources[resource_name]) + amount
+	record_flow(resource_name, cause, amount)
+
+func record_flow(good: String, cause: String, amount: int) -> void:
+	if amount == 0:
+		return
+	if not _flows.has(good):
+		_flows[good] = {}
+	var by_cause: Dictionary = _flows[good]
+	by_cause[cause] = int(by_cause.get(cause, 0)) + amount
 
 func can_afford_cost(cost: Dictionary) -> bool:
 	for resource_name: String in cost.keys():
@@ -2089,4 +2107,4 @@ func can_afford_cost(cost: Dictionary) -> bool:
 
 func pay_cost(cost: Dictionary):
 	for resource_name: String in cost.keys():
-		remove_resource(resource_name, int(cost[resource_name]))
+		remove_resource(resource_name, int(cost[resource_name]), "built")
