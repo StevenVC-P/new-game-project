@@ -42,7 +42,7 @@ const SHORTAGE_WEIGHT: float = 4.0
 # deters where the land is poor or the work yields less by nature.
 const LAND_WEIGHT: float = 3.0
 const LAND_SITE_TILES: float = 8.0
-const LAND_REASONS: Dictionary = {"water": "little water in reach to fish", "woods": "little game in reach", "pasture": "little pasture in reach"}
+const LAND_REASONS: Dictionary = {"water": "little water in reach to fish", "woods": "little game in reach", "pasture": "little pasture in reach", "timber": "the trees it could fell are far off or few"}
 # A good the town only goes without (wool, for clothing; goods to come) pulls less than what it
 # lives on (the food, wood and tools terms of get_work_desire, 1.5 to 3 each): no one making it,
 # the need it meets going unmet, and each other family already making it.

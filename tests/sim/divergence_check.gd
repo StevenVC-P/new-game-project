@@ -16,7 +16,11 @@ extends SceneTree
 #   --starts=N               starts per environment (12); --from=K skips the first K
 #   --years=N                years (6), with a year-3 snapshot
 #   --conditions=a,b         ordinary (default), stressed (the stand-in's hard first winter)
-#   --policies=a,b           none (default), guided
+#   --policies=a,b           none (default), guided; and contrasting players, each acting only through
+#                            the game's own controls, so player choices can make or break a village:
+#                            attentive (weekly, answers the warning cards with the appeals they offer),
+#                            investment_first (productive investment as the town's priority from
+#                            founding, never changed), overprotect (keeps every wood from the first week)
 #   --meta=a,b               comparison switches set on each town before its first day
 #   --commission=type@day    the player commissions one workplace of that type on that day (repeat
 #                            with commas), on the valid spot with the most of its deposit underfoot,
@@ -248,14 +252,20 @@ func play(site: Dictionary, start: int, condition: String, policy: String) -> Di
 	var state: Dictionary = {"fingerprints": [], "short_days": 0, "first_year_short_days": 0, "tools_out_days": 0, "old_age": 0, "ids": city.households.map(func(h: Household) -> int: return h.id),
 		"departed": 0, "woods_start": count_woods(city), "commissioned": [], "day_ms": [], "memory_start": Performance.get_monitor(Performance.MEMORY_STATIC), "last_ms": Time.get_ticks_usec()}
 	var measured: Dictionary = {}
-	scenario["each_day"] = func(town: City, day: int, _player) -> void:
+	scenario["each_day"] = func(town: City, day: int, player) -> void:
+		state["tick_usec"] = int(player.tick_usec)
+		state["days"] = day + 1
 		# The day's tick and the stand-in's own work, not this check's (the clock restarts at the end).
 		(state["day_ms"] as Array).append(float(Time.get_ticks_usec() - int(state["last_ms"])) / 1000.0)
 		checker.check_day(town, day)
 		if day % Calendar.DAYS_PER_MONTH == Calendar.DAYS_PER_MONTH - 1:
 			checker.check_month(town, day)
 			(state["fingerprints"] as Array).append(fingerprint(town))
+		if day % Calendar.DAYS_PER_MONTH == 0:
+			state["short_days_last_month"] = int(state.get("short_days_this_month", 0))
+			state["short_days_this_month"] = 0
 		if town.resources["food_shortage"] == true:
+			state["short_days_this_month"] = int(state.get("short_days_this_month", 0)) + 1
 			state["short_days"] = int(state["short_days"]) + 1
 			if day < Calendar.DAYS_PER_YEAR:
 				state["first_year_short_days"] = int(state["first_year_short_days"]) + 1
@@ -268,6 +278,7 @@ func play(site: Dictionary, start: int, condition: String, policy: String) -> Di
 		state["old_age"] = int(state["old_age"]) + maxi(0, gone - (departed - int(state["departed"])))
 		state["ids"] = ids
 		state["departed"] = departed
+		act_as_player(town, day, policy, state)
 		for order: Dictionary in commissions:
 			if day == int(order["day"]):
 				var spot: Vector2i = choose_commission_site(town, str(order["type"]))
@@ -279,6 +290,38 @@ func play(site: Dictionary, start: int, condition: String, policy: String) -> Di
 	var result: Dictionary = StandInPlayerScript.new().play(city, scenario, years * Calendar.DAYS_PER_YEAR)
 	measured[years] = measure(city, state, bool(result["off_the_ground"]))
 	return {"years": measured, "invariants": checker, "fingerprints": state["fingerprints"]}
+
+# What the contrasting players do (see the options), through the game's own controls only. Every act
+# is counted in the town's measures.
+static func act_as_player(city: City, day: int, policy: String, state: Dictionary) -> void:
+	match policy:
+		"investment_first":
+			if day == 0:
+				city.influence.set_priority(CommunityPriority.INVESTMENT)
+				state["player_acts"] = int(state.get("player_acts", 0)) + 1
+		"overprotect":
+			if day == 7:
+				var size: Vector2i = city.logistics.map_size()
+				for y in range(0, size.y, TownWoodland.MAX_MARK_SIDE):
+					for x in range(0, size.x, TownWoodland.MAX_MARK_SIDE):
+						var from: Vector2i = Vector2i(x, y)
+						var to: Vector2i = (from + Vector2i.ONE * (TownWoodland.MAX_MARK_SIDE - 1)).min(size - Vector2i.ONE)
+						if not city.woodland.get_wooded_in_block(from, to).all(func(t: Vector2i) -> bool: return city.woodland.is_protected(t)):
+							city.woodland.protect_block(from, to)
+				state["player_acts"] = int(state.get("player_acts", 0)) + 1
+		"attentive":
+			if day % 7 != 0:
+				return
+			var titles: Array[String] = []
+			for card: Dictionary in SidebarOverviewPage.get_attention(city):
+				titles.append(str(card["title"]))
+			var food_short: bool = titles.any(func(t: String) -> bool: return t.begins_with("Food") or t.contains("less food"))
+			var tools_short: bool = titles.any(func(t: String) -> bool: return t.begins_with("Tools")) and FamilyInitiative.count_producers(city, TownInfluence.ACTIVITY_TOOLS) == 0
+			var wood_short: bool = titles.any(func(t: String) -> bool: return t.begins_with("Wood") or t == "Timber is running out")
+			for want: Array in [[food_short, TownInfluence.ACTIVITY_FOOD], [tools_short, TownInfluence.ACTIVITY_TOOLS], [wood_short, TownInfluence.ACTIVITY_WOOD]]:
+				if bool(want[0]) and not FocusedAppeal.is_active(city, str(want[1])):
+					FocusedAppeal.make(city, str(want[1]))
+					state["player_acts"] = int(state.get("player_acts", 0)) + 1
 
 # The valid spot with the most of the workplace's deposit underfoot, then the nearest the stockpile.
 static func choose_commission_site(city: City, building_type: String) -> Vector2i:
@@ -336,6 +379,12 @@ static func first_difference(a: Array, b: Array) -> int:
 func measure(city: City, state: Dictionary, off_the_ground: bool) -> Dictionary:
 	var m: Dictionary = {}
 	m["off_the_ground"] = off_the_ground
+	# The test plan's success (section 10b), measured the same at any snapshot: alive, its founding
+	# families' number kept, everyone housed, and fed this past month.
+	var housed: bool = city.households.all(func(h: Household) -> bool: return h.housing_status == Household.RESIDENCE_HOUSED)
+	var fed: bool = int(state.get("short_days_last_month", 0)) == 0
+	m["success"] = city.households.size() >= EconomyBalance.FOUNDING_FAMILIES and housed and fed
+	m["failure"] = city.households.size() < EconomyBalance.FOUNDING_FAMILIES
 	m["people"] = city.get_total_population()
 	m["households"] = city.households.size()
 	m["departed"] = int(city.resources.get("departed_households", 0))
@@ -360,6 +409,7 @@ func measure(city: City, state: Dictionary, off_the_ground: bool) -> Dictionary:
 		flows[good] = (city._flows[good] as Dictionary).duplicate()
 	m["flows"] = flows
 	m["commissioned"] = (state["commissioned"] as Array).duplicate(true)
+	m["player_acts"] = int(state.get("player_acts", 0))
 	m["woods_start"] = int(state["woods_start"])
 	m["woods_now"] = count_woods(city)
 	# Who does what: the holding each family works, by trade.
@@ -399,6 +449,8 @@ func measure(city: City, state: Dictionary, off_the_ground: bool) -> Dictionary:
 		total += float(t)
 	m["day_ms_mean"] = snappedf(total / maxf(1.0, times.size()), 0.01)
 	m["day_ms_max"] = snappedf(float(times[-1]) if not times.is_empty() else 0.0, 0.01)
+	# The town's own tick alone, without the stand-in player's searching.
+	m["tick_ms_mean"] = snappedf(float(state.get("tick_usec", 0)) / 1000.0 / maxf(1.0, float(state.get("days", 1))), 0.01)
 	m["memory_mb"] = snappedf(Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0, 0.1)
 	return m
 
@@ -409,7 +461,7 @@ func summarize(environment: String, condition: String, policy: String, year: int
 		return
 	var alive: int = rows.filter(func(r: Dictionary) -> bool: return int(r["households"]) > 0).size()
 	var kept: int = rows.filter(func(r: Dictionary) -> bool: return int(r["households"]) >= EconomyBalance.FOUNDING_FAMILIES).size()
-	var off: int = rows.filter(func(r: Dictionary) -> bool: return bool(r["off_the_ground"])).size()
+	var off: int = rows.filter(func(r: Dictionary) -> bool: return bool(r.get("success", r["off_the_ground"]))).size()
 	var trades: Dictionary = {}
 	var made: Dictionary = {}
 	for row: Dictionary in rows:
@@ -424,7 +476,7 @@ func summarize(environment: String, condition: String, policy: String, year: int
 	var made_text: Array[String] = []
 	for good: String in made.keys():
 		made_text.append("%s %.0f" % [good, made[good] / n])
-	_report("SUM %-15s %-8s %-8s y%d | towns %d | alive %d | kept founders %d | off the ground %d | people %s | departed %s | old age %s | short days %s | first-year short %s | tools-out days %s | food days %s | outside-food share %s | diversity %s | woods left %s | day ms %s" % [
+	_report("SUM %-15s %-8s %-8s y%d | towns %d | alive %d | kept founders %d | succeeding %d | people %s | departed %s | old age %s | short days %s | first-year short %s | tools-out days %s | food days %s | outside-food share %s | diversity %s | woods left %s | day ms %s" % [
 		environment, condition, policy, year, rows.size(), alive, kept, off, spread(rows, "people"), spread(rows, "departed"), spread(rows, "old_age"),
 		spread(rows, "short_days"), spread(rows, "first_year_short_days"), spread(rows, "tools_out_days"), spread(rows, "food_days"),
 		spread(rows, "outside_food_share"), spread(rows, "trade_diversity"), spread_ratio(rows, "woods_now", "woods_start"), spread(rows, "day_ms_mean")])

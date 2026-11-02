@@ -70,6 +70,8 @@ function Get-Summary($Towns) {
 	$Rows["woods left (share of start)"] = Get-Spread @($Towns | ForEach-Object { [double]$_.m.woods_now / [Math]::Max(1, [double]$_.m.woods_start) }) "0.00"
 	$Rows["made per town"] = (($Made.Keys | Sort-Object | ForEach-Object { "{0} {1:0}" -f $_, ($Made[$_] / $N) }) -join ", ")
 	$Rows["holdings per town"] = (($Holdings.Keys | Sort-Object | ForEach-Object { "{0} {1:0.0}" -f $_, ($Holdings[$_] / $N) }) -join ", ")
+	$Rows["succeeding / failing (test plan 10b)"] = "{0} / {1}" -f @($Towns | Where-Object { $_.m.success }).Count, @($Towns | Where-Object { $_.m.failure }).Count
+	$Rows["town tick ms (mean)"] = Get-Spread @($Towns | ForEach-Object { [double]$_.m.tick_ms_mean }) "0.0"
 	$Rows["ms per day (mean)"] = Get-Spread @($Towns | ForEach-Object { [double]$_.m.day_ms_mean }) "0.0"
 	return $Rows
 }

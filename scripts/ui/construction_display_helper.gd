@@ -109,6 +109,12 @@ static func get_travel_lines(city: City, building: Building) -> Array[String]:
 		lines.append("Game: %d%% of a full bag (woods in reach)" % int(round(city.land.get_reach_factor(building) * 100.0)))
 	elif base == Building.BUILDING_HERDER:
 		lines.append("Grazing: %d%% of a full flock (open land in reach)" % int(round(city.land.get_reach_factor(building) * 100.0)))
+	elif base == Building.BUILDING_WOODCUTTER:
+		var target: Vector2i = city.woodland.get_cutting_target(building)
+		if target.x < 0:
+			lines.append("Timber: no trees left it may fell")
+		else:
+			lines.append("Timber: %d%% of a full cut (trees %d tiles off)" % [int(round(city.woodland.get_felling_factor(building) * 100.0)), int(round(Vector2(target - TownLogistics.center_tile(building.tile, building.size)).length()))])
 	elif base == Building.BUILDING_QUARRY:
 		var factor: float = TownDeposits.get_quarry_factor(city, building)
 		if factor <= 0.0:

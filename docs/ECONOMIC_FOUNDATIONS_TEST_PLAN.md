@@ -65,7 +65,7 @@ Rules as built in S1a (`divergence_check.gd classify`), applied in this order (r
 ### 3.3 Conditions and policies
 
 - **Ordinary** (the town as founded) and **stressed** (the stand-in's existing hard first winter: the food store cut to 8 days on day 270, as the other checks' "stressed" condition). From S3, a fuel disruption joins it.
-- **Player:** `none` (never intervenes) is the yardstick; `guided` uses the stand-in's existing `guide()` (stores kept for the priorities, asks for what is short). Neither orders a family. `--commission=type@day` adds a player commissioning one workplace on the spot with the most of its deposit underfoot (S1b: a quarry at the start of year 2), since families can't yet choose stone and craft work.
+- **Player:** `none` (never intervenes) is the yardstick; `guided` uses the stand-in's existing `guide()` (stores kept for the priorities, asks for what is short). Contrasting players for the review between sprints (section 10b): `attentive` (answers warning cards with their appeals), `investment_first` (investment priority from founding, kept), `overprotect` (keeps every wood from the first week). None orders a family. `--commission=type@day` adds a player commissioning one workplace on the spot with the most of its deposit underfoot (S1b: a quarry at the start of year 2), since families can't yet choose stone and craft work.
 - **Values profiles** (mandate §8, from S4): the same land with founders' values pushed toward one side (communal vs independent, thrifty vs quality-seeking, traditional vs open), then the same under the stressed condition to confirm survival wins.
 
 ### 3.4 Horizons
@@ -192,6 +192,19 @@ Every sprint meets the **Definition of Done** (mandate §10): mechanic implement
 | S5 Clay and lime | Brickworks need clay, kilns limestone; deposits cap output; the products have consumers; opportunities differ by geography |
 | S6–S9 | The ownership and trade invariants I9–I13; contribution policies compared; reserves and redistribution in shortage; barter; families choosing among own work, commons and trade; survival-driven change; culture's response. Tests written with the sprint, never results imagined ahead of it |
 
+## 10b. Review Between Sprints (owner, 2026-11-02)
+
+Before the next sprint starts, the last one gets a review. It goes in that sprint's report and can reorder the backlog.
+
+1. **Complexity holds.** Daily tick cost (`day_ms`, median and worst) against the previous sprint and B0; any invariant violation; new state fields and the high-risk files touched; whether the new mechanic's effects can be read from the game (its warnings, panel lines) and from the families' stated reasons. A sprint that makes the town's behaviour harder to explain is a finding, not a pass.
+2. **Villages diverge by land.** Per environment, the spread of people, trades held, goods made and shortages, against the previous sprint: the environments should move further apart, or stay apart, for reasons the mechanics explain.
+3. **Player choices make and break villages.** The same land and founders under contrasting players: `none`, `attentive`, `investment_first` and `overprotect` (section 3.3 and `divergence_check.gd act_as_player`).
+   - **Success:** at year 6 the town is alive, has kept at least its founding families, and is off the ground (housed, fed, no families lost).
+   - **Failure:** fewer families than it was founded with, or not off the ground.
+
+   Expected: on every environment some player does clearly better than another, and no player wins everywhere or fails everywhere. If choices stop mattering (every policy within a town or two of the others), or one policy dominates, that is reported as a design finding for the owner, not tuned in passing.
+4. **Cost.** The review runs 6 starts per environment and policy over 6 years (5 × 3 × 6 = 90 towns besides the sprint's own `none` runs), about 2–3 hours on three processes. The sample size is a documented reduction from 12 (section 9).
+
 ## 11. Sprint Reports
 
 One file per sprint in `docs/economic_foundations/`, named `S1a_framework.md` and so on, in this order:
@@ -216,3 +229,4 @@ The roadmap's tracking table links each report.
 
 - 2026-11-02: plan written from the owner's testing mandate. Nothing built.
 - 2026-11-02: owner's working terms: four processes at most, mortality (I14, S3b), interface verification.
+- 2026-11-02: owner: a review between sprints (section 10b) of complexity, divergence by land, and success and failure from player choices; contrasting players added to the divergence check. Batches run at three processes, keeping the fourth for tests.

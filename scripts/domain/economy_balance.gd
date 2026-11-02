@@ -37,6 +37,10 @@ const FARM_SEASON_YIELD: Array[float] = [0.8, 1.0, 1.4, 0.8]
 # Felling is winter work: woodcutters fell twice as fast in winter, marked woods or not.
 const WINTER_FELLING_FACTOR: float = 2.0
 const WOODCUTTER_WOOD_PER_DAY: float = 6.0
+# Since sprint S2 a woodcutter's wood is the timber it fells, so winter's faster felling shows in its
+# wood: twice the other seasons' pace in winter, the year's total unchanged (spring, summer, autumn,
+# winter).
+const WOOD_SEASON_YIELD: Array[float] = [0.8, 0.8, 0.8, 1.6]
 const TOOLMAKER_TOOLS_PER_DAY: float = 1.0
 # Wood the toolmaker consumes for each tool it makes.
 const TOOLMAKER_WOOD_PER_TOOL: int = 2
@@ -341,9 +345,19 @@ const FENCE_WORK_DAYS_PER_EDGE_TILE: float = 1.0 / 6.0
 # A woodcutter's family fells the woods the player marked for clearing as the place it cuts its
 # wood (its output is unchanged): a wooded tile takes this many full working days.
 const CLEAR_DAYS_PER_TILE: float = 2.0
-# With no woods marked, a woodcutter cuts the trees nearest it, slowly (owner, 2026-10-27): this
-# share of its day goes into felling, so a tile falls every 20 working days, about 16 a year.
-const UNMARKED_FELLING_SHARE: float = 0.1
+# With no woods marked, a woodcutter cuts the trees nearest it, slowly (owner, 2026-10-27: a tile
+# about every 20 working days, some 16 a year). Since sprint S2 that pace follows from its wood: a
+# woodcutter's wood comes out of the trees it fells, and a mature wooded tile holds TIMBER_PER_TILE
+# wood, so a full woodcutter (WOODCUTTER_WOOD_PER_DAY) fells about 16 tiles a year, and with nothing
+# left to fell it brings in nothing. Woods that
+# spread grow in young, with YOUNG_WOODS_TIMBER, and gain TIMBER_GROWTH_PER_YEAR each spring until
+# mature (about ten years). A woodcutter cuts its full rate from trees within
+# WOODCUTTER_FULL_DISTANCE tiles of its middle (the reach it was placed by), and less the farther it
+# must go, down to LAND_YIELD_FLOOR.
+const TIMBER_PER_TILE: int = 135
+const YOUNG_WOODS_TIMBER: int = 15
+const TIMBER_GROWTH_PER_YEAR: int = 12
+const WOODCUTTER_FULL_DISTANCE: float = 6.0
 # Clearing only clears; land marked to till becomes farmland after this many full working days
 # of a field's family (TownFarmland), its harvest unchanged.
 const TILL_DAYS_PER_TILE: float = 3.0

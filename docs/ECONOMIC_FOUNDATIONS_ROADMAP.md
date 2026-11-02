@@ -198,6 +198,8 @@ Mechanism from `docs/PROPERTY_AND_COMMUNAL_RESOURCES.md`, revised by D1.
 
 ## 8. Evaluating Results
 
+**Between every two sprints, a review** (owner, 2026-11-02; test plan section 10b): does the complexity still hold together, do villages diverge by land, and do player choices produce both successful and failing villages? It is recorded in the sprint's report and may reorder this backlog. A sprint's own comparison plus its review costs roughly 3–6 hours of unattended runs, so sprints close a few a day at best, and the handoff below is kept current after each.
+
 **`docs/ECONOMIC_FOUNDATIONS_TEST_PLAN.md` governs:** the four test levels, environments and founder sets, invariants, metrics, the intended-versus-defect rule, stopping rules, the Definition of Done and the sprint report format. Sprint reports live in `docs/economic_foundations/`. In short: every economic sprint runs the divergence check against its base and B0, mechanic on and off; unequal outcomes are reported, not equalised; a failing invariant stops the affected work.
 
 ## 9. Constraints Carried Into Every Sprint

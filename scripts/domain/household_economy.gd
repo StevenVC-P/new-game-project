@@ -225,6 +225,11 @@ static func produce_secondary(city: City, household: Household, activity: String
 			amount *= household.woods_land
 			household.gathered_wood += amount
 			while household.gathered_wood >= 1.0:
+				# Each unit is cut from the trees nearest the family's home (TownWoodland); with none
+				# left that it may cut, what it gathered comes to nothing.
+				if city.logistics.has_map() and city.woodland.take_timber_near(city.logistics.get_home_tile(household), WOODS_REACH, 1) < 1:
+					household.gathered_wood = 0.0
+					break
 				household.gathered_wood -= 1.0
 				deliver_wood(city, household)
 		"tools":

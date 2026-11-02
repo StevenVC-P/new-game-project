@@ -85,8 +85,11 @@ func get_output_factor(building: Building) -> float:
 	elif base == Building.BUILDING_HERDER:
 		factor *= get_reach_factor(building)
 	elif base == Building.BUILDING_WOODCUTTER:
-		# Woods the player keeps send woodcutters farther for their timber (TownWoodland).
+		# The trees it may still fell, and how far it must walk to them (TownWoodland); felling is
+		# winter work.
 		factor *= city.woodland.get_felling_factor(building)
+		if has_map():
+			factor *= EconomyBalance.WOOD_SEASON_YIELD[season]
 	elif base == Building.BUILDING_QUARRY:
 		factor *= TownDeposits.get_quarry_factor(city, building)
 	if season == SEASON_WINTER and is_wolf_exposed(building):
@@ -112,6 +115,10 @@ func is_wolf_exposed(building: Building) -> bool:
 func get_reach_factor(building: Building) -> float:
 	if not has_map():
 		return 1.0
+	# Wood work: the trees it may still fell, which change with every tile felled or kept, so never
+	# cached here (TownWoodland caches its own search).
+	if get_reach_kind(building.type) == TIMBER:
+		return city.woodland.get_felling_factor(building)
 	if is_shared(get_reach_kind(building.type)):
 		var key: int = hash([city.logistics.layout_version, get_rivals_key(Building.BUILDING_FISHER), get_rivals_key(Building.BUILDING_HUNTER), get_rivals_key(Building.BUILDING_HERDER)])
 		if _shared_reach_key != key:
@@ -127,8 +134,11 @@ func get_reach_factor(building: Building) -> float:
 		_reach[building.id] = get_reach_factor_at(building.type, building.tile, building.size, false)
 	return float(_reach[building.id])
 
-# What a workplace's yield depends on in its reach ("water", "woods", "pasture"), or "" when the
-# land around it does not matter.
+# What a workplace's yield depends on in its reach ("water", "woods", "pasture", or "timber": the
+# trees a woodcutter may still fell, sprint S2), or "" when the land around it does not matter.
+# Timber is not shared reach: woodcutters compete by felling the same trees (TownWoodland).
+const TIMBER: String = "timber"
+
 static func get_reach_kind(building_type: String) -> String:
 	match BuildingTiers.get_base_type(building_type):
 		Building.BUILDING_FISHER:
@@ -137,6 +147,8 @@ static func get_reach_kind(building_type: String) -> String:
 			return "woods"
 		Building.BUILDING_HERDER:
 			return "pasture"
+		Building.BUILDING_WOODCUTTER:
+			return TIMBER
 	return ""
 
 # What a workplace of this type would make at `origin`. Its land is shared: every tile also in reach
@@ -150,6 +162,8 @@ func get_reach_factor_at(building_type: String, origin: Vector2i, size: Vector2i
 	var kind: String = get_reach_kind(building_type)
 	if kind == "":
 		return 1.0
+	if kind == TIMBER:
+		return city.woodland.estimate_felling_factor_at(origin, size)
 	var full: int = EconomyBalance.HUNTER_FULL_WOODS_TILES
 	match kind:
 		"water":

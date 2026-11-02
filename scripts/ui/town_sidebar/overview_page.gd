@@ -354,6 +354,10 @@ static func get_failing_livelihood_cards(city: City) -> Array[Dictionary]:
 					lines.append(cause.substr(0, 1).to_upper() + cause.substr(1) + ".")
 				lines.append("Woodcutters fell woods marked for clearing before any others.")
 				buttons.append({"text": "Mark woods to fell elsewhere (C)", "action": {"action": "select_tool", "tool": TownWoodland.CLEAR}})
+			TownLand.TIMBER:
+				title = "Timber is running out"
+				lines.append("The trees round %d woodcutter%s now give %d%% of the wood they did." % [count, plural, share])
+				lines.append("Felled land grows young woods again only slowly; keeping woods saves them for later.")
 			"pasture":
 				title = "Grazing land is being lost"
 				lines.append("The open ground round %d grazing workplace%s now feeds %d%% of the flock it did." % [count, plural, share])

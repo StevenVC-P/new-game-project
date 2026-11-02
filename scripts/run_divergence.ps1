@@ -32,7 +32,8 @@ if ([string]::IsNullOrWhiteSpace($GodotBin)) { $GodotBin = (Get-Content -Literal
 $OutDir = Join-Path $Here "test-logs/div/$Label"
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $Commit = (& git -c safe.directory=* -C $ProjectRoot rev-parse --short HEAD)
-Set-Content -LiteralPath (Join-Path $OutDir "run.txt") -Value @("label $Label", "commit $Commit", "root $ProjectRoot", "starts $Starts years $Years", "extra $Extra", "started $(Get-Date -Format s)") -Encoding utf8
+# The runner's own process id, so the whole batch can be stopped (its Godot runs are its children).
+Set-Content -LiteralPath (Join-Path $OutDir "run.txt") -Value @("label $Label", "runner pid $PID", "commit $Commit", "root $ProjectRoot", "starts $Starts years $Years", "extra $Extra", "started $(Get-Date -Format s)") -Encoding utf8
 
 $Jobs = New-Object System.Collections.Queue
 foreach ($Condition in $Conditions) { foreach ($Policy in $Policies) { foreach ($Environment in $Environments) {

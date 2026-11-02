@@ -7,11 +7,13 @@ extends SceneTree
 # - A viable founding (VIABLE_SEED): its families take up work for their own reasons, food work
 #   among them; families build; it keeps its founding families, is fed at the end and has a family
 #   in a proper home.
-# - A failed founding (the sidebar test's seed, FAILING_SEED): its families' close choices leave it
-#   growing less food than it eats; the stores run out, hungry months build hardship, and families
-#   leave, never before the town has gone hungry. Since 2026-11-02 (woods shared among lodges) a
-#   forest family's near tie between hunting and woodcutting goes to wood; until then this town came
-#   through its year. Failing for those reasons is the expected outcome here.
+# - A failed founding (FAILING_SEED): its families' choices leave it growing less food than it eats;
+#   the stores run out, hungry months build hardship, and families leave, never before the town has
+#   gone hungry. Failing for those reasons is the expected outcome here. Until sprint S2 (living
+#   forests) this was the sidebar test's seed, 20261101, whose fate hung on a forest family's near tie
+#   between hunting and woodcutting; once families judged wood work by the trees in reach, that tie
+#   went to hunting and the town lost one family, not three (docs/economic_foundations/S2_forests.md).
+#   20261116 was chosen by --probe as a founding that fails for the same reasons under S2's rules.
 # - Both: the state stays consistent (no negative stores, no work held by a family that is gone, no
 #   family at two workplaces, no empty family), and the failing town, saved in the middle of its decline and
 #   loaded, plays on exactly as the original (saves to a folder of this process's own, removed
@@ -21,30 +23,37 @@ extends SceneTree
 
 const MainScript = preload("res://scripts/main.gd")
 const StandInPlayerScript = preload("res://tests/sim/stand_in_player.gd")
-const SidebarTest = preload("res://tests/town_sidebar_validation.gd")
 
 # Chosen by --probe among the save and hunting tests' founding seeds as one that comes through its
 # year under the rules of 2026-11-02 (docs/AUTONOMOUS_OCCUPATIONS.md, sixth round).
 const VIABLE_SEED: int = 20261102
-const FAILING_SEED: int = SidebarTest.FOUNDING_SEED
+const FAILING_SEED: int = 20261116
 const DAYS: int = 360
-# Between its families leaving (days 119, 149 and 179 under the rules of 2026-11-02), mid-decline.
-const SAVE_DAY: int = 150
+# Between its families leaving (days 269, 299, 329 and 359 under S2's rules), mid-decline.
+const SAVE_DAY: int = 280
 const DAYS_AFTER_LOAD: int = 60
 var TEST_DIRECTORY: String = "user://founded_town_regression_%d" % OS.get_process_id()
 
 var failure_count: int = 0
+# "-- --probe=N --trace": also print every family's first choice of work, ranked with its reasons.
+var trace: bool = false
 
 func _init() -> void:
 	call_deferred("run_all")
 
 func run_all() -> void:
 	root.size = Vector2i(1600, 900)
+	trace = OS.get_cmdline_user_args().has("--trace")
 	for argument: String in OS.get_cmdline_user_args():
 		if argument.begins_with("--probe="):
 			for seed_text: String in argument.trim_prefix("--probe=").split(","):
 				var probe: Dictionary = await play_founding(int(seed_text), DAYS)
 				print("[PROBE] seed %s | %s" % [seed_text, describe(probe)])
+				for entry: Dictionary in (probe["city"] as City).get_meta("trace_choices", []):
+					var ranked: Array[String] = []
+					for option: Dictionary in (entry["ranked"] as Array).slice(0, 3):
+						ranked.append("%s %.2f for %s against %s" % [option.get("occupation", "?"), float(option.get("score", 0.0)), str(option.get("for", "")), str(option.get("against", ""))])
+					print("[CHOICE] day %d | household %d | %s" % [int(entry["day"]), int(entry["household"]), " || ".join(ranked)])
 				await free_main(probe["main"])
 			quit()
 			return
@@ -84,6 +93,8 @@ func play_founding(seed: int, days: int) -> Dictionary:
 	_check(main.found_player_city_at_pending_site(), "founding should open the town (seed %d)" % seed)
 	main.simulation_clock.is_paused = true
 	var city: City = main.cities[main.selected_city_index]
+	if trace:
+		city.set_meta("trace_choices", [])
 	var record: Dictionary = {"main": main, "city": city, "founders": city.households.map(func(h: Household) -> int: return h.id), "callings": city.households.map(func(h: Household) -> String: return "/".join(CultureEffects.get_callings(h.values))), "short_days": 0, "first_short_day": -1, "departures": [], "consistent": []}
 	var present: Array = (record["founders"] as Array).duplicate()
 	var player = StandInPlayerScript.new()

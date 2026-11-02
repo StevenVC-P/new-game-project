@@ -74,6 +74,10 @@ const OVERSUPPLY: String = "oversupplied"
 const DISTANCE: String = "distance"
 const SHORTAGE: String = "essential_shortage"
 const HUNGER: String = "hungry"
+# Wood work whose trees are running out (sprint S2): half of the best share of a full cut it has had,
+# or less, for a season; with no tree left it may fell, it doesn't wait for its tenure or year.
+const TIMBER: String = "timber_failing"
+const TIMBER_FAILING_SHARE: float = 0.5
 
 static func is_on(city: City) -> bool:
 	return city.influence.enabled and city.influence.reconsider_work
@@ -143,9 +147,15 @@ static func is_due(city: City, household: Household) -> bool:
 		return false
 	return household.work_review_day < 0 or today - household.work_review_day >= REVIEW_INTERVAL_DAYS
 
-# Reasons that do not wait for the usual tenure or year: an essential shortage, a family's own hunger.
+# Reasons that do not wait for the usual tenure or year: an essential shortage, a family's own hunger,
+# wood work whose trees are failing (after a season at half its best, or at once with none left).
 static func is_urgent(triggers: Array[String]) -> bool:
-	return triggers.has(SHORTAGE) or triggers.has(HUNGER)
+	return triggers.has(SHORTAGE) or triggers.has(HUNGER) or triggers.has(TIMBER)
+
+static func is_timber_failing(city: City, holding: Building) -> bool:
+	if TownLand.get_reach_kind(holding.type) != TownLand.TIMBER or city.local_map.is_empty():
+		return false
+	return city.land.get_reach_factor(holding) <= maxf(0.0001, holding.peak_land_yield * TIMBER_FAILING_SHARE)
 
 # Sooner, when the town is in danger of running out of something essential, or the family goes hungry.
 static func is_due_in_danger(city: City, household: Household) -> bool:
@@ -163,6 +173,7 @@ static func update_strain(city: City, household: Household, holding: Building) -
 		OVERSUPPLY: is_oversupplied(city, holding) and is_short_elsewhere(city, FamilyInitiative.get_activity(holding.type)),
 		DISTANCE: is_far(city, household, holding),
 		HUNGER: household.short_days_this_month >= HUNGRY_DAYS_IN_MONTH and not city.has_meta("no_survival_awareness"),
+		TIMBER: is_timber_failing(city, holding),
 	}
 	for reason: String in holds.keys():
 		household.work_strain[reason] = int(household.work_strain.get(reason, 0)) + 1 if bool(holds[reason]) else 0
@@ -172,9 +183,11 @@ static func get_triggers(city: City, household: Household, holding: Building) ->
 	var triggers: Array[String] = []
 	if is_against_calling(city, household, holding):
 		triggers.append(CALLING)
-	for reason: String in [TOOLS, OVERSUPPLY, DISTANCE]:
+	for reason: String in [TOOLS, OVERSUPPLY, DISTANCE, TIMBER]:
 		if int(household.work_strain.get(reason, 0)) >= STRAIN_MONTHS:
 			triggers.append(reason)
+	if TownLand.get_reach_kind(holding.type) == TownLand.TIMBER and not triggers.has(TIMBER) and not city.local_map.is_empty() and city.land.get_reach_factor(holding) <= 0.0:
+		triggers.append(TIMBER)
 	if get_danger(city, FamilyInitiative.get_activity(holding.type)) >= SHORTAGE_TRIGGER:
 		triggers.append(SHORTAGE)
 	if int(household.work_strain.get(HUNGER, 0)) >= HUNGRY_MONTHS:

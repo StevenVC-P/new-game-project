@@ -25,6 +25,9 @@ const STUCK_WOOD_DAYS: int = 60
 
 # Building kinds that could not find a valid spot on the map at least once.
 var blocked_by_map: Dictionary = {}
+# Time spent in the town's own daily tick, apart from this player's work (microseconds; the
+# divergence check reports it).
+var tick_usec: int = 0
 
 # scenario: see opening_check.gd (prebuild, never, not_before, idle_until, max_count), plus, on a
 # town map, "homes_on_plots" (set aside residential plots and let families build their own homes
@@ -83,7 +86,9 @@ func play(city, scenario: Dictionary, days: int) -> Dictionary:
 		var month_before: int = calendar.current_month
 		var season_before: String = calendar.get_current_season()
 		calendar.advance_day()
+		var tick_started: int = Time.get_ticks_usec()
 		city.tick()
+		tick_usec += Time.get_ticks_usec() - tick_started
 		if calendar.current_month != month_before:
 			city.advance_household_lifecycle_month(0)
 		if calendar.get_current_season() != season_before:

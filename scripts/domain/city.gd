@@ -1335,9 +1335,12 @@ func apply_building_production(building: Building):
 
 	var building_type: String = building.type
 	var output_amount: int = get_current_building_output_amount(building)
-	# A quarry can't cut more than the stone left under it.
+	# A quarry can't cut more than the stone left under it; a woodcutter's wood is what it cuts from
+	# the trees (TownWoodland.take_timber).
 	if output_amount > 0 and TownDeposits.is_quarry(building) and not local_map.is_empty():
 		output_amount = mini(output_amount, TownDeposits.get_stone_left(self, building))
+	if output_amount > 0 and BuildingTiersScript.get_base_type(building.type) == Building.BUILDING_WOODCUTTER and not local_map.is_empty():
+		output_amount = woodland.take_timber(building, output_amount)
 	if output_amount > 0:
 		# Tier 0 buildings produce the same goods as their tier 1 counterpart, at a lower rate.
 		var chain: Dictionary = EconomyBalanceScript.PRODUCTION.get(BuildingTiersScript.get_base_type(building_type), {})
