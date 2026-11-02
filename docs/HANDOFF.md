@@ -2,13 +2,22 @@
 
 Snapshot for whoever picks the project up next. Update it when a milestone closes; durable detail lives in the linked docs, not here.
 
-*Last updated: 2026-11-02. `feature/autonomous-occupations` is merged into `develop` (Priority 5 closed); `main` is unchanged since "Merged 2026-11-01" below and awaits the owner's review.*
+*Last updated: 2026-11-02. **The early-game simulation sprint is complete** (owner, 2026-11-02). Its work is on `develop` and `main`:*
+- *`feature/autonomous-occupations` merged into `develop`: `91e820e`;*
+- *`develop` merged into `main`: `6611c74`, the sprint's final merge.*
+
+*Both passed the full 46-script suite, import validation, save loading and determinism checks.*
 
 ## Current Objective
 
-**Next milestone (owner, 2026-11-02): household property, private exchange, communal contributions and treasury allocations.** It has its own architectural plan on branch `docs/property-and-communal-resources` (not merged), and the earlier audit `docs/TREASURY_AUDIT.md`. Nothing of it is built yet. A founding allocation is the intended lever on the first weeks.
+**No implementation sprint is authorized.** The owner is reviewing the long-term vision and future features before the next one.
 
-**Priority 5 is closed** (`docs/IMPLEMENTATION_ROADMAP.md`, "Autonomous Occupations and Priority 5"; detail in `docs/AUTONOMOUS_OCCUPATIONS.md`, sixth round; agency in `docs/PLAYER_AGENCY_AUDIT.md`, round 6). On `develop`:
+**Planned next, not yet authorized:** household property, private exchange, communal contributions and treasury allocations.
+- **The plan:** the agreed design decisions and implementation sequence are on branch `docs/property-and-communal-resources`. It is preserved and deliberately not merged.
+- **Earlier audit:** `docs/TREASURY_AUDIT.md`.
+- **Status:** nothing of it is built. A founding allocation is the intended lever on the first weeks.
+
+**Priority 5 is closed** (`docs/IMPLEMENTATION_ROADMAP.md`, "Autonomous Occupations and Priority 5"; detail in `docs/AUTONOMOUS_OCCUPATIONS.md`, sixth round; agency in `docs/PLAYER_AGENCY_AUDIT.md`, round 6). On `develop` and `main`:
 - **Occupations:** families choose every trade with a hand-work stage, by scored terms with reasons and seeded noise. Survival comes before a calling as hunger nears; for wool work the calling fades fully (the herding adjustment).
 - **Shared land:** woods, fishing water and pasture are divided among the workplaces of their kind that are in use, so no land is counted twice.
 - **The tool trap is fixed:** the reserve no longer blocks projects that draw nothing from it.

@@ -302,7 +302,11 @@ Map luck "before" already counts travel; without it (`develop` before this work)
 
 ## Autonomous Occupations and Priority 5 (closed 2026-11-02)
 
-Done; owner-approved and merged to `develop`. Detail, results and history are in `docs/AUTONOMOUS_OCCUPATIONS.md` (sixth round at the top); player agency is in `docs/PLAYER_AGENCY_AUDIT.md` (round 6).
+Done; owner-approved.
+- **Merges:** into `develop` at `91e820e`; `develop` into `main` at `6611c74`, which closes the early-game simulation sprint.
+- **Verified on both:** the full 46-script suite, import validation, save loading and deterministic reruns.
+
+Detail, results and history are in `docs/AUTONOMOUS_OCCUPATIONS.md` (sixth round at the top); player agency is in `docs/PLAYER_AGENCY_AUDIT.md` (round 6).
 
 **The final occupation rules:**
 - **The trades.** Families choose their own work among every trade with a hand-work stage: farming, woodcutting, toolmaking, fishing, hunting and herding.
@@ -336,7 +340,7 @@ Done; owner-approved and merged to `develop`. Detail, results and history are in
 - communal contributions;
 - treasury allocations, binding, with a founding allocation as the intended lever on the first weeks.
 
-It has its own architectural plan (branch `docs/property-and-communal-resources`) and the earlier `docs/TREASURY_AUDIT.md`.
+It has its own architectural plan, with the agreed design decisions and implementation sequence, on branch `docs/property-and-communal-resources` (preserved, not merged), and the earlier `docs/TREASURY_AUDIT.md`. It is planned but not yet authorized: the owner is reviewing the long-term vision before the next sprint.
 
 ## Map And Presentation Track (2026-10-20)
 
