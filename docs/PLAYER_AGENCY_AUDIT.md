@@ -1,5 +1,32 @@
 # Player Agency Audit
 
+## Round 5 (2026-11-02): the early hunting-grounds card; the fifth round's rules
+
+Rules: all trades, with tonight's defaults (woods shared among lodges, the tool-trap fix; `docs/AUTONOMOUS_OCCUPATIONS.md`, fifth round). Same 12 towns per condition, six years. Paired against no player on the same rules.
+
+| People at year 6 (paired change; towns saved / lost) | Ordinary | Stressed | Difficult |
+|---|---|---|---|
+| no player | 48.6 | 56.0 | 34.8 |
+| **answers the early card promptly** (`keep_on_warning`) | +2.9 (0/0) | −3.4 (0/1) | +6.4 (1/0) |
+| keeps round each lodge from the week it is worked (`keep_lodges`) | +3.0 (0/0) | −2.9 (0/1) | +5.8 (1/0) |
+| keeps late, once a lodge has lost a third (`keep_hunting`) | +4.2 (0/0) | −3.4 (0/1) | +0.3 (0/0) |
+| keeps every wood at founding (`overprotect`) | **−15.6** (0/2) | **−16.4** (0/2) | −2.4 (3/1) |
+| informed, land and cards only, no appeals (`informed_land`) | −0.8 (0/1) | −6.2 (0/2) | +4.5 (1/0) |
+| informed, with repeated appeals (`informed`; comparison only) | +8.4 (1/1) | +1.6 (0/1) | +18.1 (4/0) |
+| appeals only (`informed_appeal`; comparison only) | +6.9 (1/1) | −4.6 (0/1) | +13.0 (4/1) |
+
+**Opportunity cost:** woodcutter-days spent walking farther, per town: answering the card 738 / 864 / 531; late keeping 363 / 339 / 176; keeping everything 1,623 / 1,921 / 1,532.
+
+**What a player can now do:**
+- **Saved:** ordinary 880325585 (11 → 40 answering the card; 62 keeping late), difficult 3849992342 (0 → 71). The card shows in time to act in the towns where it matters (day 7 in 880325585, 61 days before any loss).
+- **Harmed by reasonable intervention:** stressed 2610263185 (14 → 0) and 880325585 (55 → 40) under every keeping rule; stressed 2860120474 (93 → 75). In these the woodcutters' longer walks cost lumber the town needed for its fields and toolmaker, and the lodge was not what kept it alive. The card states the cost, but a player cannot tell from it which matters more in that town.
+- **Failures despite reasonable intervention:** the towns that die with every player (ordinary and stressed 2316526815, difficult 4185861261) die within the first year, short of food 186–262 of its days; an informed player's appeals keep four people alive into year 1 or 3 at most. No hunting card concerns them.
+- **Harmful choices:** keeping every wood remains the clear misuse; it costs ordinary and stressed towns about 16 people.
+
+**Compared with Round 4:** early keeping then gave +6.8 / +13.8 / +1.1 on the old double-counted woods and with the tool trap present; with the woods shared and the trap fixed, much of that gain is now in the no-player baseline (stressed 880325585 lives without a player, 2860120474 no longer traps). What is left to the player is smaller and depends on the town.
+
+**Appeals** are still compared, not expanded: they remain the largest single lever for an informed player, which is why their status (a standing pull the owner judged too close to a hidden command) still matters for the treasury's design.
+
 ## Round 4 (2026-11-01): one appeal against many; keeping hunting grounds
 
 **Appeals, single against repeated.**

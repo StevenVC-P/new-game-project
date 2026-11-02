@@ -1,20 +1,113 @@
 # Autonomous Occupations and Survival-Aware Work Decisions
 
-**Status: implemented (2026-11-01), awaiting owner review.** Branch `feature/autonomous-occupations`, from `develop`. Not merged.
+**Status: implemented (2026-11-02), awaiting owner review.** Branch `feature/autonomous-occupations`, from `develop`. Not merged.
 
 Code:
 - `scripts/domain/building_tiers.gd`: the three new hand-work stages.
 - `scripts/domain/family_initiative.gd`: occupations, land in reach, shortages, hardship.
 - `scripts/domain/occupation_review.gd`: early reviews for a shortage or a family's own hunger.
-- `scripts/domain/focused_appeal.gd`: focused appeals; `scripts/domain/town_woodland.gd`: kept woods.
+- `scripts/domain/focused_appeal.gd`: focused appeals; `scripts/domain/town_woodland.gd`: kept woods, the hunting-grounds threat.
+- `scripts/domain/town_land.gd`: land in reach; woods shared among lodges.
 - `scripts/domain/economy_balance.gd`: build cost and work for the new stages only.
 
 Tests:
 - `tests/autonomous_occupations_validation.gd`: the rules.
+- `tests/hunting_grounds_validation.gd`: shared woods, the early warning, keeping, in the real game.
 - `tests/founded_town_regression.gd`: gameplay, one founded town for a year.
 - `tests/town_sidebar_validation.gd`: now deterministic, interface only.
 
-Comparison: `tests/sim/occupation_check.gd`. Owner's town: `tests/sim/autosave_replay.gd`. Commands in `docs/TESTING.md`.
+Comparison: `tests/sim/occupation_check.gd`, `tests/sim/intervention_check.gd`. Owner's town: `tests/sim/autosave_replay.gd`. Commands in `docs/TESTING.md`.
+
+## Fifth Round (2026-11-02): Priority 5 Built; the Tool Trap; Provisions
+
+The owner's overnight brief on Priority 5 and the remaining founding-economy problems. It authorized the scoped changes below on this branch, no merge. Ownership, communal contributions, markets and treasury spending are untouched; the treasury roadmap (`docs/TREASURY_AUDIT.md`) stands.
+
+**What changed, and whether it changes decisions:**
+
+| Change | Default | Affects |
+|---|---|---|
+| Early hunting-grounds warning, keep button, clearing obstacles explained | on | information only (the player decides) |
+| Woods shared among lodges (each lodge counts its share) | on | production and families' expectations |
+| The tool-trap fix (`can_supply` skips materials a project does not use) | on | which projects the stores admit; nothing is spent that the stores do not hold |
+| The calling fades for wool work under imminent hunger (`comfort_calling_fades`) | **off** (meta) | first choices and reviews, when on |
+
+**Method.** The same 12 towns per condition and seeds as every earlier round, six years, run from fixed commits in a separate worktree, 12 processes at a time. Every rule was written before it was measured and none was tuned afterwards. The baseline reproduced the Priority 5 results exactly (72/72 towns). Paired differences are per town; "saved" and "lost" are towns that live or die only under one side. Determinism: three batches rerun, identical.
+
+### The early hunting-grounds warning (built)
+
+- **When:** as soon as a woodcutter's next felling lies inside a worked woods lodge's reach and, at the present felling rate plus any marked tiles, the lodge would lose part of its best yield within 180 days (`TownWoodland.get_hunting_threats`). Abundant woods that would still give a full bag give no warning.
+- **What it says** ("Woodcutters are felling hunting grounds"): up to three lodges by family and place, how many wooded tiles each counts, which woodcutters are felling, roughly when the bag starts to shrink and how far it falls; that keeping is binding (no one fells a kept tree, the player's word is final); and its cost: the woodcutters walk farther, so the town gets less lumber.
+- **The answer:** "Keep <family>'s hunting grounds" keeps every wooded tile in that lodge's reach, or "Keep woods (V)" to choose. Nothing is ever kept automatically.
+- **Timing:** in the test town the card shows on the first day of felling, with the bag still full; the old card ("Hunting grounds are being felled", kept for comparison behind meta `late_hunting_card`) came 198 days later. In the sims it shows on day 7 in 880325585 (61 days before any loss) and up to 133 days ahead elsewhere, against day 651–2,156 or never for the old card.
+- **Clearing obstacles explained:** marked woods that are not being cleared say why: no working woodcutter, felling stops while the town is out of food, or no woodcutter can reach them (`get_clearing_obstacle`).
+- **Tests:** timeliness, no false warnings, marked woods, binding protection and its cost to woodcutters, reading changes nothing (two towns, 120 days, identical saves), and the card answered by real mouse clicks at 1920×1080 and 1366×768. Screenshots: `tests/visual/hunting_warning_capture.gd`.
+
+### Overlapping woods (fixed: production as well as expectations)
+
+- **The bug was in production too,** not only in what families expected: two lodges in the same woods each hunted the whole woods.
+- **Now** each wooded tile counts once, split among the worked lodges (and claimed lodge projects, for a family weighing one) whose reach holds it (`TownLand.count_woods_share`). Fishing water and pasture overlap the same way and were left alone (no evidence they matter; the same function would serve).
+- **Tests:** uncontested, same woods, partial overlap, separate woods, felled, kept, and changing over time; families judge a new lodge by its share. Hunting rates were not changed.
+- **Effect, paired against the old double counting (people at year 6):** +0.2 / +4.0 / −4.6 (ordinary / stressed / difficult). One town saved (stressed 880325585, 10 → 55), one lost (difficult 3849992342, 54 → 0). A correctness fix that moves close decisions both ways, not a balance gain.
+- **It breaks `founded_town_regression`.** That town's forest family weighs a second snare line against woodcutting at 4.23 against 4.27; counting its share of woods the first lodge already hunts tips it to wood, and the town starves (4 families instead of 8). With the old counting the town reproduces exactly. The test was not loosened and its seed not changed: owner decision below.
+
+### The calling under imminent hunger (candidate, off by default)
+
+**The rule, fixed before measuring:** for a family whose calling fits non-essential work (wool), its pull fades with hardship as that work's need terms already do (`1 − hardship`, instead of half surviving). Food, wood and tools are untouched, farming is not assigned, production is unchanged.
+
+**People at year 6, no player (all rules):**
+
+| Condition | Current | Candidate | No herding | No new trade in year 1 | First three trades |
+|---|---|---|---|---|---|
+| ordinary | 48.6 | **56.2** (+7.6) | 57.9 | 54.2 | 58.8 |
+| stressed | 56.0 | 56.2 (+0.2) | 57.3 | 55.4 | 59.8 |
+| difficult | 34.8 | **50.3** (+15.5) | 53.6 | 56.6 | 57.5 |
+| held-out ordinary (8 towns) | 33.9 | 33.9 | | | |
+| held-out stressed (8 towns) | 23.9 | 24.9 | | | |
+
+- **Towns:** 3 saved, none lost, none more than 5 people worse (36 towns); held-out: unchanged or better.
+- **Decisions changed: 12 in 36 towns** (9 first choices, 3 reviews), almost all a loom family's first choice at hardship 0.8–1.0. Founding herders 2/2/10 → 1/1/6: herding still happens, just not as the hungry founders' first work.
+- **First-year food shortage:** 75/82/93 → 68/73/79 days. Days without tools: 420/195/571 → 263/175/583.
+- **Traced (difficult 655683252, 0 → 108):** on day 1 the loom family at hardship 0.8 ranks herding 1.62 → 0.42 and takes wood instead; a neighbour then takes a snare line, the town is fed by day 240; a herder starts by day 120 anyway. Ordinary 2487541759 (0 → 35) and difficult 3151458409 (0 → 67): the same family turns to a farm.
+- **Recovery:** it recovers about two thirds of what banning herding would, without banning it, and harms no town measured. Held-out sets are small and showed little; not proof of a general gain.
+- **Kept as meta `comfort_calling_fades`; default unchanged** (it changes an owner-approved weight). Recommended for adoption: decision below.
+
+### The five-year tool trap (a bug, fixed)
+
+- **Traced** (stressed 2860120474, `--trace-tools`): from day 105 the tool mender's family wanted to improve to a toolmaker (wood 10, **tools 0**). Wood rose past 4,000; tools stayed below the protected reserve (4 + 2 per proper workplace) for four years; upkeep was paid or mended, never the cause.
+- **Cause:** `TownConstruction.can_supply` refused every material whose free store was below the reserve, even one the project does not use. So the only project that makes tools was blocked for lack of tools.
+- **Fix:** materials the project costs nothing of are skipped. The reserve is unchanged and still binding for what a project actually draws; no resource is created (test 21 in `autonomous_occupations_validation`, which fails three checks without the fix).
+- **Effect:** the trapped town gets its toolmaker early, no days without tools, 93 people at year 6 instead of 9. Paired against the baseline (both with the old woods counting): −0.9 / +6.4 / −0.2 on average. One ordinary town lost people (1668705218, 20 → 6): the fix only moved its toolmaker from day 1,620 to day 960; both runs then met the same famine near day 1,920, and only the baseline recovered — a chaotic divergence, not a mechanism.
+
+### Founding provisions (diagnostic only; nothing changed)
+
+Starting cargo `--provisions`, people at year 6, paired against today's (300 food, 45 wood, 14 tools, worth 507.5 grain). The first four are trades of equal value.
+
+| Cargo | Ordinary | Stressed | Difficult |
+|---|---|---|---|
+| more food, fewer tools (380 / 45 / 6) | +0.8 | −11.0 | −11.5 |
+| more food, little wood (360 / 5 / 14) | −12.4 | −21.1 | +4.6 |
+| more food, both less (390 / 25 / 8) | −4.3 | −14.9 | −2.0 |
+| building materials (220 / 65 / 19) | +5.6 | −5.9 | −4.5 |
+| food 200 (others today's) | −1.3 | −2.0 | +0.8 |
+| food 400 (others today's) | −4.3 | −6.0 | −8.9 |
+
+- **No cargo helps reliably, and more food alone does not help.** With more food, hardship reads lower at founding and more families take non-food or comfort work (founding herders rise); losing a third of the food costs little. Tools and wood traded away cost the most on hard land.
+- **So** the founding fragility is about which work families take up in the first weeks, not the size of the larder. An expedition-provisioning decision would mostly be a trade-off the player cannot judge from these results. Not worth developing now; the treasury's founding allocation (`docs/TREASURY_AUDIT.md`) acts on the same weeks more directly.
+
+### Player agency: see `docs/PLAYER_AGENCY_AUDIT.md`, Round 5
+
+In short: answering the early card helps ordinary (+2.9) and difficult (+6.4) sites and costs stressed ones (−3.4); keeping every wood is clearly harmful (−15.6 / −16.4 / −2.4); the informed player helps (+8.4 / +1.6 / +18.1).
+
+### For the owner (fifth round)
+
+1. **`founded_town_regression` fails on this branch.** Choose one:
+   - accept that this founded town now starves (a correct-counting outcome of a near tie) and re-pin the test to a town that still checks the same things;
+   - keep it red until the founding economy is settled (the treasury's founding allocation may change it);
+   - run it under `woods_not_shared` (not recommended: hides the fix).
+2. **The candidate** (`comfort_calling_fades`): adopt as default (recommended; no town harmed in 52 measured), keep as a comparison meta, or drop.
+3. **Shared woods and the tool-trap fix** are on by default as correctness fixes; approval wanted.
+4. **Fishing water and pasture** overlap as woods did; extend `count_woods_share` to them, or leave them until evidence.
+5. **Founding provisions:** no decision recommended now (above).
 
 ## Fourth Round, Phase 3 (2026-11-01): Priority 5, the New Trades Investigated
 

@@ -93,6 +93,19 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # Policies added: informed_appeal_once, keep_hunting, keep_lodges, informed_appeal, informed_land, priority_switcher, overprotect.
 # Save-using tests (save_game_validation, community_play_validation) write to a folder of their own process and found a fixed
 # town, so they may run side by side and pass or fail the same way every run.
+# Fifth round (docs/AUTONOMOUS_OCCUPATIONS.md): policy keep_on_warning answers the early hunting-grounds card with its keep
+# button; keep_hunting now keeps only once a lodge has lost a third of its best yield (the late rule). Metas:
+# comfort_calling_fades (the candidate, off by default), woods_not_shared (the old double-counted woods), late_hunting_card.
+# --provisions=food:N,wood:N,tools:N sets the starting stores (founding-provisions diagnostic); --trace-tools (with --seed=N)
+# prints the tool and wood stores, reserve, upkeep and every family's word on improving its work ([TOOLS]).
+# Results now carry people at years 1 and 3, first-year shortage days, work taken up, founding herders, the candidate's
+# changed decisions (fade_changed, fade_cases), woodcutter-days lost to kept woods and the early card's first showing.
+
+# Hunting grounds (fifth round): woods shared among lodges (seven cases), the early warning's timing, no false warnings,
+# keeping binding and its cost to woodcutters, reading changes nothing, clearing obstacles, and the card answered by real
+# clicks at 1920x1080 and 1366x768; then its screenshots (needs a window)
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/hunting_grounds_validation.gd
+& (Get-Content .godot-exe).Trim() --path . --script res://tests/visual/hunting_warning_capture.gd -- <output_dir>
 
 # Home sites (docs/HOME_SITES.md): families choosing their own sites on land set aside, preferred land, no land, no
 # overlap, explanations, starting land, land reserved from work, shared works among homes, preferred land between equal sites, explanations
