@@ -41,6 +41,7 @@ The owner is about to give the next piece of work. Until then, the open owner de
    - prompt the Elder to reappoint after a vacancy?
    - the office brings favouritism, so any Speaker leaves trust below no Speaker.
 7. **Earlier open decisions still stand:** occupation reconsideration's rate and the retired swap's cost; the guiding-wisdom list.
+8. **Property, contributions and the treasury** (`docs/PROPERTY_AND_COMMUNAL_RESOURCES.md`, design audit only, 2026-11-01): decisions P1–P10, including two places where respected voices blur reputation and authority. Separate from the occupations work, and its implementation waits for it.
 
 **Where things are.**
 - **Branches:** the feature branches (`feature/step3-integration`, `feature/guiding-wisdom`, `feature/occupation-reconsideration`, `feature/household-self-sufficiency`, `feature/emergent-recognition`, `investigate/workplace-choices`) are merged and pushed, and kept for reference.

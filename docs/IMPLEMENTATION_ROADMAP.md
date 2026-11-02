@@ -339,6 +339,18 @@ Next implementation step: draw regional deposits onto town maps as resource tile
 2. Readability pass: tell tier 0 from tier 1, who works where, who is struggling, at a glance.
 3. Art direction decision (style, perspective, scope), then art, the UI overhaul, and audio replacing code-drawn shapes. `BuildingVisuals` profiles are the intended hook for sprites. (All three map scales now share the miniature style, so in practice the direction is set; sprites, UI, and audio remain.)
 
+## Property, Contributions And The Treasury (proposed 2026-11-01, awaiting owner decisions)
+
+Design audit and phases: `docs/PROPERTY_AND_COMMUNAL_RESOURCES.md`. Nothing built. If approved (decision P9 there), these phases replace M7's state storehouse and tithe rate: customary contributions come first, and taxation is a later policy.
+
+- **Phase 1, ledger with no change in play:** household shares in the one store, who paid for each building, a read-only treasury. Matched snapshots identical to `develop`.
+- **Phase 1b (independent), reputation and authority apart:** respected voices weighted by their own view of an ask; economic weight reaching influence only through regard.
+- **Phase 2, founding compact:** each family's contribution share from its values, trust and the town's custom; the common table; families paying for their own building first. Communal and private towns must both be viable.
+- **Phase 3, commitments and offers:** explicit treasury commitments; offers that lower a project's real cost; the Speaker within the Elder's commitments.
+- **Phase 4, market day:** monthly exchange among families in grain, without credit; wealth as a level.
+
+Starts after `feature/autonomous-occupations` is merged or set aside (shared files).
+
 ## Future Feature Notes
 
 Ideas recorded for later design, not scheduled:
