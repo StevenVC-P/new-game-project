@@ -5,10 +5,16 @@ extends SceneTree
 # Needs attention shows only what the town's state holds; tabs, the wheel, and buttons answer real
 # clicks; a family card and the map's selection follow each other; the tool footer and the ground
 # readout appear when they should; and every shortcut the Planning page lists selects that tool.
+#
+# The town is the same every run (FOUNDING_SEED), and the checks of what the sidebar shows set the
+# state they are about. Whether that town fares well after its year is a gameplay question, checked
+# in tests/founded_town_regression.gd, not here.
 
 const MainScript = preload("res://scripts/main.gd")
 const StandInPlayerScript = preload("res://tests/sim/stand_in_player.gd")
 const KNOWN_KINDS: Array[String] = ["heading", "status", "card", "row", "text", "buttons", "expander", "gap"]
+# The game's random numbers (founders, their values) from here, so every run founds the same town.
+const FOUNDING_SEED: int = 20261101
 
 var failure_count: int = 0
 
@@ -20,6 +26,7 @@ func run_all() -> void:
 	var main: Node2D = MainScript.new()
 	main.use_authored_world = true
 	root.add_child(main)
+	main.rng.seed = FOUNDING_SEED
 	await _settle()
 	var region: WorldMapData.Region = main.world_map_data.find_region_by_name("Meander Plains")
 	main.world_map_view.request_region_entry(region.id)
@@ -106,20 +113,24 @@ func test_pages_change_nothing(main: Node2D, city: City) -> void:
 	_check(city.households.map(func(h: Household) -> String: return h.initiative_note + h.social_note) == notes, "building pages leaves families' notes as they were")
 	city.influence.set_encouraged(TownInfluence.ACTIVITY_WOOD, false)
 
+# What the cards show follows the state set here, whatever the town's year left it with.
 func test_attention_follows_state(city: City) -> void:
 	var titles: Callable = func() -> Array: return SidebarOverviewPage.get_attention(city).map(func(card: Dictionary) -> String: return str(card["title"]))
+	var shortage: bool = city.resources["food_shortage"]
+	city.resources["food_shortage"] = false
 	_check(not titles.call().has("Food has run out"), "no hunger card while there is food")
 	_check(not titles.call().has("Bandits on the road"), "no bandit card while no band is coming")
-	var shortage: bool = city.resources["food_shortage"]
 	city.resources["food_shortage"] = true
 	_check(titles.call().has("Food has run out"), "a shortage shows the hunger card")
-	city.resources["food_shortage"] = shortage
+	# Among the cards of a town that is not starving, a band on the road comes first.
+	city.resources["food_shortage"] = false
 	city.defense.raid_day = city.construction.day + 10
 	city.defense.raid_strength = 3
 	var cards: Array[Dictionary] = SidebarOverviewPage.get_attention(city)
 	_check(str(cards[0]["title"]) == "Bandits on the road", "bandits on the road come first")
 	_check((cards[0]["buttons"] as Array).any(func(b: Dictionary) -> bool: return b["action"]["action"] == "call_militia"), "the bandit card offers the militia")
 	city.defense.raid_day = -1
+	city.resources["food_shortage"] = shortage
 	city.trade.arrive(city.construction.day, TownTrade.LINK_ROAD)
 	var trader: Array = SidebarOverviewPage.get_attention(city).filter(func(card: Dictionary) -> bool: return card["title"] == "A trader is in town")
 	_check(trader.size() == 1 and (trader[0]["buttons"] as Array).size() == city.trade.get_lots().size(), "a trader's card offers each of its lots")
@@ -199,8 +210,10 @@ func test_family_focus(main: Node2D, city: City) -> void:
 	var sidebar: TownSidebar = main.town_sidebar
 	var housed: Household = null
 	for household: Household in city.households:
-		if household.residence_building_id >= 0 and city.buildings[household.residence_building_id].is_house():
-			housed = household
+		for building: Building in city.buildings:
+			if building.id == household.residence_building_id and building.is_house():
+				housed = household
+		if housed != null:
 			break
 	_check(housed != null, "the grown town has a housed family")
 	if housed == null:

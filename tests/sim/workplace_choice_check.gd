@@ -87,9 +87,12 @@ func play(site: Dictionary, stress: bool, years: int) -> Dictionary:
 				var holding: Building = FamilyInitiative.get_holding(town, household)
 				if holding == null and household.assigned_workers <= 0 and not town.construction.is_promised_to_workplace(household.id):
 					var options: Dictionary = {}
-					for activity: String in FamilyInitiative.ACTIVITIES:
-						var desire: Dictionary = FamilyInitiative.get_work_desire(town, household, activity)
-						options[activity] = {"score": float(desire["score"]) + FamilyInitiative.get_noise(town, household, activity), "terms": desire["terms"]}
+					# By the first three trades' old names (food, wood, tools), and the others' own.
+					for occupation: String in FamilyInitiative.get_occupations(town):
+						var desire: Dictionary = FamilyInitiative.get_work_desire(town, household, occupation)
+						var key: String = FamilyInitiative.get_choice_key(occupation)
+						if bool(desire["available"]):
+							options[key] = {"score": float(desire["score"]) + FamilyInitiative.get_noise(town, household, key), "terms": desire["terms"]}
 					pending[household.id] = {"kind": "takeup", "options": options, "calling": household.get_match_quality("toolmaker"), "trade": household.family_trade}
 				elif holding != null and holding.is_tier0() and FamilyInitiative.get_activity(holding.type) != "" and town.construction.get_upgrade_project(holding.id) == null:
 					var proper: String = BuildingTiers.get_upgrade_type(holding.type)

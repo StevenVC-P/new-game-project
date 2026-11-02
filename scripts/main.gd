@@ -1251,6 +1251,12 @@ func apply_city_action(option_data: Dictionary) -> void:
 		city.defense.call_militia()
 	elif action == "set_priority":
 		city.influence.set_priority(str(option_data["priority"]))
+	elif action == "make_appeal":
+		FocusedAppeal.make(city, str(option_data["good"]))
+	elif action == "keep_hunting_ground":
+		for building: Building in city.buildings:
+			if building.id == int(option_data["building"]):
+				city.woodland.keep_hunting_ground(building)
 	elif action == "set_store_rule":
 		city.influence.store_rule = str(option_data["rule"])
 	elif action == "choose_wisdom":
@@ -1484,6 +1490,8 @@ func handle_building_selection_key_event(key_event: InputEventKey) -> bool:
 		select_building_type(TownWoodland.CLEAR)
 	elif is_letter_key(keycode, physical_keycode, KEY_F):
 		select_building_type(TownFarmland.TILL)
+	elif is_letter_key(keycode, physical_keycode, KEY_V):
+		select_building_type(TownWoodland.PROTECT)
 	elif is_letter_key(keycode, physical_keycode, KEY_G):
 		select_building_type(TownConstruction.ROAD)
 	elif is_letter_key(keycode, physical_keycode, KEY_K) and selected_city_index >= 0 and selected_city_index < cities.size() and cities[selected_city_index].influence.enabled:
@@ -1578,7 +1586,7 @@ func get_road_preview(city: City) -> Array[Vector2i]:
 
 # The clearing and tilling tools mark a block between two clicks.
 static func is_block_tool(building_type: String) -> bool:
-	return building_type == TownWoodland.CLEAR or building_type == TownFarmland.TILL or building_type == TownInfluence.WORK_GROUND or HomeSites.TOOL_LEVELS.has(building_type)
+	return building_type == TownWoodland.CLEAR or building_type == TownWoodland.PROTECT or building_type == TownFarmland.TILL or building_type == TownInfluence.WORK_GROUND or HomeSites.TOOL_LEVELS.has(building_type)
 
 func place_block_corner(city: City) -> void:
 	if block_start_tile.x < 0:
@@ -1591,6 +1599,9 @@ func place_block_corner(city: City) -> void:
 	elif selected_building_type == TownFarmland.TILL:
 		if city.farmland.mark_block(block_start_tile, city_hovered_tile) == 0:
 			print("No open ground to till there")
+	elif selected_building_type == TownWoodland.PROTECT:
+		if city.woodland.protect_block(block_start_tile, city_hovered_tile) == 0:
+			print("No woods to keep there")
 	elif city.woodland.mark_block(block_start_tile, city_hovered_tile) == 0:
 		print("No woods to clear there")
 	block_start_tile = Vector2i(-1, -1)
@@ -1700,7 +1711,7 @@ func get_block_result(city: City, origin: Vector2i) -> Dictionary:
 				return building_placement.make_result(true, "Valid placement: click %s corner of the land the community would rather families build on (all marked: unmark)" % corner, footprint)
 		return building_placement.make_result(true, "Valid placement: click %s corner of the land set aside for homes (all marked: unmark)" % corner, footprint)
 	if block_start_tile.x < 0:
-		return building_placement.make_result(true, "Valid placement: click one corner of the " + ("land to till" if selected_building_type == TownFarmland.TILL else "woods to clear"), footprint)
+		return building_placement.make_result(true, "Valid placement: click one corner of the " + ("land to till" if selected_building_type == TownFarmland.TILL else "woods to keep" if selected_building_type == TownWoodland.PROTECT else "woods to clear"), footprint)
 	if selected_building_type == TownFarmland.TILL:
 		var open: int = city.farmland.get_tillable_in_block(block_start_tile, origin).size()
 		if open == 0:
@@ -1709,6 +1720,8 @@ func get_block_result(city: City, origin: Vector2i) -> Dictionary:
 	var woods: int = city.woodland.get_wooded_in_block(block_start_tile, origin).size()
 	if woods == 0:
 		return building_placement.make_result(false, "No woods in that block", footprint)
+	if selected_building_type == TownWoodland.PROTECT:
+		return building_placement.make_result(true, "Valid placement: click the opposite corner (%d wooded tiles to keep; all kept: lift)" % woods, footprint)
 	return building_placement.make_result(true, "Valid placement: click the opposite corner (%d wooded tiles; all marked: unmark)" % woods, footprint)
 
 func get_building_size(building_type: String) -> Vector2i:

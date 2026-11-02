@@ -42,7 +42,7 @@ static func get_sidebar_lines(city: City) -> Array[String]:
 		lines.append("%d famil%s want a home plot (P)" % [construction.families_without_plot, "y" if construction.families_without_plot == 1 else "ies"])
 	var marked: int = city.woodland.marked.size()
 	if marked > 0:
-		lines.append("Woods to clear: %d tile%s%s" % [marked, "" if marked == 1 else "s", "" if not city.woodland.get_woodcutters().is_empty() else " (needs a working woodcutter)"])
+		lines.append("Woods to clear: %d tile%s%s" % [marked, "" if marked == 1 else "s", "" if city.woodland.get_clearing_obstacle() == "" else " (%s)" % city.woodland.get_clearing_obstacle()])
 	lines.append_array(city.land.get_notices())
 	lines.append_array(FamilyAmbitions.get_notices(city))
 	lines.append_array(city.trade.get_notices())

@@ -300,6 +300,44 @@ How towns get built, settled before it is locked in. Owner decisions: homes and 
 
 Map luck "before" already counts travel; without it (`develop` before this work) the continuous map was 42/42. Measuring found three ways construction stalled a town, each fixed and recorded as a judgment call in the model doc: spare time limited to homes and tier 0 left spare houses unbuilt and stopped growth; a finished workplace could stand empty because its family had been pulled onto another vacancy; towns that left homes to families never had a spare home for marriages.
 
+## Autonomous Occupations and Priority 5 (closed 2026-11-02)
+
+Done; owner-approved and merged to `develop`. Detail, results and history are in `docs/AUTONOMOUS_OCCUPATIONS.md` (sixth round at the top); player agency is in `docs/PLAYER_AGENCY_AUDIT.md` (round 6).
+
+**The final occupation rules:**
+- **The trades.** Families choose their own work among every trade with a hand-work stage: farming, woodcutting, toolmaking, fishing, hunting and herding.
+- **How a choice is scored.** Scored terms with reasons and seeded noise. Shortage recognition is narrow: a good no one makes.
+- **Hunger.** Survival comes first as hunger nears: a calling keeps half its pull for food, wood and tools. For wool work it fades fully (the herding adjustment).
+- **Reconsidering.** A hungry family looks at its work again.
+- **Nothing is forbidden.** Herding stays a founding choice, and families can still choose badly.
+
+**Shared-resource production, corrected:**
+- Woods, fishing water and pasture are each divided among the workplaces of their kind that are in use (`Building.can_produce`) and whose reach holds them. No land is counted twice, in output or in families' expectations.
+- Empty, abandoned and idle workplaces take no share.
+- The protected tool reserve no longer blocks projects that draw nothing from it (the toolmaker trap).
+
+**The player's side:**
+- The hunting-grounds card comes early and gives both sides as a choice.
+- Kept woods are binding.
+
+**Previous behaviour stays reproducible** through comparison metas: `comfort_calling_kept`, `woods_not_shared`, `water_not_shared`, `pasture_not_shared`.
+
+**Accepted trade-off.** Counting water once lowers fishing towns' catch (up to about 45% where several huts share one lake). The owner accepted this as the consequence of removing duplicated production; fishing balance may be revisited later.
+
+**Early-game balance observations (no further occupation tuning now):**
+- Foundings are still decided by a few first-week work choices.
+- The first three trades alone still do somewhat better on stressed and difficult sites.
+- Extra founding food does not help.
+- Some foundings fail for hunger, as `tests/founded_town_regression.gd` pins with one viable and one failed founding.
+
+**Next economic milestone:**
+- household property;
+- private exchange;
+- communal contributions;
+- treasury allocations, binding, with a founding allocation as the intended lever on the first weeks.
+
+It has its own architectural plan (branch `docs/property-and-communal-resources`) and the earlier `docs/TREASURY_AUDIT.md`.
+
 ## Map And Presentation Track (2026-10-20)
 
 Owner direction: the map is part of the plan now; art and presentation wait for mechanics to settle.
