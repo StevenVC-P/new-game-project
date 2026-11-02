@@ -407,7 +407,7 @@ static func get_hunting_ground_cards(city: City) -> Array[Dictionary]:
 		lines.append("%d more hunting workplaces are threatened." % (threats.size() - HUNTING_LODGES_NAMED))
 	if hungry > 0:
 		lines.append("%d of their families %s going hungry." % [hungry, "is" if hungry == 1 else "are"])
-	var kept: String = "If the woods are kept: no one may fell them, whatever the families want (marking them for clearing lifts it; keeping lifts any clearing marks there)"
+	var kept: String = "If the woods are kept: no one may fell them, whatever the families want, until you mark them for clearing"
 	if not cutters.is_empty():
 		var rect: Rect2i = threats[0]["rect"]
 		var keeps: float = 1.0
