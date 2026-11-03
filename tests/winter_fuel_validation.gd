@@ -29,6 +29,7 @@ func run_all() -> void:
 	test_cold_hearths()
 	test_fuel_counts_in_wood_use()
 	test_a_cold_family_gathers_wood()
+	test_cold_draws_families_to_wood_work()
 	test_the_player_is_warned()
 	test_no_map_no_fuel()
 	test_cold_is_saved()
@@ -142,6 +143,31 @@ func test_a_cold_family_gathers_wood() -> void:
 	var desire: Dictionary = HouseholdEconomy.get_secondary_desire(city, household, holding, "wood", {})
 	var reasons: String = str(FamilyInitiative.get_reasons(desire["terms"], true))
 	_check(not bool(desire["possible"]) or reasons.contains("hearth went cold"), "a family whose hearth went cold has that reason to gather wood: %s" % reasons)
+
+# Survival first for cold as for hunger (sprint S3 review): a town whose hearths will go cold draws
+# families to wood work, a family whose own hearth went cold more so, and two cold months running
+# make a family look at its work again at once. Found when the first comparison showed forest towns
+# freezing beside their woods because no family changed its work.
+func test_cold_draws_families_to_wood_work() -> void:
+	var city: City = town(0.3, [Rect2i(20, 18, 10, 10)])
+	set_season(city, AUTUMN)
+	city.resources["wood"] = 0
+	var household: Household = city.households[0]
+	var cold: Dictionary = FamilyInitiative.get_cold_hardship(city, household)
+	_check(float(cold["level"]) > 0.5, "a cold town with no wood is a danger to its families (%.2f)" % float(cold["level"]))
+	var desire: Dictionary = FamilyInitiative.get_work_desire(city, household, "woodcutter")
+	_check(str(FamilyInitiative.get_reasons(desire["terms"], true)).contains("go cold"), "and draws them to wood work: %s" % str(FamilyInitiative.get_reasons(desire["terms"], true)))
+	var warm: City = town(0.8, [Rect2i(20, 18, 10, 10)])
+	warm.resources["wood"] = 0
+	_check(float(FamilyInitiative.get_cold_hardship(warm, warm.households[0])["level"]) == 0.0, "where nothing burns, no such danger")
+	var holding: Building = Building.new(-1, "farm", Vector2i(34, 30), Vector2i(3, 3))
+	city.add_building(holding, household)
+	household.work_building_id = holding.id
+	for _month in range(2):
+		household.cold_days_this_month = OccupationReview.HUNGRY_DAYS_IN_MONTH
+		OccupationReview.update_strain(city, household, holding)
+	var triggers: Array[String] = OccupationReview.get_triggers(city, household, holding)
+	_check(triggers.has(OccupationReview.COLD) and OccupationReview.is_urgent(triggers), "two cold months make a family look at its work at once: %s" % str(triggers))
 
 func test_the_player_is_warned() -> void:
 	var city: City = town(0.3)

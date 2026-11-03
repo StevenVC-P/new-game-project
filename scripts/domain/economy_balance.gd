@@ -58,6 +58,8 @@ const ROUGH_SHELTER_FUEL_FACTOR: float = 1.5
 const COLD_SKIP_TICK_INTERVAL: int = 4
 const HARDSHIP_COLD_DAYS: int = 10
 const COLD_HARDSHIP_POINTS: int = 1
+# While hearths burn, workshops and builders leave this many days of the hearths' wood in store.
+const FUEL_RESERVE_DAYS: float = 5.0
 
 # --- Fatal hardship (HouseholdMortality, sprint S3b) ---
 # A month is severe when a family went hungry, or its hearth cold, on HARDSHIP_SEVERE_DAYS or more

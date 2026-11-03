@@ -1387,7 +1387,9 @@ func apply_input_output_production(output_key: String, output_amount: int, input
 		var input_cost: int = int(input_costs[input_key])
 		if input_cost <= 0:
 			continue
-		capped_output = min(capped_output, int(floor(float(int(resources[input_key])) / float(input_cost))))
+		# The hearths' wood comes first in the cold seasons (TownFuel.get_reserve): workshops use only
+		# what lies beyond it.
+		capped_output = min(capped_output, int(floor(float(int(resources[input_key]) - TownFuel.get_reserve(self, input_key)) / float(input_cost))))
 
 	if capped_output <= 0:
 		return 0

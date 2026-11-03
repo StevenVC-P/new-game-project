@@ -62,6 +62,9 @@ const STEP_SCORES: Array[float] = [0.0, 1.5, 3.0]
 const SECONDARY_COST: float = 1.5
 const TOWN_SHORT_WEIGHT: float = 2.5
 const OWN_NEED_WEIGHT: float = 1.0
+# The danger of cold at its worst, drawing a family to gather firewood (sprint S3 review): as much as
+# hunger draws a family to food work (FamilyInitiative.SURVIVAL_WEIGHT).
+const COLD_SURVIVAL_WEIGHT: float = 4.0
 const OWN_PLENTY_WEIGHT: float = 1.0
 const KNOWS_WEIGHT: float = 1.0
 const OWN_SKILL_WEIGHT: float = 0.5
@@ -463,13 +466,13 @@ static func get_secondary_desire(city: City, household: Household, holding: Buil
 			if land < 1.0:
 				FamilyInitiative.add(terms, -(1.0 - land), "its garden ground is poor or small")
 		"wood":
-			# A hearth gone cold this month, or a cold season ahead with little wood in store (TownFuel).
-			if household.cold_days_this_month > 0:
+			# Survival first (sprint S3 review): the danger of cold, the family's own hearth or the
+			# town's, draws it to gather firewood as hunger draws a family to food work
+			# (FamilyInitiative.get_cold_hardship).
+			var cold: Dictionary = FamilyInitiative.get_cold_hardship(city, household)
+			if float(cold["level"]) > 0.0:
 				own_need = true
-				FamilyInitiative.add(terms, OWN_NEED_WEIGHT, "its hearth went cold")
-			elif TownFuel.get_need_over(city, FamilyInitiative.FUEL_RISK_DAYS) > float(int(city.resources.get("wood", 0))):
-				own_need = true
-				FamilyInitiative.add(terms, OWN_NEED_WEIGHT * 0.5, "the cold season will burn more wood than the town holds")
+				FamilyInitiative.add(terms, COLD_SURVIVAL_WEIGHT * float(cold["level"]), str(cold["reason"]))
 			if land < 1.0:
 				FamilyInitiative.add(terms, -(1.0 - land), "few trees near its home")
 		"tools":

@@ -92,6 +92,16 @@ static func skips_work(city: City, household: Household) -> bool:
 	var interval: int = EconomyBalance.COLD_SKIP_TICK_INTERVAL
 	return int(city.resources["production_tick_count"]) % interval == interval / 2
 
+# Wood kept back for the hearths (sprint S3 review): while hearths burn, workshops that use wood
+# take only what lies beyond FUEL_RESERVE_DAYS of the hearths' need, so the day's wood warms families
+# before it becomes tools. Survival first, as the protected reserve keeps tools for upkeep. Builders
+# are not held back: a better woodcutter or a proper home is how a cold town gets warm. Nothing kept
+# of other goods, or when nothing burns.
+static func get_reserve(city: City, good: String) -> int:
+	if good != "wood" or not is_on(city):
+		return 0
+	return int(ceil(get_daily_need(city) * EconomyBalance.FUEL_RESERVE_DAYS))
+
 # Days of fuel the store holds at today's need (INF when nothing burns now).
 static func get_fuel_days(city: City) -> float:
 	var need: float = get_daily_need(city)

@@ -238,7 +238,11 @@ static func get_work_desire(city: City, household: Household, occupation: String
 	var activity: String = get_activity(occupation)
 	# Hardship: a calling is what a family pursues when it can; as hunger nears, it matters less.
 	var hardship: Dictionary = get_hardship(city, household)
-	var level: float = float(hardship["level"])
+	var hunger: float = float(hardship["level"])
+	# Cold is a danger to survival too (TownFuel; sprint S3 review): a calling and what the town only
+	# goes without yield to whichever danger is greater.
+	var cold: Dictionary = get_cold_hardship(city, household)
+	var level: float = maxf(hunger, float(cold["level"]))
 	var prosperity: float = 1.0 - CALLING_YIELD * level
 	var hard_times: String = ", though survival comes first now" if level >= 0.3 else ""
 	var essential: bool = activity in [TownInfluence.ACTIVITY_FOOD, TownInfluence.ACTIVITY_WOOD, TownInfluence.ACTIVITY_TOOLS]
@@ -333,10 +337,14 @@ static func get_work_desire(city: City, household: Household, occupation: String
 			add(terms, land, LAND_REASONS[reach_kind] if reach < 0.75 else "it yields less than other ways of getting " + GoodsNeedBucketHelper.get_good_display_name(activity).to_lower())
 	# The danger of hunger draws a family to food work, as far as that work would really feed people
 	# here: on this land, with its skill, through the coming seasons.
-	if activity == TownInfluence.ACTIVITY_FOOD and level > 0.0:
+	if activity == TownInfluence.ACTIVITY_FOOD and hunger > 0.0:
 		var relief: float = get_food_relief(city, household, occupation, reach)
 		if relief > 0.05:
-			add(terms, SURVIVAL_WEIGHT * level * relief, str(hardship["reason"]))
+			add(terms, SURVIVAL_WEIGHT * hunger * relief, str(hardship["reason"]))
+	# The danger of cold draws a family to wood work in the same way, as far as the trees in reach of
+	# where it would cut allow.
+	if activity == TownInfluence.ACTIVITY_WOOD and float(cold["level"]) > 0.0 and reach > 0.05:
+		add(terms, SURVIVAL_WEIGHT * float(cold["level"]) * minf(1.0, reach), str(cold["reason"]))
 	# What it knows draws it to that work; work it would have to learn, it starts at a novice's pace
 	# (HouseholdEconomy).
 	if HouseholdEconomy.is_on(city) and not city.has_meta("economy_no_proficiency_effects"):
@@ -380,6 +388,25 @@ static func get_hardship(city: City, household: Household) -> Dictionary:
 		return {"level": town, "reason": "the town grows less food than it eats"}
 	var winter: bool = city.get_season_index() >= 2
 	return {"level": town, "reason": "the town will go hungry before %s" % ("the winter is out" if winter else "the next harvest is in")}
+
+# The danger of cold (TownFuel; sprint S3 review): {"level" 0..1, "reason"}, as get_hardship is for
+# hunger. The family's own cold hearth this month, or the town's wood in store and coming from its
+# wood work over the coming SURVIVAL_HORIZON_DAYS against what its hearths and workshops will burn and
+# use then, weighed by temperament. Nothing where no hearth burns.
+static func get_cold_hardship(city: City, household: Household) -> Dictionary:
+	if city.has_meta("no_survival_awareness") or not TownFuel.is_on(city):
+		return {"level": 0.0, "reason": ""}
+	var own: float = clampf(float(household.cold_days_this_month) / HUNGRY_DAYS_DESPERATE, 0.0, 1.0)
+	var town: float = 0.0
+	if TownFuel.get_need_over(city, SURVIVAL_HORIZON_DAYS) > 0.0:
+		var use: float = get_use(city, TownInfluence.ACTIVITY_WOOD, SURVIVAL_HORIZON_DAYS)
+		var coming: float = float(int(city.resources["wood"])) + get_working_output(city, TownInfluence.ACTIVITY_WOOD) * SURVIVAL_HORIZON_DAYS
+		var risk: int = HouseholdCharacter.get_axis(household, HouseholdCharacter.RISK)
+		var temperament: float = 1.0 + 0.25 * maxi(0, -risk) - 0.1 * maxi(0, risk)
+		town = clampf((1.0 - coming / maxf(1.0, use)) * temperament, 0.0, 1.0)
+	if own >= town and own > 0.0:
+		return {"level": own, "reason": "its own hearth has gone cold"}
+	return {"level": town, "reason": "the town's hearths will go cold before the cold season is out"}
 
 # How far the town's food falls short of what its people will eat over the coming
 # SURVIVAL_HORIZON_DAYS, 0 (enough) to 1 (nothing in store or coming): its food in store and its

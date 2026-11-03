@@ -77,6 +77,9 @@ const HUNGER: String = "hungry"
 # Wood work whose trees are running out (sprint S2): half of the best share of a full cut it has had,
 # or less, for a season; with no tree left it may fell, it doesn't wait for its tenure or year.
 const TIMBER: String = "timber_failing"
+# A family whose own hearth went cold for two months running (TownFuel; sprint S3 review): like
+# hunger, it doesn't wait for its tenure or year to try another way to stay warm.
+const COLD: String = "cold"
 const TIMBER_FAILING_SHARE: float = 0.5
 
 static func is_on(city: City) -> bool:
@@ -150,7 +153,7 @@ static func is_due(city: City, household: Household) -> bool:
 # Reasons that do not wait for the usual tenure or year: an essential shortage, a family's own hunger,
 # wood work whose trees are failing (after a season at half its best, or at once with none left).
 static func is_urgent(triggers: Array[String]) -> bool:
-	return triggers.has(SHORTAGE) or triggers.has(HUNGER) or triggers.has(TIMBER)
+	return triggers.has(SHORTAGE) or triggers.has(HUNGER) or triggers.has(TIMBER) or triggers.has(COLD)
 
 static func is_timber_failing(city: City, holding: Building) -> bool:
 	if TownLand.get_reach_kind(holding.type) != TownLand.TIMBER or city.local_map.is_empty():
@@ -174,6 +177,7 @@ static func update_strain(city: City, household: Household, holding: Building) -
 		DISTANCE: is_far(city, household, holding),
 		HUNGER: household.short_days_this_month >= HUNGRY_DAYS_IN_MONTH and not city.has_meta("no_survival_awareness"),
 		TIMBER: is_timber_failing(city, holding),
+		COLD: household.cold_days_this_month >= HUNGRY_DAYS_IN_MONTH and not city.has_meta("no_survival_awareness"),
 	}
 	for reason: String in holds.keys():
 		household.work_strain[reason] = int(household.work_strain.get(reason, 0)) + 1 if bool(holds[reason]) else 0
@@ -192,6 +196,8 @@ static func get_triggers(city: City, household: Household, holding: Building) ->
 		triggers.append(SHORTAGE)
 	if int(household.work_strain.get(HUNGER, 0)) >= HUNGRY_MONTHS:
 		triggers.append(HUNGER)
+	if int(household.work_strain.get(COLD, 0)) >= HUNGRY_MONTHS:
+		triggers.append(COLD)
 	return triggers
 
 # The worst essential shortage the town faces in a good other than `own` (FamilyInitiative.get_shortage).

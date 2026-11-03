@@ -612,6 +612,8 @@ func apply_labor(project: ConstructionProject, labor: float) -> void:
 		var material: String = ""
 		var remaining: Dictionary = project.get_remaining_materials()
 		for candidate: String in remaining.keys():
+			# Builders may take the hearths' wood (unlike workshops, TownFuel.get_reserve): a better
+			# woodcutter or home is how a cold town gets warm.
 			if int(city.resources.get(candidate, 0)) > 0:
 				material = candidate
 				break
