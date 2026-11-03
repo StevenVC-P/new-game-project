@@ -211,6 +211,8 @@ From `AGENTS.md`, `HANDOFF.md` and the brief: `main.gd` gets no simulation logic
 
 ## 10. Handoff
 
+*Update 2026-11-03:* the first comparisons ran. **S1b confirmed** (stone only where the land holds it: marginal towns' stone fell from 412 to 45 blocks by year 3, rocky kept 320 of 342; `S1b_summary_y3.md`). **S2 stands** (no harm; `S2_S3_S3b_summary_y6.md`). **S3 had a survival-first defect** (towns froze beside their woods; traced and fixed in `4556af0`, report `S3_firewood.md`), so the first S3, S3b, S4 and S5 comparisons are set aside. Re-running on the fixed build (`../ngg-ef-runs5` at `4556af0`): labels `A` (all on, ordinary and stressed), `A-nodeaths`, `A-nofuel` (deaths and fuel off), `A-review`. The fix sits on top of the stack (`feature/ef-s5-clay-lime`) rather than on S3's branch; the integration merge takes the stack in order.
+
 *As of 2026-11-02 evening.*
 - **Track A is built:** S1a (`e5410ba`), S1b (`3ca6e31`), S2 (`10c8745`), S3 (`accb93d`), S3b (`07b80eb`), S4 (`2179f49`, S4c `4d78d9d`), S5 (`4a08dc6`), each on its own branch `feature/ef-<sprint>` stacked on the one before and pushed. Every sprint's rules tests and the full suite pass (53/53 at S5).
 - **Measured so far:** only the baseline B0 (ordinary, quarry commission; stressed running). The comparisons and reviews of S1b–S5 are queued in order and take roughly 3–6 hours each at three processes: S1b quarry → the S3b build run as S2, S3 and S3b (metas `no_hardship_deaths`, `no_winter_fuel`) → S3b review → S4 and review → S5 and review. Fixed worktrees: `../ngg-ef-runs` (B0, `e5410ba`), `-runs3` (S1b), `-runs2` (S3b), `-runs4` (S4), `-runs5` (S5). Logs in `test-logs/div/<label>/`; tables by `scripts/compare_divergence.ps1`.
