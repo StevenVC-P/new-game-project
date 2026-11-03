@@ -20,7 +20,9 @@ const TIER0_TO_TIER1: Dictionary = {
 	"grazing_pen": "herder",
 	# Sprint S4c (owner D6): families take up stone work themselves, prising stone from a deposit by
 	# hand before any quarry is built.
-	"stone_pit": "quarry"
+	"stone_pit": "quarry",
+	# Sprint S5: clay dug and fired in a clamp by hand where it lies, before a brickworks is built.
+	"clay_pit": "brickworks"
 }
 
 const DISPLAY_NAMES: Dictionary = {
@@ -32,6 +34,7 @@ const DISPLAY_NAMES: Dictionary = {
 	"snare_line": "Snare Line",
 	"grazing_pen": "Grazing Pen",
 	"stone_pit": "Stone Pit",
+	"clay_pit": "Clay Pit",
 	"fisher": "Fisher's Hut",
 	"hunter": "Hunter's Lodge",
 	"watch_post": "Watch Post",

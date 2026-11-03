@@ -90,8 +90,9 @@ func get_output_factor(building: Building) -> float:
 		factor *= city.woodland.get_felling_factor(building)
 		if has_map():
 			factor *= EconomyBalance.WOOD_SEASON_YIELD[season]
-	elif base == Building.BUILDING_QUARRY:
-		factor *= TownDeposits.get_quarry_factor(city, building)
+	elif TownDeposits.draws_on_deposit(building):
+		# The stone or clay underfoot (TownDeposits).
+		factor *= TownDeposits.get_factor(city, building)
 	if season == SEASON_WINTER and is_wolf_exposed(building):
 		factor *= EconomyBalance.WOLF_WINTER_YIELD
 	return factor
@@ -119,9 +120,9 @@ func get_reach_factor(building: Building) -> float:
 	# cached here (TownWoodland caches its own search).
 	if get_reach_kind(building.type) == TIMBER:
 		return city.woodland.get_felling_factor(building)
-	# Stone work: the stone left underfoot, which every block cut changes (TownDeposits).
-	if get_reach_kind(building.type) == STONE:
-		return TownDeposits.get_quarry_factor(city, building)
+	# Stone or clay work: the deposit left underfoot, which every unit taken changes (TownDeposits).
+	if get_reach_kind(building.type) == STONE or get_reach_kind(building.type) == CLAY:
+		return TownDeposits.get_factor(city, building)
 	if is_shared(get_reach_kind(building.type)):
 		var key: int = hash([city.logistics.layout_version, get_rivals_key(Building.BUILDING_FISHER), get_rivals_key(Building.BUILDING_HUNTER), get_rivals_key(Building.BUILDING_HERDER)])
 		if _shared_reach_key != key:
@@ -143,6 +144,8 @@ func get_reach_factor(building: Building) -> float:
 const TIMBER: String = "timber"
 # And "stone": the deposit under a quarry or stone pit (TownDeposits, sprint S4c), not shared either.
 const STONE: String = "stone"
+# And "clay": the clay under a brickworks or clay pit (sprint S5).
+const CLAY: String = "clay"
 
 static func get_reach_kind(building_type: String) -> String:
 	match BuildingTiers.get_base_type(building_type):
@@ -156,6 +159,8 @@ static func get_reach_kind(building_type: String) -> String:
 			return TIMBER
 		Building.BUILDING_QUARRY:
 			return STONE
+		Building.BUILDING_BRICKWORKS:
+			return CLAY
 	return ""
 
 # What a workplace of this type would make at `origin`. Its land is shared: every tile also in reach
@@ -171,8 +176,8 @@ func get_reach_factor_at(building_type: String, origin: Vector2i, size: Vector2i
 		return 1.0
 	if kind == TIMBER:
 		return city.woodland.estimate_felling_factor_at(origin, size)
-	if kind == STONE:
-		return TownDeposits.get_footprint_factor(city.local_map, origin, size)
+	if kind == STONE or kind == CLAY:
+		return TownDeposits.get_footprint_factor(city.local_map, origin, size, kind)
 	var full: int = EconomyBalance.HUNTER_FULL_WOODS_TILES
 	match kind:
 		"water":

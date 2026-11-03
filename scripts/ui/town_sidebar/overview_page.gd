@@ -358,6 +358,10 @@ static func get_failing_livelihood_cards(city: City) -> Array[Dictionary]:
 					lines.append(cause.substr(0, 1).to_upper() + cause.substr(1) + ".")
 				lines.append("Woodcutters fell woods marked for clearing before any others.")
 				buttons.append({"text": "Mark woods to fell elsewhere (C)", "action": {"action": "select_tool", "tool": TownWoodland.CLEAR}})
+			TownLand.CLAY:
+				title = "Clay is running out"
+				lines.append("The clay under %d brickworks now gives %d%% of what it did." % [count, share])
+				lines.append("Worked-out clay pits let their families go; more clay lies along the water.")
 			TownLand.STONE:
 				title = "Stone is running out"
 				lines.append("The stone under %d quarr%s now gives %d%% of what it did." % [count, "y" if count == 1 else "ies", share])

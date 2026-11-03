@@ -52,7 +52,7 @@ var repeat: bool = false
 var metas: Array[String] = []
 var commissions: Array[Dictionary] = []
 # The deposit a workplace is best placed on, for choosing a commissioned site.
-const DEPOSIT_OF: Dictionary = {"quarry": "stone"}
+const DEPOSIT_OF: Dictionary = {"quarry": "stone", "brickworks": "clay"}
 
 func _init() -> void:
 	call_deferred("run")
@@ -142,7 +142,7 @@ static func collect_pool() -> Array:
 
 # What a town map holds, as shares of all its tiles.
 static func measure_land(map: Array) -> Dictionary:
-	var counts: Dictionary = {"farmland": 0, "woods": 0, "rock": 0, "water": 0, "stone": 0, "iron": 0, "hills": 0}
+	var counts: Dictionary = {"farmland": 0, "woods": 0, "rock": 0, "water": 0, "stone": 0, "iron": 0, "clay": 0, "hills": 0}
 	var total: int = 0
 	for row: Array in map:
 		for tile: Dictionary in row:

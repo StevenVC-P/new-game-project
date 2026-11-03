@@ -1360,10 +1360,10 @@ func apply_building_production(building: Building):
 
 	var building_type: String = building.type
 	var output_amount: int = get_current_building_output_amount(building)
-	# A quarry can't cut more than the stone left under it; a woodcutter's wood is what it cuts from
-	# the trees (TownWoodland.take_timber).
-	if output_amount > 0 and TownDeposits.is_quarry(building) and not local_map.is_empty():
-		output_amount = mini(output_amount, TownDeposits.get_stone_left(self, building))
+	# A quarry or brickworks can't get more than the deposit left under it; a woodcutter's wood is
+	# what it cuts from the trees (TownWoodland.take_timber).
+	if output_amount > 0 and TownDeposits.draws_on_deposit(building) and not local_map.is_empty():
+		output_amount = mini(output_amount, TownDeposits.get_left_under(self, building))
 	if output_amount > 0 and BuildingTiersScript.get_base_type(building.type) == Building.BUILDING_WOODCUTTER and not local_map.is_empty():
 		output_amount = woodland.take_timber(building, output_amount)
 	if output_amount > 0:
@@ -1372,12 +1372,12 @@ func apply_building_production(building: Building):
 		if chain.is_empty():
 			return
 		var made: int = apply_input_output_production(str(chain["output"]), output_amount, chain["inputs"])
-		if TownDeposits.is_quarry(building):
+		if TownDeposits.draws_on_deposit(building):
 			TownDeposits.extract(self, building, made)
-	# A quarry with no stone left underfoot is worked out: its family is free for other work, and
+	# A workplace with nothing left underfoot is worked out: its family is free for other work, and
 	# nobody is put to work there again (TownDeposits).
 	if TownDeposits.is_worked_out(self, building):
-		log_household_lifecycle_event(0, building.assigned_household_id, "QuarryWorkedOut", "building=" + str(building.id))
+		log_household_lifecycle_event(0, building.assigned_household_id, "DepositWorkedOut", "building=" + str(building.id))
 		unassign_building_worker(buildings.find(building))
 
 # Returns what was made.

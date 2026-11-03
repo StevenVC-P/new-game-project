@@ -152,7 +152,10 @@ func check_floors(local_map: Array, label: String) -> void:
 			if tile["type"] == "water":
 				_check(tile["water_kind"] in ["river", "lake", "sea"], "water should say what kind it is " + label)
 				_check(not tile["has_trees"] and not tile["is_fertile"], "water should hold no trees or farmland " + label)
-			if tile["resource"] != "none":
+			# Stone and ore are rough ground; clay (sprint S5) lies on open ground by the water.
+			if tile["resource"] == "clay":
+				_check(tile["type"] == "ground", "clay should be open ground " + label)
+			elif tile["resource"] != "none":
 				_check(tile["type"] == "rough", "deposits should be rough ground " + label)
 			if tile["is_fertile"]:
 				_check(LocalCityMapGenerator.is_buildable(tile), "farmland should be open ground " + label)

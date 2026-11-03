@@ -103,7 +103,7 @@ Status: Planned, Active, Complete, Blocked. Complexity: S (days), M (about a wee
 | S2 Living forests | E3 | **Active** (built `10c8745`; comparison and review queued) | S1 (report) | Woodcutting thins the woods and slows with them; regrowth over years; families weigh woods for woodcutting | Report on forest and sparse sites; hunting coupling | — | — |
 | S3 Winter fuel | E3 | **Active** (built `accb93d`, suite passes; comparison queued) | S2 | Households burn firewood in the cold season; shortage has real cost; wood surplus falls | Report; first-winter stress | — | — |
 | S3b Fatal hardship | E3, E11 | **Active** (built `07b80eb`, 51/51 tests; comparison queued: one build measures S2, S3 and S3b through its switches) | S3 | Sustained severe hunger or cold can kill members, then a household; risk follows severity, housing and season; families tried what they could first | Rules test; deaths by cause vs B0 | — | — |
-| S4 Materials in construction ◆ | E4, E10 | Planned | S1 | Timber and stone versions of homes and workplaces; families choose; masonry and paving get uses | Report: share of stone buildings by site | — | — |
+| S4 Materials in construction ◆ | E4, E10 | **Active** (S4a/b `2179f49`, S4c families quarry `4d78d9d`; 52/52 tests; comparison and review queued) | S1 | Timber and stone versions of homes and workplaces; families choose; masonry and paving get uses | Report: share of stone buildings by site | — | — |
 | S5 Clay and limestone | E2, E4 | Planned | S4 | Brickworks needs clay, lime kiln needs limestone; brick and tile have building uses | Report | — | — |
 | S6 Ownership ledger | E5 | Planned | S0 | Household shares, building funders, treasury view; play unchanged under the migration-only 100% setting | Matched snapshots identical to the base; saves | — | — |
 | S7 Contributions by category ◆ | E5 | Planned | S6 | Player sets % per category of total output; families keep the rest; new games ask for an initial choice | Matched towns at 100/60/30/10% | — | — |
@@ -180,6 +180,8 @@ Status: Planned, Active, Complete, Blocked. Complexity: S (days), M (about a wee
 - **Visible behaviour:** stone towns on rock, timber towns in forests; mixed towns where families differ.
 - **Acceptance:** the divergence report shows the share of stone buildings following deposits and values; the one construction pipeline is unchanged (tier 0 never deadlocks).
 - **Risks:** touches `TownConstruction`, `BUILD_COSTS`, `FamilyDevelopment`, building visuals and saves (a building records its material). Split into S4a (uses for masonry and paving, player side) and S4b (family choice) if it grows.
+- **As built:** S4a: timber, rough stone and dressed stone (masonry) for homes and proper buildings (stone keeps a third of the wood, 1.5 blocks or 0.5 masonry per wood replaced; work ×1.6 / ×1.25; upkeep interval ×1.5; a stone home ×0.75 firewood); fields and hand work timber only; a "Building material" card on the Planning page sets the player's choice. S4b: `MaterialChoice` for families' own homes and improvements (stores, labour and urgency, warmth or upkeep, values, seeded noise; only what the stores can supply). S4c: the stone pit, hand work on a deposit, makes stone a trade families choose (`TownLand` kind "stone"; drawn by calling and by building waiting for stone). Grey walls for stone on the map.
+- **Not done, moved to the backlog:** paving stones as paved roads (no use for paving yet); the placement preview still shows the timber cost.
 
 ### S5: Clay and limestone (M)
 

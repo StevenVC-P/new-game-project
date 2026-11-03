@@ -117,12 +117,13 @@ static func get_travel_lines(city: City, building: Building) -> Array[String]:
 			lines.append("Timber: no trees left it may fell")
 		else:
 			lines.append("Timber: %d%% of a full cut (trees %d tiles off)" % [int(round(city.woodland.get_felling_factor(building) * 100.0)), int(round(Vector2(target - TownLogistics.center_tile(building.tile, building.size)).length()))])
-	elif base == Building.BUILDING_QUARRY:
-		var factor: float = TownDeposits.get_quarry_factor(city, building)
+	elif TownDeposits.draws_on_deposit(building):
+		var kind: String = TownDeposits.get_deposit_kind(building.type)
+		var factor: float = TownDeposits.get_factor(city, building)
 		if factor <= 0.0:
-			lines.append("Stone: worked out (no stone left underfoot)")
+			lines.append("%s: worked out (none left underfoot)" % kind.capitalize())
 		else:
-			lines.append("Stone: %d%% of a full cut (%s stone underfoot, %d blocks left)" % [int(round(factor * 100.0)), TownDeposits.describe_quality(factor), TownDeposits.get_stone_left(city, building)])
+			lines.append("%s: %d%% of a full yield (%s %s underfoot, %d left)" % [kind.capitalize(), int(round(factor * 100.0)), TownDeposits.describe_quality(factor), kind, TownDeposits.get_left_under(city, building)])
 	if city.land.is_wolf_exposed(building):
 		lines.append("Wolves in winter: -%d%% (fence the yard)" % int(round((1.0 - EconomyBalance.WOLF_WINTER_YIELD) * 100.0)))
 	if city.land.is_waterlogged(building):

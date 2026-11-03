@@ -35,22 +35,26 @@ static func get_lines(local_map: Array, profile: SettlementSiteProfile) -> Array
 			var resource: String = tile.get("resource", "none")
 			if resource != "none":
 				deposits[resource] = true
+			if str(tile.get("stone_kind", "")) == TownDeposits.LIMESTONE:
+				deposits[TownDeposits.LIMESTONE] = true
 
 	var lines: Array[String] = []
 	lines.append("Farmland: " + _level(fertile, FARMLAND_RICH_TILES, FARMLAND_FAIR_TILES, "rich", "fair", "limited"))
 	lines.append("Forest: " + _level(trees, FOREST_DENSE_TILES, FOREST_SOME_TILES, "dense", "some", "light"))
 	lines.append("Water: " + _water_text(water_kinds))
 	lines.append("Rough ground: " + ("some" if rough > 0 else "none"))
-	if not deposits.is_empty():
+	if deposits.has(TownDeposits.STONE) or deposits.has("iron"):
 		var text: String = "Stone/ore: " + _deposit_text(deposits) + " on the town map"
-		# How much a quarry on its best stone would cut (TownDeposits).
+		# How much a quarry on its best stone would cut (TownDeposits), and whether lime can be burnt.
 		if deposits.has(TownDeposits.STONE):
-			text += " (%s quarry stone)" % TownDeposits.describe_quality(TownDeposits.get_best_quarry_factor(local_map))
+			text += " (%s quarry stone%s)" % [TownDeposits.describe_quality(TownDeposits.get_best_quarry_factor(local_map)), ", limestone among it" if deposits.has(TownDeposits.LIMESTONE) else ""]
 		lines.append(text)
 	elif profile != null and profile.nearest_resource_distance >= 0:
 		lines.append("Stone/ore: in the region, " + str(profile.nearest_resource_distance) + " tiles away")
 	else:
 		lines.append("Stone/ore: none nearby")
+	# Clay for bricks, by the water (sprint S5).
+	lines.append("Clay: " + ("%s by the water" % TownDeposits.describe_quality(TownDeposits.get_best_factor(local_map, TownDeposits.CLAY)) if deposits.has(TownDeposits.CLAY) else "none"))
 	return lines
 
 # The kind of water most of the town's water is.

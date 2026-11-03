@@ -78,7 +78,7 @@ static func build(context: Dictionary) -> Array:
 
 # What the buildings the player plans are built of (sprint S4; owner D6: the player chooses for
 # communal construction, families for their own). Fields and hand work are timber whatever is chosen.
-const MATERIAL_NAMES: Dictionary = {"timber": "Timber", "stone": "Stone", "dressed_stone": "Dressed stone"}
+const MATERIAL_NAMES: Dictionary = {"timber": "Timber", "stone": "Stone", "dressed_stone": "Dressed stone", "brick": "Brick"}
 
 static func get_material_card(city: City) -> Dictionary:
 	var chosen: String = city.influence.build_material
@@ -86,11 +86,11 @@ static func get_material_card(city: City) -> Dictionary:
 	for material: String in EconomyBalance.MATERIALS:
 		house.append("%s %s" % [MATERIAL_NAMES[material], cost_text(EconomyBalance.get_build_cost(Building.BUILDING_HOUSE, material))])
 	var lines: Array = ["What the buildings you plan are built of. Stone takes longer to raise but needs fewer tools to keep up, and a stone home less firewood. Families choose for their own homes and work."]
-	var muted: Array = ["A house: " + "; ".join(house), "In store: %d stone blocks, %d masonry" % [int(city.resources.get("stone_blocks", 0)), int(city.resources.get("masonry", 0))]]
+	var muted: Array = ["A house: " + "; ".join(house), "In store: %d stone blocks, %d masonry, %d bricks" % [int(city.resources.get("stone_blocks", 0)), int(city.resources.get("masonry", 0)), int(city.resources.get("bricks", 0))]]
 	var buttons: Array = []
 	for material: String in EconomyBalance.MATERIALS:
 		buttons.append({"text": MATERIAL_NAMES[material], "toggle": true, "active": chosen == material, "action": {"action": "set_build_material", "material": material}})
-	return {"kind": "card", "title": "Building material", "lines": lines, "muted": muted, "buttons": buttons, "columns": 3}
+	return {"kind": "card", "title": "Building material", "lines": lines, "muted": muted, "buttons": buttons, "columns": 2}
 
 # Land set aside for homes (HomeSites): families choose their own sites on it, by what they value;
 # preferred land is the community's hope, which receptive families heed more. No workplace may be

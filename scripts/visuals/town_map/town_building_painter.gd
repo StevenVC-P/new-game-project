@@ -16,6 +16,7 @@ const WEATHER_COLOR: Color = Color(0.46, 0.43, 0.39)
 # paler, even grey of dressed stone. Timber keeps its profile's wall.
 const STONE_WALL: Color = Color(0.56, 0.55, 0.52)
 const DRESSED_WALL: Color = Color(0.72, 0.70, 0.66)
+const BRICK_WALL: Color = Color(0.62, 0.34, 0.26)
 
 static func draw(c: CanvasItem, rect: Rect2, profile: Dictionary, state: Dictionary) -> void:
 	var roof: Color = tint(profile["roof"], state, true)
@@ -25,6 +26,8 @@ static func draw(c: CanvasItem, rect: Rect2, profile: Dictionary, state: Diction
 			wall_color = STONE_WALL
 		"dressed_stone":
 			wall_color = DRESSED_WALL
+		"brick":
+			wall_color = BRICK_WALL
 	var wall: Color = tint(wall_color, state, false)
 	match str(profile["drawing"]):
 		"house":

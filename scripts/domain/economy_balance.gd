@@ -137,6 +137,7 @@ const BUILD_COSTS: Dictionary = {
 	"forager_garden": {},
 	"gatherer_camp": {},
 	"stone_pit": {},
+	"clay_pit": {},
 	"tool_mender": {},
 	"fish_weir": {},
 	"snare_line": {},
@@ -171,6 +172,7 @@ const BUILD_WORK_DAYS: Dictionary = {
 	"forager_garden": 2.0,
 	"gatherer_camp": 2.0,
 	"stone_pit": 3.0,
+	"clay_pit": 3.0,
 	"tool_mender": 3.0,
 	"fish_weir": 2.0,
 	"snare_line": 2.0,
@@ -273,6 +275,13 @@ const HERDER_FULL_PASTURE_TILES: int = 90
 const QUARRY_FULL_DEPOSIT_TILES: int = 4
 const DEPOSIT_GRADE_FLOOR: float = 0.4
 const STONE_DEPOSIT_UNITS_PER_TILE: int = 600
+# Clay (sprint S5) lies on open ground beside rivers and lakes, CLAY_DEPOSIT_UNITS_PER_TILE bricks'
+# worth a tile; a brickworks stands on it as a quarry stands on stone. Some stone outcrops are
+# limestone (LIMESTONE_SHARE of them, by place); a lime kiln must stand within
+# LIME_KILN_LIMESTONE_REACH tiles of limestone.
+const CLAY_DEPOSIT_UNITS_PER_TILE: int = 400
+const LIMESTONE_SHARE: float = 0.45
+const LIME_KILN_LIMESTONE_REACH: int = 4
 
 # --- Clothing (docs/FIRST_STAGE_LOOP.md, milestone 6) ---
 # A garment lasts CLOTHING_DAYS_PER_PERSON, so a town needs one for every that many people a day
@@ -431,9 +440,14 @@ static func get_fence_work_days(size: Vector2i) -> float:
 const MATERIAL_TIMBER: String = "timber"
 const MATERIAL_STONE: String = "stone"
 const MATERIAL_DRESSED: String = "dressed_stone"
-const MATERIALS: Array[String] = [MATERIAL_TIMBER, MATERIAL_STONE, MATERIAL_DRESSED]
+# Brick (sprint S5): fired clay, BRICKS_PER_WOOD for each wood replaced, raised at BRICK_WORK_FACTOR
+# of timber's work; it lasts and keeps warm like stone.
+const MATERIAL_BRICK: String = "brick"
+const MATERIALS: Array[String] = [MATERIAL_TIMBER, MATERIAL_STONE, MATERIAL_DRESSED, MATERIAL_BRICK]
 const STONE_PER_WOOD: float = 1.5
 const MASONRY_PER_WOOD: float = 0.5
+const BRICKS_PER_WOOD: float = 1.0
+const BRICK_WORK_FACTOR: float = 1.3
 const STONE_MIN_WOOD: int = 4
 const STONE_WORK_FACTOR: float = 1.6
 const DRESSED_WORK_FACTOR: float = 1.25
@@ -445,8 +459,9 @@ static func can_be_stone(building_type: String) -> bool:
 		return false
 	return int((BUILD_COSTS.get(building_type, {}) as Dictionary).get("wood", 0)) >= STONE_MIN_WOOD
 
+# Built of stone or brick: lasting and warm.
 static func is_stone_material(material: String) -> bool:
-	return material == MATERIAL_STONE or material == MATERIAL_DRESSED
+	return material == MATERIAL_STONE or material == MATERIAL_DRESSED or material == MATERIAL_BRICK
 
 static func get_build_cost(building_type: String, material: String = MATERIAL_TIMBER) -> Dictionary:
 	var cost: Dictionary = (BUILD_COSTS.get(building_type, {}) as Dictionary).duplicate()
@@ -455,10 +470,13 @@ static func get_build_cost(building_type: String, material: String = MATERIAL_TI
 	var wood: int = int(cost.get("wood", 0))
 	var kept: int = int(ceil(float(wood) / 3.0))
 	cost["wood"] = kept
-	if material == MATERIAL_STONE:
-		cost["stone_blocks"] = int(ceil(float(wood - kept) * STONE_PER_WOOD))
-	else:
-		cost["masonry"] = int(ceil(float(wood - kept) * MASONRY_PER_WOOD))
+	match material:
+		MATERIAL_STONE:
+			cost["stone_blocks"] = int(ceil(float(wood - kept) * STONE_PER_WOOD))
+		MATERIAL_BRICK:
+			cost["bricks"] = int(ceil(float(wood - kept) * BRICKS_PER_WOOD))
+		_:
+			cost["masonry"] = int(ceil(float(wood - kept) * MASONRY_PER_WOOD))
 	return cost
 
 static func get_build_work_days(building_type: String, material: String = MATERIAL_TIMBER) -> float:
@@ -469,6 +487,8 @@ static func get_build_work_days(building_type: String, material: String = MATERI
 				days *= STONE_WORK_FACTOR
 			MATERIAL_DRESSED:
 				days *= DRESSED_WORK_FACTOR
+			MATERIAL_BRICK:
+				days *= BRICK_WORK_FACTOR
 	return days
 
 static func get_maintenance_interval(building_type: String) -> int:

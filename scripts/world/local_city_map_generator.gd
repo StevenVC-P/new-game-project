@@ -157,6 +157,7 @@ func generate(site: Vector2i, regional_tiles: Array, hash_origin: Vector2i, clim
 	add_copses(local_map, forest_amount, town_origin, COPSE_SHARE)
 	add_arable_land(local_map, hill_amount, fertile_amount, town_origin, climate)
 	ensure_floors(local_map, forest_amount, town_origin)
+	add_clay_and_limestone(local_map, town_origin)
 	return local_map
 
 # --- Regional fields ------------------------------------------------------------------------
@@ -332,6 +333,55 @@ func ensure_floors(local_map: Array, forest_amount: PackedFloat32Array, town_ori
 	while count_tiles(local_map, func(t: Dictionary) -> bool: return t["has_trees"] == true) < MIN_TREE_TILES and share < 0.5:
 		share += 0.02
 		add_copses(local_map, forest_amount, town_origin, share)
+
+# Clay and limestone (sprint S5), a last pass that changes nothing but the tiles' resource, so the
+# land itself is as before. Clay: open ground beside a river or lake (never the sea), the bank itself
+# and, here and there, a tile further back. Limestone: whole stone outcrops, LIMESTONE_SHARE of them,
+# picked by the outcrop's place on the planet. Both a pure function of global position, like the
+# rest of the town map (no game randomness).
+const CLAY_BANK_REACH: int = 2
+const CLAY_BACK_SHARE: float = 0.5
+
+func add_clay_and_limestone(local_map: Array, town_origin: Vector2) -> void:
+	for y in range(height):
+		for x in range(width):
+			var tile: Dictionary = local_map[y][x]
+			if tile["type"] != "ground" or tile["resource"] != "none":
+				continue
+			var nearest: int = CLAY_BANK_REACH + 1
+			for dy in range(-CLAY_BANK_REACH, CLAY_BANK_REACH + 1):
+				for dx in range(-CLAY_BANK_REACH, CLAY_BANK_REACH + 1):
+					var ny: int = y + dy
+					var nx: int = x + dx
+					if ny < 0 or ny >= height or nx < 0 or nx >= width:
+						continue
+					var other: Dictionary = local_map[ny][nx]
+					if other["type"] == "water" and other.get("water_kind", "") != "sea":
+						nearest = mini(nearest, maxi(absi(dx), absi(dy)))
+			var global: Vector2i = Vector2i(town_origin) + Vector2i(x, y)
+			if nearest <= 1 or (nearest <= CLAY_BANK_REACH and float(absi(hash([global.x, global.y, "clay"])) % 1000) / 1000.0 < CLAY_BACK_SHARE):
+				tile["resource"] = "clay"
+	var seen: Dictionary = {}
+	for y in range(height):
+		for x in range(width):
+			if seen.has(Vector2i(x, y)) or local_map[y][x]["resource"] != "stone":
+				continue
+			# The outcrop, by flood fill, known by its first tile on the planet.
+			var outcrop: Array[Vector2i] = []
+			var open: Array[Vector2i] = [Vector2i(x, y)]
+			seen[Vector2i(x, y)] = true
+			while not open.is_empty():
+				var cell: Vector2i = open.pop_back()
+				outcrop.append(cell)
+				for side: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					var next: Vector2i = cell + side
+					if next.x >= 0 and next.y >= 0 and next.x < width and next.y < height and not seen.has(next) and local_map[next.y][next.x]["resource"] == "stone":
+						seen[next] = true
+						open.append(next)
+			var key: Vector2i = Vector2i(town_origin) + Vector2i(x, y)
+			if float(absi(hash([key.x, key.y, "limestone"])) % 1000) / 1000.0 < EconomyBalance.LIMESTONE_SHARE:
+				for cell: Vector2i in outcrop:
+					local_map[cell.y][cell.x]["stone_kind"] = "limestone"
 
 static func is_buildable(tile: Dictionary) -> bool:
 	return tile["type"] == "ground" and not tile["has_trees"] and not tile["has_road"]
