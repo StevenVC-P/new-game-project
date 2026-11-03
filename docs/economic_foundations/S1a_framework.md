@@ -41,6 +41,11 @@ Run from a fixed worktree at `e5410ba` (`../ngg-ef-runs`): every environment, 12
 
 **Process note.** For about half an hour a stray earlier runner and the S1b comparison ran beside the baseline, six Godot processes at the peak against the owner's limit of four. Both were stopped; the batch runner now records its own process id so a stop can't miss it. Batches run at three processes, keeping one for tests.
 
+### B0 with a quarry commissioned in year 2 (`B0_quarry_y6.md`, 8 starts)
+
+- **Stone from nowhere:** the quarry stood near the town's heart wherever it was placed and cut 850–1,534 stone blocks a town by year 6 **on every kind of land**: marginal towns cut as much as rocky ones (1,534 and 1,485). This is what S1b must change.
+- **A commission costs a family's work:** with a quarry taking one family off other work, fewer towns came through in several environments (fertile valley 4 of 8 housed and fed, against 9 of 12 without it; forested 5 of 8 against 8 of 12). The samples differ (8 against 12 starts), so this is a hint, not a measurement, but it is the first sign of a player's choice sinking villages: building what the town doesn't need.
+
 ## Next Steps
 
 - Record the B0 tables here; then close S1b against B0-quarry.

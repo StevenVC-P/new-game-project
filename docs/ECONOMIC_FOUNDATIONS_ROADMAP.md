@@ -104,7 +104,7 @@ Status: Planned, Active, Complete, Blocked. Complexity: S (days), M (about a wee
 | S3 Winter fuel | E3 | **Active** (built `accb93d`, suite passes; comparison queued) | S2 | Households burn firewood in the cold season; shortage has real cost; wood surplus falls | Report; first-winter stress | — | — |
 | S3b Fatal hardship | E3, E11 | **Active** (built `07b80eb`, 51/51 tests; comparison queued: one build measures S2, S3 and S3b through its switches) | S3 | Sustained severe hunger or cold can kill members, then a household; risk follows severity, housing and season; families tried what they could first | Rules test; deaths by cause vs B0 | — | — |
 | S4 Materials in construction ◆ | E4, E10 | **Active** (S4a/b `2179f49`, S4c families quarry `4d78d9d`; 52/52 tests; comparison and review queued) | S1 | Timber and stone versions of homes and workplaces; families choose; masonry and paving get uses | Report: share of stone buildings by site | — | — |
-| S5 Clay and limestone | E2, E4 | Planned | S4 | Brickworks needs clay, lime kiln needs limestone; brick and tile have building uses | Report | — | — |
+| S5 Clay and limestone | E2, E4 | **Active** (built `4a08dc6`, 53/53 tests; comparison and review queued) | S4 | Brickworks needs clay, lime kiln needs limestone; brick and tile have building uses | Report | — | — |
 | S6 Ownership ledger | E5 | Planned | S0 | Household shares, building funders, treasury view; play unchanged under the migration-only 100% setting | Matched snapshots identical to the base; saves | — | — |
 | S7 Contributions by category ◆ | E5 | Planned | S6 | Player sets % per category of total output; families keep the rest; new games ask for an initial choice | Matched towns at 100/60/30/10% | — | — |
 | S8 Redistribution and asking for help | E5, E11 | Planned | S7 | Player's reserve/redistribute rules; families in danger seek the commons and neighbours | Report: deaths and departures where goods existed | — | — |
@@ -211,9 +211,11 @@ From `AGENTS.md`, `HANDOFF.md` and the brief: `main.gd` gets no simulation logic
 
 ## 10. Handoff
 
-- **Completed:** this roadmap and the test plan; D1–D8 and Q1–Q6 approved.
-- **Branches:** planning on `docs/economic-foundations-roadmap` (from `develop` at `fcfc0fc`); `feature/economic-foundations` from it, worktree `../ngg-economic-foundations`; sprints on `feature/ef-<sprint>` merged into it.
-- **Next:** S1a.
+*As of 2026-11-02 evening.*
+- **Track A is built:** S1a (`e5410ba`), S1b (`3ca6e31`), S2 (`10c8745`), S3 (`accb93d`), S3b (`07b80eb`), S4 (`2179f49`, S4c `4d78d9d`), S5 (`4a08dc6`), each on its own branch `feature/ef-<sprint>` stacked on the one before and pushed. Every sprint's rules tests and the full suite pass (53/53 at S5).
+- **Measured so far:** only the baseline B0 (ordinary, quarry commission; stressed running). The comparisons and reviews of S1b–S5 are queued in order and take roughly 3–6 hours each at three processes: S1b quarry → the S3b build run as S2, S3 and S3b (metas `no_hardship_deaths`, `no_winter_fuel`) → S3b review → S4 and review → S5 and review. Fixed worktrees: `../ngg-ef-runs` (B0, `e5410ba`), `-runs3` (S1b), `-runs2` (S3b), `-runs4` (S4), `-runs5` (S5). Logs in `test-logs/div/<label>/`; tables by `scripts/compare_divergence.ps1`.
+- **Not yet merged into `feature/economic-foundations`:** sprint branches are merged as each one's comparison confirms it.
+- **Next:** read each comparison and review as it lands, write the sprint reports (`docs/economic_foundations/`), fix what they reveal, then start Track B (S6 ledger) only once Track A's results are understood. Open question for the review: the 80–140 ms simulated day (stand-in included) needs the town's own tick measured (the S2+ runs record `tick_ms_mean`).
 - **Open housekeeping:** the unmerged `docs/property-and-communal-resources` holds the superseded §4.3; when S6 begins, bring its doc in with a note that D1 replaces §4.3, rather than leave it to mislead.
 
 ## Log
