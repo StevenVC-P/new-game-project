@@ -46,6 +46,10 @@ Run from a fixed worktree at `e5410ba` (`../ngg-ef-runs`): every environment, 12
 - **Stone from nowhere:** the quarry stood near the town's heart wherever it was placed and cut 850–1,534 stone blocks a town by year 6 **on every kind of land**: marginal towns cut as much as rocky ones (1,534 and 1,485). This is what S1b must change.
 - **A commission costs a family's work:** with a quarry taking one family off other work, fewer towns came through in several environments (fertile valley 4 of 8 housed and fed, against 9 of 12 without it; forested 5 of 8 against 8 of 12). The samples differ (8 against 12 starts), so this is a hint, not a measurement, but it is the first sign of a player's choice sinking villages: building what the town doesn't need.
 
+### B0 under the stressed condition (`B0_stressed_y6.md`, 12 starts)
+
+The stand-in's hard first winter (the food store cut to 8 days on day 270) **barely changes which towns survive** (housed and fed at year 6: fertile 10, forested 8, balanced 10, marginal 8, rocky 9, against 9 / 8 / 10 / 7 / 8 ordinary), but it changes their size where food is fragile: **forest towns halve** (25 people against 48; 239 hunger days against 89), fertile towns shrink (40 against 51), the others hold. So the existing "stressed" condition is a mild test, as `HANDOFF.md` open decision 2 already says ("a harder stores disruption for validation"); S3's fuel disruption should be the sharper one, and a harsher food shock is worth adding when the review shows whether difficult sites already separate well.
+
 ## Next Steps
 
 - Record the B0 tables here; then close S1b against B0-quarry.
