@@ -17,7 +17,10 @@ const TIER0_TO_TIER1: Dictionary = {
 	"tool_mender": "toolmaker",
 	"fish_weir": "fisher",
 	"snare_line": "hunter",
-	"grazing_pen": "herder"
+	"grazing_pen": "herder",
+	# Sprint S4c (owner D6): families take up stone work themselves, prising stone from a deposit by
+	# hand before any quarry is built.
+	"stone_pit": "quarry"
 }
 
 const DISPLAY_NAMES: Dictionary = {
@@ -28,6 +31,7 @@ const DISPLAY_NAMES: Dictionary = {
 	"fish_weir": "Fish Weir",
 	"snare_line": "Snare Line",
 	"grazing_pen": "Grazing Pen",
+	"stone_pit": "Stone Pit",
 	"fisher": "Fisher's Hut",
 	"hunter": "Hunter's Lodge",
 	"watch_post": "Watch Post",

@@ -27,6 +27,7 @@ func run_all() -> void:
 	test_a_worked_out_quarry_lets_its_family_go()
 	test_stone_left_is_saved()
 	test_no_map_works_as_before()
+	test_families_take_up_stone_work()
 	if failure_count > 0:
 		push_error("Quarry deposit validation failed: " + str(failure_count) + " failure(s)")
 		quit(1)
@@ -151,6 +152,43 @@ func test_no_map_works_as_before() -> void:
 	var building: Building = Building.new(-1, "quarry", Vector2i(2, 2), Vector2i(3, 3))
 	city.add_building(building, city.households[0])
 	_check(is_equal_approx(TownDeposits.get_quarry_factor(city, building), 1.0) and not TownDeposits.is_worked_out(city, building), "without a town map a quarry cuts as before")
+
+# Sprint S4c (owner D6): stone work is a trade families choose, starting as a stone pit by hand on a
+# deposit; it is open only where there is stone, judged by the stone underfoot, drawn by a calling
+# and by building that waits for stone, and a pit cuts from the deposit like a quarry.
+func test_families_take_up_stone_work() -> void:
+	var city: City = town()
+	city.influence.enabled = true
+	var household: Household = city.households[0]
+	var profile: Dictionary = household.values.duplicate(true)
+	profile[CultureValues.CATEGORY_CALLING] = ["stone"]
+	household.set_values(profile)
+	_check(FamilyInitiative.get_occupations(city).has("quarry"), "stone work is among the trades families choose")
+	var desire: Dictionary = FamilyInitiative.get_work_desire(city, household, "quarry")
+	_check(bool(desire.get("available", true)) and desire.has("site"), "a family can take it up where there is stone: %s" % str(desire.get("site", "no site")))
+	if desire.has("site"):
+		var site: Vector2i = desire["site"]
+		_check(TownDeposits.get_footprint_factor(city.local_map, site, Vector2i(3, 3)) > 0.5, "and sets its pit on good stone (%s)" % str(site))
+	_check(str(FamilyInitiative.get_reasons(desire["terms"], true)).contains("calling"), "drawn by its calling: %s" % str(FamilyInitiative.get_reasons(desire["terms"], true)))
+	var bare: City = ConstructionTest.make_city()
+	bare.local_map = HuntingTest.open_map([])
+	bare.influence.enabled = true
+	bare.households[0].set_values(profile)
+	_check(not bool(FamilyInitiative.get_work_desire(bare, bare.households[0], "quarry").get("available", true)), "with no stone on the map it can't")
+	# A fed town (survival first: with no food work, wants beyond food fade entirely).
+	for i in range(2, 5):
+		city.add_building(Building.new(-1, "farm", Vector2i(6 * i, 36), Vector2i(3, 3)), city.households[i])
+	city.influence.build_material = EconomyBalance.MATERIAL_STONE
+	city.construction.request_building("toolmaker", Vector2i(10, 30))
+	var wanted: Dictionary = FamilyInitiative.get_work_desire(city, city.households[1], "quarry")
+	_check(str(FamilyInitiative.get_reasons(wanted["terms"], true)).contains("building waits for"), "building that waits for stone draws families to stone work: %s" % str(FamilyInitiative.get_reasons(wanted["terms"], true)))
+	var pit: Building = Building.new(-1, "stone_pit", Vector2i(31, 10), Vector2i(3, 3))
+	city.add_building(pit, household)
+	var left: int = TownDeposits.get_stone_left(city, pit)
+	for _day in range(60):
+		city.apply_building_production(pit)
+	var cut: int = left - TownDeposits.get_stone_left(city, pit)
+	_check(cut > 0 and cut < 60 * 2, "a pit cuts from the deposit by hand, slower than a quarry (%d in 60 days)" % cut)
 
 func _check(condition: bool, message: String) -> void:
 	if condition:

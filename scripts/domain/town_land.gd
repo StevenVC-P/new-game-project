@@ -119,6 +119,9 @@ func get_reach_factor(building: Building) -> float:
 	# cached here (TownWoodland caches its own search).
 	if get_reach_kind(building.type) == TIMBER:
 		return city.woodland.get_felling_factor(building)
+	# Stone work: the stone left underfoot, which every block cut changes (TownDeposits).
+	if get_reach_kind(building.type) == STONE:
+		return TownDeposits.get_quarry_factor(city, building)
 	if is_shared(get_reach_kind(building.type)):
 		var key: int = hash([city.logistics.layout_version, get_rivals_key(Building.BUILDING_FISHER), get_rivals_key(Building.BUILDING_HUNTER), get_rivals_key(Building.BUILDING_HERDER)])
 		if _shared_reach_key != key:
@@ -138,6 +141,8 @@ func get_reach_factor(building: Building) -> float:
 # trees a woodcutter may still fell, sprint S2), or "" when the land around it does not matter.
 # Timber is not shared reach: woodcutters compete by felling the same trees (TownWoodland).
 const TIMBER: String = "timber"
+# And "stone": the deposit under a quarry or stone pit (TownDeposits, sprint S4c), not shared either.
+const STONE: String = "stone"
 
 static func get_reach_kind(building_type: String) -> String:
 	match BuildingTiers.get_base_type(building_type):
@@ -149,6 +154,8 @@ static func get_reach_kind(building_type: String) -> String:
 			return "pasture"
 		Building.BUILDING_WOODCUTTER:
 			return TIMBER
+		Building.BUILDING_QUARRY:
+			return STONE
 	return ""
 
 # What a workplace of this type would make at `origin`. Its land is shared: every tile also in reach
@@ -164,6 +171,8 @@ func get_reach_factor_at(building_type: String, origin: Vector2i, size: Vector2i
 		return 1.0
 	if kind == TIMBER:
 		return city.woodland.estimate_felling_factor_at(origin, size)
+	if kind == STONE:
+		return TownDeposits.get_footprint_factor(city.local_map, origin, size)
 	var full: int = EconomyBalance.HUNTER_FULL_WOODS_TILES
 	match kind:
 		"water":

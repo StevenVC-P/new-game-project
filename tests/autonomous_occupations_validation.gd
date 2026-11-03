@@ -116,7 +116,8 @@ func own_project(city: City, household: Household) -> ConstructionProject:
 func test_every_trade_with_hand_work_is_a_choice() -> void:
 	var city: City = town()
 	var occupations: Array[String] = FamilyInitiative.get_occupations(city)
-	_check(occupations == (["farm", "woodcutter", "toolmaker", "fisher", "hunter", "herder"] as Array[String]), "every trade with a hand-work stage is a choice, the first three first: %s" % str(occupations))
+	# Stone work joined in sprint S4c (owner D6).
+	_check(occupations == (["farm", "woodcutter", "toolmaker", "fisher", "hunter", "herder", "quarry"] as Array[String]), "every trade with a hand-work stage is a choice, the first three first: %s" % str(occupations))
 	for pair: Array in [["fish_weir", "fisher"], ["snare_line", "hunter"], ["grazing_pen", "herder"]]:
 		_check(BuildingTiers.get_upgrade_type(pair[0]) == pair[1] and BuildingTiers.get_hand_work_type(pair[1]) == pair[0], "%s improves into %s" % pair)
 		_check(EconomyBalance.get_build_cost(pair[0]).is_empty(), "%s needs no materials, like all hand work" % pair[0])

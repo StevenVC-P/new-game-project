@@ -42,13 +42,15 @@ const SHORTAGE_WEIGHT: float = 4.0
 # deters where the land is poor or the work yields less by nature.
 const LAND_WEIGHT: float = 3.0
 const LAND_SITE_TILES: float = 8.0
-const LAND_REASONS: Dictionary = {"water": "little water in reach to fish", "woods": "little game in reach", "pasture": "little pasture in reach", "timber": "the trees it could fell are far off or few"}
+const LAND_REASONS: Dictionary = {"water": "little water in reach to fish", "woods": "little game in reach", "pasture": "little pasture in reach", "timber": "the trees it could fell are far off or few", "stone": "little good stone underfoot"}
 # A good the town only goes without (wool, for clothing; goods to come) pulls less than what it
 # lives on (the food, wood and tools terms of get_work_desire, 1.5 to 3 each): no one making it,
 # the need it meets going unmet, and each other family already making it.
 const COMFORT_NONE_WEIGHT: float = 0.5
 const COMFORT_UNMET_WEIGHT: float = 1.0
 const COMFORT_OTHERS_WEIGHT: float = 1.5
+# Building planned that waits for a good no one has enough of (stone, sprint S4c), at its most.
+const BUILDING_WAITS_WEIGHT: float = 1.5
 # Survival before prosperity (owner, 2026-11-01; get_hardship): how far ahead a family looks at the
 # town's food, how much the danger of hunger weighs for food work at its worst (scaled by what that
 # work would really bring in here), and how much of its calling's pull a family sets aside at the
@@ -303,6 +305,11 @@ static func get_work_desire(city: City, household: Household, occupation: String
 				add(terms, -COMFORT_OTHERS_WEIGHT * producers, "others already make " + name)
 			if unmet != "" and comfort > 0.0:
 				add(terms, COMFORT_UNMET_WEIGHT * comfort, "the town goes without " + unmet)
+			# Building that waits for this good (stone for stone buildings, sprint S4c): wanted, not
+			# merely missed, but still less than what the town lives on.
+			var waiting_for: int = int(city.construction.get_committed_materials().get(activity, 0)) - int(city.resources.get(activity, 0))
+			if waiting_for > 0 and comfort > 0.0:
+				add(terms, BUILDING_WAITS_WEIGHT * comfort * minf(1.0, float(waiting_for) / 20.0), "the town's building waits for " + name)
 	# An essential good running out within the season: the danger competes with everything else.
 	var shortage: float = get_shortage(city, activity)
 	if shortage > 0.0:

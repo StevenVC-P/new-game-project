@@ -9,6 +9,7 @@ static func get_building_catalog() -> Array[Dictionary]:
 		{"id": "fish_weir", "display_name": "Fish Weir", "category": "Hand Work (Tier 0)"},
 		{"id": "snare_line", "display_name": "Snare Line", "category": "Hand Work (Tier 0)"},
 		{"id": "grazing_pen", "display_name": "Grazing Pen", "category": "Hand Work (Tier 0)"},
+		{"id": "stone_pit", "display_name": "Stone Pit", "category": "Hand Work (Tier 0)"},
 		{"id": "plot", "display_name": "Residential Plot", "category": "Town Planning"},
 		{"id": "road", "display_name": "Road", "category": "Town Planning"},
 		{"id": "storehouse", "display_name": "Storehouse", "category": "Town Planning"},
