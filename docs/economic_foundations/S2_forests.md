@@ -23,4 +23,20 @@
 
 ## Economic outcomes
 
-Pending: the divergence check against B0 and the review between sprints (test plan 10b).
+Measured on the S3b build with winter fuel and deaths switched off (`S3b-as-S2`, 8 starts, 6 years; `S2_S3_S3b_summary_y6.md`), against B0 (12 starts). No invariant failed.
+
+| Year 6, ordinary | B0: ok / people / hunger days | S2: ok / people / hunger days |
+|---|---|---|
+| Fertile valley | 9/12, 51, 39 | 6/8, 62, 90 |
+| Forested | 8/12, 48, 89 | 7/8, 46, 30 |
+| Balanced | 10/12, 34, 44 | 8/8, 33, 33 |
+| Marginal | 7/12, 32, 223 | 6/8, 41, 224 |
+| Rocky highland | 8/12, 26, 207 | 7/8, 57, 48 |
+
+- **No harm found.** Survival is as good or better everywhere (the samples differ, 8 starts against 12, so the shifts are indicative).
+- **Forest and rocky towns go hungry less.** The likeliest cause, consistent with the traced founding in `founded_town_regression`: families now judge wood work by the trees in reach, so a second woodcutter's camp far from the trees loses to food work.
+- Wood no longer comes from nowhere: timber is cut from real tiles and woods thin around camps, the precondition for S3's firewood to matter.
+
+## Next steps
+
+Done. Woods are now a finite resource that S3's firewood and S4's timber homes draw on.
