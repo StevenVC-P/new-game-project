@@ -22,8 +22,16 @@ func run() -> void:
 			start = int(argument.trim_prefix("--start="))
 		elif argument.begins_with("--years="):
 			years = int(argument.trim_prefix("--years="))
+		elif argument.begins_with("--meta="):
+			metas.assign(argument.trim_prefix("--meta=").split(","))
+		elif argument == "--choices":
+			choices = true
 	var site: Dictionary = (Divergence.classify(Divergence.collect_pool())[environment] as Array)[start]
 	var city: City = Divergence.found(site, start)
+	for meta: String in metas:
+		city.set_meta(meta, true)
+	if choices:
+		city.set_meta("trace_choices", [])
 	print("[FUEL] %s start %d seed %d | climate %s" % [environment, start, int(site["seed"]), str(city.site_profile.climate)])
 	var scenario: Dictionary = Divergence.BASE.duplicate(true)
 	var last: Dictionary = {}
@@ -46,4 +54,13 @@ func run() -> void:
 	StandInPlayerScript.new().play(city, scenario, years * Calendar.DAYS_PER_YEAR)
 	for entry: Dictionary in city.influence._work_review_log:
 		print("[FUEL] REVIEW %s" % JSON.stringify(entry))
+	# Every first choice of work, ranked with its reasons ("--choices").
+	for entry: Dictionary in city.get_meta("trace_choices", []):
+		var ranked: Array[String] = []
+		for option: Dictionary in (entry["ranked"] as Array).slice(0, 3):
+			ranked.append("%s %.2f for %s against %s" % [option["occupation"], float(option["score"]), str(option["for"]), str(option["against"])])
+		print("[FUEL] CHOICE day %d household %d food coverage %.2f | %s" % [int(entry["day"]), int(entry["household"]), float(entry["coverage"]), " || ".join(ranked)])
 	quit()
+
+var metas: Array[String] = []
+var choices: bool = false

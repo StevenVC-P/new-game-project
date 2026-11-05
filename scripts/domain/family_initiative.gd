@@ -51,6 +51,16 @@ const COMFORT_UNMET_WEIGHT: float = 1.0
 const COMFORT_OTHERS_WEIGHT: float = 1.5
 # Building planned that waits for a good no one has enough of (stone, sprint S4c), at its most.
 const BUILDING_WAITS_WEIGHT: float = 1.5
+# A good with no use in the town (no need, no building waiting, no workshop using it) and this much
+# already in store: more of it is work for nothing (sprint S4 review). Enough stone or bricks for
+# a few homes stays wanted, so families can choose to build of it.
+const NO_USE_STOCK: int = 30
+const NO_USE_WEIGHT: float = 3.0
+# A family wanting a better home of a material it would make itself (owner 2026-11-03).
+const OWN_DEMAND_WEIGHT: float = 1.5
+# New deposit trades (stone, brick) while the town holds less than SECURE_FOOD_DAYS of food in store
+# and coming: at worst this much against, times how survival-minded the family is (owner 2026-11-03).
+const FOOD_INSECURITY_WEIGHT: float = 2.0
 # Survival before prosperity (owner, 2026-11-01; get_hardship): how far ahead a family looks at the
 # town's food, how much the danger of hunger weighs for food work at its worst (scaled by what that
 # work would really bring in here), and how much of its calling's pull a family sets aside at the
@@ -314,6 +324,22 @@ static func get_work_desire(city: City, household: Household, occupation: String
 			var waiting_for: int = int(city.construction.get_committed_materials().get(activity, 0)) - int(city.resources.get(activity, 0))
 			if waiting_for > 0 and comfort > 0.0:
 				add(terms, BUILDING_WAITS_WEIGHT * comfort * minf(1.0, float(waiting_for) / 20.0), "the town's building waits for " + name)
+			# A family that means to build its own home of this (sprint S4 review, owner 2026-11-03) has
+			# its own reason to make it, before anyone else wants it: how new industries start.
+			var for_own_home: bool = means_to_build_with(city, household, activity)
+			if for_own_home:
+				add(terms, OWN_DEMAND_WEIGHT, "it means to build its own home of %s" % name)
+			# Work only for a pile no one uses (sprint S4 review): with a good no need, building or
+			# workshop uses and NO_USE_STOCK of it already in store, more of it serves no one.
+			elif has_no_use(city, activity):
+				add(terms, -NO_USE_WEIGHT, "the town has more %s than it uses" % name)
+			# New deposit trades while the town's food isn't secure (owner 2026-11-03): a weighed
+			# reason, as strong as the family's temperament and values make it, never a bar. A family
+			# holding to its craft may well go on, and bear what follows.
+			if TownDeposits.DEPOSIT_OF.values().has(TownLand.get_reach_kind(occupation)):
+				var insecurity: float = get_food_insecurity(city)
+				if insecurity > 0.0:
+					add(terms, -FOOD_INSECURITY_WEIGHT * insecurity * get_survival_mindedness(household), "the town's food isn't secure yet")
 	# An essential good running out within the season: the danger competes with everything else.
 	var shortage: float = get_shortage(city, activity)
 	if shortage > 0.0:
@@ -504,6 +530,50 @@ static func get_shortage(city: City, good: String) -> float:
 	if use <= 0.0:
 		return 0.0
 	return clampf(1.0 - (float(int(city.resources.get(good, 0))) + making) / use, 0.0, 1.0)
+
+# How far the town is from food security, 0 (secure) to 1 (nothing in store or coming): its food
+# in store, in larders and coming from its work over the coming SURVIVAL_HORIZON_DAYS, against
+# SECURE_FOOD_DAYS of eating (owner 2026-11-03).
+static func get_food_insecurity(city: City) -> float:
+	var coverage: float = get_food_coverage(city)
+	if is_inf(coverage):
+		return 0.0
+	return clampf(1.0 - coverage * float(SURVIVAL_HORIZON_DAYS) / SECURE_FOOD_DAYS, 0.0, 1.0)
+
+# How much a family's temperament and values make it weigh survival over its craft (owner
+# 2026-11-03): more for the cautious, less for the daring and the ambitious, and less again for a
+# family that holds to its craft or its ways (Keepers of Craft, Traditionalist, Perfectionist).
+# Values aren't good or bad economically: each cuts both ways by circumstance.
+static func get_survival_mindedness(household: Household) -> float:
+	var risk: int = HouseholdCharacter.get_axis(household, HouseholdCharacter.RISK)
+	var ambition: int = HouseholdCharacter.get_axis(household, HouseholdCharacter.AMBITION)
+	var weight: float = 1.0 + 0.25 * maxi(0, -risk) - 0.1 * maxi(0, risk) - 0.1 * maxi(0, ambition)
+	for value_id: String in ["keepers_of_craft", "traditionalist", "perfectionist"]:
+		if HouseholdCharacter.get_strength(household, value_id) > 0:
+			weight *= CRAFT_HOLDS_SURVIVAL_FACTOR
+	return maxf(0.0, weight)
+
+const CRAFT_HOLDS_SURVIVAL_FACTOR: float = 0.6
+
+# Whether a family wanting a better home would build it of what this good makes, if it could have
+# any (MaterialChoice with supply set aside; sprint S4 review).
+static func means_to_build_with(city: City, household: Household, good: String) -> bool:
+	if not EconomyBalance.can_be_stone(Building.BUILDING_HOUSE):
+		return false
+	var wants_home: bool = household.housing_status != Household.RESIDENCE_HOUSED or city.is_household_in_rough_housing(household) or FamilyDevelopment.wants_better_home(household)
+	if not wants_home:
+		return false
+	var material: String = str(MaterialChoice.choose(city, household, Building.BUILDING_HOUSE, true)["material"])
+	return EconomyBalance.get_build_cost(Building.BUILDING_HOUSE, material).has(good)
+
+# Whether the town has no use for more of a good (sprint S4 review): not food, wood or tools, no need
+# it meets going short, no building waiting for it, no workshop using it, and NO_USE_STOCK in store.
+static func has_no_use(city: City, good: String) -> bool:
+	if good in ACTIVITIES or int(city.resources.get(good, 0)) < NO_USE_STOCK or get_unmet_need(city, good) != "":
+		return false
+	if int(city.construction.get_committed_materials().get(good, 0)) > int(city.resources.get(good, 0)):
+		return false
+	return get_use(city, good, SHORTAGE_HORIZON_DAYS) <= 0.0
 
 static func get_use(city: City, good: String, days: int) -> float:
 	var use: float = 0.0

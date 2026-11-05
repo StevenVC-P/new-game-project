@@ -51,6 +51,8 @@ var only_seed: int = -1
 var repeat: bool = false
 var metas: Array[String] = []
 var commissions: Array[Dictionary] = []
+# Comparison only: trades families may not choose (FamilyInitiative, meta "occupations_left_out").
+var left_out: Array = []
 # The deposit a workplace is best placed on, for choosing a commissioned site.
 const DEPOSIT_OF: Dictionary = {"quarry": "stone", "brickworks": "clay"}
 
@@ -79,6 +81,8 @@ func run() -> void:
 			policies.assign(argument.trim_prefix("--policies=").split(","))
 		elif argument.begins_with("--meta="):
 			metas.assign(argument.trim_prefix("--meta=").split(","))
+		elif argument.begins_with("--leave-out="):
+			left_out.assign(argument.trim_prefix("--leave-out=").split(","))
 		elif argument.begins_with("--commission="):
 			for entry: String in argument.trim_prefix("--commission=").split(","):
 				commissions.append({"type": entry.get_slice("@", 0), "day": int(entry.get_slice("@", 1))})
@@ -244,6 +248,8 @@ func play(site: Dictionary, start: int, condition: String, policy: String) -> Di
 	var city: City = found(site, start)
 	for meta: String in metas:
 		city.set_meta(meta, true)
+	if not left_out.is_empty():
+		city.set_meta("occupations_left_out", left_out)
 	var scenario: Dictionary = BASE.duplicate(true)
 	scenario["hard_winter"] = condition == "stressed"
 	scenario["guided"] = policy == "guided"

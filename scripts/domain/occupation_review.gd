@@ -225,6 +225,9 @@ static func is_oversupplied(city: City, holding: Building) -> bool:
 	var activity: String = FamilyInitiative.get_activity(holding.type)
 	if activity == TownInfluence.ACTIVITY_FOOD:
 		return FamilyInitiative.get_food_ratio(city) > FOOD_PLENTY_RATIO
+	# A pile no one uses (sprint S4 review) is more than enough, however few make it.
+	if FamilyInitiative.has_no_use(city, activity):
+		return true
 	return FamilyInitiative.count_producers(city, activity) - 1 >= OTHER_PRODUCERS_PLENTY
 
 static func is_short_elsewhere(city: City, activity: String) -> bool:

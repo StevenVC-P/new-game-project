@@ -24,8 +24,10 @@ const WARMTH_WEIGHT: float = 1.2
 const VALUE_WEIGHT: float = 0.6
 const NOISE: float = 0.4
 
-# {"material", "terms" (of the chosen), "options": [{material, score, terms}]}.
-static func choose(city: City, household: Household, building_type: String) -> Dictionary:
+# {"material", "terms" (of the chosen), "options": [{material, score, terms}]}. With `ignore_supply`,
+# what the family would build of if every material could be had: what it would set out to make
+# (FamilyInitiative, a family producing for its own home; sprint S4 review).
+static func choose(city: City, household: Household, building_type: String, ignore_supply: bool = false) -> Dictionary:
 	var options: Array[Dictionary] = []
 	if not EconomyBalance.can_be_stone(building_type):
 		return {"material": EconomyBalance.MATERIAL_TIMBER, "terms": [], "options": options}
@@ -33,10 +35,10 @@ static func choose(city: City, household: Household, building_type: String) -> D
 	var timber_days: float = EconomyBalance.get_build_work_days(building_type)
 	for material: String in EconomyBalance.MATERIALS:
 		var cost: Dictionary = EconomyBalance.get_build_cost(building_type, material)
-		if material != EconomyBalance.MATERIAL_TIMBER and not city.construction.can_supply(cost):
+		if material != EconomyBalance.MATERIAL_TIMBER and not ignore_supply and not city.construction.can_supply(cost):
 			continue
 		var terms: Array = []
-		var spending: float = FamilyInitiative.get_spending_risk(city, cost)
+		var spending: float = 0.0 if ignore_supply else FamilyInitiative.get_spending_risk(city, cost)
 		if spending > 0.0:
 			FamilyInitiative.add(terms, -SPEND_WEIGHT * spending, "it would take scarce %s" % ", ".join(cost.keys().filter(func(k: String) -> bool: return int(cost[k]) > 0)))
 		var extra: float = EconomyBalance.get_build_work_days(building_type, material) / timber_days - 1.0

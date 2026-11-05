@@ -28,6 +28,7 @@ func run_all() -> void:
 	test_stone_left_is_saved()
 	test_no_map_works_as_before()
 	test_families_take_up_stone_work()
+	test_food_security_and_own_demand_weigh_in()
 	if failure_count > 0:
 		push_error("Quarry deposit validation failed: " + str(failure_count) + " failure(s)")
 		quit(1)
@@ -189,6 +190,37 @@ func test_families_take_up_stone_work() -> void:
 		city.apply_building_production(pit)
 	var cut: int = left - TownDeposits.get_stone_left(city, pit)
 	_check(cut > 0 and cut < 60 * 2, "a pit cuts from the deposit by hand, slower than a quarry (%d in 60 days)" % cut)
+
+# Owner 2026-11-03: food security is a weighed reason against new deposit trades, as strong as the
+# family's temperament and values make it (never a bar); a family that means to build its own home of
+# stone has its own reason to quarry, so new industries start without the player.
+func test_food_security_and_own_demand_weigh_in() -> void:
+	var city: City = town()
+	city.influence.enabled = true
+	city.resources["food"] = 0
+	_check(FamilyInitiative.get_food_insecurity(city) > 0.9, "a town with no food is far from secure (%.2f)" % FamilyInitiative.get_food_insecurity(city))
+	var household: Household = city.households[0]
+	var desire: Dictionary = FamilyInitiative.get_work_desire(city, household, "quarry")
+	_check(str(FamilyInitiative.get_reasons(desire["terms"], false, 6)).contains("secure yet"), "and that weighs against stone work: %s" % str(FamilyInitiative.get_reasons(desire["terms"], false, 6)))
+	var plain: float = FamilyInitiative.get_survival_mindedness(household)
+	var profile: Dictionary = household.values.duplicate(true)
+	profile[CultureValues.CATEGORY_CRAFT_LEARNING] = ["keepers_of_craft"]
+	household.set_values(profile)
+	_check(FamilyInitiative.get_survival_mindedness(household) < plain, "a family keeping to its craft weighs it less (%.2f against %.2f)" % [FamilyInitiative.get_survival_mindedness(household), plain])
+	city.resources["food"] = 100000
+	_check(FamilyInitiative.get_food_insecurity(city) == 0.0, "a well-stocked town is secure")
+	# A housed family in a hut that wants a better home and would build it of stone.
+	var builder: Household = city.households[1]
+	var stone_profile: Dictionary = builder.values.duplicate(true)
+	stone_profile[CultureValues.CATEGORY_WORK_ETHIC] = ["perfectionist"]
+	stone_profile[CultureValues.CATEGORY_CRAFT_LEARNING] = ["keepers_of_craft"]
+	builder.set_values(stone_profile)
+	var choice: Dictionary = MaterialChoice.choose(city, builder, "house", true)
+	_check((choice["options"] as Array).any(func(o: Dictionary) -> bool: return str(o["material"]) == EconomyBalance.MATERIAL_STONE), "with supply set aside, stone is among what a family would build of")
+	if str(choice["material"]) == EconomyBalance.MATERIAL_STONE:
+		builder.housing_status = Household.RESIDENCE_TEMPORARY
+		var wants: Dictionary = FamilyInitiative.get_work_desire(city, builder, "quarry")
+		_check(str(FamilyInitiative.get_reasons(wants["terms"], true, 6)).contains("its own home of"), "a family meaning to build its own stone home has its own reason to quarry: %s" % str(FamilyInitiative.get_reasons(wants["terms"], true, 6)))
 
 func _check(condition: bool, message: String) -> void:
 	if condition:
