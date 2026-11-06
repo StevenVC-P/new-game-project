@@ -80,6 +80,10 @@ const TIMBER: String = "timber_failing"
 # A family whose own hearth went cold for two months running (TownFuel; sprint S3 review): like
 # hunger, it doesn't wait for its tenure or year to try another way to stay warm.
 const COLD: String = "cold"
+# Wood work while the store already holds more than the coming winter needs and the town is short of
+# something else (sprint S5b, FamilyInitiative.get_wood_plenty): the family looks again without
+# waiting for its year; what it then chooses is its own weighing.
+const WOOD_PLENTY: String = "wood_beyond_winter"
 const TIMBER_FAILING_SHARE: float = 0.5
 
 static func is_on(city: City) -> bool:
@@ -153,7 +157,7 @@ static func is_due(city: City, household: Household) -> bool:
 # Reasons that do not wait for the usual tenure or year: an essential shortage, a family's own hunger,
 # wood work whose trees are failing (after a season at half its best, or at once with none left).
 static func is_urgent(triggers: Array[String]) -> bool:
-	return triggers.has(SHORTAGE) or triggers.has(HUNGER) or triggers.has(TIMBER) or triggers.has(COLD)
+	return triggers.has(SHORTAGE) or triggers.has(HUNGER) or triggers.has(TIMBER) or triggers.has(COLD) or triggers.has(WOOD_PLENTY)
 
 static func is_timber_failing(city: City, holding: Building) -> bool:
 	if TownLand.get_reach_kind(holding.type) != TownLand.TIMBER or city.local_map.is_empty():
@@ -198,6 +202,9 @@ static func get_triggers(city: City, household: Household, holding: Building) ->
 		triggers.append(HUNGER)
 	if int(household.work_strain.get(COLD, 0)) >= HUNGRY_MONTHS:
 		triggers.append(COLD)
+	var activity: String = FamilyInitiative.get_activity(holding.type)
+	if activity == TownInfluence.ACTIVITY_WOOD and FamilyInitiative.get_wood_plenty(city) > 0.0 and is_short_elsewhere(city, activity):
+		triggers.append(WOOD_PLENTY)
 	return triggers
 
 # The worst essential shortage the town faces in a good other than `own` (FamilyInitiative.get_shortage).
