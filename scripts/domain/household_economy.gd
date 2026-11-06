@@ -65,6 +65,8 @@ const OWN_NEED_WEIGHT: float = 1.0
 # The danger of cold at its worst, drawing a family to gather firewood (sprint S3 review): as much as
 # hunger draws a family to food work (FamilyInitiative.SURVIVAL_WEIGHT).
 const COLD_SURVIVAL_WEIGHT: float = 4.0
+# Wood in store beyond the coming winter's need, against gathering more at its most (sprint S5b).
+const WOOD_PLENTY_SIDE_WEIGHT: float = 2.0
 const OWN_PLENTY_WEIGHT: float = 1.0
 const KNOWS_WEIGHT: float = 1.0
 const OWN_SKILL_WEIGHT: float = 0.5
@@ -511,6 +513,10 @@ static func get_secondary_desire(city: City, household: Household, holding: Buil
 			if float(cold["level"]) > 0.0:
 				own_need = true
 				FamilyInitiative.add(terms, COLD_SURVIVAL_WEIGHT * float(cold["level"]), str(cold["reason"]))
+			# Gathering more for a store that already holds the coming winter's wood (sprint S5b).
+			var plenty: float = FamilyInitiative.get_wood_plenty(city)
+			if plenty > 0.0:
+				FamilyInitiative.add(terms, -WOOD_PLENTY_SIDE_WEIGHT * plenty, FamilyInitiative.WOOD_PLENTY_REASON)
 			if land < 1.0:
 				FamilyInitiative.add(terms, -(1.0 - land), "few trees near its home")
 		"tools":
