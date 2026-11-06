@@ -205,6 +205,10 @@ func test_reasons_must_last_a_season() -> void:
 # a month; the others wait their turn.
 func test_once_a_year_and_one_a_month() -> void:
 	var city: City = town()
+	# The second family's other work here was woodcutting, against its calling, beside 500 wood the
+	# town never burns; since S5b that plenty weighs against it. This test is about the monthly limit,
+	# so it keeps the judgment it was written for.
+	city.set_meta("no_wood_plenty", true)
 	var forge: Array[Household] = []
 	var x: int = 4
 	for household: Household in city.households:
