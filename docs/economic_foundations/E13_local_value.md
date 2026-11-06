@@ -130,10 +130,19 @@ V0 stays in the harness, and gameplay logs must be byte-identical with it on or 
 - **Currency docs:** the metal-and-paper direction conflicts with `ECONOMY_MODEL.md` §1 and §7, and the conflict stays open for now.
 - **Currency value:** this formula can't price money. Coin and paper have little or no use demand, so they'd sit at the floor. They'll need a value source based on acceptance, which should be designed with currency.
 
-## Decisions for later
+## Owner's decisions (2026-11-06)
 
-These can wait until you've reviewed S9b:
-1. Does accessible coverage set the town reference, with physical coverage kept as a separate signal? I recommend yes.
-2. Should a family's keep-back count as unavailable? It's the simplest reading of "unwilling to exchange", but it makes a fixed 60-day rule shape value until V3.
-3. Is a small set of general settings acceptable, given it can't be eliminated entirely?
+The general design direction is approved. This approves direction only: V0 stays unauthorized, and no valuation is built.
+
+1. **Accessible coverage sets the town's economic reference value.** Physical coverage is preserved as a separate measurement.
+2. **Household keep-back is unavailable.** Goods a family reserves for itself are unavailable to other households unless voluntarily offered or made accessible through existing rules. The fixed 60-day reserve is provisional and can evolve as household behaviour grows more sophisticated.
+3. **A small number of consistent general settings is acceptable.** They are validated through testing and never adjusted simply to produce preferred survival outcomes.
+
+## Long-term constraint: demographic scaling
+
+Families are simulated individually at first, but settlements will eventually reach hundreds of thousands or millions of people, represented by demographic groups. An architectural consideration for later, not a request to build demographics now.
+
+- **E13 must eventually support both individual households and aggregated demographic groups without an entirely different valuation system.** The questions stay the same: production, consumption, supply, demand, ownership and accessibility.
+- **Aggregation must preserve distributions** of wealth, resource ownership, economic circumstances and inherited cultural values. A simple average would hide widespread hunger in a settlement where a few wealthy families control most of the food.
+- **Family lineages and their inherited values stay meaningful** as the simulation scales.
 
