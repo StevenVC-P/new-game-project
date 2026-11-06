@@ -1054,10 +1054,11 @@ static func get_prized(household: Household) -> String:
 			prized = category
 	return prized
 
-# Already well off: housed, on a proper holding of its own.
+# Already well off: housed, on a proper holding of its own; or, under a compact, holding well above
+# the town's middle in wealth (TownMarket, sprint S9).
 func is_prosperous(household: Household) -> bool:
 	var holding: Building = FamilyInitiative.get_holding(city, household)
-	return holding != null and not holding.is_tier0() and household.housing_status == Household.RESIDENCE_HOUSED and not city.is_household_in_rough_housing(household)
+	return (holding != null and not holding.is_tier0() and household.housing_status == Household.RESIDENCE_HOUSED and not city.is_household_in_rough_housing(household)) or TownMarket.is_wealthy(city, household)
 
 # Whether a household's own achievement benefits the town: its work supplies what the town is
 # short of, or what no one else here supplies. Service and civic work always serve others.

@@ -35,7 +35,8 @@ static func is_in_danger(household: Household) -> bool:
 # The common table under a compact, after families ate their own (HouseholdEconomy.feed): the
 # community's food above the reserve feeds every family alike (as before S8 when there is no
 # reserve); the reserve feeds only families in danger. What the table can't give comes from each
-# family's larder reserve, then from neighbours who will give. A family left wanting is short today.
+# family's larder reserve, then from neighbours who will give, then from selling its goods for food
+# (TownMarket, S9). A family left wanting is short today.
 static func feed_from_table(city: City, from_store: Dictionary) -> void:
 	var community: int = TownLedger.get_community(city, "food")
 	var open: float = float(maxi(0, community - get_reserve(city)))
@@ -64,6 +65,9 @@ static func feed_from_table(city: City, from_store: Dictionary) -> void:
 		city.influence.larder_eaten_short += reserve_food
 		if unmet > 0.001:
 			unmet -= ask_for_food(city, household, unmet)
+		# Still short: it may sell what it holds for food, any day (TownMarket, sprint S9).
+		if unmet > 0.001:
+			unmet -= TownMarket.sell_for_food(city, household, unmet)
 		if unmet > 0.001:
 			household.short_today = true
 			household.short_days_this_month += 1

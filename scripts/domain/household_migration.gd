@@ -59,6 +59,8 @@ static func advance_month(city, city_index: int = 0) -> void:
 	FamilyAmbitions.advance_month(city)
 	OccupationReview.advance_month(city)
 	HouseholdEconomy.advance_month(city)
+	# The market day: families barter what they hold beyond their needs (TownMarket).
+	TownMarket.hold(city)
 	# Families leaning toward the community give more than the compact asks (TownCompact).
 	TownCompact.advance_month(city)
 	# The commons' grants, by the player's rule (TownCommons).

@@ -118,6 +118,8 @@ var stores_share: Dictionary = {}
 var share_food_owed: float = 0.0
 var share_fuel_owed: float = 0.0
 var given_to_community: int = 0
+# Units it has sold on market days (TownMarket).
+var market_sales: int = 0
 var larder: float = 0.0
 var larder_target_days: int = 0
 var short_today: bool = false

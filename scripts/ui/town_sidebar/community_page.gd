@@ -115,7 +115,7 @@ static func get_stores(city: City) -> Array:
 	return [
 		{"kind": "heading", "text": "Shared resources"},
 		get_compact_card(city),
-	] + ([get_commons_card(city)] if TownCommons.is_on(city) else []) + [
+	] + ([get_commons_card(city), get_market_card(city)] if TownCommons.is_on(city) else []) + [
 		get_treasury_card(city),
 		{"kind": "card", "title": "Common stores", "tag": "priorities first" if priorities else "open", "lines": lines, "muted": muted, "columns": 2, "buttons": [
 			{"text": "Open", "toggle": true, "active": not priorities, "action": {"action": "set_store_rule", "rule": TownInfluence.RULE_OPEN}},
@@ -156,6 +156,19 @@ static func get_treasury_card(city: City) -> Dictionary:
 		muted.append("Given by families beyond the compact: %d goods" % given)
 	muted.append("Building sites still wait for: " + (", ".join(waiting_parts) if not waiting_parts.is_empty() else "nothing"))
 	return {"kind": "card", "title": "Treasury", "tag": "pooled" if not TownCompact.is_set(city) else "", "lines": lines, "muted": muted}
+
+# The market day (TownMarket), read-only: what changed hands last month and at what price in food.
+static func get_market_card(city: City) -> Dictionary:
+	var lines: Array = []
+	var goods: Array = city.market_last.keys()
+	goods.sort()
+	for good: String in goods:
+		var deal: Dictionary = city.market_last[good]
+		lines.append("%d %s at %.1f food each" % [int(deal["units"]), good.replace("_", " "), float(deal["price"])])
+	if lines.is_empty():
+		lines.append("Nothing changed hands at the last market day.")
+	var muted: Array = ["Families trade what they hold beyond their own needs, paying in food; prices follow what the town wants and has.", "Sold for food on hungry days: %d goods." % city.market_emergency_sales]
+	return {"kind": "card", "title": "Market day", "lines": lines, "muted": muted}
 
 # The commons' rules (TownCommons): how many days of food the table keeps back for families in
 # danger, and whether the community grants part of its surplus to families each month.

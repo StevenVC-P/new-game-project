@@ -92,6 +92,12 @@ var commons_granted: Dictionary = {}
 var commons_help_asked: int = 0
 var commons_help_given: float = 0.0
 var commons_help_month: Dictionary = {}
+# The market day (TownMarket): last prices in food, last month's dealings by good, everything that
+# has changed hands, and sales for food on hungry days.
+var market_prices: Dictionary = {}
+var market_last: Dictionary = {}
+var market_traded: Dictionary = {}
+var market_emergency_sales: int = 0
 # Value counts of the region newcomers come from; generated on first arrival.
 var regional_value_counts: Dictionary = {}
 # Producing buildings by type, refreshed each tick; read by Communal Labor.

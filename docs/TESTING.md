@@ -23,6 +23,8 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_compact_validation.gd
 # The commons (S8): the table's reserve for families in danger, neighbours answering a hungry family, grants
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_commons_validation.gd
+# The market day (S9): barter in food at the town's prices, keeps, values, selling for food any day, wealth
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_market_validation.gd
 # Diagnostic: one divergence town under a compact, a line for each family short a day (filter for [CT])
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/compact_trace.gd -- --environment=forested --start=0 --compact=private > trace.log
 # Divergence check: the same founder sets on five kinds of land, daily invariants (filter for [DIV]; "-- --survey" lists

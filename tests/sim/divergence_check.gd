@@ -453,6 +453,22 @@ func measure_compact(city: City, state: Dictionary, m: Dictionary) -> void:
 	for good: String in city.commons_granted.keys():
 		granted += int(city.commons_granted[good])
 	m["granted"] = granted
+	# The market day (S9): what changed hands, sales for food on hungry days, and wealth by trade.
+	var traded: int = 0
+	for good: String in city.market_traded.keys():
+		traded += int(city.market_traded[good])
+	m["market_units"] = traded
+	m["market_emergency"] = city.market_emergency_sales
+	var wealth_by_trade: Dictionary = {}
+	var counts: Dictionary = {}
+	for household: Household in city.households:
+		var holding: Building = FamilyInitiative.get_holding(city, household)
+		var trade: String = BuildingTiers.get_base_type(holding.type) if holding != null else "none"
+		wealth_by_trade[trade] = float(wealth_by_trade.get(trade, 0.0)) + TownMarket.get_wealth(household)
+		counts[trade] = int(counts.get(trade, 0)) + 1
+	for trade: String in wealth_by_trade.keys():
+		wealth_by_trade[trade] = roundi(float(wealth_by_trade[trade]) / float(counts[trade]))
+	m["wealth_by_trade"] = wealth_by_trade
 
 # One town at one moment, in the test plan's metric categories (section 6).
 func measure(city: City, state: Dictionary, off_the_ground: bool) -> Dictionary:

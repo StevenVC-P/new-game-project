@@ -378,6 +378,24 @@ const HELP_KEEPS_FOOD_DAYS: int = 30
 # as in danger while the reserve held food.
 const DANGER_SHORT_DAYS: int = 5
 
+# --- The market day (sprint S9; TownMarket) ---
+# Monthly, families barter what they hold beyond their own needs, food the medium. A family keeps
+# MARKET_KEEPS_FOOD_DAYS of its eating, wants food up to MARKET_WANTS_FOOD_DAYS and winter fuel for
+# MARKET_WANTS_FUEL_DAYS, and wants twice a holding's upkeep in tools when it keeps the holding up.
+# A good's price in food is its worth scaled by the town's demand against supply, between
+# MARKET_PRICE_MIN and MARKET_PRICE_MAX. Insular families bring INSULAR_MARKET_SHARE less to market a
+# point of strength (at least MARKET_SHARE_MIN of it); Hagglers take HAGGLE_PER_POINT more of what
+# buyers pay a point. A family is prosperous on wealth PROSPEROUS_WEALTH_SHARE above the town's median.
+const MARKET_KEEPS_FOOD_DAYS: int = 60
+const MARKET_WANTS_FOOD_DAYS: int = 60
+const MARKET_WANTS_FUEL_DAYS: int = 90
+const MARKET_PRICE_MIN: float = 0.5
+const MARKET_PRICE_MAX: float = 2.0
+const INSULAR_MARKET_SHARE: float = 0.25
+const MARKET_SHARE_MIN: float = 0.25
+const HAGGLE_PER_POINT: float = 0.1
+const PROSPEROUS_WEALTH_SHARE: float = 2.0
+
 # --- Defense (docs/FIRST_STAGE_LOOP.md, milestone 5; TownDefense) ---
 # From BANDITS_FROM_DAY, every BANDIT_ROLL_INTERVAL_DAYS outside winter, a band takes to the road
 # toward a town with BANDIT_MONTHLY_CHANCE by how traders reach it, times the town's temptation
