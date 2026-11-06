@@ -80,9 +80,10 @@ S7, S8 and S9 go in order; no food exchange is pulled forward into S7. Low-contr
 1. **Measure first.** S1a builds the test framework (`docs/ECONOMIC_FOUNDATIONS_TEST_PLAN.md`) on the existing checks and records baseline B0 on `develop`; S1b lands the first mechanic against it. (The owner's testing mandate, 2026-11-02, puts the framework before substantial mechanics, so it is its own small sprint.)
 2. **Make geography bite: Track A (S1–S5).** Stone, finite forests, fuel, materials in construction and grounded clay give sites real advantages, scarcity and sinks, and give settlements their first visible identity. It closes F1–F4 and some of F6, and makes property worth having.
 3. **Ownership and exchange: Track B (S6–S9).** The ledger (behaviour-neutral), player-set contributions, redistribution and survival-seeking, and the market day. S6 touches nothing Track A changes in behaviour and may move earlier if convenient.
-4. **The land's year: Track C (S10–S14).** Food kinds, seasonal crops, soil, fish and game stocks, livestock and draft animals.
-5. **Metal and quality: Track D (S15–S17).** Iron with charcoal, tool tiers, wood species.
-6. **Threads through every sprint:** culture ↔ economy (a sprint states which values touch its decisions), autonomy (no new player micromanagement), saves, determinism and the cost of the tick.
+4. **Local value: E13 (V0–V4), between Tracks B and C.** A town-specific value for each good, from projected scarcity and an anchor that emerges from the economy. It informs decisions and never dictates them. Numbers stay hidden from players. No new goods or categories. V0 decides the timing of the later stages, so V2 isn't committed before S10 without evidence. Proposal: `economic_foundations/E13_local_value.md`.
+5. **The land's year: Track C (S10–S14).** Food kinds, seasonal crops, soil, fish and game stocks, livestock and draft animals.
+6. **Metal and quality: Track D (S15–S17).** Iron with charcoal, tool tiers, wood species.
+7. **Threads through every sprint:** culture ↔ economy (a sprint states which values touch its decisions), autonomy (no new player micromanagement), saves, determinism and the cost of the tick.
 
 **Why not property first,** as `HANDOFF.md` had it planned: with no scarcity beyond the first year, a ledger, a contribution rate and a market move goods nobody lacks (F3). Track A makes those decisions matter. The owner approved this order (2026-11-02).
 
@@ -102,6 +103,7 @@ S7, S8 and S9 go in order; no food exchange is pulled forward into S7. Low-contr
 | E10 Production and technology | Dead ends, tool tiers, practical capability (4) | S4, S15, S16, B-items |
 | E11 Culture ↔ economy | Values in consumption and investment; experience changing values (2.4) | thread; S18 |
 | E12 Scale guardrails | Aggregation-friendly data, the tick's cost (8) | thread; S19 |
+| E13 Local Value | Town-specific values from projected scarcity and an emergent anchor; informs decisions, never dictates | V0–V4 |
 
 ## 5. Tracking
 
@@ -132,6 +134,11 @@ Status: Planned, Active, Complete, Blocked. Complexity: S (days), M (about a wee
 | S17 Wood species | E3 | Planned | S2, S4 | Species by climate and soil; each has a distinct use (durability, handles, baskets, fuel) | Report | — | — |
 | S18 Values from experience | E11 | Planned | S7, S9 | Economic experience moves values (e.g. hunger under hoarding → private holdings) | Report: culture drift by policy | — | — |
 | S19 Scale check | E12 | Planned | Track B | Tick cost at 100 households within the benchmark's budget | `HOUSEHOLD_SIM_BENCHMARK.md` | — | — |
+| V0 Observe | E13 | Planned; **not authorized** ([proposal](economic_foundations/E13_local_value.md)) | S9b reviewed; owner authorizes | Harness only: monthly raw inputs logged, the proposal's eight questions answered | Gameplay logs identical with it on or off; report reviewed | — | — |
+| V1 Town Reference ◆ | E13 | Planned | V0 | Local values in market and wealth; signals preserved; food floats | Pooled towns identical day for day; saves and determinism hold; owner reviews how far exchange diverges from values | — | — |
+| V2 Work Decisions ◆ | E13 | Planned | V1; timing set by V0 | One reasoned term; old scarcity terms retired one at a time | Fixed weights; matched on/off runs; no boom-and-bust cycle; callings, values and survival remain meaningful | — | — |
+| V3 Household Valuation | E13 | Planned | V1, likely V2; Track C and S18 | Different exchange terms by household | Differences explained by need, values or expectations | — | — |
+| V4 Regional Valuation | E13 | Planned | A second economy, merchant families | Value gaps drive trade | Separate design | — | — |
 
 **Backlog, not yet sprinted:** copper and tin → bronze (after S16 shows tiers matter); coal; salt preserving meat and fish (after S10); flax → linen and wool → spun cloth, so clothing has a producer (F4); dogs for herding and hunting; horses and transport; water transport; trader wants and offers from the neutral town's own geography, so a mining town can import food; settlement visuals by material beyond S4's first pass; evasion, resentment and departure as answers to contribution policy (only once the mechanics in S7–S9 exist); fruit trees.
 
@@ -239,3 +246,4 @@ From `AGENTS.md`, `HANDOFF.md` and the brief: `main.gd` gets no simulation logic
 - 2026-11-02: owner approved D1–D8 with additions (an initial contribution choice in new games, voluntary contributions, exchange outside market day, firewood by housing and household size, families choosing their own building materials). Recorded; work not started.
 - 2026-11-02: owner's testing mandate → `docs/ECONOMIC_FOUNDATIONS_TEST_PLAN.md`. S1 split into S1a (framework and baseline) and S1b (quarries). Not started.
 - 2026-11-02: owner approved Q1–Q6 and authorized the work. Mortality from sustained hunger and cold added as S3b.
+- 2026-11-06: owner added E13 Local Value (V0–V4). Nothing built; V0 waits for the owner's word.
