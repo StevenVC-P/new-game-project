@@ -113,6 +113,11 @@ var mending: float = 0.0
 # The family's own goods in the town's store, good -> amount (TownLedger; sprint S6). Empty while
 # everything is pooled.
 var stores_share: Dictionary = {}
+# Under a compact (TownCompact): food and fuel eaten or burned from its share but not yet taken as a
+# whole unit, and goods it has given the community beyond the compact.
+var share_food_owed: float = 0.0
+var share_fuel_owed: float = 0.0
+var given_to_community: int = 0
 var larder: float = 0.0
 var larder_target_days: int = 0
 var short_today: bool = false

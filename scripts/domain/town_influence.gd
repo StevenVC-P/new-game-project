@@ -158,7 +158,7 @@ func get_funding_block(cost: Dictionary, activities: Array[String], household: H
 		# First claim given by the Speaker of the Gathering stays within the Elder's rule (TownRegard).
 		if household == null or household.first_claim_until < city.construction.day or TownRegard.is_on(city):
 			return "the stores go to the community's priorities first"
-	if not city.construction.can_supply(cost, get_protected_reserve()):
+	if not city.construction.can_supply(cost, get_protected_reserve(), household):
 		return "the stores hold too little beyond what is kept back"
 	return ""
 

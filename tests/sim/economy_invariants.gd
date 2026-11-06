@@ -10,7 +10,9 @@ extends RefCounted
 #     their reach counted once (an idle or empty workplace taking a share, or a tile counted twice,
 #     breaks it);
 # I7  no construction site holds more of a material than it needs;
-# I14 no family's members are negative, and its number is its members (sprint S3b).
+# I14 no family's members are negative, and its number is its members (sprint S3b);
+# I15 no family's share in the store is negative, and families' shares of a good never exceed the
+#     store's stock of it (TownLedger, sprints S6-S7).
 
 const SHARED_KINDS: Array[String] = ["woods", "water", "pasture"]
 # How many violations are kept word for word; the rest are only counted.
@@ -64,6 +66,12 @@ func check_day(city: City, day: int) -> void:
 		# I14: members never negative, and the family's number is its members.
 		if mini(mini(household.working_adults, household.young_children), mini(household.older_children, household.adult_children)) < 0 or household.total_population != household.working_adults + household.get_total_child_count():
 			fail(day, "I14 household %d: adults %d, children %d/%d/%d, population %d" % [household.id, household.working_adults, household.young_children, household.older_children, household.adult_children, household.total_population])
+		for good: String in household.stores_share.keys():
+			if int(household.stores_share[good]) < 0:
+				fail(day, "I15 household %d holds %d %s in the store" % [household.id, int(household.stores_share[good]), good])
+	for good: String in get_goods():
+		if TownLedger.get_shares_total(city, good) > int(city.resources.get(good, 0)):
+			fail(day, "I15 families hold %d %s, the store has %d" % [TownLedger.get_shares_total(city, good), good, int(city.resources.get(good, 0))])
 	for project: ConstructionProject in city.construction.projects:
 		for material: String in project.materials_delivered.keys():
 			if int(project.materials_delivered[material]) > int(project.materials_needed.get(material, 0)):

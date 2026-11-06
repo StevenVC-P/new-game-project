@@ -649,7 +649,7 @@ static func get_improve_desire(city: City, household: Household, proper_type: St
 	var waiting: float = get_waiting_risk(city, get_activity(proper_type))
 	if waiting > 0.0:
 		add(terms, 1.5 * waiting, {TownInfluence.ACTIVITY_FOOD: "more food for the winter", TownInfluence.ACTIVITY_WOOD: "the town needs wood", TownInfluence.ACTIVITY_TOOLS: "the town needs tools"}[get_activity(proper_type)])
-	var spending: float = get_spending_risk(city, EconomyBalance.get_build_cost(proper_type))
+	var spending: float = get_spending_risk(city, EconomyBalance.get_build_cost(proper_type), household)
 	var established: int = count_proper(city, proper_type)
 	var untried: float = 0.5 if established == 0 else 0.0
 	var acting: float = spending + untried
@@ -845,15 +845,18 @@ static func get_neighbours_example(city: City, household: Household) -> Dictiona
 			idle += 1
 	return {"paying": paying, "idle": idle}
 
-# How much of the free stores (above the protected reserve) a cost would take, 0 to 1.5.
-static func get_spending_risk(city: City, cost: Dictionary) -> float:
+# How much of the free stores (above the protected reserve) a cost would take, 0 to 1.5. For a
+# family, what it would draw on: its own share and the community's free goods (TownLedger).
+static func get_spending_risk(city: City, cost: Dictionary, household: Household = null) -> float:
 	var reserve: Dictionary = city.influence.get_protected_reserve()
 	var committed: Dictionary = city.construction.get_committed_materials()
 	var risk: float = 0.0
 	for material: String in cost.keys():
 		if int(cost[material]) <= 0:
 			continue
-		var free: int = int(city.resources.get(material, 0)) - int(committed.get(material, 0)) - int(reserve.get(material, 0))
+		var free: int = TownLedger.get_community(city, material) - int(committed.get(material, 0)) - int(reserve.get(material, 0))
+		if household != null:
+			free += TownLedger.get_share(household, material)
 		risk += float(cost[material]) / float(maxi(1, free))
 	return minf(1.5, risk)
 

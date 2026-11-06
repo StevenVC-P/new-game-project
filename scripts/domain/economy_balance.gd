@@ -337,6 +337,32 @@ const TRADER_STAY_DAYS: int = 10
 const TRADER_INTERVAL_DAYS: Dictionary = {"crossroads": 20, "road": 30, "river": 45}
 const TRADER_INTERVAL_JITTER_DAYS: int = 6
 
+# --- The founding compact (sprint S7; TownCompact) ---
+# The share of a holding's work each preset gives the community, in every category. A workshop's
+# output is divided by worth in grain: its inputs' worth goes back to whoever owned them, and only
+# the worth the work added is shared at the rate, so nothing is claimed twice along a chain.
+# WORKED_VALUE_IN_GRAIN prices the goods the trader never deals in, for that division only (adding
+# them to VALUE_IN_GRAIN would change the stores' temptation to bandits).
+const COMPACT_PRESETS: Dictionary = {"communal": 1.0, "shared": 0.6, "private": 0.2}
+const COMPACT_RATE_STEP: float = 0.1
+const WORKED_VALUE_IN_GRAIN: Dictionary = {
+	"lime": 6.0,
+	"mortar": 10.0,
+	"masonry": 18.0,
+	"statues": 25.0,
+	"tiles": 7.0,
+	"paving_stones": 4.0,
+}
+# Giving more than the compact asks (monthly): a family whose values and trust lean toward the
+# community gives GIVE_SHARE_PER_POINT of what it holds beyond its own needs per point of lean, at
+# most GIVE_SHARE_MAX. Its needs: GIVE_KEEPS_FOOD_DAYS of food, GIVE_KEEPS_FUEL_DAYS of winter fuel,
+# and whatever its own building projects still wait for. Trust counts TRUST_GIVING_WEIGHT a step.
+const GIVE_SHARE_PER_POINT: float = 0.05
+const GIVE_SHARE_MAX: float = 0.3
+const GIVE_KEEPS_FOOD_DAYS: int = 90
+const GIVE_KEEPS_FUEL_DAYS: int = 90
+const TRUST_GIVING_WEIGHT: float = 0.5
+
 # --- Defense (docs/FIRST_STAGE_LOOP.md, milestone 5; TownDefense) ---
 # From BANDITS_FROM_DAY, every BANDIT_ROLL_INTERVAL_DAYS outside winter, a band takes to the road
 # toward a town with BANDIT_MONTHLY_CHANCE by how traders reach it, times the town's temptation

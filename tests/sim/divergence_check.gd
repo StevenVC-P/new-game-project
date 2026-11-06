@@ -22,6 +22,7 @@ extends SceneTree
 #                            investment_first (productive investment as the town's priority from
 #                            founding, never changed), overprotect (keeps every wood from the first week)
 #   --meta=a,b               comparison switches set on each town before its first day
+#   --compact=preset         each town's founding compact (communal, shared, private; default pooled)
 #   --commission=type@day    the player commissions one workplace of that type on that day (repeat
 #                            with commas), on the valid spot with the most of its deposit underfoot,
 #                            then nearest the town centre; a family is found to work it as in play
@@ -53,6 +54,8 @@ var metas: Array[String] = []
 var commissions: Array[Dictionary] = []
 # Comparison only: trades families may not choose (FamilyInitiative, meta "occupations_left_out").
 var left_out: Array = []
+# The founding compact each town starts with (TownCompact preset; "" pooled, as before S7).
+var compact: String = ""
 # The deposit a workplace is best placed on, for choosing a commissioned site.
 const DEPOSIT_OF: Dictionary = {"quarry": "stone", "brickworks": "clay"}
 
@@ -81,6 +84,8 @@ func run() -> void:
 			policies.assign(argument.trim_prefix("--policies=").split(","))
 		elif argument.begins_with("--meta="):
 			metas.assign(argument.trim_prefix("--meta=").split(","))
+		elif argument.begins_with("--compact="):
+			compact = argument.trim_prefix("--compact=")
 		elif argument.begins_with("--leave-out="):
 			left_out.assign(argument.trim_prefix("--leave-out=").split(","))
 		elif argument.begins_with("--commission="):
@@ -250,6 +255,8 @@ func play(site: Dictionary, start: int, condition: String, policy: String) -> Di
 		city.set_meta(meta, true)
 	if not left_out.is_empty():
 		city.set_meta("occupations_left_out", left_out)
+	if compact != "":
+		TownCompact.set_preset(city, compact)
 	var scenario: Dictionary = BASE.duplicate(true)
 	scenario["hard_winter"] = condition == "stressed"
 	scenario["guided"] = policy == "guided"
@@ -277,6 +284,15 @@ func play(site: Dictionary, start: int, condition: String, policy: String) -> Di
 				state["first_year_short_days"] = int(state["first_year_short_days"]) + 1
 		if int(town.resources["tools"]) == 0 and town.buildings.any(func(b: Building) -> bool: return b.needs_maintenance()):
 			state["tools_out_days"] = int(state["tools_out_days"]) + 1
+		# Under a compact, who goes hungry, by the trade each family works (S7 report).
+		if TownCompact.is_set(town):
+			for household: Household in town.households:
+				if household.short_today:
+					var holding: Building = FamilyInitiative.get_holding(town, household)
+					var trade: String = BuildingTiers.get_base_type(holding.type) if holding != null else "none"
+					var by_trade: Dictionary = state.get("short_by_trade", {})
+					by_trade[trade] = int(by_trade.get(trade, 0)) + 1
+					state["short_by_trade"] = by_trade
 		# Households gone without departing came to the end of their lives (old couples).
 		var ids: Array = town.households.map(func(h: Household) -> int: return h.id)
 		var departed: int = int(town.resources.get("departed_households", 0))
@@ -381,6 +397,38 @@ static func first_difference(a: Array, b: Array) -> int:
 			return i + 1
 	return mini(a.size(), b.size()) + 1
 
+# The founding compact (S7): the community's goods and families' own, in grain; how unevenly
+# families hold (Gini of each family's own goods and larder); what was given beyond the compact;
+# household hunger days by trade.
+func measure_compact(city: City, state: Dictionary, m: Dictionary) -> void:
+	var community: float = 0.0
+	var holdings: Array[float] = []
+	for good: String in Invariants.get_goods():
+		community += float(TownLedger.get_community(city, good)) * TownCompact.get_value(good)
+	for household: Household in city.households:
+		var worth: float = household.larder
+		for good: String in household.stores_share.keys():
+			worth += float(household.stores_share[good]) * TownCompact.get_value(good)
+		holdings.append(worth)
+	var own: float = 0.0
+	for worth: float in holdings:
+		own += worth
+	var gini: float = 0.0
+	if own > 0.0:
+		for a: float in holdings:
+			for b: float in holdings:
+				gini += absf(a - b)
+		gini /= 2.0 * float(holdings.size()) * own
+	var given: int = 0
+	for good: String in city.compact_given.keys():
+		given += int(city.compact_given[good])
+	m["compact"] = TownCompact.get_preset(city)
+	m["community_worth"] = roundi(community)
+	m["family_worth"] = roundi(own)
+	m["holding_gini"] = snappedf(gini, 0.01)
+	m["given"] = given
+	m["short_by_trade"] = (state.get("short_by_trade", {}) as Dictionary).duplicate()
+
 # One town at one moment, in the test plan's metric categories (section 6).
 func measure(city: City, state: Dictionary, off_the_ground: bool) -> Dictionary:
 	var m: Dictionary = {}
@@ -462,6 +510,8 @@ func measure(city: City, state: Dictionary, off_the_ground: bool) -> Dictionary:
 		trust += household.trust
 	m["trust"] = snappedf(trust / maxf(1.0, city.households.size()), 0.01)
 	m["value_changes"] = city.social.value_changes
+	if TownCompact.is_set(city):
+		measure_compact(city, state, m)
 	var times: Array = (state["day_ms"] as Array).duplicate()
 	times.sort()
 	var total: float = 0.0

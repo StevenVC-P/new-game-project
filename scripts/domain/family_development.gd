@@ -41,7 +41,7 @@ static func advance(city: City) -> Array[ConstructionProject]:
 		var project: ConstructionProject = null
 		var hut: Building = get_hut(city, household)
 		if hut != null:
-			if wants_better_home(household) and construction.can_supply(EconomyBalance.get_build_cost(Building.BUILDING_HOUSE), STORE_RESERVE):
+			if wants_better_home(household) and construction.can_supply(EconomyBalance.get_build_cost(Building.BUILDING_HOUSE), STORE_RESERVE, household):
 				project = construction.request_upgrade(hut.id, ConstructionProject.REQUESTED_BY_HOUSEHOLD, household.id, choose_material(city, household))
 		elif household.housing_status != Household.RESIDENCE_HOUSED:
 			project = claim_plot(city, household)
@@ -96,7 +96,7 @@ static func wants_better_home(household: Household) -> bool:
 # family records why (home_site_note).
 static func claim_plot(city: City, household: Household, for_itself: bool = true) -> ConstructionProject:
 	var home_type: String = "hut"
-	if not CultureValues.has_value(household.values, "simple_living") and city.construction.can_supply(EconomyBalance.get_build_cost(Building.BUILDING_HOUSE), STORE_RESERVE):
+	if not CultureValues.has_value(household.values, "simple_living") and city.construction.can_supply(EconomyBalance.get_build_cost(Building.BUILDING_HOUSE), STORE_RESERVE, household):
 		home_type = Building.BUILDING_HOUSE
 	var choice: Dictionary = HomeSites.choose(city, household, home_type)
 	household.home_site_note = choice["note"]

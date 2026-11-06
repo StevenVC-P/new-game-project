@@ -65,24 +65,51 @@ static func burn(city: City) -> void:
 		household.cold_today = false
 	if not is_on(city):
 		return
-	var need: float = get_daily_need(city) + city.fuel_carry
+	var season: int = city.get_season_index()
+	# Under a compact (TownCompact) each hearth burns its family's own wood first; the community's
+	# wood warms the rest, and only hearths it can't warm go cold.
+	var from_store: Dictionary = {}
+	var store_need: float = get_daily_need(city)
+	if TownCompact.is_set(city):
+		store_need = 0.0
+		for household: Household in city.households:
+			from_store[household.id] = burn_own_share(city, household, get_household_need(city, household, season))
+			store_need += float(from_store[household.id])
+	var need: float = store_need + city.fuel_carry
 	var whole: int = int(floor(need))
 	city.fuel_carry = need - float(whole)
 	if whole <= 0:
 		return
-	var burned: int = city.consume_need_bucket(GoodsNeedBucketHelper.BUCKET_FUEL, whole)
+	var available: int = whole if not TownCompact.is_set(city) else mini(whole, TownLedger.get_community(city, "wood"))
+	var burned: int = city.consume_need_bucket(GoodsNeedBucketHelper.BUCKET_FUEL, available)
 	city.fuel_burned += burned
 	if burned >= whole:
 		return
 	# Short: the warmth missed today is gone, not owed, so nothing is carried; every hearth that needs
-	# fuel goes cold today.
+	# fuel from the store goes cold today.
 	city.fuel_carry = 0.0
 	city.fuel_short_days += 1
-	var season: int = city.get_season_index()
 	for household: Household in city.households:
-		if get_household_need(city, household, season) > 0.0:
+		var needs_store: bool = float(from_store[household.id]) > 0.0 if TownCompact.is_set(city) else get_household_need(city, household, season) > 0.0
+		if needs_store:
 			household.cold_today = true
 			household.cold_days_this_month += 1
+
+# Burns what it can of a family's own wood (TownLedger) for its hearth's need today; returns what
+# it still needs from the store. Whole units leave the store as the fractions add up.
+static func burn_own_share(city: City, household: Household, need: float) -> float:
+	var own: float = float(TownLedger.get_share(household, "wood")) - household.share_fuel_owed
+	var take: float = clampf(need, 0.0, maxf(0.0, own))
+	if take <= 0.0:
+		return need
+	household.share_fuel_owed += take
+	var whole: int = int(floor(household.share_fuel_owed + 0.000001))
+	if whole > 0:
+		city.remove_resource("wood", whole, "need_fuel")
+		TownLedger.charge(household, "wood", whole)
+		household.share_fuel_owed = maxf(0.0, household.share_fuel_owed - float(whole))
+	city.fuel_burned += whole
+	return need - take
 
 # Whether a cold family loses today's work: one day in COLD_SKIP_TICK_INTERVAL, on other days than
 # hunger's (City.skips_work_today).

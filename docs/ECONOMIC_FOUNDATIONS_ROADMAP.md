@@ -61,6 +61,18 @@ All eight are resolved. Routine design details are made in sprint and recorded i
 - **Q5 Mortality: severe, sustained hunger or cold can kill.** Families first try what they can (own reserves, the commons, trade, other work, other fuel or shelter, leaving), and none of it is guaranteed. Death follows sustained, severe conditions, never one missed day; housing, resources and environment shape the risk; no arbitrary mortality and no artificial protection. Uses the existing household member counts and lifecycle removal, as its own bounded sprint (S3b).
 - **Q6 Worktree:** the initiative runs in a separate `git worktree`; the main folder stays on `develop` for playtesting.
 
+### Track B guidance (owner, 2026-11-05)
+
+S7, S8 and S9 go in order; no food exchange is pulled forward into S7. Low-contribution towns are judged at S9's review point, not before: private economies need household exchange as communal ones need shared resources.
+- **The compact is an agreement among families, not taxation.** Their values, trust and circumstances should eventually shape acceptance and compliance.
+- **Household ownership is meaningful:** families keep goods, provide for themselves, invest in their own interests and later exchange. Communal goods stay distinct in ownership though they share one physical store.
+- **No artificial advantage to either arrangement:** high rates give communal security and fewer private resources; low rates the reverse, and more dependence on cooperation and trade. Let it emerge.
+- **The founding choice must matter** to the town's development; families respond by their values.
+- **Track hunger, specialisation, household holdings and community reserves in S7 and S8** without balancing them early.
+- **Keep the `main.gd` change narrow** and verify founding still works.
+- **Count contributions correctly along production chains,** so processing creates no extra claims on the same goods.
+- **After S9:** compare across environments and founding families. The question is whether different arrangements can succeed under the right circumstances, not whether they perform equally.
+
 **Sequencing approved:** geography and scarcity (S1–S5) before property and markets; Track B follows by dependencies and findings. Each sprint should still move toward the eventual joining of geography, autonomous production, ownership, exchange and culture.
 
 ## 3. Sequencing
@@ -106,7 +118,7 @@ Status: Planned, Active, Complete, Blocked. Complexity: S (days), M (about a wee
 | S4 Materials in construction ◆ | E4, E10 | **Active** (S4a/b `2179f49`, S4c families quarry `4d78d9d`; 52/52 tests; comparison and review queued) | S1 | Timber and stone versions of homes and workplaces; families choose; masonry and paving get uses | Report: share of stone buildings by site | — | — |
 | S5 Clay and limestone | E2, E4 | **Active** (built `4a08dc6`, 53/53 tests; comparison and review queued) | S4 | Brickworks needs clay, lime kiln needs limestone; brick and tile have building uses | Report | — | — |
 | S6 Ownership ledger | E5 | **Active** (built on `feature/ef-s6-ledger`; 54/54 tests; matched towns identical to the base; held unmerged until the Track A review is read; [report](economic_foundations/S6_ledger.md)) | S0 | Household shares, building funders, treasury view; play unchanged under the migration-only 100% setting | Matched snapshots identical to the base; saves | — | — |
-| S7 Contributions by category ◆ | E5 | Planned | S6 | Player sets % per category of total output; families keep the rest; new games ask for an initial choice | Matched towns at 100/60/30/10% | — | — |
+| S7 Contributions by category ◆ | E5 | **Active** (owner approved S7–S9 in order, 2026-11-05; built on `feature/ef-s7-compact`; [report](economic_foundations/S7_compact.md)) | S6 | Player sets % per category of total output; families keep the rest; new games ask for an initial choice | Matched towns at 100/60/30/10% | — | — |
 | S8 Redistribution and asking for help | E5, E11 | Planned | S7 | Player's reserve/redistribute rules; families in danger seek the commons and neighbours | Report: deaths and departures where goods existed | — | — |
 | S9 Market day ◆ | E6 | Planned | S7 | Monthly barter among families; urgent exchange any day; specialists live by exchange | Report: specialisation and wealth spread | — | — |
 | S10 Food kinds and spoilage | E7 | Planned | — | Several food goods meet one need; storage and spoilage differ | Saves; matched survival | — | — |

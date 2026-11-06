@@ -35,10 +35,10 @@ static func choose(city: City, household: Household, building_type: String, igno
 	var timber_days: float = EconomyBalance.get_build_work_days(building_type)
 	for material: String in EconomyBalance.MATERIALS:
 		var cost: Dictionary = EconomyBalance.get_build_cost(building_type, material)
-		if material != EconomyBalance.MATERIAL_TIMBER and not ignore_supply and not city.construction.can_supply(cost):
+		if material != EconomyBalance.MATERIAL_TIMBER and not ignore_supply and not city.construction.can_supply(cost, {}, household):
 			continue
 		var terms: Array = []
-		var spending: float = 0.0 if ignore_supply else FamilyInitiative.get_spending_risk(city, cost)
+		var spending: float = 0.0 if ignore_supply else FamilyInitiative.get_spending_risk(city, cost, household)
 		if spending > 0.0:
 			FamilyInitiative.add(terms, -SPEND_WEIGHT * spending, "it would take scarce %s" % ", ".join(cost.keys().filter(func(k: String) -> bool: return int(cost[k]) > 0)))
 		var extra: float = EconomyBalance.get_build_work_days(building_type, material) / timber_days - 1.0

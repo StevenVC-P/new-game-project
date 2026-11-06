@@ -431,12 +431,16 @@ func get_committed_materials() -> Dictionary:
 # the cost lists at nothing is not drawn on, so its store, however low, never refuses it: a toolmaker
 # (10 wood, 0 tools) was refused while tools were below their reserve, the one improvement that
 # makes tools (docs/AUTONOMOUS_OCCUPATIONS.md, fifth round, the tool trap).
-func can_supply(cost: Dictionary, reserve: Dictionary = {}) -> bool:
+# Whether the community's goods, less what sites wait for and the reserve, cover a cost; for a
+# family's own project, its own share counts too (TownLedger; pooled, the whole store).
+func can_supply(cost: Dictionary, reserve: Dictionary = {}, household: Household = null) -> bool:
 	var committed: Dictionary = get_committed_materials()
 	for material: String in cost.keys():
 		if int(cost[material]) <= 0:
 			continue
-		var free: int = int(city.resources.get(material, 0)) - int(committed.get(material, 0)) - int(reserve.get(material, 0))
+		var free: int = TownLedger.get_community(city, material) - int(committed.get(material, 0)) - int(reserve.get(material, 0))
+		if household != null:
+			free += TownLedger.get_share(household, material)
 		if free < int(cost[material]):
 			return false
 	return true

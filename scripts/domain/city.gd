@@ -79,6 +79,10 @@ var fuel_short_days: int = 0
 # Deaths from sustained hunger or cold, by cause (HouseholdMortality), and families ended by them.
 var hardship_deaths: Dictionary = {}
 var households_ended_by_hardship: int = 0
+# The founding compact (TownCompact): {category: the community's share}, empty while pooled; and
+# what families have given beyond it, good -> units.
+var compact: Dictionary = {}
+var compact_given: Dictionary = {}
 # Value counts of the region newcomers come from; generated on first arrival.
 var regional_value_counts: Dictionary = {}
 # Producing buildings by type, refreshed each tick; read by Communal Labor.
@@ -1372,7 +1376,7 @@ func apply_building_production(building: Building):
 		var chain: Dictionary = EconomyBalanceScript.PRODUCTION.get(BuildingTiersScript.get_base_type(building_type), {})
 		if chain.is_empty():
 			return
-		var made: int = apply_input_output_production(str(chain["output"]), output_amount, chain["inputs"])
+		var made: int = apply_input_output_production(str(chain["output"]), output_amount, chain["inputs"], building)
 		if TownDeposits.draws_on_deposit(building):
 			TownDeposits.extract(self, building, made)
 	# A workplace with nothing left underfoot is worked out: its family is free for other work, and
@@ -1381,28 +1385,33 @@ func apply_building_production(building: Building):
 		log_household_lifecycle_event(0, building.assigned_household_id, "DepositWorkedOut", "building=" + str(building.id))
 		unassign_building_worker(buildings.find(building))
 
-# Returns what was made.
-func apply_input_output_production(output_key: String, output_amount: int, input_costs: Dictionary) -> int:
+# Returns what was made. A workshop's inputs come from its family's own share first, then the
+# community's goods (TownLedger); who gets the output is TownCompact's (pooled: the community).
+func apply_input_output_production(output_key: String, output_amount: int, input_costs: Dictionary, building: Building = null) -> int:
+	var worker: Household = get_household_by_id(building.assigned_household_id) if building != null and building.assigned_household_id >= 0 else null
 	var capped_output: int = output_amount
 	for input_key: String in input_costs.keys():
 		var input_cost: int = int(input_costs[input_key])
 		if input_cost <= 0:
 			continue
 		# The hearths' wood comes first in the cold seasons (TownFuel.get_reserve): workshops use only
-		# what lies beyond it.
-		capped_output = min(capped_output, int(floor(float(int(resources[input_key]) - TownFuel.get_reserve(self, input_key)) / float(input_cost))))
+		# what lies beyond it of the community's goods.
+		var usable: int = TownLedger.get_community(self, input_key) - TownFuel.get_reserve(self, input_key)
+		if worker != null:
+			usable += TownLedger.get_share(worker, input_key)
+		capped_output = min(capped_output, int(floor(float(usable) / float(input_cost))))
 
 	if capped_output <= 0:
 		return 0
 
+	var paid: Dictionary = {}
 	for input_key: String in input_costs.keys():
 		var input_cost: int = int(input_costs[input_key])
 		if input_cost > 0:
-			resources[input_key] = int(resources[input_key]) - capped_output * input_cost
-			record_flow(input_key, "used", -capped_output * input_cost)
+			remove_resource(input_key, capped_output * input_cost, "used")
+			paid[input_key] = TownLedger.charge(worker, input_key, capped_output * input_cost)
 
-	resources[output_key] = int(resources[output_key]) + capped_output
-	record_flow(output_key, "made", capped_output)
+	TownCompact.deliver_output(self, building, output_key, capped_output, paid)
 	return capped_output
 
 func get_current_building_output_amount(building: Building) -> int:
@@ -1795,12 +1804,19 @@ func update_building_maintenance(building: Building):
 	# Mending its family did itself takes the place of a tool from the store (HouseholdEconomy).
 	if building.receives_maintenance and HouseholdEconomy.mend(self, building):
 		building.maintenance_level = min(100, building.maintenance_level + 25)
-	elif building.receives_maintenance and int(resources["tools"]) >= cost:
-		resources["tools"] = int(resources["tools"]) - cost
-		record_flow("tools", "upkeep", -cost)
+	elif building.receives_maintenance and TownLedger.get_available(self, get_upkeep_payer(building), "tools") >= cost:
+		remove_resource("tools", cost, "upkeep")
+		TownLedger.charge(get_upkeep_payer(building), "tools", cost)
 		building.maintenance_level = min(100, building.maintenance_level + 25)
 	else:
 		building.maintenance_level = max(0, building.maintenance_level - 25)
+
+# Who keeps a workplace up: the family working it when it paid for most of it (its holding,
+# PROPERTY_AND_COMMUNAL_RESOURCES.md §4.2), from its own tools first; otherwise the community.
+func get_upkeep_payer(building: Building) -> Household:
+	if building.assigned_household_id < 0 or TownLedger.get_funded_share(building.funded, building.assigned_household_id) <= 0.5:
+		return null
+	return get_household_by_id(building.assigned_household_id)
 
 func record_resource_history():
 	resource_history.append({

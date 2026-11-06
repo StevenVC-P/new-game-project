@@ -50,7 +50,14 @@ func run() -> void:
 	await settle(main)
 	await shot("f4_site_chosen")
 
-	main.found_player_city_at_pending_site()
+	# Founding through the panel's own actions (sprint S7): it waits for a founding compact.
+	main.apply_region_action({"action": "found_player_city"})
+	print("[CAPTURE] founded without a compact: ", main.has_player_city())
+	main.apply_region_action({"action": "choose_founding_compact", "preset": "shared"})
+	await settle(main)
+	await shot("f4b_compact_chosen")
+	main.apply_region_action({"action": "found_player_city"})
+	print("[CAPTURE] founded with the shared compact: ", main.has_player_city(), " ", main.get_player_city().compact if main.has_player_city() else {})
 	await settle(main)
 	await shot("f5_town_view")
 
