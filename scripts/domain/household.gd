@@ -110,6 +110,9 @@ var garden_land: float = 0.0
 var woods_land: float = 0.0
 var gathered_wood: float = 0.0
 var mending: float = 0.0
+# The family's own goods in the town's store, good -> amount (TownLedger; sprint S6). Empty while
+# everything is pooled.
+var stores_share: Dictionary = {}
 var larder: float = 0.0
 var larder_target_days: int = 0
 var short_today: bool = false

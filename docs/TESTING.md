@@ -17,6 +17,8 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # Economic foundations (docs/ECONOMIC_FOUNDATIONS_TEST_PLAN.md): the invariant checker's own test, quarries on stone
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/economy_invariants_validation.gd
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/quarry_deposit_validation.gd
+# The ownership ledger (S6): families' shares in the one store, who paid for a building, losses, saves
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_ledger_validation.gd
 # Divergence check: the same founder sets on five kinds of land, daily invariants (filter for [DIV]; "-- --survey" lists
 # the site pool). Batches and tables: run_divergence.ps1 -Label X [-Extra "--commission=quarry@360"], then
 # compare_divergence.ps1 -Base X -New Y. Run batches from a fixed-commit worktree.

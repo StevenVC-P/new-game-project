@@ -130,8 +130,7 @@ func resolve_raid() -> void:
 				keep = int(float(city.resources["food_consumption_rate"]) * EconomyBalance.RAID_FOOD_KEPT_DAYS)
 			var amount: int = mini(int(float(city.resources.get(good, 0)) * share), maxi(0, int(city.resources.get(good, 0)) - keep))
 			if amount > 0:
-				city.resources[good] = int(city.resources[good]) - amount
-				city.record_flow(good, "raided", -amount)
+				TownLedger.lose(city, good, amount, "raided")
 				taken.append("%d %s" % [amount, good])
 		for household: Household in city.households:
 			household.contentment = maxi(0, household.contentment - EconomyBalance.RAID_CONTENTMENT_LOSS)

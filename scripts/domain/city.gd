@@ -1012,6 +1012,7 @@ func tick():
 	settlement.advance_day()
 
 	resolve_soft_needs()
+	TownLedger.settle(self)
 	if resources["food_shortage"] == true:
 		resources["shortage_days_this_month"] = int(resources["shortage_days_this_month"]) + 1
 

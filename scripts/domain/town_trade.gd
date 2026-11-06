@@ -132,7 +132,8 @@ func get_lots() -> Array[Dictionary]:
 		return lots
 	for give: String in wants.keys():
 		var give_amount: int = mini(int(wants[give]), maxi(1, roundi(EconomyBalance.TRADER_LOT_GRAIN / get_value(give))))
-		if give_amount <= 0 or int(city.resources.get(give, 0)) < give_amount:
+		# The player trades only the community's goods (TownLedger).
+		if give_amount <= 0 or TownLedger.get_community(city, give) < give_amount:
 			continue
 		for get_good: String in offers.keys():
 			var worth: float = float(give_amount) * get_bid(give)

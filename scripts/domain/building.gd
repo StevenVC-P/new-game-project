@@ -61,6 +61,9 @@ var peak_land_yield: float = 0.0
 # What it is built of (EconomyBalance, Building materials; sprint S4): timber, stone or dressed stone.
 # Older saves' buildings are timber.
 var material: String = EconomyBalanceScript.MATERIAL_TIMBER
+# Who paid for its materials, {good: {payer id: amount}} (TownLedger; sprint S6). Empty for
+# everything built before: that was paid from the common store.
+var funded: Dictionary = {}
 
 func _init(building_id: int = -1, building_type: String = BUILDING_HOUSE, tile_pos: Vector2i = Vector2i.ZERO, footprint_size: Vector2i = Vector2i(2, 2)):
 	id = building_id

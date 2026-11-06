@@ -114,11 +114,42 @@ static func get_stores(city: City) -> Array:
 	var muted: Array = ["Always kept back from families' projects: " + ", ".join(reserve_parts) + ".", "Times a family's improvement was held back by the stores: %d" % influence.held_back_by_stores]
 	return [
 		{"kind": "heading", "text": "Shared resources"},
+		get_treasury_card(city),
 		{"kind": "card", "title": "Common stores", "tag": "priorities first" if priorities else "open", "lines": lines, "muted": muted, "columns": 2, "buttons": [
 			{"text": "Open", "toggle": true, "active": not priorities, "action": {"action": "set_store_rule", "rule": TownInfluence.RULE_OPEN}},
 			{"text": "Priorities first", "toggle": true, "active": priorities, "action": {"action": "set_store_rule", "rule": TownInfluence.RULE_PRIORITIES}},
 		]},
 	]
+
+# Whose the goods in the store are (TownLedger), read-only: the community's, families' own, and
+# what building sites still wait for.
+static func get_treasury_card(city: City) -> Dictionary:
+	var community: Array[String] = []
+	var own: Array[String] = []
+	for good: String in TownLedger.SHOWN_GOODS:
+		var held: int = TownLedger.get_community(city, good)
+		if held > 0:
+			community.append("%d %s" % [held, good.replace("_", " ")])
+		var families: int = TownLedger.get_shares_total(city, good)
+		if families > 0:
+			own.append("%d %s" % [families, good.replace("_", " ")])
+	var waiting: Dictionary = {}
+	for project: ConstructionProject in city.construction.projects:
+		var remaining: Dictionary = project.get_remaining_materials()
+		for good: String in remaining.keys():
+			waiting[good] = int(waiting.get(good, 0)) + int(remaining[good])
+	var waiting_parts: Array[String] = []
+	for good: String in waiting.keys():
+		if int(waiting[good]) > 0:
+			waiting_parts.append("%d %s" % [int(waiting[good]), good.replace("_", " ")])
+	var lines: Array = ["The community's: " + (", ".join(community) if not community.is_empty() else "nothing")]
+	var muted: Array = []
+	if TownLedger.is_pooled(city):
+		muted.append("Everything families make goes to the common store; no family holds goods of its own.")
+	else:
+		lines.append("Families' own: " + ", ".join(own))
+	muted.append("Building sites still wait for: " + (", ".join(waiting_parts) if not waiting_parts.is_empty() else "nothing"))
+	return {"kind": "card", "title": "Treasury", "tag": "pooled" if TownLedger.is_pooled(city) else "", "lines": lines, "muted": muted}
 
 # The town's guiding wisdom (GuidingWisdom): the leader's title and slots, each wisdom held with
 # what families have done about it and the qualities appearing, and the wisdoms that may still be
