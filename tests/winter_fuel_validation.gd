@@ -30,6 +30,7 @@ func run_all() -> void:
 	test_fuel_counts_in_wood_use()
 	test_a_cold_family_gathers_wood()
 	test_cold_draws_families_to_wood_work()
+	test_wood_beyond_winter()
 	test_the_player_is_warned()
 	test_no_map_no_fuel()
 	test_cold_is_saved()
@@ -168,6 +169,47 @@ func test_cold_draws_families_to_wood_work() -> void:
 		OccupationReview.update_strain(city, household, holding)
 	var triggers: Array[String] = OccupationReview.get_triggers(city, household, holding)
 	_check(triggers.has(OccupationReview.COLD) and OccupationReview.is_urgent(triggers), "two cold months make a family look at its work at once: %s" % str(triggers))
+
+# Wood beyond the coming winter (sprint S5b; owner 2026-11-05, option b of the Track A review): the
+# store against what the town will burn and use through the end of the coming winter weighs against
+# wood work and gathering, a past cold hearth weighs less once the store holds the coming need, and a
+# woodcutter in a town short of food looks at its work again. A reason, never a rule. Found when cold
+# towns kept three woodcutters beside 500 wood while their families went hungry and left.
+func test_wood_beyond_winter() -> void:
+	var city: City = town(0.3, [Rect2i(20, 18, 10, 10)])
+	set_season(city, SPRING)
+	var household: Household = city.households[0]
+	var need: float = FamilyInitiative.get_use(city, TownInfluence.ACTIVITY_WOOD, Calendar.DAYS_PER_YEAR - (city.get_day_of_year() - 1))
+	city.resources["wood"] = int(need * 0.9)
+	_check(FamilyInitiative.get_wood_plenty(city) == 0.0, "a store that won't see the coming winter out is no plenty (%d for %.0f)" % [int(city.resources["wood"]), need])
+	var lean: float = float(FamilyInitiative.get_work_desire(city, household, "woodcutter")["score"])
+	set_season(city, WINTER)
+	_check(FamilyInitiative.get_wood_plenty(city) > 0.0, "the same store is spare with only the winter's end left to burn")
+	set_season(city, SPRING)
+	city.resources["wood"] = int(need * 2.5)
+	_check(is_equal_approx(FamilyInitiative.get_wood_plenty(city), 1.0), "twice the coming need and more is plenty")
+	var desire: Dictionary = FamilyInitiative.get_work_desire(city, household, "woodcutter")
+	_check(has_reason(desire["terms"], FamilyInitiative.WOOD_PLENTY_REASON) and float(desire["score"]) < lean, "and weighs against wood work (%.2f, %.2f before)" % [float(desire["score"]), lean])
+	household.cold_days_this_month = int(FamilyInitiative.HUNGRY_DAYS_DESPERATE)
+	set_season(city, AUTUMN)
+	_check(float(FamilyInitiative.get_cold_hardship(city, household)["level"]) == 0.0, "a hearth gone cold weighs nothing once the store holds the coming need")
+	city.resources["wood"] = 0
+	_check(float(FamilyInitiative.get_cold_hardship(city, household)["level"]) == 1.0, "and fully while the store is empty")
+	household.cold_days_this_month = 0
+	city.resources["wood"] = int(need * 2.5)
+	var holding: Building = Building.new(-1, BuildingTiers.get_hand_work_type("woodcutter"), Vector2i(34, 30), Vector2i(2, 2))
+	city.add_building(holding, household)
+	var gathering: Dictionary = HouseholdEconomy.get_secondary_desire(city, household, Building.new(-1, "farm", Vector2i(30, 30), Vector2i(3, 3)), "wood", {})
+	_check(not bool(gathering["possible"]) or has_reason(gathering["terms"], FamilyInitiative.WOOD_PLENTY_REASON), "and against gathering more")
+	_check(not OccupationReview.get_triggers(city, household, holding).has(OccupationReview.WOOD_PLENTY), "a fed town's woodcutter goes on")
+	city.resources["food"] = 0
+	var triggers: Array[String] = OccupationReview.get_triggers(city, household, holding)
+	_check(triggers.has(OccupationReview.WOOD_PLENTY) and OccupationReview.is_urgent(triggers), "a hungry town's woodcutter looks at its work again: %s" % str(triggers))
+	city.set_meta("no_wood_plenty", true)
+	_check(FamilyInitiative.get_wood_plenty(city) == 0.0 and not OccupationReview.get_triggers(city, household, holding).has(OccupationReview.WOOD_PLENTY), "the Track A comparison switch restores the old judgment")
+
+func has_reason(terms: Array, reason: String) -> bool:
+	return terms.any(func(term: Dictionary) -> bool: return str(term["reason"]) == reason)
 
 func test_the_player_is_warned() -> void:
 	var city: City = town(0.3)
