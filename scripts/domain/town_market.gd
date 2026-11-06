@@ -73,6 +73,21 @@ static func get_offers(city: City, household: Household) -> Dictionary:
 static func get_food_budget(city: City, household: Household) -> float:
 	return maxf(0.0, float(TownLedger.get_share(household, "food")) - household.share_food_owed - float(get_keep(city, household, "food")))
 
+# What a family could buy of a good at the market as it stands: its own want, what the others
+# would bring, and what its food would pay for at the last price, each as the market day limits it
+# (hold). Nothing here decides or trades.
+static func get_obtainable(city: City, household: Household, good: String) -> int:
+	if not is_on(city):
+		return 0
+	var want: int = int(scale(get_wants(city, household), get_market_share(household)).get(good, 0))
+	if want <= 0:
+		return 0
+	var offered: int = 0
+	for other: Household in city.households:
+		if other != household:
+			offered += int(scale(get_offers(city, other), get_market_share(other)).get(good, 0))
+	return mini(mini(want, offered), int(floor(get_food_budget(city, household) / get_price(city, good))))
+
 # How much of what it would deal an Insular family brings to market.
 static func get_market_share(household: Household) -> float:
 	return maxf(EconomyBalance.MARKET_SHARE_MIN, 1.0 - EconomyBalance.INSULAR_MARKET_SHARE * float(HouseholdCharacter.get_strength(household, "insular")))

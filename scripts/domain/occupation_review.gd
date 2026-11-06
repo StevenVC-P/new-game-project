@@ -203,7 +203,7 @@ static func get_triggers(city: City, household: Household, holding: Building) ->
 	if int(household.work_strain.get(COLD, 0)) >= HUNGRY_MONTHS:
 		triggers.append(COLD)
 	var activity: String = FamilyInitiative.get_activity(holding.type)
-	if activity == TownInfluence.ACTIVITY_WOOD and FamilyInitiative.get_wood_plenty(city) > 0.0 and is_short_elsewhere(city, activity):
+	if activity == TownInfluence.ACTIVITY_WOOD and FamilyInitiative.get_wood_plenty(city, household) > 0.0 and is_short_elsewhere(city, activity):
 		triggers.append(WOOD_PLENTY)
 	return triggers
 

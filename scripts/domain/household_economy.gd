@@ -507,7 +507,7 @@ static func get_secondary_desire(city: City, household: Household, holding: Buil
 				own_need = true
 				FamilyInitiative.add(terms, COLD_SURVIVAL_WEIGHT * float(cold["level"]), str(cold["reason"]))
 			# Gathering more for a store that already holds the coming winter's wood (sprint S5b).
-			var plenty: float = FamilyInitiative.get_wood_plenty(city)
+			var plenty: float = FamilyInitiative.get_wood_plenty(city, household)
 			if plenty > 0.0:
 				FamilyInitiative.add(terms, -WOOD_PLENTY_SIDE_WEIGHT * plenty, FamilyInitiative.WOOD_PLENTY_REASON)
 			if land < 1.0:

@@ -300,9 +300,9 @@ static func get_work_desire(city: City, household: Household, occupation: String
 				add(terms, 2.5, "no one cuts wood")
 			elif producers >= 2:
 				add(terms, -1.5 * (producers - 1), "others already cut wood")
-			if int(city.resources["wood"]) < 20:
+			if get_reachable_wood(city, household) < 20:
 				add(terms, 1.5, "wood is short")
-			var plenty: float = get_wood_plenty(city)
+			var plenty: float = get_wood_plenty(city, household)
 			if plenty > 0.0:
 				add(terms, -WOOD_PLENTY_WEIGHT * plenty, WOOD_PLENTY_REASON)
 		TownInfluence.ACTIVITY_TOOLS:
@@ -434,14 +434,14 @@ static func get_cold_hardship(city: City, household: Household) -> Dictionary:
 	var town: float = 0.0
 	if TownFuel.get_need_over(city, SURVIVAL_HORIZON_DAYS) > 0.0:
 		var use: float = get_use(city, TownInfluence.ACTIVITY_WOOD, SURVIVAL_HORIZON_DAYS)
-		var coming: float = float(int(city.resources["wood"])) + get_working_output(city, TownInfluence.ACTIVITY_WOOD) * SURVIVAL_HORIZON_DAYS
+		var coming: float = float(get_reachable_wood(city, household)) + get_working_output(city, TownInfluence.ACTIVITY_WOOD) * SURVIVAL_HORIZON_DAYS
 		var risk: int = HouseholdCharacter.get_axis(household, HouseholdCharacter.RISK)
 		var temperament: float = 1.0 + 0.25 * maxi(0, -risk) - 0.1 * maxi(0, risk)
 		town = clampf((1.0 - coming / maxf(1.0, use)) * temperament, 0.0, 1.0)
 		# A hearth that went cold this month weighs less once the store again holds the coming need
 		# (sprint S5b): the cold is remembered, but the wood to answer it is there.
 		if not city.has_meta("no_wood_plenty"):
-			own *= clampf(1.0 - float(int(city.resources["wood"])) / maxf(1.0, use), 0.0, 1.0)
+			own *= clampf(1.0 - float(get_reachable_wood(city, household)) / maxf(1.0, use), 0.0, 1.0)
 	if own >= town and own > 0.0:
 		return {"level": own, "reason": "its own hearth has gone cold"}
 	return {"level": town, "reason": "the town's hearths will go cold before the cold season is out"}
@@ -587,19 +587,28 @@ static func has_no_use(city: City, good: String) -> bool:
 		return false
 	return get_use(city, good, SHORTAGE_HORIZON_DAYS) <= 0.0
 
-const WOOD_PLENTY_REASON: String = "the town holds more wood than it needs through the coming winter"
+const WOOD_PLENTY_REASON: String = "more wood lies within reach than the town needs through the coming winter"
 
-# How far the wood in store exceeds what the town will burn and use through the end of the coming
+# The wood a family can actually turn to (sprint S5c; owner 2026-11-06). In a pooled town, the store.
+# Under a compact: its own, the community's (every hearth may burn it, TownFuel.burn), and what it
+# could buy at the market as it stands (TownMarket.get_obtainable). Another family's wood is not
+# within reach beyond that.
+static func get_reachable_wood(city: City, household: Household) -> int:
+	if not TownCompact.is_set(city):
+		return int(city.resources["wood"])
+	return TownLedger.get_share(household, "wood") + TownLedger.get_community(city, "wood") + TownMarket.get_obtainable(city, household, "wood")
+
+# How far the wood within a family's reach exceeds what the town will burn and use through the end of the coming
 # winter, and what its building still waits for (sprint S5b; owner 2026-11-05, option b of the Track A
 # review): 0 (nothing spare) to 1 (spare as large again as that need, or WOOD_PLENTY_FLOOR where
 # little is needed). What families see in the store, not what is coming. It weighs in their choices
 # as a reason, never as a rule. Off with the meta "no_wood_plenty" (the Track A build).
-static func get_wood_plenty(city: City) -> float:
+static func get_wood_plenty(city: City, household: Household) -> float:
 	if city.has_meta("no_wood_plenty"):
 		return 0.0
 	var days: int = Calendar.DAYS_PER_YEAR - (city.get_day_of_year() - 1)
 	var need: float = get_use(city, TownInfluence.ACTIVITY_WOOD, days) + float(int(city.construction.get_committed_materials().get("wood", 0)))
-	return clampf((float(int(city.resources["wood"])) - need) / maxf(need, WOOD_PLENTY_FLOOR), 0.0, 1.0)
+	return clampf((float(get_reachable_wood(city, household)) - need) / maxf(need, WOOD_PLENTY_FLOOR), 0.0, 1.0)
 
 static func get_use(city: City, good: String, days: int) -> float:
 	var use: float = 0.0
