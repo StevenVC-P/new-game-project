@@ -15,7 +15,7 @@ The finished Track A build (`110a128`; the S4 review fix included), against the 
 ## 1. How complex the game has become, and whether it holds
 
 - **Cost:** the town's own tick is 3–17 ms a day (median per group), well inside budget. The stand-in player's searching, not the simulation, is the larger cost.
-- **Correctness:** none of the 15 invariants failed on any day of any run, and repeated towns replay identically.
+- **Correctness:** none of the invariants checked on this build (I1, I2, I6, I7, I14) failed on any day of any run. Determinism was checked earlier with `--repeat` (S1a), not in these runs.
 - **The parts now interact:** stone and clay by land, finite forests, winter fuel, materials, deaths, and families choosing stone and brick work. Each lever shows in the results: switching fuel off or deaths off visibly changes outcomes.
 
 ## 2. Do towns form differently by land? Yes
