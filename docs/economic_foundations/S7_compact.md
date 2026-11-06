@@ -59,7 +59,7 @@
 - **Invariant I15:** shares are never negative and never exceed the stock, checked daily in every divergence run.
 - **Neutrality:** pooled S7 against S6 on the same matched towns as S6's check: all 45 lines identical (timing and memory aside), before and after the sharing fix.
 - **Suite:** 55/55.
-- **Founding, in the real flow** (	ests/visual/region_flow_capture.gd, shots f4 and f4b): Found Town with no compact founds nothing; choosing Shared and founding gives the town 60% in every category; the town view opens as before.
+- **Founding, in the real flow** (`tests/visual/region_flow_capture.gd`, shots f4 and f4b): Found Town with no compact founds nothing; choosing Shared and founding gives the town 60% in every category; the town view opens as before.
 
 ## Measures (tracked, not yet judged)
 
