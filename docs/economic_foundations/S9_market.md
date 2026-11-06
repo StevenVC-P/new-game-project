@@ -53,4 +53,4 @@
   | S9, 30 days, grants in need | 5 | 1 | 747 | 2 | 156 |
 
   - **Emergent market power, recorded and not tuned:** in both S9 towns the woodcutting family ends year 2 holding 740–1,000 food-worth while the farm families hold almost nothing. Winter wood is scarce and every family wants it, so its price sits high and the farm families spend their surplus beyond their 60 days on it.
-- The S9 review-point comparisons (compacts across environments and founder sets): pending.
+- The S9 review-point comparisons (compacts across environments and founder sets), run on the build before S5b: `S9_review.md`.
