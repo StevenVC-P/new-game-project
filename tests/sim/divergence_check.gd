@@ -23,6 +23,8 @@ extends SceneTree
 #                            founding, never changed), overprotect (keeps every wood from the first week)
 #   --meta=a,b               comparison switches set on each town before its first day
 #   --compact=preset         each town's founding compact (communal, shared, private; default pooled)
+#   --commons=days:rule      the commons' rules under it: table reserve days (0, 30, 60, 90) and
+#                            grants (none, in_need, equal)
 #   --commission=type@day    the player commissions one workplace of that type on that day (repeat
 #                            with commas), on the valid spot with the most of its deposit underfoot,
 #                            then nearest the town centre; a family is found to work it as in play
@@ -56,6 +58,8 @@ var commissions: Array[Dictionary] = []
 var left_out: Array = []
 # The founding compact each town starts with (TownCompact preset; "" pooled, as before S7).
 var compact: String = ""
+# The commons' rules under it (TownCommons): reserve days and grant rule, "30:in_need".
+var commons: String = ""
 # The deposit a workplace is best placed on, for choosing a commissioned site.
 const DEPOSIT_OF: Dictionary = {"quarry": "stone", "brickworks": "clay"}
 
@@ -86,6 +90,8 @@ func run() -> void:
 			metas.assign(argument.trim_prefix("--meta=").split(","))
 		elif argument.begins_with("--compact="):
 			compact = argument.trim_prefix("--compact=")
+		elif argument.begins_with("--commons="):
+			commons = argument.trim_prefix("--commons=")
 		elif argument.begins_with("--leave-out="):
 			left_out.assign(argument.trim_prefix("--leave-out=").split(","))
 		elif argument.begins_with("--commission="):
@@ -257,6 +263,9 @@ func play(site: Dictionary, start: int, condition: String, policy: String) -> Di
 		city.set_meta("occupations_left_out", left_out)
 	if compact != "":
 		TownCompact.set_preset(city, compact)
+	if commons != "":
+		TownCommons.set_reserve_days(city, int(commons.get_slice(":", 0)))
+		TownCommons.set_grants(city, commons.get_slice(":", 1))
 	var scenario: Dictionary = BASE.duplicate(true)
 	scenario["hard_winter"] = condition == "stressed"
 	scenario["guided"] = policy == "guided"
@@ -286,6 +295,13 @@ func play(site: Dictionary, start: int, condition: String, policy: String) -> Di
 			state["tools_out_days"] = int(state["tools_out_days"]) + 1
 		# Under a compact, who goes hungry, by the trade each family works (S7 report).
 		if TownCompact.is_set(town):
+			# Hunger while goods existed (S8): short beside the commons' food, or beside a family with food to spare.
+			var commons_food: bool = TownLedger.get_community(town, "food") > 0
+			var spare_food: bool = town.households.any(func(h: Household) -> bool: return TownCommons.get_spare_food(h) >= 1.0)
+			for household: Household in town.households:
+				if household.short_today:
+					state["short_beside_commons"] = int(state.get("short_beside_commons", 0)) + (1 if commons_food else 0)
+					state["short_beside_spare"] = int(state.get("short_beside_spare", 0)) + (1 if spare_food else 0)
 			for household: Household in town.households:
 				if household.short_today:
 					var holding: Building = FamilyInitiative.get_holding(town, household)
@@ -428,6 +444,15 @@ func measure_compact(city: City, state: Dictionary, m: Dictionary) -> void:
 	m["holding_gini"] = snappedf(gini, 0.01)
 	m["given"] = given
 	m["short_by_trade"] = (state.get("short_by_trade", {}) as Dictionary).duplicate()
+	m["commons"] = "%d:%s" % [city.commons_reserve_days, city.commons_grants]
+	m["short_beside_commons"] = int(state.get("short_beside_commons", 0))
+	m["short_beside_spare"] = int(state.get("short_beside_spare", 0))
+	m["help_asked"] = city.commons_help_asked
+	m["help_given"] = roundi(city.commons_help_given)
+	var granted: int = 0
+	for good: String in city.commons_granted.keys():
+		granted += int(city.commons_granted[good])
+	m["granted"] = granted
 
 # One town at one moment, in the test plan's metric categories (section 6).
 func measure(city: City, state: Dictionary, off_the_ground: bool) -> Dictionary:

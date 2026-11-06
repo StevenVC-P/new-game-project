@@ -21,6 +21,8 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_ledger_validation.gd
 # The founding compact (S7): sharing at the rate, the chain rule, eating and warming from one's own, giving more
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_compact_validation.gd
+# The commons (S8): the table's reserve for families in danger, neighbours answering a hungry family, grants
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_commons_validation.gd
 # Diagnostic: one divergence town under a compact, a line for each family short a day (filter for [CT])
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/compact_trace.gd -- --environment=forested --start=0 --compact=private > trace.log
 # Divergence check: the same founder sets on five kinds of land, daily invariants (filter for [DIV]; "-- --survey" lists

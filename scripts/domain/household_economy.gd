@@ -296,14 +296,13 @@ static func feed(city: City, rate: int) -> void:
 		from_store[household.id] = need - own
 	city.influence.larder_eaten_own += own_total
 	# Under a compact a family eats its own share in the store next; the common table (the
-	# community's food) feeds what is left, and feeds everyone.
+	# community's food) feeds what is left, by the commons' rules (TownCommons).
 	if TownCompact.is_set(city):
-		own_total += eat_own_shares(city, from_store)
+		eat_own_shares(city, from_store)
+		TownCommons.feed_from_table(city, from_store)
+		return
 	var demand: int = maxi(0, int(ceil(float(rate) - own_total - 0.000001)))
-	if TownCompact.is_set(city):
-		demand = mini(demand, maxi(0, int(ceil(get_table_need(from_store) - 0.000001))))
-	var table: int = demand if not TownCompact.is_set(city) else mini(demand, TownLedger.get_community(city, "food"))
-	var consumed: int = city.consume_need_bucket(GoodsNeedBucketHelper.BUCKET_FOOD, table)
+	var consumed: int = city.consume_need_bucket(GoodsNeedBucketHelper.BUCKET_FOOD, demand)
 	city.resources["food_shortage"] = consumed < demand
 	if consumed >= demand:
 		return
@@ -337,12 +336,6 @@ static func eat_own_shares(city: City, from_store: Dictionary) -> float:
 		from_store[household.id] = float(from_store[household.id]) - take
 		eaten += take
 	return eaten
-
-static func get_table_need(from_store: Dictionary) -> float:
-	var total: float = 0.0
-	for id: int in from_store.keys():
-		total += float(from_store[id])
-	return total
 
 # --- The month --------------------------------------------------------------------------------
 

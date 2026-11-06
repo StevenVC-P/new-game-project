@@ -61,6 +61,8 @@ static func advance_month(city, city_index: int = 0) -> void:
 	HouseholdEconomy.advance_month(city)
 	# Families leaning toward the community give more than the compact asks (TownCompact).
 	TownCompact.advance_month(city)
+	# The commons' grants, by the player's rule (TownCommons).
+	TownCommons.advance_month(city)
 	# Neighbours may share their rations before the shortage's hardship falls (TownSocial).
 	city.social.share_in_shortage()
 	update_hardship(city)

@@ -1274,6 +1274,10 @@ func apply_city_action(option_data: Dictionary) -> void:
 		TownCompact.set_preset(city, str(option_data["preset"]))
 	elif action == "change_compact_rate":
 		TownCompact.change_rate(city, str(option_data["category"]), int(option_data["steps"]))
+	elif action == "set_commons_reserve":
+		TownCommons.set_reserve_days(city, int(option_data["days"]))
+	elif action == "set_commons_grants":
+		TownCommons.set_grants(city, str(option_data["rule"]))
 	elif action == "choose_wisdom":
 		GuidingWisdom.choose(city, str(option_data["wisdom"]))
 	elif action == "appoint_speaker":

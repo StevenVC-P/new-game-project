@@ -83,6 +83,15 @@ var households_ended_by_hardship: int = 0
 # what families have given beyond it, good -> units.
 var compact: Dictionary = {}
 var compact_given: Dictionary = {}
+# The commons' rules under a compact (TownCommons): days of food the table keeps back for families in
+# danger, and the monthly grant rule; what the commons has granted, good -> units; and hungry
+# families asking their neighbours: times asked, food given, and the month each pair last counted.
+var commons_reserve_days: int = 0
+var commons_grants: String = "none"
+var commons_granted: Dictionary = {}
+var commons_help_asked: int = 0
+var commons_help_given: float = 0.0
+var commons_help_month: Dictionary = {}
 # Value counts of the region newcomers come from; generated on first arrival.
 var regional_value_counts: Dictionary = {}
 # Producing buildings by type, refreshed each tick; read by Communal Labor.

@@ -363,6 +363,21 @@ const GIVE_KEEPS_FOOD_DAYS: int = 90
 const GIVE_KEEPS_FUEL_DAYS: int = 90
 const TRUST_GIVING_WEIGHT: float = 0.5
 
+# --- The commons' rules (sprint S8; TownCommons) ---
+# The days of the town's food the common table may keep back from families not in danger, as the
+# player chooses them. Monthly grants pass GRANT_SHARE of the community's food and wood beyond the
+# reserve and GRANT_KEEPS_DAYS of the town's need into families' own goods. A family asked for help
+# on a hungry day gives only from what it holds beyond HELP_KEEPS_FOOD_DAYS of its own eating.
+const COMMONS_RESERVE_STEPS: Array[int] = [0, 30, 60, 90]
+const GRANT_SHARE: float = 0.25
+const GRANT_KEEPS_DAYS: int = 60
+const HELP_KEEPS_FOOD_DAYS: int = 30
+# A family short on this many days in a month is in danger (the reserve feeds it) before the month's
+# hardship falls at HouseholdMigration.HARDSHIP_SHORTAGE_DAYS: survival first. Found by the S8 smoke
+# run: reading danger only from hardship and severe months, families left without ever counting
+# as in danger while the reserve held food.
+const DANGER_SHORT_DAYS: int = 5
+
 # --- Defense (docs/FIRST_STAGE_LOOP.md, milestone 5; TownDefense) ---
 # From BANDITS_FROM_DAY, every BANDIT_ROLL_INTERVAL_DAYS outside winter, a band takes to the road
 # toward a town with BANDIT_MONTHLY_CHANCE by how traders reach it, times the town's temptation

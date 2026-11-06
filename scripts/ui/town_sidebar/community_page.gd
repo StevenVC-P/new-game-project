@@ -115,6 +115,7 @@ static func get_stores(city: City) -> Array:
 	return [
 		{"kind": "heading", "text": "Shared resources"},
 		get_compact_card(city),
+	] + ([get_commons_card(city)] if TownCommons.is_on(city) else []) + [
 		get_treasury_card(city),
 		{"kind": "card", "title": "Common stores", "tag": "priorities first" if priorities else "open", "lines": lines, "muted": muted, "columns": 2, "buttons": [
 			{"text": "Open", "toggle": true, "active": not priorities, "action": {"action": "set_store_rule", "rule": TownInfluence.RULE_OPEN}},
@@ -155,6 +156,31 @@ static func get_treasury_card(city: City) -> Dictionary:
 		muted.append("Given by families beyond the compact: %d goods" % given)
 	muted.append("Building sites still wait for: " + (", ".join(waiting_parts) if not waiting_parts.is_empty() else "nothing"))
 	return {"kind": "card", "title": "Treasury", "tag": "pooled" if not TownCompact.is_set(city) else "", "lines": lines, "muted": muted}
+
+# The commons' rules (TownCommons): how many days of food the table keeps back for families in
+# danger, and whether the community grants part of its surplus to families each month.
+static func get_commons_card(city: City) -> Dictionary:
+	var lines: Array = [
+		"The table keeps back %d days of food for families in danger." % city.commons_reserve_days if city.commons_reserve_days > 0 else "The table feeds every family from all the community's food.",
+		"Grants: %s." % str(TownCommons.GRANT_NAMES[city.commons_grants]).to_lower(),
+	]
+	var buttons: Array = []
+	for days: int in EconomyBalance.COMMONS_RESERVE_STEPS:
+		buttons.append({"text": "Keep %d days" % days if days > 0 else "No reserve", "toggle": true, "active": city.commons_reserve_days == days, "action": {"action": "set_commons_reserve", "days": days}})
+	for rule: String in TownCommons.GRANT_RULES:
+		buttons.append({"text": TownCommons.GRANT_NAMES[rule], "toggle": true, "active": city.commons_grants == rule, "action": {"action": "set_commons_grants", "rule": rule}})
+	var granted: int = 0
+	for good: String in city.commons_granted.keys():
+		granted += int(city.commons_granted[good])
+	var muted: Array = [
+		"Hungry families ask the families they know; %d times so far, %d food given." % [city.commons_help_asked, roundi(city.commons_help_given)],
+		"Granted to families so far: %d goods. Families judge whether grants are fair." % granted,
+	]
+	var tone: String = ""
+	if TownCommons.get_reserve(city) > 0 and TownLedger.get_community(city, "food") <= TownCommons.get_reserve(city):
+		lines.append("The commons holds no more than the reserve: the table feeds only families in danger, and others go short first.")
+		tone = SP.TONE_CAUTION
+	return {"kind": "card", "title": "The commons", "lines": lines, "muted": muted, "buttons": buttons, "columns": 2, "tone": tone}
 
 # The founding compact (TownCompact): what share of each kind of work families give the community.
 # The player may change it; families keep the rest as their own.
