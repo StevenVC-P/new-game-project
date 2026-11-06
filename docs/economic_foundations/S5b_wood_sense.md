@@ -50,4 +50,47 @@ Traced in a rocky town (`tests/sim/fuel_trace.gd`, rocky start 2):
 - **Comparisons (`../ngg-ef-runs6` at this sprint's commit):**
   - `G`: as F, with no player, ordinary and stressed conditions, 8 starts, 6 years;
   - `G-review`: as F-review, with the attentive, investment-first and overprotecting players, 6 starts.
-  - Results: pending.
+
+## Results
+
+No survival rate was aimed at. Logs: `test-logs/div/G`, `test-logs/div/G-review`.
+
+**Wood at year 3, no player (mean over 8 towns, F → G):**
+
+| Land | Cond. | Wood in store | Wood cut | Woodcutter families |
+|---|---|---|---|---|
+| Balanced | ordinary | 1053 → 708 | 2976 → 2243 | 1.00 → 0.88 |
+| Balanced | stressed | 799 → 632 | 2015 → 1879 | 0.62 → 0.62 |
+| Fertile valley | ordinary | 916 → 898 | 3433 → 3219 | 1.00 → 0.88 |
+| Fertile valley | stressed | 1054 → 955 | 3229 → 2918 | 0.88 → 0.62 |
+| Forested | ordinary | 425 → 345 | 2819 → 2573 | 0.88 → 0.75 |
+| Forested | stressed | 416 → 374 | 2470 → 2429 | 0.75 → 0.75 |
+| Marginal | ordinary | 393 → 295 | 2399 → 2075 | 1.00 → 1.00 |
+| Marginal | stressed | 311 → 186 | 2057 → 1906 | 0.62 → 0.62 |
+| Rocky | ordinary | 918 → 513 | 2183 → 1593 | 0.62 → 0.38 |
+| Rocky | stressed | 922 → 201 | 2009 → 1396 | 0.38 → 0.38 |
+
+The defect's signature is gone: idle wood falls everywhere, most on rocky land.
+
+**Outcomes at year 6, towns ok (F → G):**
+
+| | Balanced | Fertile valley | Forested | Marginal | Rocky | Total |
+|---|---|---|---|---|---|---|
+| No player, ordinary (of 8) | 6 → 6 | 6 → 5 | 4 → 3 | 3 → 2 | 2 → 2 | 21 → 18 of 40 |
+| No player, stressed (of 8) | 4 → 5 | 5 → 4 | 3 → 3 | 3 → 4 | 2 → 2 | 17 → 18 of 40 |
+| Three players (of 18) | 8 → 8 | 6 → 6 | 7 → 6 | 5 → 6 | 2 → 3 | 28 → 29 of 90 |
+
+- **Survival is essentially unchanged.** On rocky land the same two founder sets (starts 0 and 1) live and the same six fail in both builds and both conditions. Those towns fail on food, the land's hardship.
+- **Marginal land:** one town lost (ordinary, start 3) and one gained (stressed, start 1).
+  - The lost town was already freezing in both builds, with about 1 wood in store at year 3, so the new reason rarely applied there.
+  - The loss is the knock-on of earlier choices, not plenty pulling its woodcutters away.
+- **Hunger days (as `summarize_divergence.ps1` reports them):**
+  - Rises: fertile valley ordinary 133 → 249, fertile valley stressed 211 → 260, marginal ordinary 141 → 190.
+  - Falls: balanced stressed 200 → 148.
+  - The rest are within a few days.
+  - Families leaving wood work don't reliably feed the town better: they go to other work, by their callings and values, as intended.
+- **Investment-first player:** cold days rise on most lands (balanced 28 → 123, fertile valley 0 → 72, rocky 43 → 114). With fewer woodcutters, a player who pulls labour toward building runs the winter closer. That is a poor decision the town can still make, as intended.
+- **Overprotecting player:** results are identical; those towns fail before plenty arises.
+- **Tick time** is lower in G runs, but they shared the machine with fewer processes, so it's not attributed to the change.
+
+**Reading:** S5b changes how families weigh wood without changing which towns can survive. The remaining hardship on rocky and marginal land is the land's, consistent with the owner's decision.
