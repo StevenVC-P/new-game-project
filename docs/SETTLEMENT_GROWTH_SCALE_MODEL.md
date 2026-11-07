@@ -1,6 +1,6 @@
 # Settlement Growth Scale Model
 
-This document defines what `Founding Hamlet -> Stable Village -> Early Town` means, which pressures should matter at each step, and which implementation sprint should come first. It is planning-only. It follows `docs/map_and_settlement_scale_audit.md`, which recommended this model before any new growth mechanics.
+This document defines what `Founding Hamlet -> Stable Village -> Early Town` means, which pressures should matter at each step, and which implementation sprint should come first. It is planning-only. It follows `docs/archive/map_and_settlement_scale_audit.md` (superseded by `docs/MAP_SCALE_ARCHITECTURE.md`), which recommended this model before any new growth mechanics.
 
 Thresholds and pacing numbers here are provisional design guardrails, not tuned values. Items marked **Owner decision** need an explicit product call before implementation.
 

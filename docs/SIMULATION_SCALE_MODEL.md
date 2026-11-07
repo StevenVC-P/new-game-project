@@ -1,6 +1,8 @@
 # Simulation Scale Model
 
-Firm owner decisions on what the game simulates at each scale, and what it deliberately does not (2026-10-19). Sits under `docs/GAME_VISION.md`; builds on the bands in `docs/map_and_settlement_scale_audit.md`.
+> **Partly superseded (2026-11-07).** Where this model differs, `GAME_VISION.md` (Families At Scale; One World, Many Views) and `docs/MASTER_ROADMAP.md` win. In particular, the district blocks the player places give way to districts that form from families' choices, and grouping follows weighted family records, not Houses. The model is rewritten as roadmap Phases 4–6 decide its parts. `HOUSEHOLD_SIM_BENCHMARK.md` is stale until the Phase 1 scale check replaces it.
+
+Firm owner decisions on what the game simulates at each scale, and what it deliberately does not (2026-10-19). Sits under `docs/GAME_VISION.md`; builds on the bands in `docs/archive/map_and_settlement_scale_audit.md`.
 
 Performance numbers are measured in `docs/HOUSEHOLD_SIM_BENCHMARK.md`.
 

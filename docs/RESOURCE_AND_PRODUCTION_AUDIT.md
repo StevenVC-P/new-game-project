@@ -28,7 +28,7 @@ Evidence: **[code]** read in code; **[doc]** a document's claim; **[inferred]** 
 | `goods_quality_preference_modifiers_plan.md`, `household_home_inventory_plan.md` | Quality grades, home inventories | **Planned only** (May 2026). Larders are the only household inventory built. |
 | `archive/MONEY_OBLIGATION_AND_CITY_CREDIT_MODEL.md` | Credit and currency | **Mostly superseded** by `ECONOMY_MODEL.md`. |
 | `CULTURE_AND_VALUES_MODEL.md` | Values and callings | **Current draft.** Its economic effects are partly built (section 6). |
-| `SETTLEMENT_GROWTH_SCALE_MODEL.md`, `SIMULATION_SCALE_MODEL.md`, `map_and_settlement_scale_audit.md` | Scale bands and aggregation | **Current direction, Planned** beyond one town. |
+| `SETTLEMENT_GROWTH_SCALE_MODEL.md`, `SIMULATION_SCALE_MODEL.md`, `archive/map_and_settlement_scale_audit.md` | Scale bands and aggregation | Superseded in part by `GAME_VISION.md` and `MASTER_ROADMAP.md` (2026-11-07). |
 
 ---
 
