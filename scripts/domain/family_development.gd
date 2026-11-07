@@ -41,8 +41,8 @@ static func advance(city: City) -> Array[ConstructionProject]:
 		var project: ConstructionProject = null
 		var hut: Building = get_hut(city, household)
 		if hut != null:
-			if wants_better_home(household) and construction.can_supply(EconomyBalance.get_build_cost(Building.BUILDING_HOUSE), STORE_RESERVE):
-				project = construction.request_upgrade(hut.id, ConstructionProject.REQUESTED_BY_HOUSEHOLD, household.id)
+			if wants_better_home(household) and construction.can_supply(EconomyBalance.get_build_cost(Building.BUILDING_HOUSE), STORE_RESERVE, household):
+				project = construction.request_upgrade(hut.id, ConstructionProject.REQUESTED_BY_HOUSEHOLD, household.id, choose_material(city, household))
 		elif household.housing_status != Household.RESIDENCE_HOUSED:
 			project = claim_plot(city, household)
 			if project == null:
@@ -96,7 +96,7 @@ static func wants_better_home(household: Household) -> bool:
 # family records why (home_site_note).
 static func claim_plot(city: City, household: Household, for_itself: bool = true) -> ConstructionProject:
 	var home_type: String = "hut"
-	if not CultureValues.has_value(household.values, "simple_living") and city.construction.can_supply(EconomyBalance.get_build_cost(Building.BUILDING_HOUSE), STORE_RESERVE):
+	if not CultureValues.has_value(household.values, "simple_living") and city.construction.can_supply(EconomyBalance.get_build_cost(Building.BUILDING_HOUSE), STORE_RESERVE, household):
 		home_type = Building.BUILDING_HOUSE
 	var choice: Dictionary = HomeSites.choose(city, household, home_type)
 	household.home_site_note = choice["note"]
@@ -106,7 +106,16 @@ static func claim_plot(city: City, household: Household, for_itself: bool = true
 	var tile: Vector2i = choice["tile"]
 	if tile.x < 0:
 		return null
-	return city.construction.request_building(home_type, tile, ConstructionProject.REQUESTED_BY_HOUSEHOLD, household.id, household.id if for_itself else -1)
+	var material: String = choose_material(city, household) if home_type == Building.BUILDING_HOUSE else EconomyBalance.MATERIAL_TIMBER
+	return city.construction.request_building(home_type, tile, ConstructionProject.REQUESTED_BY_HOUSEHOLD, household.id, household.id if for_itself else -1, material)
+
+# What the family builds its home of (MaterialChoice), with its reasons noted when it isn't timber.
+static func choose_material(city: City, household: Household) -> String:
+	var choice: Dictionary = MaterialChoice.choose(city, household, Building.BUILDING_HOUSE)
+	var material: String = str(choice["material"])
+	if material != EconomyBalance.MATERIAL_TIMBER:
+		FamilyInitiative.note(city, household, "Builds its home of %s (%s)" % [material.replace("_", " "), "; ".join(FamilyInitiative.get_reasons(choice["terms"], true))])
+	return material
 
 # Whether what last kept a family from building a home still holds: it still has no home, or (when it
 # was building for a grown child) a child is still waiting for one and none stands empty. Once it

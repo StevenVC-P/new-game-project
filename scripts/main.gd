@@ -82,6 +82,9 @@ var pending_founding_tile: Vector2i = Vector2i(-1, -1)
 var pending_site_profile: SettlementSiteProfile = null
 var pending_local_map: Array = []
 var pending_site_survey: Array[String] = []
+# The founding compact the player picked for the new town (TownCompact preset); founding from the
+# panel waits for one. Founding called directly (tests, sims) with none keeps the pooled store.
+var pending_founding_compact: String = ""
 var current_view: String = VIEW_REGION
 var selected_city_index: int = -1
 var household_debug_inspector: Control = null
@@ -1148,6 +1151,8 @@ func found_player_city_at_pending_site() -> bool:
 		configure_new_city_map(founded_city)
 	# Families lead: a modest block of land is set aside for their homes (HomeSites).
 	HomeSites.ensure_starting_land(founded_city)
+	if pending_founding_compact != "":
+		TownCompact.set_preset(founded_city, pending_founding_compact)
 	clear_pending_founding_tile()
 	founded_city.trade.partner_name = get_nearest_neutral_town_name(founded_city)
 	generate_roads()
@@ -1233,8 +1238,12 @@ func apply_region_action(option_data: Dictionary):
 
 	if action == "new_trade_route":
 		trade_menu.open(cities)
+	elif action == "choose_founding_compact":
+		pending_founding_compact = str(option_data["preset"])
+		queue_redraw()
 	elif action == "found_player_city":
-		found_player_city_at_pending_site()
+		if pending_founding_compact != "":
+			found_player_city_at_pending_site()
 	else:
 		apply_time_control_action(action)
 
@@ -1259,6 +1268,16 @@ func apply_city_action(option_data: Dictionary) -> void:
 				city.woodland.keep_hunting_ground(building)
 	elif action == "set_store_rule":
 		city.influence.store_rule = str(option_data["rule"])
+	elif action == "set_build_material":
+		city.influence.build_material = str(option_data["material"])
+	elif action == "set_compact_preset":
+		TownCompact.set_preset(city, str(option_data["preset"]))
+	elif action == "change_compact_rate":
+		TownCompact.change_rate(city, str(option_data["category"]), int(option_data["steps"]))
+	elif action == "set_commons_reserve":
+		TownCommons.set_reserve_days(city, int(option_data["days"]))
+	elif action == "set_commons_grants":
+		TownCommons.set_grants(city, str(option_data["rule"]))
 	elif action == "choose_wisdom":
 		GuidingWisdom.choose(city, str(option_data["wisdom"]))
 	elif action == "appoint_speaker":
@@ -2145,7 +2164,13 @@ func draw_inspector_panel():
 			y = draw_sidebar_like_line(font, font_size, "The gold circle is the town's land.", text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_MUTED)
 		y = draw_sidebar_like_line(font, font_size, "Right-click to clear.", text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_MUTED)
 		if can_found_player_city():
-			y = draw_region_action_option(font, font_size, "Found Town", text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, {"action": "found_player_city"}, VisualStyle.COLOR_UI_BUTTON_ACTIVE)
+			y = draw_sidebar_like_line(font, font_size, "Founding compact:", text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, VisualStyle.COLOR_UI_TEXT_SOFT)
+			for preset: String in EconomyBalance.COMPACT_PRESETS.keys():
+				var percent: int = roundi(float(EconomyBalance.COMPACT_PRESETS[preset]) * 100.0)
+				var label: String = ("Chosen: %s, %d%%" if preset == pending_founding_compact else "%s: %d%% to the community") % [TownCompact.PRESET_NAMES[preset], percent]
+				y = draw_region_action_option(font, font_size, label, text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, {"action": "choose_founding_compact", "preset": preset}, VisualStyle.COLOR_UI_BUTTON_ACTIVE if preset == pending_founding_compact else VisualStyle.COLOR_UI_BUTTON_DISABLED)
+			var found_label: String = "Found Town" if pending_founding_compact != "" else "Choose the founding compact first"
+			y = draw_region_action_option(font, font_size, found_label, text_pos.x, y, PANEL_WIDTH - PANEL_PADDING * 2, {"action": "found_player_city"}, VisualStyle.COLOR_UI_BUTTON_ACTIVE if pending_founding_compact != "" else VisualStyle.COLOR_UI_BUTTON_DISABLED)
 
 	y += 12.0
 	y = draw_region_section_title(font, "Trade / Routes", text_pos.x, y)

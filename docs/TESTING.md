@@ -11,6 +11,28 @@ $env:GODOT_BIN = (Get-Content .godot-exe).Trim(); .\scripts\validate_project.ps1
 # Run one test (tests extend SceneTree and quit with a non-zero code on failure)
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/founding_city_validation.gd
 
+# Every rules test in tests/, four at a time; one line each in test-logs/<time>/summary.txt ("-Filter quarry*" for some)
+.\scripts\run_tests.ps1
+
+# Economic foundations (docs/ECONOMIC_FOUNDATIONS_TEST_PLAN.md): the invariant checker's own test, quarries on stone
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/economy_invariants_validation.gd
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/quarry_deposit_validation.gd
+# The ownership ledger (S6): families' shares in the one store, who paid for a building, losses, saves
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_ledger_validation.gd
+# The founding compact (S7): sharing at the rate, the chain rule, eating and warming from one's own, giving more
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_compact_validation.gd
+# The commons (S8): the table's reserve for families in danger, neighbours answering a hungry family, grants
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_commons_validation.gd
+# The market day (S9): barter in food at the town's prices, keeps, values, selling for food any day, wealth
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/town_market_validation.gd
+# Diagnostic: one divergence town under a compact, a line for each family short a day (filter for [CT])
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/compact_trace.gd -- --environment=forested --start=0 --compact=private > trace.log
+# Divergence check: the same founder sets on five kinds of land, daily invariants (filter for [DIV]; "-- --survey" lists
+# the site pool). Batches and tables: run_divergence.ps1 -Label X [-Extra "--commission=quarry@360"], then
+# compare_divergence.ps1 -Base X -New Y. Run batches from a fixed-commit worktree.
+& (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/divergence_check.gd -- --environments=forested --starts=2 --years=1 > div.log
+.\scripts\run_divergence.ps1 -Label B0 -ProjectRoot ..\ngg-ef-runs
+
 # Opening check: can 20 different towns get off the ground in two years? (filter for [OPEN])
 & (Get-Content .godot-exe).Trim() --headless --path . --script res://tests/sim/opening_check.gd
 

@@ -67,6 +67,37 @@ var resource_history: Array = []
 var soft_need_results: Dictionary = {}
 # Mixed into every random roll the town makes (founders, values, newcomers, marriages).
 var founding_seed: int = 0
+# Goods into (+) and out of (-) the store, by good and cause, so a check can hold the store to what
+# moved it (tests/sim/economy_invariants.gd). Nothing in play reads it; the underscore keeps it out
+# of saves.
+var _flows: Dictionary = {}
+# Winter fuel (TownFuel): the day's fraction of a unit carried over, wood burned in hearths so far,
+# and days the hearths went short.
+var fuel_carry: float = 0.0
+var fuel_burned: int = 0
+var fuel_short_days: int = 0
+# Deaths from sustained hunger or cold, by cause (HouseholdMortality), and families ended by them.
+var hardship_deaths: Dictionary = {}
+var households_ended_by_hardship: int = 0
+# The founding compact (TownCompact): {category: the community's share}, empty while pooled; and
+# what families have given beyond it, good -> units.
+var compact: Dictionary = {}
+var compact_given: Dictionary = {}
+# The commons' rules under a compact (TownCommons): days of food the table keeps back for families in
+# danger, and the monthly grant rule; what the commons has granted, good -> units; and hungry
+# families asking their neighbours: times asked, food given, and the month each pair last counted.
+var commons_reserve_days: int = 0
+var commons_grants: String = "none"
+var commons_granted: Dictionary = {}
+var commons_help_asked: int = 0
+var commons_help_given: float = 0.0
+var commons_help_month: Dictionary = {}
+# The market day (TownMarket): last prices in food, last month's dealings by good, everything that
+# has changed hands, and sales for food on hungry days.
+var market_prices: Dictionary = {}
+var market_last: Dictionary = {}
+var market_traded: Dictionary = {}
+var market_emergency_sales: int = 0
 # Value counts of the region newcomers come from; generated on first arrival.
 var regional_value_counts: Dictionary = {}
 # Producing buildings by type, refreshed each tick; read by Communal Labor.
@@ -590,6 +621,18 @@ func complete_old_couple_lifecycle(household: Household, city_index: int = 0):
 	households.erase(household)
 	log_household_lifecycle_event(city_index, household.id, "HouseholdRemoved", "reason=old_couple_lifecycle_complete")
 
+# A family with no one left to keep it (HouseholdMortality) ends as an old couple's does: its work
+# passes to an heir or stands vacant, its house is freed.
+func end_household(household: Household, reason: String, city_index: int = 0):
+	var house_id: int = household.residence_building_id
+	cleanup_removed_household_assignments(household, city_index)
+	if house_id >= 0:
+		log_household_lifecycle_event(city_index, household.id, "HouseFreed", "house=" + str(house_id))
+	households.erase(household)
+	households_ended_by_hardship += 1
+	log_household_lifecycle_event(city_index, household.id, "HouseholdRemoved", "reason=" + reason)
+	update_shelter_counts()
+
 func cleanup_removed_household_assignments(household: Household, city_index: int = 0):
 	for building: Building in buildings:
 		if building.assigned_household_id != household.id:
@@ -955,6 +998,8 @@ func tick():
 	consume_food()
 	refresh_operating_building_counts()
 	construction.advance_day()
+	# By today's date (the founding day would otherwise count as a winter's day).
+	TownFuel.burn(self)
 	if construction.day % FamilyDevelopment.INTERVAL_DAYS == 0:
 		FamilyDevelopment.advance(self)
 	# A day after families look at their homes, and from the first day, so founders take up work
@@ -986,6 +1031,7 @@ func tick():
 	settlement.advance_day()
 
 	resolve_soft_needs()
+	TownLedger.settle(self)
 	if resources["food_shortage"] == true:
 		resources["shortage_days_this_month"] = int(resources["shortage_days_this_month"]) + 1
 
@@ -1238,6 +1284,7 @@ func consume_need_bucket(bucket_id: String, amount: int) -> int:
 
 		var consumed_good_amount: int = min(remaining_amount, available_good_amount)
 		resources[good_id] = available_good_amount - consumed_good_amount
+		record_flow(good_id, "need_" + bucket_id, -consumed_good_amount)
 		remaining_amount -= consumed_good_amount
 		consumed_amount += consumed_good_amount
 
@@ -1317,11 +1364,14 @@ func should_skip_for_food_shortage() -> bool:
 # Whether a family loses today's work to hunger. With household larders (HouseholdEconomy) only a
 # family that went short today does; otherwise every family when the town goes short.
 func skips_work_today(household_id: int) -> bool:
+	var household: Household = get_household_by_id(household_id) if household_id >= 0 else null
+	# A family whose hearth went cold loses some days too (TownFuel).
+	if TownFuel.skips_work(self, household):
+		return true
 	if not should_skip_for_food_shortage():
 		return false
 	if not HouseholdEconomy.is_on(self):
 		return true
-	var household: Household = get_household_by_id(household_id) if household_id >= 0 else null
 	return household == null or household.short_today
 
 func apply_building_production(building: Building):
@@ -1330,32 +1380,54 @@ func apply_building_production(building: Building):
 
 	var building_type: String = building.type
 	var output_amount: int = get_current_building_output_amount(building)
-	if output_amount <= 0:
-		return
+	# A quarry or brickworks can't get more than the deposit left under it; a woodcutter's wood is
+	# what it cuts from the trees (TownWoodland.take_timber).
+	if output_amount > 0 and TownDeposits.draws_on_deposit(building) and not local_map.is_empty():
+		output_amount = mini(output_amount, TownDeposits.get_left_under(self, building))
+	if output_amount > 0 and BuildingTiersScript.get_base_type(building.type) == Building.BUILDING_WOODCUTTER and not local_map.is_empty():
+		output_amount = woodland.take_timber(building, output_amount)
+	if output_amount > 0:
+		# Tier 0 buildings produce the same goods as their tier 1 counterpart, at a lower rate.
+		var chain: Dictionary = EconomyBalanceScript.PRODUCTION.get(BuildingTiersScript.get_base_type(building_type), {})
+		if chain.is_empty():
+			return
+		var made: int = apply_input_output_production(str(chain["output"]), output_amount, chain["inputs"], building)
+		if TownDeposits.draws_on_deposit(building):
+			TownDeposits.extract(self, building, made)
+	# A workplace with nothing left underfoot is worked out: its family is free for other work, and
+	# nobody is put to work there again (TownDeposits).
+	if TownDeposits.is_worked_out(self, building):
+		log_household_lifecycle_event(0, building.assigned_household_id, "DepositWorkedOut", "building=" + str(building.id))
+		unassign_building_worker(buildings.find(building))
 
-	# Tier 0 buildings produce the same goods as their tier 1 counterpart, at a lower rate.
-	var chain: Dictionary = EconomyBalanceScript.PRODUCTION.get(BuildingTiersScript.get_base_type(building_type), {})
-	if chain.is_empty():
-		return
-	apply_input_output_production(str(chain["output"]), output_amount, chain["inputs"])
-
-func apply_input_output_production(output_key: String, output_amount: int, input_costs: Dictionary):
+# Returns what was made. A workshop's inputs come from its family's own share first, then the
+# community's goods (TownLedger); who gets the output is TownCompact's (pooled: the community).
+func apply_input_output_production(output_key: String, output_amount: int, input_costs: Dictionary, building: Building = null) -> int:
+	var worker: Household = get_household_by_id(building.assigned_household_id) if building != null and building.assigned_household_id >= 0 else null
 	var capped_output: int = output_amount
 	for input_key: String in input_costs.keys():
 		var input_cost: int = int(input_costs[input_key])
 		if input_cost <= 0:
 			continue
-		capped_output = min(capped_output, int(floor(float(int(resources[input_key])) / float(input_cost))))
+		# The hearths' wood comes first in the cold seasons (TownFuel.get_reserve): workshops use only
+		# what lies beyond it of the community's goods.
+		var usable: int = TownLedger.get_community(self, input_key) - TownFuel.get_reserve(self, input_key)
+		if worker != null:
+			usable += TownLedger.get_share(worker, input_key)
+		capped_output = min(capped_output, int(floor(float(usable) / float(input_cost))))
 
 	if capped_output <= 0:
-		return
+		return 0
 
+	var paid: Dictionary = {}
 	for input_key: String in input_costs.keys():
 		var input_cost: int = int(input_costs[input_key])
 		if input_cost > 0:
-			resources[input_key] = int(resources[input_key]) - capped_output * input_cost
+			remove_resource(input_key, capped_output * input_cost, "used")
+			paid[input_key] = TownLedger.charge(worker, input_key, capped_output * input_cost)
 
-	resources[output_key] = int(resources[output_key]) + capped_output
+	TownCompact.deliver_output(self, building, output_key, capped_output, paid)
+	return capped_output
 
 func get_current_building_output_amount(building: Building) -> int:
 	var maintenance_level: int = building.maintenance_level
@@ -1747,11 +1819,19 @@ func update_building_maintenance(building: Building):
 	# Mending its family did itself takes the place of a tool from the store (HouseholdEconomy).
 	if building.receives_maintenance and HouseholdEconomy.mend(self, building):
 		building.maintenance_level = min(100, building.maintenance_level + 25)
-	elif building.receives_maintenance and int(resources["tools"]) >= cost:
-		resources["tools"] = int(resources["tools"]) - cost
+	elif building.receives_maintenance and TownLedger.get_available(self, get_upkeep_payer(building), "tools") >= cost:
+		remove_resource("tools", cost, "upkeep")
+		TownLedger.charge(get_upkeep_payer(building), "tools", cost)
 		building.maintenance_level = min(100, building.maintenance_level + 25)
 	else:
 		building.maintenance_level = max(0, building.maintenance_level - 25)
+
+# Who keeps a workplace up: the family working it when it paid for most of it (its holding,
+# PROPERTY_AND_COMMUNAL_RESOURCES.md §4.2), from its own tools first; otherwise the community.
+func get_upkeep_payer(building: Building) -> Household:
+	if building.assigned_household_id < 0 or TownLedger.get_funded_share(building.funded, building.assigned_household_id) <= 0.5:
+		return null
+	return get_household_by_id(building.assigned_household_id)
 
 func record_resource_history():
 	resource_history.append({
@@ -2074,11 +2154,21 @@ func get_maintenance_tool_demand_estimate() -> int:
 func can_transfer(resource_name: String, amount: int) -> bool:
 	return int(resources[resource_name]) >= amount
 
-func remove_resource(resource_name: String, amount: int):
+func remove_resource(resource_name: String, amount: int, cause: String = "transfer"):
 	resources[resource_name] = int(resources[resource_name]) - amount
+	record_flow(resource_name, cause, -amount)
 
-func add_resource(resource_name: String, amount: int):
+func add_resource(resource_name: String, amount: int, cause: String = "transfer"):
 	resources[resource_name] = int(resources[resource_name]) + amount
+	record_flow(resource_name, cause, amount)
+
+func record_flow(good: String, cause: String, amount: int) -> void:
+	if amount == 0:
+		return
+	if not _flows.has(good):
+		_flows[good] = {}
+	var by_cause: Dictionary = _flows[good]
+	by_cause[cause] = int(by_cause.get(cause, 0)) + amount
 
 func can_afford_cost(cost: Dictionary) -> bool:
 	for resource_name: String in cost.keys():
@@ -2089,4 +2179,4 @@ func can_afford_cost(cost: Dictionary) -> bool:
 
 func pay_cost(cost: Dictionary):
 	for resource_name: String in cost.keys():
-		remove_resource(resource_name, int(cost[resource_name]))
+		remove_resource(resource_name, int(cost[resource_name]), "built")

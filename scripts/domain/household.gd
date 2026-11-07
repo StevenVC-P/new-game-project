@@ -110,10 +110,30 @@ var garden_land: float = 0.0
 var woods_land: float = 0.0
 var gathered_wood: float = 0.0
 var mending: float = 0.0
+# The family's own goods in the town's store, good -> amount (TownLedger; sprint S6). Empty while
+# everything is pooled.
+var stores_share: Dictionary = {}
+# Under a compact (TownCompact): food and fuel eaten or burned from its share but not yet taken as a
+# whole unit, and goods it has given the community beyond the compact.
+var share_food_owed: float = 0.0
+var share_fuel_owed: float = 0.0
+var given_to_community: int = 0
+# Units it has sold on market days (TownMarket).
+var market_sales: int = 0
 var larder: float = 0.0
 var larder_target_days: int = 0
 var short_today: bool = false
 var short_days_this_month: int = 0
+# Winter fuel (TownFuel, sprint S3): whether the family's hearth went short today, and on how many
+# days this month.
+var cold_today: bool = false
+var cold_days_this_month: int = 0
+# Fatal hardship (HouseholdMortality, sprint S3b): severe months running of hunger and of cold, the
+# family's deaths from them, and the cause of the last.
+var severe_hunger_months: int = 0
+var severe_cold_months: int = 0
+var hardship_deaths: int = 0
+var last_death_cause: String = ""
 var economy_note: String = ""
 var economy_note_day: int = -1
 var larder_note: String = ""

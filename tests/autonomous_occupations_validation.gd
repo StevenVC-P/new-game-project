@@ -116,7 +116,8 @@ func own_project(city: City, household: Household) -> ConstructionProject:
 func test_every_trade_with_hand_work_is_a_choice() -> void:
 	var city: City = town()
 	var occupations: Array[String] = FamilyInitiative.get_occupations(city)
-	_check(occupations == (["farm", "woodcutter", "toolmaker", "fisher", "hunter", "herder"] as Array[String]), "every trade with a hand-work stage is a choice, the first three first: %s" % str(occupations))
+	# Stone work joined in sprint S4c (owner D6), brickmaking in S5.
+	_check(occupations == (["farm", "woodcutter", "toolmaker", "fisher", "hunter", "herder", "quarry", "brickworks"] as Array[String]), "every trade with a hand-work stage is a choice, the first three first: %s" % str(occupations))
 	for pair: Array in [["fish_weir", "fisher"], ["snare_line", "hunter"], ["grazing_pen", "herder"]]:
 		_check(BuildingTiers.get_upgrade_type(pair[0]) == pair[1] and BuildingTiers.get_hand_work_type(pair[1]) == pair[0], "%s improves into %s" % pair)
 		_check(EconomyBalance.get_build_cost(pair[0]).is_empty(), "%s needs no materials, like all hand work" % pair[0])
@@ -523,7 +524,8 @@ func test_kept_woods_are_binding() -> void:
 	var elsewhere: Vector2i = city.woodland.nearest_trees(cutter)
 	_check(elsewhere.x >= 60 and city.woodland.is_fellable(elsewhere), "the woodcutter seeks timber beyond the kept woods (%s)" % str(elsewhere))
 	var factor: float = city.woodland.get_felling_factor(cutter)
-	_check(factor < 1.0 and factor >= EconomyBalance.LAND_YIELD_FLOOR and city.land.get_output_factor(cutter) < 1.0, "and brings in less for the walk (%.2f)" % factor)
+	# Against the season's own share of a woodcutter's wood (felling is winter work since sprint S2).
+	_check(factor < 1.0 and factor >= EconomyBalance.LAND_YIELD_FLOOR and city.land.get_output_factor(cutter) < EconomyBalance.WOOD_SEASON_YIELD[city.get_season_index()], "and brings in less for the walk (%.2f)" % factor)
 	for day in range(200):
 		city.woodland.fell_woods()
 	var kept_standing: bool = true

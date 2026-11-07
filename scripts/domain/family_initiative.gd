@@ -42,13 +42,34 @@ const SHORTAGE_WEIGHT: float = 4.0
 # deters where the land is poor or the work yields less by nature.
 const LAND_WEIGHT: float = 3.0
 const LAND_SITE_TILES: float = 8.0
-const LAND_REASONS: Dictionary = {"water": "little water in reach to fish", "woods": "little game in reach", "pasture": "little pasture in reach"}
+const LAND_REASONS: Dictionary = {"water": "little water in reach to fish", "woods": "little game in reach", "pasture": "little pasture in reach", "timber": "the trees it could fell are far off or few", "stone": "little good stone underfoot", "clay": "little good clay underfoot"}
 # A good the town only goes without (wool, for clothing; goods to come) pulls less than what it
 # lives on (the food, wood and tools terms of get_work_desire, 1.5 to 3 each): no one making it,
 # the need it meets going unmet, and each other family already making it.
 const COMFORT_NONE_WEIGHT: float = 0.5
 const COMFORT_UNMET_WEIGHT: float = 1.0
 const COMFORT_OTHERS_WEIGHT: float = 1.5
+# Building planned that waits for a good no one has enough of (stone, sprint S4c), at its most.
+const BUILDING_WAITS_WEIGHT: float = 1.5
+# A good with no use in the town (no need, no building waiting, no workshop using it) and this much
+# already in store: more of it is work for nothing (sprint S4 review). Enough stone or bricks for
+# a few homes stays wanted, so families can choose to build of it.
+const NO_USE_STOCK: int = 30
+const NO_USE_WEIGHT: float = 3.0
+# Wood in store beyond what the town will burn and use through the coming winter (sprint S5b,
+# get_wood_plenty): at its most, as much against wood work as a pile no one uses. Where little is
+# needed, this much spare counts as full plenty.
+const WOOD_PLENTY_WEIGHT: float = 3.0
+const WOOD_PLENTY_FLOOR: float = 100.0
+# What a family keeps in mind beyond that need before calling wood spare (sprint S5d): half the need
+# again, and never less than WOOD_PLENTY_FLOOR, about a home and a workplace for each of six founding
+# families. Need counts only what is already under way, so a young town's next building isn't in it.
+const WOOD_MARGIN_SHARE: float = 0.5
+# A family wanting a better home of a material it would make itself (owner 2026-11-03).
+const OWN_DEMAND_WEIGHT: float = 1.5
+# New deposit trades (stone, brick) while the town holds less than SECURE_FOOD_DAYS of food in store
+# and coming: at worst this much against, times how survival-minded the family is (owner 2026-11-03).
+const FOOD_INSECURITY_WEIGHT: float = 2.0
 # Survival before prosperity (owner, 2026-11-01; get_hardship): how far ahead a family looks at the
 # town's food, how much the danger of hunger weighs for food work at its worst (scaled by what that
 # work would really bring in here), and how much of its calling's pull a family sets aside at the
@@ -69,6 +90,8 @@ const IMPROVE_THRESHOLD: float = 2.0
 const NOISE: float = 0.75
 const ENCOURAGE_WEIGHT: float = 2.0
 const SECURE_FOOD_DAYS: float = 180.0
+# Wood is at risk when the store holds less than the hearths will burn over this many days (TownFuel).
+const FUEL_RISK_DAYS: int = 90
 # How far a family looks for workplace sites, and how many valid ones it compares.
 const SITE_SEARCH_RADIUS: int = 30
 const SITE_CANDIDATES: int = 8
@@ -234,7 +257,11 @@ static func get_work_desire(city: City, household: Household, occupation: String
 	var activity: String = get_activity(occupation)
 	# Hardship: a calling is what a family pursues when it can; as hunger nears, it matters less.
 	var hardship: Dictionary = get_hardship(city, household)
-	var level: float = float(hardship["level"])
+	var hunger: float = float(hardship["level"])
+	# Cold is a danger to survival too (TownFuel; sprint S3 review): a calling and what the town only
+	# goes without yield to whichever danger is greater.
+	var cold: Dictionary = get_cold_hardship(city, household)
+	var level: float = maxf(hunger, float(cold["level"]))
 	var prosperity: float = 1.0 - CALLING_YIELD * level
 	var hard_times: String = ", though survival comes first now" if level >= 0.3 else ""
 	var essential: bool = activity in [TownInfluence.ACTIVITY_FOOD, TownInfluence.ACTIVITY_WOOD, TownInfluence.ACTIVITY_TOOLS]
@@ -277,8 +304,11 @@ static func get_work_desire(city: City, household: Household, occupation: String
 				add(terms, 2.5, "no one cuts wood")
 			elif producers >= 2:
 				add(terms, -1.5 * (producers - 1), "others already cut wood")
-			if int(city.resources["wood"]) < 20:
+			if get_reachable_wood(city, household) < 20:
 				add(terms, 1.5, "wood is short")
+			var plenty: float = get_wood_plenty(city, household)
+			if plenty > 0.0:
+				add(terms, -WOOD_PLENTY_WEIGHT * plenty, WOOD_PLENTY_REASON)
 		TownInfluence.ACTIVITY_TOOLS:
 			var producers: int = count_producers(city, activity) - (1 if own != null and get_activity(own.type) == activity else 0)
 			if producers == 0 and int(city.resources["tools"]) < 10:
@@ -301,6 +331,27 @@ static func get_work_desire(city: City, household: Household, occupation: String
 				add(terms, -COMFORT_OTHERS_WEIGHT * producers, "others already make " + name)
 			if unmet != "" and comfort > 0.0:
 				add(terms, COMFORT_UNMET_WEIGHT * comfort, "the town goes without " + unmet)
+			# Building that waits for this good (stone for stone buildings, sprint S4c): wanted, not
+			# merely missed, but still less than what the town lives on.
+			var waiting_for: int = int(city.construction.get_committed_materials().get(activity, 0)) - int(city.resources.get(activity, 0))
+			if waiting_for > 0 and comfort > 0.0:
+				add(terms, BUILDING_WAITS_WEIGHT * comfort * minf(1.0, float(waiting_for) / 20.0), "the town's building waits for " + name)
+			# A family that means to build its own home of this (sprint S4 review, owner 2026-11-03) has
+			# its own reason to make it, before anyone else wants it: how new industries start.
+			var for_own_home: bool = means_to_build_with(city, household, activity)
+			if for_own_home:
+				add(terms, OWN_DEMAND_WEIGHT, "it means to build its own home of %s" % name)
+			# Work only for a pile no one uses (sprint S4 review): with a good no need, building or
+			# workshop uses and NO_USE_STOCK of it already in store, more of it serves no one.
+			elif has_no_use(city, activity):
+				add(terms, -NO_USE_WEIGHT, "the town has more %s than it uses" % name)
+			# New deposit trades while the town's food isn't secure (owner 2026-11-03): a weighed
+			# reason, as strong as the family's temperament and values make it, never a bar. A family
+			# holding to its craft may well go on, and bear what follows.
+			if TownDeposits.DEPOSIT_OF.values().has(TownLand.get_reach_kind(occupation)):
+				var insecurity: float = get_food_insecurity(city)
+				if insecurity > 0.0:
+					add(terms, -FOOD_INSECURITY_WEIGHT * insecurity * get_survival_mindedness(household), "the town's food isn't secure yet")
 	# An essential good running out within the season: the danger competes with everything else.
 	var shortage: float = get_shortage(city, activity)
 	if shortage > 0.0:
@@ -324,10 +375,14 @@ static func get_work_desire(city: City, household: Household, occupation: String
 			add(terms, land, LAND_REASONS[reach_kind] if reach < 0.75 else "it yields less than other ways of getting " + GoodsNeedBucketHelper.get_good_display_name(activity).to_lower())
 	# The danger of hunger draws a family to food work, as far as that work would really feed people
 	# here: on this land, with its skill, through the coming seasons.
-	if activity == TownInfluence.ACTIVITY_FOOD and level > 0.0:
+	if activity == TownInfluence.ACTIVITY_FOOD and hunger > 0.0:
 		var relief: float = get_food_relief(city, household, occupation, reach)
 		if relief > 0.05:
-			add(terms, SURVIVAL_WEIGHT * level * relief, str(hardship["reason"]))
+			add(terms, SURVIVAL_WEIGHT * hunger * relief, str(hardship["reason"]))
+	# The danger of cold draws a family to wood work in the same way, as far as the trees in reach of
+	# where it would cut allow.
+	if activity == TownInfluence.ACTIVITY_WOOD and float(cold["level"]) > 0.0 and reach > 0.05:
+		add(terms, SURVIVAL_WEIGHT * float(cold["level"]) * minf(1.0, reach), str(cold["reason"]))
 	# What it knows draws it to that work; work it would have to learn, it starts at a novice's pace
 	# (HouseholdEconomy).
 	if HouseholdEconomy.is_on(city) and not city.has_meta("economy_no_proficiency_effects"):
@@ -371,6 +426,29 @@ static func get_hardship(city: City, household: Household) -> Dictionary:
 		return {"level": town, "reason": "the town grows less food than it eats"}
 	var winter: bool = city.get_season_index() >= 2
 	return {"level": town, "reason": "the town will go hungry before %s" % ("the winter is out" if winter else "the next harvest is in")}
+
+# The danger of cold (TownFuel; sprint S3 review): {"level" 0..1, "reason"}, as get_hardship is for
+# hunger. The family's own cold hearth this month, or the town's wood in store and coming from its
+# wood work over the coming SURVIVAL_HORIZON_DAYS against what its hearths and workshops will burn and
+# use then, weighed by temperament. Nothing where no hearth burns.
+static func get_cold_hardship(city: City, household: Household) -> Dictionary:
+	if city.has_meta("no_survival_awareness") or not TownFuel.is_on(city):
+		return {"level": 0.0, "reason": ""}
+	var own: float = clampf(float(household.cold_days_this_month) / HUNGRY_DAYS_DESPERATE, 0.0, 1.0)
+	var town: float = 0.0
+	if TownFuel.get_need_over(city, SURVIVAL_HORIZON_DAYS) > 0.0:
+		var use: float = get_use(city, TownInfluence.ACTIVITY_WOOD, SURVIVAL_HORIZON_DAYS)
+		var coming: float = float(get_reachable_wood(city, household)) + get_working_output(city, TownInfluence.ACTIVITY_WOOD) * SURVIVAL_HORIZON_DAYS
+		var risk: int = HouseholdCharacter.get_axis(household, HouseholdCharacter.RISK)
+		var temperament: float = 1.0 + 0.25 * maxi(0, -risk) - 0.1 * maxi(0, risk)
+		town = clampf((1.0 - coming / maxf(1.0, use)) * temperament, 0.0, 1.0)
+		# A hearth that went cold this month weighs less once the store again holds the coming need
+		# (sprint S5b): the cold is remembered, but the wood to answer it is there.
+		if not city.has_meta("no_wood_plenty"):
+			own *= clampf(1.0 - float(get_reachable_wood(city, household)) / maxf(1.0, use), 0.0, 1.0)
+	if own >= town and own > 0.0:
+		return {"level": own, "reason": "its own hearth has gone cold"}
+	return {"level": town, "reason": "the town's hearths will go cold before the cold season is out"}
 
 # How far the town's food falls short of what its people will eat over the coming
 # SURVIVAL_HORIZON_DAYS, 0 (enough) to 1 (nothing in store or coming): its food in store and its
@@ -469,10 +547,91 @@ static func get_shortage(city: City, good: String) -> float:
 		return 0.0
 	return clampf(1.0 - (float(int(city.resources.get(good, 0))) + making) / use, 0.0, 1.0)
 
+# How far the town is from food security, 0 (secure) to 1 (nothing in store or coming): its food
+# in store, in larders and coming from its work over the coming SURVIVAL_HORIZON_DAYS, against
+# SECURE_FOOD_DAYS of eating (owner 2026-11-03).
+static func get_food_insecurity(city: City) -> float:
+	var coverage: float = get_food_coverage(city)
+	if is_inf(coverage):
+		return 0.0
+	return clampf(1.0 - coverage * float(SURVIVAL_HORIZON_DAYS) / SECURE_FOOD_DAYS, 0.0, 1.0)
+
+# How much a family's temperament and values make it weigh survival over its craft (owner
+# 2026-11-03): more for the cautious, less for the daring and the ambitious, and less again for a
+# family that holds to its craft or its ways (Keepers of Craft, Traditionalist, Perfectionist).
+# Values aren't good or bad economically: each cuts both ways by circumstance.
+static func get_survival_mindedness(household: Household) -> float:
+	var risk: int = HouseholdCharacter.get_axis(household, HouseholdCharacter.RISK)
+	var ambition: int = HouseholdCharacter.get_axis(household, HouseholdCharacter.AMBITION)
+	var weight: float = 1.0 + 0.25 * maxi(0, -risk) - 0.1 * maxi(0, risk) - 0.1 * maxi(0, ambition)
+	for value_id: String in ["keepers_of_craft", "traditionalist", "perfectionist"]:
+		if HouseholdCharacter.get_strength(household, value_id) > 0:
+			weight *= CRAFT_HOLDS_SURVIVAL_FACTOR
+	return maxf(0.0, weight)
+
+const CRAFT_HOLDS_SURVIVAL_FACTOR: float = 0.6
+
+# Whether a family wanting a better home would build it of what this good makes, if it could have
+# any (MaterialChoice with supply set aside; sprint S4 review).
+static func means_to_build_with(city: City, household: Household, good: String) -> bool:
+	if not EconomyBalance.can_be_stone(Building.BUILDING_HOUSE):
+		return false
+	var wants_home: bool = household.housing_status != Household.RESIDENCE_HOUSED or city.is_household_in_rough_housing(household) or FamilyDevelopment.wants_better_home(household)
+	if not wants_home:
+		return false
+	var material: String = str(MaterialChoice.choose(city, household, Building.BUILDING_HOUSE, true)["material"])
+	return EconomyBalance.get_build_cost(Building.BUILDING_HOUSE, material).has(good)
+
+# Whether the town has no use for more of a good (sprint S4 review): not food, wood or tools, no need
+# it meets going short, no building waiting for it, no workshop using it, and NO_USE_STOCK in store.
+static func has_no_use(city: City, good: String) -> bool:
+	if good in ACTIVITIES or int(city.resources.get(good, 0)) < NO_USE_STOCK or get_unmet_need(city, good) != "":
+		return false
+	if int(city.construction.get_committed_materials().get(good, 0)) > int(city.resources.get(good, 0)):
+		return false
+	return get_use(city, good, SHORTAGE_HORIZON_DAYS) <= 0.0
+
+const WOOD_PLENTY_REASON: String = "more wood lies within reach than the town needs through the coming winter"
+
+# The wood a family can actually turn to (sprint S5c; owner 2026-11-06). In a pooled town, the store.
+# Under a compact: its own, the community's (every hearth may burn it, TownFuel.burn), and what it
+# could buy at the market as it stands (TownMarket.get_obtainable). Another family's wood is not
+# within reach beyond that.
+static func get_reachable_wood(city: City, household: Household) -> int:
+	if not TownCompact.is_set(city):
+		return int(city.resources["wood"])
+	return TownLedger.get_share(household, "wood") + TownLedger.get_community(city, "wood") + TownMarket.get_obtainable(city, household, "wood")
+
+# What the town will burn and use through the end of the next winter not yet begun, and what its
+# building still waits for (sprint S5d). Once winter has begun the one after it is the next to
+# prepare for, so late in winter the need doesn't collapse to the few days left.
+static func get_wood_need(city: City) -> float:
+	var days: int = Calendar.DAYS_PER_YEAR - (city.get_day_of_year() - 1)
+	if city.get_season_index() == 3:
+		days += Calendar.DAYS_PER_YEAR
+	return get_use(city, TownInfluence.ACTIVITY_WOOD, days) + float(int(city.construction.get_committed_materials().get("wood", 0)))
+
+static func get_wood_margin(need: float) -> float:
+	return maxf(need * WOOD_MARGIN_SHARE, WOOD_PLENTY_FLOOR)
+
+# How far the wood within a family's reach exceeds that need and its margin (sprints S5b, S5d; owner
+# 2026-11-05, option b of the Track A review): 0 (nothing spare) to 1 (spare as large again as the
+# need, or WOOD_PLENTY_FLOOR where little is needed). What families see in the store, not what is
+# coming. It weighs in their choices as a reason, never as a rule. Off with the meta "no_wood_plenty"
+# (the Track A build).
+static func get_wood_plenty(city: City, household: Household) -> float:
+	if city.has_meta("no_wood_plenty"):
+		return 0.0
+	var need: float = get_wood_need(city)
+	return clampf((float(get_reachable_wood(city, household)) - need - get_wood_margin(need)) / maxf(need, WOOD_PLENTY_FLOOR), 0.0, 1.0)
+
 static func get_use(city: City, good: String, days: int) -> float:
 	var use: float = 0.0
 	if good == TownInfluence.ACTIVITY_FOOD:
 		use += float(city.get_food_consumption_for_population(city.get_total_population())) * days
+	# The hearths' wood over the coming days, season by season (TownFuel).
+	if good == TownInfluence.ACTIVITY_WOOD:
+		use += TownFuel.get_need_over(city, days)
 	for building: Building in city.buildings:
 		if good == TownInfluence.ACTIVITY_TOOLS and building.needs_maintenance() and building.receives_maintenance:
 			var working_days: int = days - building.upkeep_grace_days
@@ -500,13 +659,16 @@ static func consider_improving(city: City, household: Household, holding: Buildi
 			GuidingWisdom.record_if_at_stake(city, household, GuidingWisdom.PREPARE, true, score, IMPROVE_THRESHOLD, float(desire["prepare"]))
 		note(city, household, "Keeps to hand work at its %s (%s)" % [name, "; ".join(get_reasons(desire["terms"], false))])
 		return null
-	var block: String = city.influence.get_funding_block(EconomyBalance.get_build_cost(proper), [get_activity(proper), TownInfluence.ACTIVITY_IMPROVE] as Array[String], household)
+	# What it builds the proper workplace of (MaterialChoice, sprint S4).
+	var material_choice: Dictionary = MaterialChoice.choose(city, household, proper)
+	var material: String = str(material_choice["material"])
+	var block: String = city.influence.get_funding_block(EconomyBalance.get_build_cost(proper, material), [get_activity(proper), TownInfluence.ACTIVITY_IMPROVE] as Array[String], household)
 	if block != "":
 		city.influence.held_back_by_stores += 1
 		city.social.on_held_back(household)
 		note(city, household, "Wants to improve its %s, but %s" % [name, block])
 		return null
-	var project: ConstructionProject = city.construction.request_upgrade(holding.id, ConstructionProject.REQUESTED_BY_HOUSEHOLD, household.id)
+	var project: ConstructionProject = city.construction.request_upgrade(holding.id, ConstructionProject.REQUESTED_BY_HOUSEHOLD, household.id, material)
 	if project == null:
 		return null
 	use_first_claim(city, household, project)
@@ -518,7 +680,8 @@ static func consider_improving(city: City, household: Household, holding: Buildi
 		CommunityPriority.record_swayed(city, household, "improve")
 	if household.improve_decision_day < 0:
 		household.improve_decision_day = city.construction.day
-	note(city, household, "Improving its %s into %s (%s)" % [name, describe_type(proper), "; ".join(get_reasons(desire["terms"], true))])
+	var of_stone: String = "" if material == EconomyBalance.MATERIAL_TIMBER else ", of %s (%s)" % [material.replace("_", " "), "; ".join(get_reasons(material_choice["terms"], true))]
+	note(city, household, "Improving its %s into %s (%s)%s" % [name, describe_type(proper), "; ".join(get_reasons(desire["terms"], true)), of_stone])
 	return project
 
 # How much a family wants to improve work into a proper holding of this type: {"score", "terms"}.
@@ -536,7 +699,7 @@ static func get_improve_desire(city: City, household: Household, proper_type: St
 	var waiting: float = get_waiting_risk(city, get_activity(proper_type))
 	if waiting > 0.0:
 		add(terms, 1.5 * waiting, {TownInfluence.ACTIVITY_FOOD: "more food for the winter", TownInfluence.ACTIVITY_WOOD: "the town needs wood", TownInfluence.ACTIVITY_TOOLS: "the town needs tools"}[get_activity(proper_type)])
-	var spending: float = get_spending_risk(city, EconomyBalance.get_build_cost(proper_type))
+	var spending: float = get_spending_risk(city, EconomyBalance.get_build_cost(proper_type), household)
 	var established: int = count_proper(city, proper_type)
 	var untried: float = 0.5 if established == 0 else 0.0
 	var acting: float = spending + untried
@@ -621,7 +784,9 @@ static func get_waiting_risk(city: City, activity: String) -> float:
 				risk += 0.5
 			return risk
 		TownInfluence.ACTIVITY_WOOD:
-			return 0.75 if int(city.resources["wood"]) < 20 else 0.0
+			# Little wood in store, or less than the hearths will burn this coming season (TownFuel).
+			var wood: float = float(int(city.resources["wood"]))
+			return 0.75 if wood < 20.0 or wood < TownFuel.get_need_over(city, FUEL_RISK_DAYS) else 0.0
 		TownInfluence.ACTIVITY_TOOLS:
 			return 0.75 if int(city.resources["tools"]) < 10 else 0.0
 	return 0.0
@@ -730,15 +895,18 @@ static func get_neighbours_example(city: City, household: Household) -> Dictiona
 			idle += 1
 	return {"paying": paying, "idle": idle}
 
-# How much of the free stores (above the protected reserve) a cost would take, 0 to 1.5.
-static func get_spending_risk(city: City, cost: Dictionary) -> float:
+# How much of the free stores (above the protected reserve) a cost would take, 0 to 1.5. For a
+# family, what it would draw on: its own share and the community's free goods (TownLedger).
+static func get_spending_risk(city: City, cost: Dictionary, household: Household = null) -> float:
 	var reserve: Dictionary = city.influence.get_protected_reserve()
 	var committed: Dictionary = city.construction.get_committed_materials()
 	var risk: float = 0.0
 	for material: String in cost.keys():
 		if int(cost[material]) <= 0:
 			continue
-		var free: int = int(city.resources.get(material, 0)) - int(committed.get(material, 0)) - int(reserve.get(material, 0))
+		var free: int = TownLedger.get_community(city, material) - int(committed.get(material, 0)) - int(reserve.get(material, 0))
+		if household != null:
+			free += TownLedger.get_share(household, material)
 		risk += float(cost[material]) / float(maxi(1, free))
 	return minf(1.5, risk)
 

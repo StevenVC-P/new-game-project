@@ -12,6 +12,14 @@ extends RefCounted
 # Woods take only land nothing else holds: not water or rock, nothing built or reserved (fields
 # are buildings), no road, and no trail or path (TownLogistics). A path in use holds its line
 # open; once nobody walks it, it fades and the woods may take it.
+#
+# Living forests (sprint S2, docs/ECONOMIC_FOUNDATIONS_ROADMAP.md): a woodcutter's wood comes out of
+# the trees. Every wooded tile holds timber (the tile's "timber", EconomyBalance.TIMBER_PER_TILE when
+# mature; a tile from an older map, with none recorded, is mature). A woodcutter cuts its day's wood
+# from the trees it fells (take_timber) and a tile with none left falls, so it fells at the pace its
+# wood is made; it brings in less the farther it must go for trees it may fell, and nothing when there
+# are none (get_felling_factor). Families' wood gathering cuts the trees near their homes the same
+# way. Woods that spread grow in young and gain timber each spring until mature.
 # Design: docs/TOWN_BUILDING_MODEL.md (Woodland). A town without a town map has no woodland.
 
 const CLEAR: String = "clear_woods"
@@ -34,7 +42,8 @@ var city: City:
 var marked: Dictionary = {}
 # Woods kept: tile -> true. Saved with the town, like the clearing marks.
 var protected: Dictionary = {}
-# Unmarked trees a woodcutter is cutting: tile -> working days spent so far.
+# Unmarked trees a woodcutter was cutting: tile -> working days spent so far. No longer advanced
+# since sprint S2 (unmarked trees fall as their timber is cut); kept so older saves load as they were.
 var cutting: Dictionary = {}
 # This year's chosen spread: tile -> the day of the year it grows in.
 var scheduled: Dictionary = {}
@@ -147,47 +156,121 @@ func is_protected(tile: Vector2i) -> bool:
 func is_fellable(tile: Vector2i) -> bool:
 	return is_wooded(tile) and not protected.has(tile)
 
-# How much of its wood a woodcutter still brings in with woods kept: the trees it may fell lie
-# farther than the nearest trees of all, and the walk costs it in proportion, down to the land's
-# floor (EconomyBalance.LAND_YIELD_FLOOR). 1 with nothing kept, or when the nearest trees are its
-# to fell.
-func get_felling_factor(building: Building) -> float:
-	if protected.is_empty() or not has_map():
-		return 1.0
-	var origin: Vector2i = TownLogistics.center_tile(building.tile, building.size)
-	var any: Vector2i = nearest_wooded(building)
-	if any.x < 0:
-		return 1.0
-	var free: Vector2i = nearest_trees(building)
-	if free.x < 0:
-		return EconomyBalance.LAND_YIELD_FLOOR
-	var near: float = maxf(2.0, Vector2(any - origin).length())
-	var far: float = maxf(2.0, Vector2(free - origin).length())
-	return clampf(near / far, EconomyBalance.LAND_YIELD_FLOOR, 1.0)
+# --- Timber ------------------------------------------------------------------------------------
 
-# The wooded tile nearest a building, kept or not (for get_felling_factor). Kept until the woods change.
-var _any_targets: Dictionary = {}
-var _any_targets_version: int = -1
-func nearest_wooded(building: Building) -> Vector2i:
-	if _any_targets_version != land_version:
-		_any_targets_version = land_version
-		_any_targets.clear()
-	if _any_targets.has(building.id):
-		return _any_targets[building.id]
-	var origin: Vector2i = TownLogistics.center_tile(building.tile, building.size)
-	var best: Vector2i = Vector2i(-1, -1)
-	var best_distance: int = 1 << 30
-	var size: Vector2i = city.logistics.map_size()
-	for y in range(size.y):
-		for x in range(size.x):
-			var tile: Vector2i = Vector2i(x, y)
-			if is_wooded(tile):
-				var distance: int = (tile - origin).length_squared()
-				if distance < best_distance or (distance == best_distance and is_before(tile, best)):
-					best_distance = distance
-					best = tile
-	_any_targets[building.id] = best
-	return best
+static func get_timber(tile: Dictionary) -> int:
+	if tile.get("has_trees", false) != true:
+		return 0
+	return int(tile.get("timber", EconomyBalance.TIMBER_PER_TILE))
+
+# How much of its wood a woodcutter brings in: all of it from trees it may fell within
+# WOODCUTTER_FULL_DISTANCE of its middle, less the farther it must walk to them (woods kept, woods
+# felled), down to the land's floor (EconomyBalance.LAND_YIELD_FLOOR); nothing with no tree it may
+# fell left in reach of a route.
+func get_felling_factor(building: Building) -> float:
+	if not has_map():
+		return 1.0
+	var target: Vector2i = get_cutting_target(building)
+	if target.x < 0:
+		return 0.0
+	return get_distance_factor(TownLogistics.center_tile(building.tile, building.size), target)
+
+static func get_distance_factor(origin: Vector2i, target: Vector2i) -> float:
+	var distance: float = Vector2(target - origin).length()
+	return clampf(EconomyBalance.WOODCUTTER_FULL_DISTANCE / maxf(EconomyBalance.WOODCUTTER_FULL_DISTANCE, distance), EconomyBalance.LAND_YIELD_FLOOR, 1.0)
+
+# What a woodcutter at `origin` would bring in, judged by straight distance to the nearest trees it
+# could fell (families judging a site; FamilyInitiative). Reads only.
+func estimate_felling_factor_at(origin: Vector2i, size: Vector2i) -> float:
+	if not has_map():
+		return 1.0
+	var center: Vector2i = TownLogistics.center_tile(origin, size)
+	var best: int = 1 << 30
+	var found: Vector2i = Vector2i(-1, -1)
+	var map_size: Vector2i = city.logistics.map_size()
+	for radius in range(0, maxi(map_size.x, map_size.y)):
+		if found.x >= 0 and radius * radius > best:
+			break
+		for y in range(center.y - radius, center.y + radius + 1):
+			for x in range(center.x - radius, center.x + radius + 1):
+				if maxi(absi(x - center.x), absi(y - center.y)) == radius and is_fellable(Vector2i(x, y)):
+					var distance: int = (Vector2i(x, y) - center).length_squared()
+					if distance < best:
+						best = distance
+						found = Vector2i(x, y)
+	if found.x < 0:
+		return 0.0
+	return get_distance_factor(center, found)
+
+# Where a woodcutter cuts now: the nearest woods marked for clearing it can reach, else the nearest
+# trees it may fell.
+func get_cutting_target(building: Building) -> Vector2i:
+	var target: Vector2i = nearest_marked(building) if not marked.is_empty() else Vector2i(-1, -1)
+	if target.x < 0:
+		target = nearest_trees(building)
+	return target
+
+# Cuts up to `amount` wood from the trees a woodcutter fells, tile by tile; a tile with no timber
+# left falls. Returns what was cut (less when the trees run out).
+func take_timber(building: Building, amount: int) -> int:
+	if not has_map():
+		return amount
+	var taken: int = 0
+	while taken < amount:
+		var target: Vector2i = get_cutting_target(building)
+		if target.x < 0:
+			break
+		taken += cut_from(target, amount - taken)
+	return taken
+
+# Up to `amount` timber from the trees a family may cut nearest its home, within `reach` tiles.
+# Returns what was cut.
+func take_timber_near(home: Vector2i, reach: int, amount: int) -> int:
+	if not has_map():
+		return amount
+	var taken: int = 0
+	while taken < amount:
+		var best: Vector2i = Vector2i(-1, -1)
+		var best_distance: int = 1 << 30
+		for y in range(home.y - reach, home.y + reach + 1):
+			for x in range(home.x - reach, home.x + reach + 1):
+				var tile: Vector2i = Vector2i(x, y)
+				if is_fellable(tile):
+					var distance: int = (tile - home).length_squared()
+					if distance < best_distance or (distance == best_distance and is_before(tile, best)):
+						best_distance = distance
+						best = tile
+		if best.x < 0:
+			break
+		taken += cut_from(best, amount - taken)
+	return taken
+
+func cut_from(tile: Vector2i, amount: int) -> int:
+	var data: Dictionary = tile_data(tile)
+	var timber: int = get_timber(data)
+	var cut: int = mini(amount, timber)
+	data["timber"] = timber - cut
+	if timber - cut <= 0:
+		fell(tile)
+		land_version += 1
+		city.logistics.mark_layout_changed()
+	return cut
+
+# The first day of spring: young woods put on timber, up to a mature tile's.
+func grow_timber() -> void:
+	for row: Array in city.local_map:
+		for data: Dictionary in row:
+			if data.get("has_trees", false) == true and data.has("timber") and int(data["timber"]) < EconomyBalance.TIMBER_PER_TILE:
+				data["timber"] = mini(EconomyBalance.TIMBER_PER_TILE, int(data["timber"]) + EconomyBalance.TIMBER_GROWTH_PER_YEAR)
+
+func get_standing_timber() -> int:
+	var total: int = 0
+	if not has_map():
+		return total
+	for row: Array in city.local_map:
+		for data: Dictionary in row:
+			total += get_timber(data)
+	return total
 
 # --- Hunting grounds under the axe ----------------------------------------------------------------
 
@@ -262,12 +345,14 @@ func get_felling_target(building: Building) -> Dictionary:
 		work *= EconomyBalance.TIER0_OUTPUT_FRACTION
 	work *= 1.0 + (EconomyBalance.WINTER_FELLING_FACTOR - 1.0) / 4.0
 	var target: Vector2i = nearest_marked(building) if not marked.is_empty() else Vector2i(-1, -1)
-	if target.x < 0:
-		target = nearest_trees(building)
-		work *= EconomyBalance.UNMARKED_FELLING_SHARE
+	if target.x >= 0:
+		return {"tile": target, "rate": work / EconomyBalance.CLEAR_DAYS_PER_TILE}
+	# Unmarked trees fall as their timber is cut (take_timber): the wood it makes a day, over a tile's.
+	target = nearest_trees(building)
 	if target.x < 0:
 		return {}
-	return {"tile": target, "rate": work / EconomyBalance.CLEAR_DAYS_PER_TILE}
+	var wood: float = city.get_base_building_output_amount(building.type) * city.get_work_time_factor(building) * get_felling_factor(building)
+	return {"tile": target, "rate": wood / maxf(1.0, float(get_timber(tile_data(target))))}
 
 # Keeps the woods within a hunting workplace's reach (the hunting-ground card's answer): every
 # wooded tile there, by the same binding designation as the Keep woods tool. Returns how many tiles
@@ -289,21 +374,18 @@ func keep_hunting_ground(building: Building) -> int:
 # Reads only.
 func estimate_felling_factor_if_kept(building: Building, rect: Rect2i) -> float:
 	var origin: Vector2i = TownLogistics.center_tile(building.tile, building.size)
-	var any: Vector2i = nearest_wooded(building)
-	if any.x < 0:
-		return 1.0
 	var size: Vector2i = city.logistics.map_size()
 	var best: int = 1 << 30
+	var found: Vector2i = Vector2i(-1, -1)
 	for y in range(size.y):
 		for x in range(size.x):
 			var tile: Vector2i = Vector2i(x, y)
-			if is_fellable(tile) and not rect.has_point(tile):
-				best = mini(best, (tile - origin).length_squared())
-	if best == 1 << 30:
-		return EconomyBalance.LAND_YIELD_FLOOR
-	var near: float = maxf(2.0, Vector2(any - origin).length())
-	var far: float = maxf(2.0, sqrt(float(best)))
-	return clampf(near / far, EconomyBalance.LAND_YIELD_FLOOR, 1.0)
+			if is_fellable(tile) and not rect.has_point(tile) and (tile - origin).length_squared() < best:
+				best = (tile - origin).length_squared()
+				found = tile
+	if found.x < 0:
+		return 0.0
+	return get_distance_factor(origin, found)
 
 # Why woods marked for clearing are not being felled, or "" when they are (Planning page).
 func get_clearing_obstacle() -> String:
@@ -337,6 +419,7 @@ func advance_day() -> void:
 	var changed: bool = fell_woods()
 	var today: int = city.get_day_of_year()
 	if today == 1:
+		grow_timber()
 		choose_spring_spread()
 	if grow_scheduled(today):
 		changed = true
@@ -345,10 +428,11 @@ func advance_day() -> void:
 		city.logistics.mark_layout_changed()
 
 # Each working woodcutter puts its day into the marked tile nearest it that it can reach, as
-# much of the day as travel and spare time leave (City.get_work_time_factor); with nothing
-# marked it cuts the trees nearest it, slowly. A gatherer's camp works at its tier's pace.
+# much of the day as travel and spare time leave (City.get_work_time_factor), and fells it in
+# CLEAR_DAYS_PER_TILE working days whatever timber is left. With nothing marked, the trees nearest
+# it fall as their timber is cut (take_timber). A gatherer's camp works at its tier's pace.
 func fell_woods() -> bool:
-	if city.should_skip_for_food_shortage():
+	if city.should_skip_for_food_shortage() or marked.is_empty():
 		return false
 	var felled: bool = false
 	for building: Building in get_woodcutters():
@@ -357,16 +441,11 @@ func fell_woods() -> bool:
 			work *= EconomyBalance.TIER0_OUTPUT_FRACTION
 		if city.get_season_index() == 3:
 			work *= EconomyBalance.WINTER_FELLING_FACTOR
-		var target: Vector2i = nearest_marked(building) if not marked.is_empty() else Vector2i(-1, -1)
-		var progress: Dictionary = marked
-		if target.x < 0:
-			target = nearest_trees(building)
-			progress = cutting
-			work *= EconomyBalance.UNMARKED_FELLING_SHARE
+		var target: Vector2i = nearest_marked(building)
 		if target.x < 0:
 			continue
-		progress[target] = float(progress.get(target, 0.0)) + work
-		if float(progress[target]) >= EconomyBalance.CLEAR_DAYS_PER_TILE:
+		marked[target] = float(marked.get(target, 0.0)) + work
+		if float(marked[target]) >= EconomyBalance.CLEAR_DAYS_PER_TILE:
 			fell(target)
 			felled = true
 	return felled
@@ -485,6 +564,7 @@ func choose_spread(draw: Callable) -> Array[Vector2i]:
 
 func plant(tile: Vector2i) -> void:
 	tile_data(tile)["has_trees"] = true
+	tile_data(tile)["timber"] = EconomyBalance.YOUNG_WOODS_TIMBER
 	spread_count += 1
 	update_frontier_around(tile)
 

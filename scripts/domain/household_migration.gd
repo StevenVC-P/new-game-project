@@ -59,14 +59,23 @@ static func advance_month(city, city_index: int = 0) -> void:
 	FamilyAmbitions.advance_month(city)
 	OccupationReview.advance_month(city)
 	HouseholdEconomy.advance_month(city)
+	# The market day: families barter what they hold beyond their needs (TownMarket).
+	TownMarket.hold(city)
+	# Families leaning toward the community give more than the compact asks (TownCompact).
+	TownCompact.advance_month(city)
+	# The commons' grants, by the player's rule (TownCommons).
+	TownCommons.advance_month(city)
 	# Neighbours may share their rations before the shortage's hardship falls (TownSocial).
 	city.social.share_in_shortage()
 	update_hardship(city)
+	# Sustained, severe hunger or cold can kill (sprint S3b).
+	HouseholdMortality.advance_month(city, city_index)
 	city.social.review_month()
 	for household: Household in city.households:
 		household.shortage_hardship_adjust = 0
 		household.long_weeks_this_month = 0
 		household.short_days_this_month = 0
+		household.cold_days_this_month = 0
 	resolve_departure(city, city_index)
 	if month_index % POOL_REFILL_MONTHS == 0:
 		city.resources["regional_migrant_families"] = min(POOL_MAX_FAMILIES, int(city.resources["regional_migrant_families"]) + 1)
@@ -90,6 +99,9 @@ static func get_monthly_hardship_points(city, household: Household) -> int:
 	if get_short_days(city, household) >= HARDSHIP_SHORTAGE_DAYS:
 		# A family that shared its ration carries more of the shortage; one helped carries less.
 		points += maxi(0, HARDSHIP_SHORTAGE_POINTS + household.shortage_hardship_adjust)
+	# A cold hearth wears on a family too, half as hard as hunger (TownFuel).
+	if household.cold_days_this_month >= EconomyBalance.HARDSHIP_COLD_DAYS:
+		points += EconomyBalance.COLD_HARDSHIP_POINTS
 	# Long days out of a family's rest (TownSocial.choose_hours) wear on it.
 	if household.long_weeks_this_month >= EconomyBalance.OVERWORK_WEEKS:
 		points += EconomyBalance.OVERWORK_HARDSHIP_POINTS

@@ -38,6 +38,9 @@ var enabled: bool = false
 var priority: String = ""
 var encouraged: Array[String] = []
 var store_rule: String = RULE_OPEN
+# What the player builds what they plan of (sprint S4; owner D6: the player chooses the material of
+# communal construction, families of their own). Timber unless the player chooses otherwise.
+var build_material: String = EconomyBalance.MATERIAL_TIMBER
 # The town's backing of its priority, worked out once a week (CommunityPriority.get_town_backing).
 var backing: float = 0.5
 var backing_week: int = -1
@@ -155,7 +158,7 @@ func get_funding_block(cost: Dictionary, activities: Array[String], household: H
 		# First claim given by the Speaker of the Gathering stays within the Elder's rule (TownRegard).
 		if household == null or household.first_claim_until < city.construction.day or TownRegard.is_on(city):
 			return "the stores go to the community's priorities first"
-	if not city.construction.can_supply(cost, get_protected_reserve()):
+	if not city.construction.can_supply(cost, get_protected_reserve(), household):
 		return "the stores hold too little beyond what is kept back"
 	return ""
 

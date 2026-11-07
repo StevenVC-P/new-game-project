@@ -103,12 +103,27 @@ static func get_travel_lines(city: City, building: Building) -> Array[String]:
 	if trodden > 0.0:
 		lines.append("  %d%% of the way on paths or roads" % int(round(trodden * 100.0)))
 	var base: String = BuildingTiers.get_base_type(building.type)
+	if building.is_stone():
+		lines.append("Built of %s: upkeep every %d days" % [building.material.replace("_", " "), building.get_maintenance_interval()])
 	if base == Building.BUILDING_FISHER:
 		lines.append("Catch: %d%% of a full one (water in reach)" % int(round(city.land.get_reach_factor(building) * 100.0)))
 	elif base == Building.BUILDING_HUNTER:
 		lines.append("Game: %d%% of a full bag (woods in reach)" % int(round(city.land.get_reach_factor(building) * 100.0)))
 	elif base == Building.BUILDING_HERDER:
 		lines.append("Grazing: %d%% of a full flock (open land in reach)" % int(round(city.land.get_reach_factor(building) * 100.0)))
+	elif base == Building.BUILDING_WOODCUTTER:
+		var target: Vector2i = city.woodland.get_cutting_target(building)
+		if target.x < 0:
+			lines.append("Timber: no trees left it may fell")
+		else:
+			lines.append("Timber: %d%% of a full cut (trees %d tiles off)" % [int(round(city.woodland.get_felling_factor(building) * 100.0)), int(round(Vector2(target - TownLogistics.center_tile(building.tile, building.size)).length()))])
+	elif TownDeposits.draws_on_deposit(building):
+		var kind: String = TownDeposits.get_deposit_kind(building.type)
+		var factor: float = TownDeposits.get_factor(city, building)
+		if factor <= 0.0:
+			lines.append("%s: worked out (none left underfoot)" % kind.capitalize())
+		else:
+			lines.append("%s: %d%% of a full yield (%s %s underfoot, %d left)" % [kind.capitalize(), int(round(factor * 100.0)), TownDeposits.describe_quality(factor), kind, TownDeposits.get_left_under(city, building)])
 	if city.land.is_wolf_exposed(building):
 		lines.append("Wolves in winter: -%d%% (fence the yard)" % int(round((1.0 - EconomyBalance.WOLF_WINTER_YIELD) * 100.0)))
 	if city.land.is_waterlogged(building):

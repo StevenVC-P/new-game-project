@@ -6,9 +6,9 @@ What is true right now. Durable detail lives in the linked docs, and past milest
 
 ## Current Objective
 
-**No implementation sprint is authorized.** The owner is reviewing the long-term vision and future features.
+**Master roadmap Phase 0, integration (authorized 2026-11-07, through Phase 1).** The order of all work is `docs/MASTER_ROADMAP.md`. Phase 0 consolidates Economic Foundations S1a–S9 and the owner's Phase 0 decisions on branch `feature/phase0-integration` (worktree `../ngg-phase0`). The integration review is `docs/economic_foundations/PHASE0_INTEGRATION.md`. Nothing reaches `develop` without the owner's review, and Phase 1 starts after the Phase 0 checkpoint.
 
-- **Planned next, not authorized:** household property, private exchange, communal contributions and treasury allocations. The agreed plan is on branch `docs/property-and-communal-resources` (deliberately unmerged); the earlier audit is `docs/TREASURY_AUDIT.md`. A founding allocation is the intended lever on the first weeks. None of it is built.
+- **Economic Foundations:** backlog and sprint cards in `docs/ECONOMIC_FOUNDATIONS_ROADMAP.md`, tests and evidence in `docs/ECONOMIC_FOUNDATIONS_TEST_PLAN.md`, sprint reports in `docs/economic_foundations/`.
 - **Design baseline for the economy and geography work:** `docs/RESOURCE_AND_PRODUCTION_AUDIT.md` (2026-11-02).
 
 ## State of Play
@@ -16,7 +16,7 @@ What is true right now. Durable detail lives in the linked docs, and past milest
 Detail on each system is in its doc: `AUTONOMOUS_OCCUPATIONS.md`, `OCCUPATION_RECONSIDERATION.md`, `HOUSEHOLD_SELF_SUFFICIENCY.md`, `EMERGENT_RECOGNITION_AND_LEADERSHIP.md`, `GUIDING_WISDOM.md`, `COMMUNITY_PRIORITIES.md`, `HOME_SITES.md`, `TOWN_UI.md`, `PLAYER_AGENCY_AUDIT.md`.
 
 - **Families lead by default.** Esc > Town rules (or `-- --classic`) switches a town to the classic rules.
-- **Occupations:** families choose every trade with a hand-work stage: farm, woodcutter, toolmaker, fisher, hunter and herder. They choose by scored terms with seeded noise, and survival comes before a calling. Stone and craft workshops are player-built only.
+- **Occupations:** families choose every trade with a hand-work stage: farm, woodcutter, toolmaker, fisher, hunter and herder. They choose by scored terms with seeded noise, and survival comes before a calling. Stone and craft workshops are player-built only. Quarries stand on stone deposits, and deposits run out (S1b).
 - **Shared land:** woods, fishing water and pasture are divided among the workplaces of their kind in use. The tool trap is fixed. Kept woods are binding.
 - **Reproducing the old defaults:** `--meta=comfort_calling_kept,water_not_shared,pasture_not_shared` on `tests/sim/intervention_check.gd`.
 - **Accepted:** shared water cuts fishing towns' catch by up to 45%, and fishing balance may be revisited. Foundings are still decided by a few first-week work choices; no further occupation tuning is planned.
@@ -34,8 +34,7 @@ Detail on each system is in its doc: `AUTONOMOUS_OCCUPATIONS.md`, `OCCUPATION_RE
    - generated worlds (no seed choice or reroll in game; the amount of ice; frontier skews tropical or dry);
    - town building (`TOWN_BUILDING_MODEL.md`, Open Owner Decisions);
    - upkeep plates shown only when they need attention;
-   - balance after the town terrain (don't tune before the next design pass);
-   - quarries on stone (the access rule decided 2026-10-25 is still unbuilt).
+   - balance after the town terrain (don't tune before the next design pass).
 
 ## Decisions Made (don't re-litigate without the owner)
 

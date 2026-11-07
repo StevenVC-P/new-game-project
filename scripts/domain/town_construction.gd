@@ -106,7 +106,9 @@ func is_on_residential_land(footprint: Array[Vector2i]) -> bool:
 	return false
 
 # Plans a new building. Returns the project, or null when the land does not allow it.
-func request_building(building_type: String, origin: Vector2i, requested_by: String = ConstructionProject.REQUESTED_BY_PLAYER, requester_household_id: int = -1, claimant_household_id: int = -1) -> ConstructionProject:
+# `material` (sprint S4): what to build it of; left empty, the player's own projects take the material
+# the player has chosen for what they plan (TownInfluence.build_material) and everything else timber.
+func request_building(building_type: String, origin: Vector2i, requested_by: String = ConstructionProject.REQUESTED_BY_PLAYER, requester_household_id: int = -1, claimant_household_id: int = -1, material: String = "") -> ConstructionProject:
 	if validate(building_type, origin)["is_valid"] != true:
 		return null
 	var project: ConstructionProject = make_project(ConstructionProject.KIND_BUILDING, building_type, requested_by, requester_household_id)
@@ -115,8 +117,9 @@ func request_building(building_type: String, origin: Vector2i, requested_by: Str
 	project.claimant_household_id = claimant_household_id
 	if claimant_household_id < 0 and not project.is_home():
 		project.claimant_household_id = find_family_for_workplace(project)
-	project.materials_needed = EconomyBalance.get_build_cost(building_type)
-	project.work_required = EconomyBalance.get_build_work_days(building_type)
+	project.material = resolve_material(building_type, requested_by, material)
+	project.materials_needed = EconomyBalance.get_build_cost(building_type, project.material)
+	project.work_required = EconomyBalance.get_build_work_days(building_type, project.material)
 	var plot: Variant = get_open_plot_at(origin) if project.is_home() else null
 	if plot != null:
 		plot["project_id"] = project.id
@@ -126,7 +129,7 @@ func request_building(building_type: String, origin: Vector2i, requested_by: Str
 	return add_project(project)
 
 # Plans upgrading a tier 0 building in place. It keeps working until the upgrade is done.
-func request_upgrade(building_id: int, requested_by: String = ConstructionProject.REQUESTED_BY_PLAYER, requester_household_id: int = -1) -> ConstructionProject:
+func request_upgrade(building_id: int, requested_by: String = ConstructionProject.REQUESTED_BY_PLAYER, requester_household_id: int = -1, material: String = "") -> ConstructionProject:
 	if building_id < 0 or building_id >= city.buildings.size():
 		return null
 	var building: Building = city.buildings[building_id]
@@ -137,8 +140,9 @@ func request_upgrade(building_id: int, requested_by: String = ConstructionProjec
 	project.tile = building.tile
 	project.size = building.size
 	project.target_building_id = building_id
-	project.materials_needed = EconomyBalance.get_build_cost(upgrade_type)
-	project.work_required = EconomyBalance.get_build_work_days(upgrade_type) * EconomyBalance.UPGRADE_WORK_FRACTION
+	project.material = resolve_material(upgrade_type, requested_by, material)
+	project.materials_needed = EconomyBalance.get_build_cost(upgrade_type, project.material)
+	project.work_required = EconomyBalance.get_build_work_days(upgrade_type, project.material) * EconomyBalance.UPGRADE_WORK_FRACTION
 	# The family living or working there takes the upgrade on as its own.
 	if building.is_house():
 		var resident: Household = city.get_household_for_building_id(building_id)
@@ -231,6 +235,16 @@ func is_roadable(tile: Vector2i) -> bool:
 	var data: Dictionary = city.local_map[tile.y][tile.x]
 	return LocalCityMapGenerator.is_buildable(data) and data["occupied"] != true and data.get("has_road", false) != true
 
+# The material a project is built of: the one asked for, else the player's chosen material for the
+# player's own projects (the player decides communal construction, owner D6), else timber; always
+# timber for what can't be built of stone.
+func resolve_material(building_type: String, requested_by: String, material: String) -> String:
+	if not EconomyBalance.can_be_stone(building_type):
+		return EconomyBalance.MATERIAL_TIMBER
+	if material == "" and requested_by == ConstructionProject.REQUESTED_BY_PLAYER:
+		material = city.influence.build_material
+	return material if EconomyBalance.MATERIALS.has(material) else EconomyBalance.MATERIAL_TIMBER
+
 func make_project(kind: String, building_type: String, requested_by: String, requester_household_id: int) -> ConstructionProject:
 	var project: ConstructionProject = ConstructionProject.new()
 	project.id = next_project_id
@@ -253,8 +267,7 @@ func cancel(project_id: int) -> bool:
 	var project: ConstructionProject = get_project(project_id)
 	if project == null:
 		return false
-	for material: String in project.materials_delivered.keys():
-		city.add_resource(material, int(project.materials_delivered[material]))
+	TownLedger.refund(city, project.materials_delivered, project.funded)
 	if project.plot_id >= 0:
 		var plot: Dictionary = get_plot(project.plot_id)
 		if not plot.is_empty():
@@ -418,12 +431,16 @@ func get_committed_materials() -> Dictionary:
 # the cost lists at nothing is not drawn on, so its store, however low, never refuses it: a toolmaker
 # (10 wood, 0 tools) was refused while tools were below their reserve, the one improvement that
 # makes tools (docs/AUTONOMOUS_OCCUPATIONS.md, fifth round, the tool trap).
-func can_supply(cost: Dictionary, reserve: Dictionary = {}) -> bool:
+# Whether the community's goods, less what sites wait for and the reserve, cover a cost; for a
+# family's own project, its own share counts too (TownLedger; pooled, the whole store).
+func can_supply(cost: Dictionary, reserve: Dictionary = {}, household: Household = null) -> bool:
 	var committed: Dictionary = get_committed_materials()
 	for material: String in cost.keys():
 		if int(cost[material]) <= 0:
 			continue
-		var free: int = int(city.resources.get(material, 0)) - int(committed.get(material, 0)) - int(reserve.get(material, 0))
+		var free: int = TownLedger.get_community(city, material) - int(committed.get(material, 0)) - int(reserve.get(material, 0))
+		if household != null:
+			free += TownLedger.get_share(household, material)
 		if free < int(cost[material]):
 			return false
 	return true
@@ -594,11 +611,14 @@ func get_builder_labor(household: Household) -> float:
 func apply_labor(project: ConstructionProject, labor: float) -> void:
 	var left: float = labor
 	var per_unit: float = logistics().get_site_haul_days_per_unit(project.get_site_tile())
+	var payer: Household = get_payer(project)
 	while left > 0.0001 and not project.has_all_materials():
 		var material: String = ""
 		var remaining: Dictionary = project.get_remaining_materials()
 		for candidate: String in remaining.keys():
-			if int(city.resources.get(candidate, 0)) > 0:
+			# Builders may take the hearths' wood (unlike workshops, TownFuel.get_reserve): a better
+			# woodcutter or home is how a cold town gets warm.
+			if TownLedger.get_available(city, payer, candidate) > 0:
 				material = candidate
 				break
 		if material == "" or is_inf(per_unit):
@@ -609,11 +629,19 @@ func apply_labor(project: ConstructionProject, labor: float) -> void:
 			return
 		left -= needed
 		project.haul_progress = 0.0
-		city.remove_resource(material, 1)
+		city.remove_resource(material, 1, "built")
+		TownLedger.add_funding(project.funded, material, TownLedger.charge(payer, material, 1))
 		project.materials_delivered[material] = int(project.materials_delivered.get(material, 0)) + 1
 		logistics().record_site_delivery(project.get_site_tile())
 	if project.has_all_materials():
 		project.work_done = minf(project.work_required, project.work_done + left)
+
+# A family's own project is paid from its share first (TownLedger.charge); the player's and the
+# town's from the community's goods.
+func get_payer(project: ConstructionProject) -> Household:
+	if project.requested_by != ConstructionProject.REQUESTED_BY_HOUSEHOLD:
+		return null
+	return city.get_household_by_id(project.requester_household_id)
 
 func complete(project: ConstructionProject) -> void:
 	projects.erase(project)
@@ -626,7 +654,14 @@ func complete(project: ConstructionProject) -> void:
 			roads_version += 1
 			logistics().mark_layout_changed()
 		ConstructionProject.KIND_UPGRADE:
+			var upgraded: Building = city.buildings[project.target_building_id]
+			# A building from before the ledger was the common store's: record that before adding the upgrade.
+			if upgraded.funded.is_empty():
+				for good: String in EconomyBalance.get_build_cost(upgraded.type, upgraded.material).keys():
+					TownLedger.add_funding(upgraded.funded, good, {TownLedger.COMMUNITY: int(EconomyBalance.get_build_cost(upgraded.type, upgraded.material)[good])})
+			TownLedger.merge_funding(upgraded.funded, project.funded)
 			city.complete_upgrade(project.target_building_id)
+			upgraded.material = project.material
 			move_claimant_in(project, project.target_building_id)
 		ConstructionProject.KIND_FENCE:
 			city.buildings[project.target_building_id].fenced = true
@@ -636,6 +671,8 @@ func complete(project: ConstructionProject) -> void:
 				var plot: Dictionary = get_plot(project.plot_id)
 				plots.erase(plot)
 			var building: Building = Building.new(-1, project.building_type, project.tile, project.size)
+			building.material = project.material
+			building.funded = project.funded.duplicate(true)
 			var claimant: Household = city.get_household_by_id(project.claimant_household_id)
 			if claimant != null and building.is_house() and not wants_to_move_in(claimant, building):
 				claimant = null

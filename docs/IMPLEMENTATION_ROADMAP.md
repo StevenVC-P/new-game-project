@@ -1,5 +1,7 @@
 # Implementation Roadmap
 
+*Beyond the first playable village, the proposed order of work is `docs/MASTER_ROADMAP.md` (approved as planning, 2026-11-07).*
+
 Ordered milestones from the current code (a founded hamlet) to the **first playable village**, drawn from the build orders in the design models (2026-10-19). Blocking owner decisions R1-R6 are resolved (see end).
 
 Design sources: `docs/GAME_VISION.md`, `docs/SETTLEMENT_GROWTH_SCALE_MODEL.md`, `docs/ECONOMY_MODEL.md`, `docs/SIMULATION_SCALE_MODEL.md`, `docs/HOUSES_AND_LINEAGE_MODEL.md`, `docs/CULTURE_AND_VALUES_MODEL.md`, `docs/WARFARE_AND_CONFLICT_MODEL.md`.
@@ -380,6 +382,10 @@ Next implementation step: draw regional deposits onto town maps as resource tile
 1. Living neighbors and rivals on the world map. (The regional map generated from its world region's geography is done: see below.)
 2. Readability pass: tell tier 0 from tier 1, who works where, who is struggling, at a glance.
 3. Art direction decision (style, perspective, scope), then art, the UI overhaul, and audio replacing code-drawn shapes. `BuildingVisuals` profiles are the intended hook for sprites. (All three map scales now share the miniature style, so in practice the direction is set; sprites, UI, and audio remain.)
+
+## Economic Foundations And Geographic Diversity (decisions approved 2026-11-02, not started)
+
+Backlog, sprints and tracking: `docs/ECONOMIC_FOUNDATIONS_ROADMAP.md`. Nothing built. It absorbs the property plan's phases (revised so the player sets contributions) and supersedes M7 (decision D1).
 
 ## Future Feature Notes
 

@@ -62,6 +62,11 @@ const STEP_SCORES: Array[float] = [0.0, 1.5, 3.0]
 const SECONDARY_COST: float = 1.5
 const TOWN_SHORT_WEIGHT: float = 2.5
 const OWN_NEED_WEIGHT: float = 1.0
+# The danger of cold at its worst, drawing a family to gather firewood (sprint S3 review): as much as
+# hunger draws a family to food work (FamilyInitiative.SURVIVAL_WEIGHT).
+const COLD_SURVIVAL_WEIGHT: float = 4.0
+# Wood in store beyond the coming winter's need, against gathering more at its most (sprint S5b).
+const WOOD_PLENTY_SIDE_WEIGHT: float = 2.0
 const OWN_PLENTY_WEIGHT: float = 1.0
 const KNOWS_WEIGHT: float = 1.0
 const OWN_SKILL_WEIGHT: float = 0.5
@@ -225,6 +230,11 @@ static func produce_secondary(city: City, household: Household, activity: String
 			amount *= household.woods_land
 			household.gathered_wood += amount
 			while household.gathered_wood >= 1.0:
+				# Each unit is cut from the trees nearest the family's home (TownWoodland); with none
+				# left that it may cut, what it gathered comes to nothing.
+				if city.logistics.has_map() and city.woodland.take_timber_near(city.logistics.get_home_tile(household), WOODS_REACH, 1) < 1:
+					household.gathered_wood = 0.0
+					break
 				household.gathered_wood -= 1.0
 				deliver_wood(city, household)
 		"tools":
@@ -232,7 +242,7 @@ static func produce_secondary(city: City, household: Household, activity: String
 	influence.secondary_output[activity] = float(influence.secondary_output.get(activity, 0.0)) + amount
 
 # Wood a family gathered goes to its own building first, carried straight to the site; else to the
-# common store.
+# store: the community's while pooled, the family's own under a compact.
 static func deliver_wood(city: City, household: Household) -> void:
 	for project: ConstructionProject in city.construction.projects:
 		if project.claimant_household_id != household.id and project.requester_household_id != household.id:
@@ -240,8 +250,14 @@ static func deliver_wood(city: City, household: Household) -> void:
 		if int(project.get_remaining_materials().get("wood", 0)) > 0:
 			project.materials_delivered["wood"] = int(project.materials_delivered.get("wood", 0)) + 1
 			city.influence.wood_to_own_projects += 1
+			# Side work is the family's own under a compact (TownCompact), so the site records it paid.
+			if TownCompact.is_set(city):
+				TownLedger.add_funding(project.funded, "wood", {household.id: 1})
 			return
-	city.add_resource("wood", 1)
+	if TownCompact.is_set(city):
+		TownLedger.credit(city, household, "wood", 1, "gathered")
+	else:
+		city.add_resource("wood", 1, "gathered")
 
 # When its workplace's upkeep falls due, a unit of mending the family did itself takes the place
 # of a tool from the store (City.update_building_maintenance).
@@ -281,6 +297,12 @@ static func feed(city: City, rate: int) -> void:
 		own_total += own
 		from_store[household.id] = need - own
 	city.influence.larder_eaten_own += own_total
+	# Under a compact a family eats its own share in the store next; the common table (the
+	# community's food) feeds what is left, by the commons' rules (TownCommons).
+	if TownCompact.is_set(city):
+		eat_own_shares(city, from_store)
+		TownCommons.feed_from_table(city, from_store)
+		return
 	var demand: int = maxi(0, int(ceil(float(rate) - own_total - 0.000001)))
 	var consumed: int = city.consume_need_bucket(GoodsNeedBucketHelper.BUCKET_FOOD, demand)
 	city.resources["food_shortage"] = consumed < demand
@@ -297,6 +319,25 @@ static func feed(city: City, rate: int) -> void:
 			household.short_today = true
 			household.short_days_this_month += 1
 			city.influence.household_short_days += 1
+
+# What families eat of their own shares in the store (TownCompact), lowering what each still needs
+# from the table. Whole units leave the store as the fractions add up (Household.share_food_owed).
+static func eat_own_shares(city: City, from_store: Dictionary) -> float:
+	var eaten: float = 0.0
+	for household: Household in city.households:
+		var own: float = float(TownLedger.get_share(household, "food")) - household.share_food_owed
+		var take: float = clampf(float(from_store[household.id]), 0.0, maxf(0.0, own))
+		if take <= 0.0:
+			continue
+		household.share_food_owed += take
+		var whole: int = int(floor(household.share_food_owed + 0.000001))
+		if whole > 0:
+			city.remove_resource("food", whole, "need_food")
+			TownLedger.charge(household, "food", whole)
+			household.share_food_owed = maxf(0.0, household.share_food_owed - float(whole))
+		from_store[household.id] = float(from_store[household.id]) - take
+		eaten += take
+	return eaten
 
 # --- The month --------------------------------------------------------------------------------
 
@@ -458,6 +499,17 @@ static func get_secondary_desire(city: City, household: Household, holding: Buil
 			if land < 1.0:
 				FamilyInitiative.add(terms, -(1.0 - land), "its garden ground is poor or small")
 		"wood":
+			# Survival first (sprint S3 review): the danger of cold, the family's own hearth or the
+			# town's, draws it to gather firewood as hunger draws a family to food work
+			# (FamilyInitiative.get_cold_hardship).
+			var cold: Dictionary = FamilyInitiative.get_cold_hardship(city, household)
+			if float(cold["level"]) > 0.0:
+				own_need = true
+				FamilyInitiative.add(terms, COLD_SURVIVAL_WEIGHT * float(cold["level"]), str(cold["reason"]))
+			# Gathering more for a store that already holds the coming winter's wood (sprint S5b).
+			var plenty: float = FamilyInitiative.get_wood_plenty(city, household)
+			if plenty > 0.0:
+				FamilyInitiative.add(terms, -WOOD_PLENTY_SIDE_WEIGHT * plenty, FamilyInitiative.WOOD_PLENTY_REASON)
 			if land < 1.0:
 				FamilyInitiative.add(terms, -(1.0 - land), "few trees near its home")
 		"tools":
@@ -551,13 +603,24 @@ static func set_note(city: City, household: Household, text: String) -> void:
 
 # --- Sharing ----------------------------------------------------------------------------------
 
-# A donor with food in its larder can give real food: GIFT_DAYS of the recipient's eating.
+# A donor with food of its own can give real food: GIFT_DAYS of the recipient's eating. Its own is
+# its larder and, under a compact, its share of food in the store (TownLedger; nothing while pooled).
 static func can_give_food(household: Household, recipient: Household) -> bool:
-	return household.larder >= GIFT_DAYS * get_daily_need(recipient)
+	return get_own_food(household) >= GIFT_DAYS * get_daily_need(recipient)
 
+static func get_own_food(household: Household) -> float:
+	return household.larder + maxf(0.0, float(TownLedger.get_share(household, "food")) - household.share_food_owed)
+
+# From the larder first; the rest passes from the donor's share in the store to the recipient's
+# (the food stays where it is; whose it is changes).
 static func give_food(city: City, donor: Household, recipient: Household) -> void:
 	var amount: float = GIFT_DAYS * get_daily_need(recipient)
-	donor.larder -= amount
-	recipient.larder += amount
+	var from_larder: float = minf(amount, donor.larder)
+	donor.larder -= from_larder
+	recipient.larder += from_larder
+	var from_share: int = mini(TownLedger.get_share(donor, "food"), int(ceil(amount - from_larder - 0.000001)))
+	if from_share > 0:
+		TownLedger.set_share(donor, "food", TownLedger.get_share(donor, "food") - from_share)
+		TownLedger.set_share(recipient, "food", TownLedger.get_share(recipient, "food") + from_share)
 	city.influence.food_gifts += 1
 	city.influence.food_gift_units += amount

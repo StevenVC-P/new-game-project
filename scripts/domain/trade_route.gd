@@ -27,8 +27,8 @@ func transfer_tick(source_city: City, destination_city: City):
 	if not can_transfer(source_city):
 		return
 
-	source_city.remove_resource(resource_type, amount_per_tick)
-	destination_city.add_resource(resource_type, amount_per_tick)
+	source_city.remove_resource(resource_type, amount_per_tick, "traded")
+	destination_city.add_resource(resource_type, amount_per_tick, "traded")
 
 func get_summary(source_label: String, destination_label: String) -> String:
 	return source_label + " -> " + destination_label + " " + resource_type + " " + str(amount_per_tick) + "/tick"

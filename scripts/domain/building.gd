@@ -58,6 +58,14 @@ var works_by_hand_without_tools: bool = false
 # For work that lives off the land (TownLand): the best share of a full yield its water, woods or
 # pasture has given while worked, so a failing livelihood can be told apart from a poor site.
 var peak_land_yield: float = 0.0
+# What it is built of (EconomyBalance, Building materials; sprint S4): timber, stone or dressed stone.
+# Older saves' buildings are timber.
+var material: String = EconomyBalanceScript.MATERIAL_TIMBER
+# Who paid for its materials, {good: {payer id: amount}} (TownLedger; sprint S6). Empty for
+# everything built before: that was paid from the common store.
+var funded: Dictionary = {}
+# The working family's fraction of a unit of output not yet credited (TownCompact.deliver_output).
+var share_carry: float = 0.0
 
 func _init(building_id: int = -1, building_type: String = BUILDING_HOUSE, tile_pos: Vector2i = Vector2i.ZERO, footprint_size: Vector2i = Vector2i(2, 2)):
 	id = building_id
@@ -132,7 +140,14 @@ func toggle_maintenance():
 	receives_maintenance = not receives_maintenance
 
 func get_maintenance_interval() -> int:
-	return EconomyBalanceScript.get_maintenance_interval(type)
+	var interval: int = EconomyBalanceScript.get_maintenance_interval(type)
+	# Stone lasts longer between repairs.
+	if EconomyBalanceScript.is_stone_material(material):
+		interval = int(round(float(interval) * EconomyBalanceScript.STONE_UPKEEP_FACTOR))
+	return interval
+
+func is_stone() -> bool:
+	return EconomyBalanceScript.is_stone_material(material)
 
 func get_maintenance_tool_cost() -> int:
 	return EconomyBalanceScript.MAINTENANCE_TOOL_COST

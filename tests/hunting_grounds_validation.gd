@@ -85,7 +85,11 @@ func fell(city: City, tile: Vector2i) -> void:
 	city.logistics.mark_layout_changed()
 
 # A day of felling, as TownWoodland.advance_day does it (without the year's spreading).
+# A day's felling: woods marked for clearing, and (since sprint S2) the unmarked trees the woodcutters
+# fell as they cut their wood.
 func fell_a_day(city: City) -> void:
+	for building: Building in city.woodland.get_woodcutters():
+		city.apply_building_production(building)
 	if city.woodland.fell_woods():
 		city.woodland.land_version += 1
 		city.logistics.mark_layout_changed()

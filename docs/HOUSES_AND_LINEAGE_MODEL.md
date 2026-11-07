@@ -1,5 +1,7 @@
 # Houses And Lineage Model
 
+> **Superseded in direction (2026-11-07).** Prominent families that emerge from their influence and the people they represent replace Houses as the general model (`GAME_VISION.md`, Families At Scale). This doc is revised in roadmap Phase 3, when inheritance and estate division are decided. Until then it is history, not a design to build on.
+
 Firm owner decisions on what families become as society scales (2026-10-19). Sits under `docs/GAME_VISION.md`. This model is the foundation that wealth, culture, and influence attach to at town scale and above, and it defines the Grouped simulation level in `docs/SIMULATION_SCALE_MODEL.md`.
 
 Items marked **Default** were set during planning to complete the model; the owner can change them without reopening the rest.

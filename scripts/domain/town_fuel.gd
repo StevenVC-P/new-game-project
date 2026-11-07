@@ -1,0 +1,137 @@
+class_name TownFuel
+extends RefCounted
+
+# Winter fuel (sprint S3, docs/ECONOMIC_FOUNDATIONS_ROADMAP.md; owner decision D5). In the cold
+# seasons every household's hearth burns wood from the common store, more the colder the season at
+# the town's site, the more people it keeps warm, and the rougher its shelter (EconomyBalance, Winter
+# fuel). So winter fuel competes with building and toolmaking for the town's wood, and a timber-poor
+# cold site pays for it. When the store can't cover the day's need, every hearth goes short alike:
+# the families lose some working days and, after enough cold days in a month, hardship builds as it
+# does in hunger (HouseholdMigration). Families answer it through their own reasoning: the town's
+# coming fuel need counts in the wood they judge it will use (FamilyInitiative.get_use), and a
+# family whose hearth went cold gives time to gathering wood (HouseholdEconomy).
+#
+# Only a town with a town map heats; comparisons can switch it off with the meta "no_winter_fuel".
+
+# What a season's warmth is at the town, 0 (bitter) to 1.
+static func get_warmth(city: City, season: int) -> float:
+	var climate: Dictionary = city.site_profile.climate if city.site_profile != null else LocalCityMapGenerator.DEFAULT_CLIMATE
+	return clampf(float(climate.get("temperature", 0.55)) + EconomyBalance.SEASON_TEMPERATURE_OFFSET[season], 0.0, 1.0)
+
+# 0 (no heating) to 1 (full cold).
+static func get_coldness(city: City, season: int) -> float:
+	return clampf((EconomyBalance.HEATING_BELOW_TEMPERATURE - get_warmth(city, season)) / EconomyBalance.HEATING_BELOW_TEMPERATURE, 0.0, 1.0)
+
+static func is_on(city: City) -> bool:
+	return not city.local_map.is_empty() and not city.has_meta("no_winter_fuel")
+
+static func get_household_need(city: City, household: Household, season: int) -> float:
+	var need: float = float(household.total_population) * EconomyBalance.FUEL_PER_PERSON_DAY * get_coldness(city, season)
+	if household.housing_status != Household.RESIDENCE_HOUSED or city.is_household_in_rough_housing(household):
+		need *= EconomyBalance.ROUGH_SHELTER_FUEL_FACTOR
+	elif household.residence_building_id >= 0 and household.residence_building_id < city.buildings.size() and city.buildings[household.residence_building_id].is_stone():
+		# A stone home holds its warmth (sprint S4).
+		need *= EconomyBalance.STONE_HOME_FUEL_FACTOR
+	return need
+
+static func get_daily_need(city: City, season: int = -1) -> float:
+	if not is_on(city):
+		return 0.0
+	if season < 0:
+		season = city.get_season_index()
+	var total: float = 0.0
+	for household: Household in city.households:
+		total += get_household_need(city, household, season)
+	return total
+
+# The town's fuel need over the coming `days`, season by season from today, at today's families.
+static func get_need_over(city: City, days: int) -> float:
+	if not is_on(city):
+		return 0.0
+	var total: float = 0.0
+	var day_of_year: int = city.get_day_of_year()
+	var by_season: Array[float] = []
+	for season in range(4):
+		by_season.append(get_daily_need(city, season))
+	for i in range(days):
+		var day: int = posmod(day_of_year - 1 + i, Calendar.DAYS_PER_YEAR)
+		total += by_season[clampi(day / Calendar.DAYS_PER_MONTH / 3, 0, 3)]
+	return total
+
+# The day's burning (City.tick, after eating). Whole units come from the store; the fraction is
+# carried to the next day (City.fuel_carry).
+static func burn(city: City) -> void:
+	for household: Household in city.households:
+		household.cold_today = false
+	if not is_on(city):
+		return
+	var season: int = city.get_season_index()
+	# Under a compact (TownCompact) each hearth burns its family's own wood first; the community's
+	# wood warms the rest, and only hearths it can't warm go cold.
+	var from_store: Dictionary = {}
+	var store_need: float = get_daily_need(city)
+	if TownCompact.is_set(city):
+		store_need = 0.0
+		for household: Household in city.households:
+			from_store[household.id] = burn_own_share(city, household, get_household_need(city, household, season))
+			store_need += float(from_store[household.id])
+	var need: float = store_need + city.fuel_carry
+	var whole: int = int(floor(need))
+	city.fuel_carry = need - float(whole)
+	if whole <= 0:
+		return
+	var available: int = whole if not TownCompact.is_set(city) else mini(whole, TownLedger.get_community(city, "wood"))
+	var burned: int = city.consume_need_bucket(GoodsNeedBucketHelper.BUCKET_FUEL, available)
+	city.fuel_burned += burned
+	if burned >= whole:
+		return
+	# Short: the warmth missed today is gone, not owed, so nothing is carried; every hearth that needs
+	# fuel from the store goes cold today.
+	city.fuel_carry = 0.0
+	city.fuel_short_days += 1
+	for household: Household in city.households:
+		var needs_store: bool = float(from_store[household.id]) > 0.0 if TownCompact.is_set(city) else get_household_need(city, household, season) > 0.0
+		if needs_store:
+			household.cold_today = true
+			household.cold_days_this_month += 1
+
+# Burns what it can of a family's own wood (TownLedger) for its hearth's need today; returns what
+# it still needs from the store. Whole units leave the store as the fractions add up.
+static func burn_own_share(city: City, household: Household, need: float) -> float:
+	var own: float = float(TownLedger.get_share(household, "wood")) - household.share_fuel_owed
+	var take: float = clampf(need, 0.0, maxf(0.0, own))
+	if take <= 0.0:
+		return need
+	household.share_fuel_owed += take
+	var whole: int = int(floor(household.share_fuel_owed + 0.000001))
+	if whole > 0:
+		city.remove_resource("wood", whole, "need_fuel")
+		TownLedger.charge(household, "wood", whole)
+		household.share_fuel_owed = maxf(0.0, household.share_fuel_owed - float(whole))
+	city.fuel_burned += whole
+	return need - take
+
+# Whether a cold family loses today's work: one day in COLD_SKIP_TICK_INTERVAL, on other days than
+# hunger's (City.skips_work_today).
+static func skips_work(city: City, household: Household) -> bool:
+	if household == null or not household.cold_today:
+		return false
+	var interval: int = EconomyBalance.COLD_SKIP_TICK_INTERVAL
+	return int(city.resources["production_tick_count"]) % interval == interval / 2
+
+# Wood kept back for the hearths (sprint S3 review): while hearths burn, workshops that use wood
+# take only what lies beyond FUEL_RESERVE_DAYS of the hearths' need, so the day's wood warms families
+# before it becomes tools. Survival first, as the protected reserve keeps tools for upkeep. Builders
+# are not held back: a better woodcutter or a proper home is how a cold town gets warm. Nothing kept
+# of other goods, or when nothing burns.
+static func get_reserve(city: City, good: String) -> int:
+	if good != "wood" or not is_on(city):
+		return 0
+	return int(ceil(get_daily_need(city) * EconomyBalance.FUEL_RESERVE_DAYS))
+
+# Days of fuel the store holds at today's need (INF when nothing burns now).
+static func get_fuel_days(city: City) -> float:
+	var need: float = get_daily_need(city)
+	if need <= 0.0:
+		return INF
+	return float(int(city.resources.get("wood", 0))) / need

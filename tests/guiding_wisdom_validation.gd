@@ -126,7 +126,8 @@ func test_conflicting_wisdoms_pull_both_ways() -> void:
 	GuidingWisdom.choose(other, GuidingWisdom.PRIDE)
 	var family: Household = other.households[0]
 	give_holding(other, family, Vector2i(28, 4), "gatherer_camp")
-	other.resources["wood"] = 200
+	# Plentiful even with the winter's firewood to come (TownFuel, sprint S3).
+	other.resources["wood"] = 2000
 	other.resources["tools"] = 100
 	other.construction.day = 10
 	_check(not GuidingWisdom.asks_to_hold_off(other, "woodcutter"), "in spring, preparation does not ask families to hold off")

@@ -7,6 +7,8 @@ const BUCKET_MAINTENANCE_MATERIALS: String = "maintenance_materials"
 const BUCKET_HOUSEHOLD_GOODS: String = "household_goods"
 const BUCKET_CLOTHING: String = "clothing"
 const BUCKET_CIVIC_GOODS: String = "civic_goods"
+# Firewood for the cold seasons (TownFuel, sprint S3).
+const BUCKET_FUEL: String = "fuel"
 
 const CURRENT_GOOD_IDS: Array[String] = [
 	"food",
@@ -28,7 +30,7 @@ const CURRENT_GOOD_IDS: Array[String] = [
 
 const GOOD_TO_NEED_BUCKETS: Dictionary = {
 	"food": [BUCKET_FOOD],
-	"wood": [BUCKET_CONSTRUCTION_MATERIALS, BUCKET_MAINTENANCE_MATERIALS],
+	"wood": [BUCKET_CONSTRUCTION_MATERIALS, BUCKET_MAINTENANCE_MATERIALS, BUCKET_FUEL],
 	"tools": [BUCKET_TOOLS, BUCKET_MAINTENANCE_MATERIALS],
 	"stone_blocks": [BUCKET_CONSTRUCTION_MATERIALS, BUCKET_MAINTENANCE_MATERIALS],
 	"cut_stone": [BUCKET_CONSTRUCTION_MATERIALS],
@@ -52,6 +54,7 @@ const BUCKET_DISPLAY_NAMES: Dictionary = {
 	BUCKET_HOUSEHOLD_GOODS: "Household Goods",
 	BUCKET_CLOTHING: "Clothing",
 	BUCKET_CIVIC_GOODS: "Civic Goods",
+	BUCKET_FUEL: "Firewood",
 }
 
 const GOOD_DISPLAY_NAMES: Dictionary = {

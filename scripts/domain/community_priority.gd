@@ -102,7 +102,7 @@ static func get_view(city: City, household: Household, priority: String) -> Dict
 				FamilyInitiative.add(terms, 0.5 * ambition, "it wants to get on")
 			if city.social.enabled and int(FamilyInitiative.get_neighbours_example(city, household)["paying"]) > 0:
 				FamilyInitiative.add(terms, 0.75, "its neighbours' improved work is paying")
-			var spending: float = FamilyInitiative.get_spending_risk(city, EconomyBalance.get_build_cost("farm"))
+			var spending: float = FamilyInitiative.get_spending_risk(city, EconomyBalance.get_build_cost("farm"), household)
 			if spending > 0.0:
 				FamilyInitiative.add(terms, -spending, "it would spend scarce wood and tools")
 		COOPERATION:

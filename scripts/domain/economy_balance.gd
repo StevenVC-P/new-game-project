@@ -37,6 +37,43 @@ const FARM_SEASON_YIELD: Array[float] = [0.8, 1.0, 1.4, 0.8]
 # Felling is winter work: woodcutters fell twice as fast in winter, marked woods or not.
 const WINTER_FELLING_FACTOR: float = 2.0
 const WOODCUTTER_WOOD_PER_DAY: float = 6.0
+# Since sprint S2 a woodcutter's wood is the timber it fells, so winter's faster felling shows in its
+# wood: twice the other seasons' pace in winter, the year's total unchanged (spring, summer, autumn,
+# winter).
+const WOOD_SEASON_YIELD: Array[float] = [0.8, 0.8, 0.8, 1.6]
+
+# --- Winter fuel (TownFuel, sprint S3) ---
+# A season's warmth is the site's climate temperature (0 to 1; temperate is about 0.55) plus
+# SEASON_TEMPERATURE_OFFSET (spring, summer, autumn, winter). Below HEATING_BELOW_TEMPERATURE a
+# hearth burns wood: FUEL_PER_PERSON_DAY at full cold (0 warmth), less the milder it is. So a
+# temperate town heats in winter only, a cold one from autumn to spring, a tropical one never: a
+# family of four burns about 0.4 wood a day in a temperate winter and 0.9 in a cold one. Families
+# in temporary shelter or a hut burn ROUGH_SHELTER_FUEL_FACTOR as much. A family short of fuel
+# loses one working day in COLD_SKIP_TICK_INTERVAL (on other days than hunger's), and
+# HARDSHIP_COLD_DAYS cold days in a month are COLD_HARDSHIP_POINTS of hardship, half of hunger's.
+const SEASON_TEMPERATURE_OFFSET: Array[float] = [0.0, 0.2, 0.0, -0.25]
+const HEATING_BELOW_TEMPERATURE: float = 0.5
+const FUEL_PER_PERSON_DAY: float = 0.25
+const ROUGH_SHELTER_FUEL_FACTOR: float = 1.5
+const COLD_SKIP_TICK_INTERVAL: int = 4
+const HARDSHIP_COLD_DAYS: int = 10
+const COLD_HARDSHIP_POINTS: int = 1
+# While hearths burn, workshops and builders leave this many days of the hearths' wood in store.
+const FUEL_RESERVE_DAYS: float = 5.0
+
+# --- Fatal hardship (HouseholdMortality, sprint S3b) ---
+# A month is severe when a family went hungry, or its hearth cold, on HARDSHIP_SEVERE_DAYS or more
+# of its days. After HARDSHIP_SUSTAINED_MONTHS severe months running, each further month risks a
+# death: HARDSHIP_DEATH_CHANCE_PER_MONTH for each month from then, for a family of
+# STARTING_HOUSEHOLD_POPULATION_FOR_RISK (more for a larger one), up to HARDSHIP_DEATH_CHANCE_MAX;
+# cold without a proper home is ROUGH_SHELTER_COLD_RISK as deadly. So a family of four starving
+# two months running risks 6% that month, 12% the next, and so on.
+const HARDSHIP_SEVERE_DAYS: int = 20
+const HARDSHIP_SUSTAINED_MONTHS: int = 2
+const HARDSHIP_DEATH_CHANCE_PER_MONTH: float = 0.06
+const HARDSHIP_DEATH_CHANCE_MAX: float = 0.35
+const STARTING_HOUSEHOLD_POPULATION_FOR_RISK: int = 4
+const ROUGH_SHELTER_COLD_RISK: float = 1.5
 const TOOLMAKER_TOOLS_PER_DAY: float = 1.0
 # Wood the toolmaker consumes for each tool it makes.
 const TOOLMAKER_WOOD_PER_TOOL: int = 2
@@ -101,6 +138,8 @@ const BUILD_COSTS: Dictionary = {
 	"hut": {},
 	"forager_garden": {},
 	"gatherer_camp": {},
+	"stone_pit": {},
+	"clay_pit": {},
 	"tool_mender": {},
 	"fish_weir": {},
 	"snare_line": {},
@@ -134,6 +173,8 @@ const BUILD_WORK_DAYS: Dictionary = {
 	"hut": 3.0,
 	"forager_garden": 2.0,
 	"gatherer_camp": 2.0,
+	"stone_pit": 3.0,
+	"clay_pit": 3.0,
 	"tool_mender": 3.0,
 	"fish_weir": 2.0,
 	"snare_line": 2.0,
@@ -228,6 +269,21 @@ const WOLF_WOODS_DISTANCE: int = 2
 const HERDER_WOOL_PER_DAY: float = 1.0
 const HERDER_REACH: int = 3
 const HERDER_FULL_PASTURE_TILES: int = 90
+# A quarry stands on stone (TownDeposits, sprint S1b): it cuts its full rate with
+# QUARRY_FULL_DEPOSIT_TILES of the best stone underfoot, less on fewer tiles or poorer stone. A
+# deposit tile's grade runs from DEPOSIT_GRADE_FLOOR (a lone tile at an outcrop's edge) to 1 (stone
+# all round it). Each tile holds STONE_DEPOSIT_UNITS_PER_TILE blocks: a quarry on four good tiles
+# works for about three years at its full rate.
+const QUARRY_FULL_DEPOSIT_TILES: int = 4
+const DEPOSIT_GRADE_FLOOR: float = 0.4
+const STONE_DEPOSIT_UNITS_PER_TILE: int = 600
+# Clay (sprint S5) lies on open ground beside rivers and lakes, CLAY_DEPOSIT_UNITS_PER_TILE bricks'
+# worth a tile; a brickworks stands on it as a quarry stands on stone. Some stone outcrops are
+# limestone (LIMESTONE_SHARE of them, by place); a lime kiln must stand within
+# LIME_KILN_LIMESTONE_REACH tiles of limestone.
+const CLAY_DEPOSIT_UNITS_PER_TILE: int = 400
+const LIMESTONE_SHARE: float = 0.45
+const LIME_KILN_LIMESTONE_REACH: int = 4
 
 # --- Clothing (docs/FIRST_STAGE_LOOP.md, milestone 6) ---
 # A garment lasts CLOTHING_DAYS_PER_PERSON, so a town needs one for every that many people a day
@@ -281,6 +337,65 @@ const TRADER_STAY_DAYS: int = 10
 const TRADER_INTERVAL_DAYS: Dictionary = {"crossroads": 20, "road": 30, "river": 45}
 const TRADER_INTERVAL_JITTER_DAYS: int = 6
 
+# --- The founding compact (sprint S7; TownCompact) ---
+# The share of a holding's work each preset gives the community, in every category. A workshop's
+# output is divided by worth in grain: its inputs' worth goes back to whoever owned them, and only
+# the worth the work added is shared at the rate, so nothing is claimed twice along a chain.
+# WORKED_VALUE_IN_GRAIN prices the goods the trader never deals in, for that division only (adding
+# them to VALUE_IN_GRAIN would change the stores' temptation to bandits).
+const COMPACT_PRESETS: Dictionary = {"communal": 1.0, "shared": 0.6, "private": 0.2}
+const COMPACT_RATE_STEP: float = 0.1
+const WORKED_VALUE_IN_GRAIN: Dictionary = {
+	"lime": 6.0,
+	"mortar": 10.0,
+	"masonry": 18.0,
+	"statues": 25.0,
+	"tiles": 7.0,
+	"paving_stones": 4.0,
+}
+# Giving more than the compact asks (monthly): a family whose values and trust lean toward the
+# community gives GIVE_SHARE_PER_POINT of what it holds beyond its own needs per point of lean, at
+# most GIVE_SHARE_MAX. Its needs: GIVE_KEEPS_FOOD_DAYS of food, GIVE_KEEPS_FUEL_DAYS of winter fuel,
+# and whatever its own building projects still wait for. Trust counts TRUST_GIVING_WEIGHT a step.
+const GIVE_SHARE_PER_POINT: float = 0.05
+const GIVE_SHARE_MAX: float = 0.3
+const GIVE_KEEPS_FOOD_DAYS: int = 90
+const GIVE_KEEPS_FUEL_DAYS: int = 90
+const TRUST_GIVING_WEIGHT: float = 0.5
+
+# --- The commons' rules (sprint S8; TownCommons) ---
+# The days of the town's food the common table may keep back from families not in danger, as the
+# player chooses them. Monthly grants pass GRANT_SHARE of the community's food and wood beyond the
+# reserve and GRANT_KEEPS_DAYS of the town's need into families' own goods. A family asked for help
+# on a hungry day gives only from what it holds beyond HELP_KEEPS_FOOD_DAYS of its own eating.
+const COMMONS_RESERVE_STEPS: Array[int] = [0, 30, 60, 90]
+const GRANT_SHARE: float = 0.25
+const GRANT_KEEPS_DAYS: int = 60
+const HELP_KEEPS_FOOD_DAYS: int = 30
+# A family short on this many days in a month is in danger (the reserve feeds it) before the month's
+# hardship falls at HouseholdMigration.HARDSHIP_SHORTAGE_DAYS: survival first. Found by the S8 smoke
+# run: reading danger only from hardship and severe months, families left without ever counting
+# as in danger while the reserve held food.
+const DANGER_SHORT_DAYS: int = 5
+
+# --- The market day (sprint S9; TownMarket) ---
+# Monthly, families barter what they hold beyond their own needs, food the medium. A family keeps
+# MARKET_KEEPS_FOOD_DAYS of its eating, wants food up to MARKET_WANTS_FOOD_DAYS and winter fuel for
+# MARKET_WANTS_FUEL_DAYS, and wants twice a holding's upkeep in tools when it keeps the holding up.
+# A good's price in food is its worth scaled by the town's demand against supply, between
+# MARKET_PRICE_MIN and MARKET_PRICE_MAX. Insular families bring INSULAR_MARKET_SHARE less to market a
+# point of strength (at least MARKET_SHARE_MIN of it); Hagglers take HAGGLE_PER_POINT more of what
+# buyers pay a point. A family is prosperous on wealth PROSPEROUS_WEALTH_SHARE above the town's median.
+const MARKET_KEEPS_FOOD_DAYS: int = 60
+const MARKET_WANTS_FOOD_DAYS: int = 60
+const MARKET_WANTS_FUEL_DAYS: int = 90
+const MARKET_PRICE_MIN: float = 0.5
+const MARKET_PRICE_MAX: float = 2.0
+const INSULAR_MARKET_SHARE: float = 0.25
+const MARKET_SHARE_MIN: float = 0.25
+const HAGGLE_PER_POINT: float = 0.1
+const PROSPEROUS_WEALTH_SHARE: float = 2.0
+
 # --- Defense (docs/FIRST_STAGE_LOOP.md, milestone 5; TownDefense) ---
 # From BANDITS_FROM_DAY, every BANDIT_ROLL_INTERVAL_DAYS outside winter, a band takes to the road
 # toward a town with BANDIT_MONTHLY_CHANCE by how traders reach it, times the town's temptation
@@ -333,9 +448,19 @@ const FENCE_WORK_DAYS_PER_EDGE_TILE: float = 1.0 / 6.0
 # A woodcutter's family fells the woods the player marked for clearing as the place it cuts its
 # wood (its output is unchanged): a wooded tile takes this many full working days.
 const CLEAR_DAYS_PER_TILE: float = 2.0
-# With no woods marked, a woodcutter cuts the trees nearest it, slowly (owner, 2026-10-27): this
-# share of its day goes into felling, so a tile falls every 20 working days, about 16 a year.
-const UNMARKED_FELLING_SHARE: float = 0.1
+# With no woods marked, a woodcutter cuts the trees nearest it, slowly (owner, 2026-10-27: a tile
+# about every 20 working days, some 16 a year). Since sprint S2 that pace follows from its wood: a
+# woodcutter's wood comes out of the trees it fells, and a mature wooded tile holds TIMBER_PER_TILE
+# wood, so a full woodcutter (WOODCUTTER_WOOD_PER_DAY) fells about 16 tiles a year, and with nothing
+# left to fell it brings in nothing. Woods that
+# spread grow in young, with YOUNG_WOODS_TIMBER, and gain TIMBER_GROWTH_PER_YEAR each spring until
+# mature (about ten years). A woodcutter cuts its full rate from trees within
+# WOODCUTTER_FULL_DISTANCE tiles of its middle (the reach it was placed by), and less the farther it
+# must go, down to LAND_YIELD_FLOOR.
+const TIMBER_PER_TILE: int = 135
+const YOUNG_WOODS_TIMBER: int = 15
+const TIMBER_GROWTH_PER_YEAR: int = 12
+const WOODCUTTER_FULL_DISTANCE: float = 6.0
 # Clearing only clears; land marked to till becomes farmland after this many full working days
 # of a field's family (TownFarmland), its harvest unchanged.
 const TILL_DAYS_PER_TILE: float = 3.0
@@ -365,11 +490,67 @@ static func get_fence_cost(size: Vector2i) -> Dictionary:
 static func get_fence_work_days(size: Vector2i) -> float:
 	return float(2 * (size.x + size.y)) * FENCE_WORK_DAYS_PER_EDGE_TILE
 
-static func get_build_cost(building_type: String) -> Dictionary:
-	return (BUILD_COSTS.get(building_type, {}) as Dictionary).duplicate()
+# --- Building materials (sprint S4) ---
+# Homes and proper buildings may be built of timber (the costs above), of rough stone, or of dressed
+# stone (masonry). Stone keeps a third of the wood (for roof and floors) and replaces the rest:
+# STONE_PER_WOOD stone blocks, or MASONRY_PER_WOOD masonry, for each wood. Rough stone is slow to
+# raise (STONE_WORK_FACTOR of the work); dressed stone, cut and mortared beforehand, less so. A
+# stone building lasts longer between repairs (STONE_UPKEEP_FACTOR times the upkeep interval) and a
+# stone home holds its warmth (STONE_HOME_FUEL_FACTOR of a timber home's firewood). Fields, hand work
+# and anything costing under STONE_MIN_WOOD wood are timber or nothing.
+const MATERIAL_TIMBER: String = "timber"
+const MATERIAL_STONE: String = "stone"
+const MATERIAL_DRESSED: String = "dressed_stone"
+# Brick (sprint S5): fired clay, BRICKS_PER_WOOD for each wood replaced, raised at BRICK_WORK_FACTOR
+# of timber's work; it lasts and keeps warm like stone.
+const MATERIAL_BRICK: String = "brick"
+const MATERIALS: Array[String] = [MATERIAL_TIMBER, MATERIAL_STONE, MATERIAL_DRESSED, MATERIAL_BRICK]
+const STONE_PER_WOOD: float = 1.5
+const MASONRY_PER_WOOD: float = 0.5
+const BRICKS_PER_WOOD: float = 1.0
+const BRICK_WORK_FACTOR: float = 1.3
+const STONE_MIN_WOOD: int = 4
+const STONE_WORK_FACTOR: float = 1.6
+const DRESSED_WORK_FACTOR: float = 1.25
+const STONE_UPKEEP_FACTOR: float = 1.5
+const STONE_HOME_FUEL_FACTOR: float = 0.75
 
-static func get_build_work_days(building_type: String) -> float:
-	return float(BUILD_WORK_DAYS.get(building_type, BUILD_WORK_DEFAULT_DAYS))
+static func can_be_stone(building_type: String) -> bool:
+	if building_type == "farm" or BuildingTiers.is_tier0(building_type):
+		return false
+	return int((BUILD_COSTS.get(building_type, {}) as Dictionary).get("wood", 0)) >= STONE_MIN_WOOD
+
+# Built of stone or brick: lasting and warm.
+static func is_stone_material(material: String) -> bool:
+	return material == MATERIAL_STONE or material == MATERIAL_DRESSED or material == MATERIAL_BRICK
+
+static func get_build_cost(building_type: String, material: String = MATERIAL_TIMBER) -> Dictionary:
+	var cost: Dictionary = (BUILD_COSTS.get(building_type, {}) as Dictionary).duplicate()
+	if not is_stone_material(material) or not can_be_stone(building_type):
+		return cost
+	var wood: int = int(cost.get("wood", 0))
+	var kept: int = int(ceil(float(wood) / 3.0))
+	cost["wood"] = kept
+	match material:
+		MATERIAL_STONE:
+			cost["stone_blocks"] = int(ceil(float(wood - kept) * STONE_PER_WOOD))
+		MATERIAL_BRICK:
+			cost["bricks"] = int(ceil(float(wood - kept) * BRICKS_PER_WOOD))
+		_:
+			cost["masonry"] = int(ceil(float(wood - kept) * MASONRY_PER_WOOD))
+	return cost
+
+static func get_build_work_days(building_type: String, material: String = MATERIAL_TIMBER) -> float:
+	var days: float = float(BUILD_WORK_DAYS.get(building_type, BUILD_WORK_DEFAULT_DAYS))
+	if can_be_stone(building_type):
+		match material:
+			MATERIAL_STONE:
+				days *= STONE_WORK_FACTOR
+			MATERIAL_DRESSED:
+				days *= DRESSED_WORK_FACTOR
+			MATERIAL_BRICK:
+				days *= BRICK_WORK_FACTOR
+	return days
 
 static func get_maintenance_interval(building_type: String) -> int:
 	return int(MAINTENANCE_INTERVAL_DAYS.get(building_type, MAINTENANCE_INTERVAL_DEFAULT_DAYS))

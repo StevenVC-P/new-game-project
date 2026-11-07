@@ -114,11 +114,104 @@ static func get_stores(city: City) -> Array:
 	var muted: Array = ["Always kept back from families' projects: " + ", ".join(reserve_parts) + ".", "Times a family's improvement was held back by the stores: %d" % influence.held_back_by_stores]
 	return [
 		{"kind": "heading", "text": "Shared resources"},
+		get_compact_card(city),
+	] + ([get_commons_card(city), get_market_card(city)] if TownCommons.is_on(city) else []) + [
+		get_treasury_card(city),
 		{"kind": "card", "title": "Common stores", "tag": "priorities first" if priorities else "open", "lines": lines, "muted": muted, "columns": 2, "buttons": [
 			{"text": "Open", "toggle": true, "active": not priorities, "action": {"action": "set_store_rule", "rule": TownInfluence.RULE_OPEN}},
 			{"text": "Priorities first", "toggle": true, "active": priorities, "action": {"action": "set_store_rule", "rule": TownInfluence.RULE_PRIORITIES}},
 		]},
 	]
+
+# Whose the goods in the store are (TownLedger), read-only: the community's, families' own, and
+# what building sites still wait for.
+static func get_treasury_card(city: City) -> Dictionary:
+	var community: Array[String] = []
+	var own: Array[String] = []
+	for good: String in TownLedger.SHOWN_GOODS:
+		var held: int = TownLedger.get_community(city, good)
+		if held > 0:
+			community.append("%d %s" % [held, good.replace("_", " ")])
+		var families: int = TownLedger.get_shares_total(city, good)
+		if families > 0:
+			own.append("%d %s" % [families, good.replace("_", " ")])
+	var waiting: Dictionary = {}
+	for project: ConstructionProject in city.construction.projects:
+		var remaining: Dictionary = project.get_remaining_materials()
+		for good: String in remaining.keys():
+			waiting[good] = int(waiting.get(good, 0)) + int(remaining[good])
+	var waiting_parts: Array[String] = []
+	for good: String in waiting.keys():
+		if int(waiting[good]) > 0:
+			waiting_parts.append("%d %s" % [int(waiting[good]), good.replace("_", " ")])
+	var lines: Array = ["The community's: " + (", ".join(community) if not community.is_empty() else "nothing")]
+	var muted: Array = []
+	if not TownCompact.is_set(city):
+		muted.append("Everything families make goes to the common store; no family holds goods of its own.")
+	else:
+		lines.append("Families' own: " + (", ".join(own) if not own.is_empty() else "nothing yet"))
+		var given: int = 0
+		for good: String in city.compact_given.keys():
+			given += int(city.compact_given[good])
+		muted.append("Given by families beyond the compact: %d goods" % given)
+	muted.append("Building sites still wait for: " + (", ".join(waiting_parts) if not waiting_parts.is_empty() else "nothing"))
+	return {"kind": "card", "title": "Treasury", "tag": "pooled" if not TownCompact.is_set(city) else "", "lines": lines, "muted": muted}
+
+# The market day (TownMarket), read-only: what changed hands last month and at what price in food.
+static func get_market_card(city: City) -> Dictionary:
+	var lines: Array = []
+	var goods: Array = city.market_last.keys()
+	goods.sort()
+	for good: String in goods:
+		var deal: Dictionary = city.market_last[good]
+		lines.append("%d %s at %.1f food each" % [int(deal["units"]), good.replace("_", " "), float(deal["price"])])
+	if lines.is_empty():
+		lines.append("Nothing changed hands at the last market day.")
+	var muted: Array = ["Families trade what they hold beyond their own needs, paying in food; prices follow what the town wants and has.", "Sold for food on hungry days: %d goods." % city.market_emergency_sales]
+	return {"kind": "card", "title": "Market day", "lines": lines, "muted": muted}
+
+# The commons' rules (TownCommons): how many days of food the table keeps back for families in
+# danger, and whether the community grants part of its surplus to families each month.
+static func get_commons_card(city: City) -> Dictionary:
+	var lines: Array = [
+		"The table keeps back %d days of food for families in danger." % city.commons_reserve_days if city.commons_reserve_days > 0 else "The table feeds every family from all the community's food.",
+		"Grants: %s." % str(TownCommons.GRANT_NAMES[city.commons_grants]).to_lower(),
+	]
+	var buttons: Array = []
+	for days: int in EconomyBalance.COMMONS_RESERVE_STEPS:
+		buttons.append({"text": "Keep %d days" % days if days > 0 else "No reserve", "toggle": true, "active": city.commons_reserve_days == days, "action": {"action": "set_commons_reserve", "days": days}})
+	for rule: String in TownCommons.GRANT_RULES:
+		buttons.append({"text": TownCommons.GRANT_NAMES[rule], "toggle": true, "active": city.commons_grants == rule, "action": {"action": "set_commons_grants", "rule": rule}})
+	var granted: int = 0
+	for good: String in city.commons_granted.keys():
+		granted += int(city.commons_granted[good])
+	var muted: Array = [
+		"Hungry families ask the families they know; %d times so far, %d food given." % [city.commons_help_asked, roundi(city.commons_help_given)],
+		"Granted to families so far: %d goods. Families judge whether grants are fair." % granted,
+	]
+	var tone: String = ""
+	if TownCommons.get_reserve(city) > 0 and TownLedger.get_community(city, "food") <= TownCommons.get_reserve(city):
+		lines.append("The commons holds no more than the reserve: the table feeds only families in danger, and others go short first.")
+		tone = SP.TONE_CAUTION
+	return {"kind": "card", "title": "The commons", "lines": lines, "muted": muted, "buttons": buttons, "columns": 2, "tone": tone}
+
+# The founding compact (TownCompact): what share of each kind of work families give the community.
+# The player may change it; families keep the rest as their own.
+static func get_compact_card(city: City) -> Dictionary:
+	var lines: Array = []
+	if not TownCompact.is_set(city):
+		lines.append("This town pools everything: all work goes to the common store (a town from before the compact). Setting a rate starts a compact.")
+	for category: String in TownCompact.CATEGORIES:
+		lines.append("%s: %d%% to the community" % [TownCompact.CATEGORY_NAMES[category], roundi(TownCompact.get_category_rate(city, category) * 100.0)])
+	var buttons: Array = []
+	var preset: String = TownCompact.get_preset(city)
+	for preset_name: String in EconomyBalance.COMPACT_PRESETS.keys():
+		buttons.append({"text": "%s %d%%" % [TownCompact.PRESET_NAMES[preset_name], roundi(float(EconomyBalance.COMPACT_PRESETS[preset_name]) * 100.0)], "toggle": true, "active": preset == preset_name, "action": {"action": "set_compact_preset", "preset": preset_name}})
+	for category: String in TownCompact.CATEGORIES:
+		buttons.append({"text": "%s -" % TownCompact.CATEGORY_NAMES[category], "action": {"action": "change_compact_rate", "category": category, "steps": -1}})
+		buttons.append({"text": "%s +" % TownCompact.CATEGORY_NAMES[category], "action": {"action": "change_compact_rate", "category": category, "steps": 1}})
+	var muted: Array = ["An agreement among the families: what they keep is theirs to eat, warm, build and work from, and some give more than it asks."]
+	return {"kind": "card", "title": "The founding compact", "tag": TownCompact.PRESET_NAMES.get(preset, "mixed").to_lower() if TownCompact.is_set(city) else "pooled", "lines": lines, "muted": muted, "buttons": buttons, "columns": 2}
 
 # The town's guiding wisdom (GuidingWisdom): the leader's title and slots, each wisdom held with
 # what families have done about it and the qualities appearing, and the wisdoms that may still be

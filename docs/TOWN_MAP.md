@@ -59,7 +59,7 @@ Shrub and flower visibility is switched in the rendering server, never with `vis
 - **Same information, restyled (owner, 2026-10-26).** Worker dots became badges in the family's color (a red badge when vacant), preference stripes became pennants on houses, walkers became figures, and maintenance bars became slim plates. Plates show only when upkeep is below full or switched off, so "no plate" means fully maintained (a judgment call; easy to reverse in `TownOverlayLayer.draw_workplace_marks`). An idle workplace looks unused (fields lie fallow), and missing upkeep greys roofs.
 - **The layout fills the window (owner, 2026-10-26).** The sidebar runs full height; when a selection fills it, the building key list shrinks to one line.
 - **Decoration never shows what the town map does not hold.** Trees only on tree tiles, boulders only on rock, details never under buildings, tents only for families without a house.
-- **Deposits are drawn, not yet required.** Town maps hold stone and ore since this change, but quarries can still stand anywhere: the access rule (owner decision 2026-10-25) is not built.
+- **A quarry stands on stone (sprint S1b, `TownDeposits`).** It must take in stone-deposit tiles and may stand on them (rough ground nothing else is built on); its cut follows the stone's grade and the tiles underfoot, and each tile holds a finite amount, kept on the tile as `deposit_left`. A tile cut out becomes plain rock (`resource` back to `none`), so decoration follows. Ore is still drawn only.
 - **Small noise offsets in the shader.** Each town shifts its ground texture by under 100 tiles. Larger offsets lost float precision in the finest noise octaves and drew one-pixel lines across the ground.
 
 ## Performance
@@ -79,7 +79,6 @@ Town maps changed, so balance was re-measured (2026-10-26):
 
 ## Remaining Work And Limitations
 
-- **The quarry access rule** (quarries on stone, owner decision 2026-10-25) is not built; the deposits it needs are on the map.
 - **The regional map still draws the player's town by rule.** With the town map at a real scale, its buildings could now be placed on the regional map where they stand in town.
 - **The player's spur road is not on the town map** (it is made after founding); world roads crossing the town's land are.
 - **Seasons do not show** (fields keep one crop color), and walkers still walk in straight lines between home and work, across water too, as before (travel itself is routed: `TownLogistics`; the selected workplace's routes are drawn).

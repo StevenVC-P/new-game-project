@@ -1,6 +1,6 @@
 # Game Vision
 
-Owner-confirmed direction for objectives, pace, and player experience (2026-10-19). This sits above the system models in `docs/`: when a model or sprint conflicts with this document, this document wins unless the owner changes it. It complements `docs/household_simulation_philosophy.md` (how the simulation works) and `docs/PROJECT_OWNER_QUESTIONS.md` (prototype-level answers).
+Owner-confirmed direction for objectives, pace, and player experience (2026-10-19; scale, map and land added 2026-11-07). This sits above the system models in `docs/`: when a model or sprint conflicts with this document, this document wins unless the owner changes it. It complements `docs/household_simulation_philosophy.md` (how the simulation works) and `docs/PROJECT_OWNER_QUESTIONS.md` (prototype-level answers).
 
 ## The Game In One Page
 
@@ -24,7 +24,48 @@ A slow, open-ended civilization sandbox in which culture and economics build on 
 
 ## Families At Scale
 
-Families stay families. Lineages that grow large collapse into **Houses**, which belong to their town and carry the lineage's name, blended values, trades, and wealth. Families outside a large lineage form the commons. Full model: `docs/HOUSES_AND_LINEAGE_MODEL.md`.
+Owner direction, 2026-11-06 and 2026-11-07 (`docs/MASTER_ROADMAP.md`). It supersedes the Houses-first wording that stood here. `docs/HOUSES_AND_LINEAGE_MODEL.md` is revised in roadmap Phase 3.
+
+- **Millions of inhabitants.** The game grows from about 20 people to millions across varied settlements, including cities near or above one million, within a 60–80 hour playthrough. Land, food, infrastructure, economics and culture set the limits. It's achievable because the simulation runs at the family level, not the person level, with demographic aggregation as populations grow.
+- **Households stay the unit.** Demographics exist from founding. Labour is the primary grouping (industry, then occupation). Each household has one primary livelihood, and secondary work still produces.
+- **Aggregation preserves the simulation.** A group keeps its spread of values and circumstances, parts of it still choose differently, and meaningful combinations of values survive. Groups form by replaceability, not size or fame. Founding families, historically important lineages and irreplaceable suppliers may stay individual, which changes how they're represented, never their outcomes.
+- **Culture is inherited, not assigned.** Values pass through inheritance, circumstance, choice, the reproductive success of the families carrying them, and outside influence. There is no flat inheritance share, and changing work doesn't change inherited values.
+- **Prominent families emerge.** They arise from their influence and the people or interests they represent. They get no automatic authority and can return to ordinary representation, while their history stays recorded.
+- **Prosperity is not resilience.** Specialization and trade create prosperity and also dependencies. Losing a critical family, supplier or enterprise must stay possible at any scale, from real dependencies only. No importance flags, no survival bonuses.
+
+### Scale guardrails
+
+From the population-scale design (Scale Brief 1), for every new system:
+- goods go through `TownLedger`;
+- decisions take a profile and a context;
+- statistics keep distributions;
+- land state summarizes cleanly;
+- no new map-size or one-town assumptions;
+- keep the source of supply;
+- never smooth capacity, and keep shocks discrete;
+- skill stays a distribution;
+- ownership outlives family detail;
+- livelihood and values stay independent;
+- rare combinations are never discarded;
+- no rule assumes one record is one family.
+
+## One World, Many Views
+
+Owner decisions, 2026-11-06 and 2026-11-07 (`docs/MAP_SCALE_ARCHITECTURE.md`):
+- One geographic truth: continuous land in sectors, with the town scale provisionally ×4 the regional.
+- Town and regional maps may look different, but they agree on geography, settlement footprints, roads, resource locations and land changes.
+- Settlements expand naturally, with no rectangular bounds.
+- Reach and influence grow from roads, travel and real activity.
+- Seamless scrolling between settlements is not required.
+
+## Land And Founding
+
+Owner decision, 2026-11-07. World generation follows terrain, climate, geography and resource distribution, and it guarantees nothing:
+- Some places are excellent for founding. Others are marginal, extremely hard or unsuitable.
+- Generation never injects resources or fertile land to rescue a site and never equalizes starts. The player may found anywhere and lives with the land chosen.
+- Scouting and land-assessment tools may come later. They reveal conditions and never change them.
+
+Difficulty comes from geography and economics, not from balancing.
 
 ## Experience Pillars
 
@@ -75,7 +116,7 @@ Ambitions are acknowledged through what the player can do on the map, not throug
 
 Influence is both soft and hard:
 
-- **Soft and relational:** trade reach (where your goods and routes go), reputation and culture (prosperity and stability that attract and sway), and kinship and lineage (families from your town who settle or marry elsewhere carry your influence with them; at scale, related Houses in different towns, per `docs/HOUSES_AND_LINEAGE_MODEL.md`).
+- **Soft and relational:** trade reach (where your goods and routes go), reputation and culture (prosperity and stability that attract and sway), and kinship and lineage (families from your town who settle or marry elsewhere carry your influence with them; at scale, related prominent families in different towns; see Families At Scale).
 - **Hard:** military presence (patrols, garrisons, safe roads).
 - **Hard borders exist.** Influence is a gradient that can overlap and be contested, but territory is ultimately claimed with clear borders.
 
@@ -138,8 +179,8 @@ These follow from the vision and should guide upcoming sprints:
 2. **Recoverable failure needs failure states.** Today shortages only block growth. Families leaving, falling into hardship, and settlement decline need to exist.
 3. **Family ambitions are a core system, not polish.** They are a main source of motivation in an open sandbox.
 4. **Neighbors and rivals are in scope.** The inert neutral town should eventually become a living neighbor. Conflict and military are in scope for the long arc; population already counts as military potential.
-5. **A world-scale map is required eventually.** The current regional map reads as one valley (see `docs/map_and_settlement_scale_audit.md`).
-6. **A fixed clock has costs at scale.** At 12 minutes per game year at 1x (since 2026-10-20), centuries of history need higher speed options later, and household-by-household simulation must give way to grouped simulation as the audit describes, or late-game ticks will be too slow.
+5. **A world-scale map is required eventually.** The direction is set in One World, Many Views and `docs/MAP_SCALE_ARCHITECTURE.md`.
+6. **A fixed clock has costs at scale.** At 12 minutes per game year at 1x (since 2026-10-20), centuries of history need higher speed options later. Household-by-household simulation must give way to weighted family records (Families At Scale; roadmap Phase 4), or late-game ticks will be too slow.
 
 7. **Influence is a core system** with two layers: a soft, overlapping influence gradient and hard claimed borders. It gates founding new towns and capturing cities. Founding a second town is currently blocked in code; it should unlock through influence and resources rather than stay blocked.
 8. **Defense matters early.** Bandits and looters can threaten a hamlet, so some defensive response (militia is already a listed household responsibility in `docs/PROJECT_OWNER_QUESTIONS.md`) belongs earlier than full military systems.
