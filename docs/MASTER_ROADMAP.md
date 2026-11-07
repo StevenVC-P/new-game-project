@@ -1,6 +1,6 @@
 # Master Roadmap
 
-*Structure and sequencing approved by the owner on 2026-11-07, as planning only.* This approval authorizes no implementation, merge or push. Each sprint still runs the usual cycle: propose, the owner approves, build on a branch, run matched sims, the owner reviews, and the owner merges. The doc orders three planning threads into six phases, and the owner playtests after each phase before the next is built.
+*Approved by the owner on 2026-11-07.* Work is authorized through the end of Phase 1, including Phase 0's integration. The sprints inside that span go ahead without separate permission, but the Phase 0 checkpoint (owner review and playtest) comes before Phase 1 starts. Nothing merges into `develop` or `main` without the owner's review. Settled design decisions don't change, and no new major system starts, without consulting the owner. Each sprint still builds on a branch, runs matched sims and regression checks, and is reported honestly. The doc orders three planning threads into six phases, and the owner playtests after each phase before the next is built.
 
 Sources (all unmerged):
 - **Economic Foundations:** `docs/ECONOMIC_FOUNDATIONS_ROADMAP.md` and `docs/economic_foundations/` on `feature/ef-s5d-wood-margin` (S1a–S9 built). The reserve experiments are on `experiment/ef-reserve-rules`.
@@ -19,7 +19,11 @@ Don't reopen these without a concrete technical or gameplay contradiction.
    - reach and influence grow from roads, travel and real activity;
    - seamless scrolling between settlements is not required.
 3. **Generation.** World generation follows terrain, climate, geography and resources, and guarantees nothing. Some sites are excellent; others are marginal, very hard or unsuitable. Generation never injects resources or fertile land, never equalizes starts, and never stops a founding in a poor place. Later scouting and assessment tools reveal conditions and never change them. Difficulty comes from geography and economics.
-4. **Callings and food security.** Food security strongly influences specialization. Callings, inherited values and present or expected demand still count. There is no fixed six-month food-security gate. Families can still make culturally motivated choices that harm them economically. S5b's term against wood no one needs stays: wood held beyond the coming winter counts against wood work. Player reserves are respected and never silently overridden to save a town. The S5d and reserve numbers are **not** approved: see Phase 0.
+4. **Callings and food security.** Food security strongly influences specialization. Callings, inherited values and present or expected demand still count. There is no fixed six-month food-security gate. Families can still make culturally motivated choices that harm them economically.
+
+The **no-use fix** from the S4 review stays and is verified (`FamilyInitiative.has_no_use`, `OccupationReview.is_oversupplied`). It counts against stone, brick and similar work when nothing needs the good, no building waits for it, no workshop uses it, and a pile is already in store. A family's own wish to build of that material still gives it a reason to make it. This is separate from S5b's winter-wood term.
+
+Player reserves are respected and never silently overridden to save a town. The Phase 0 values are decided: see below.
 5. **Grouped families.** Weighted households are the basis of scaling.
    - Labour is the primary grouping, subdivided further as needed.
    - Groups keep their cultural combinations and the spread of them.
@@ -29,7 +33,7 @@ Don't reopen these without a concrete technical or gameplay contradiction.
    - Aggregation goes by replaceability, not by size or fame.
    - The aim is to keep the cultural and economic simulation at scale, not to replace it with statistics.
    - Thresholds wait until Phase 4.
-6. **Scale target.** The architecture must support **1–10 million people in the world's demographics**. A lightweight benchmark starts in Phase 1 and repeats every phase. Core or metropolitan million stays undecided, and neither reading may become an architectural dead end.
+6. **Scale target.** The architecture must support **millions of inhabitants** across varied settlement patterns, including cities near or above one million. 1–10 million is a working range, not a world ceiling. This is achievable because the simulation runs at the family level, not the person level, with further demographic aggregation as populations grow. Family identity, cultural inheritance and economic consequences survive without simulating every inhabitant. Benchmarks test both **concentrated** populations (a few very large cities) and **distributed** ones (many towns and satellites). A lightweight benchmark starts in Phase 1 and repeats every phase. Core or metropolitan million stays undecided, and neither reading may become an architectural dead end.
 7. **Deferred until evidence exists:**
    - inheritance and estate-division mechanics;
    - aggregation budgets and rare-combination thresholds;
@@ -63,7 +67,7 @@ Don't reopen these without a concrete technical or gameplay contradiction.
 
 ### Phase 0: Consolidate and decide
 
-Open decisions, with evidence and recommendations: see "Phase 0 decisions" below.
+Decisions: see "Phase 0 decisions" below (decided 2026-11-07).
 
 Phase 0 is complete only when all five of these are done:
 1. The S5d and reserve decisions are resolved, and any adopted reserve rule is carried from the experiment branch onto the chain.
@@ -75,10 +79,12 @@ Phase 0 is complete only when all five of these are done:
 Approving the roadmap does not authorize the merge. Only the owner merges.
 
 Also in this phase:
-- Scale Stage A: vision text and guardrails. Retire `SIMULATION_SCALE_MODEL.md`, `HOUSES_AND_LINEAGE_MODEL.md`, `map_and_settlement_scale_audit.md`, and "one player settlement" in `HANDOFF.md`.
-- Write decisions 2 and 3 above into `GAME_VISION.md`.
+- **Scale Stage A:** vision text and guardrails in `GAME_VISION.md`, including decisions 2, 3 and 6.
+  - Mark where `SIMULATION_SCALE_MODEL.md` and `HOUSES_AND_LINEAGE_MODEL.md` are superseded. Their rewrites belong to the phases that decide them (Houses in Phase 3; districts and player tools in Phases 5–6).
+  - Archive `map_and_settlement_scale_audit.md`, which `MAP_SCALE_ARCHITECTURE.md` replaces.
+  - Remove "one player settlement" from `HANDOFF.md`.
 
-**Checkpoint 0:** play the merged village. Do the compacts feel different, and are cold sites dangerous but fair?
+**Checkpoint 0:** play the merged village. Do the compacts feel different, and are cold sites dangerous but fair? Town maps still have their guaranteed floors at this checkpoint. How viable natural land is can only be judged after Phase 1 removes them.
 
 ### Phase 1: Truthful world and instruments (about 4–6 sprints)
 - **Map stage 0:** position-pure land, including `add_clay_and_limestone`. Add the per-tile land-use record, and have regional chunks read it so felled woods show.
@@ -86,7 +92,7 @@ Also in this phase:
 - **Stage C foundations:** a demographic record with a labour table, a culture observer, lookups, a stored town heart and stable settlement IDs. Gate: logs identical.
 - **E13 V0**, observe only, for the owner to play.
 - **S19 scale check**, replacing the stale `HOUSEHOLD_SIM_BENCHMARK.md`.
-- **Scale benchmark (first run).** Synthetic populations of 1 and 10 million as weighted records, with plausible labour and value spreads. Measure:
+- **Scale benchmark (first run).** Synthetic family records (households, not people), with plausible labour and value spreads, at 1 and 10 million inhabitants. Each size runs in two patterns: **concentrated** (one or a few cities near or above a million) and **distributed** (many towns and satellites). Measure:
   - memory per record and in total;
   - a monthly update over all records;
   - save size;
@@ -140,17 +146,17 @@ Also in this phase:
 - Budget sweep. The benchmark at 1–10 million now runs with the full systems.
 - **Checkpoint 6:** a long playthrough. Is pacing on track for 60–80 hours, are the limits natural, and does the world hold millions?
 
-## Phase 0 decisions
+## Phase 0 decisions (owner, 2026-11-07)
 
-Evidence: `S5d_wood_margin.md` and `S9c_reserve_rules.md`. Runs cover 40 towns (5 lands × 8 starts), ordinary difficulty, no player, year 6. Differences of 1–4 towns ok are within noise, so hunger and cold deaths are the steadier signals.
+Evidence: `S5d_wood_margin.md` and `S9c_reserve_rules.md`, from 40 towns (5 lands × 8 starts), ordinary difficulty, no player, year 6.
 
-| # | Decision | Options | Evidence | Recommendation |
-|---|---|---|---|---|
-| 1 | S5d wood need and margin | (a) Keep: need runs to the end of the next winter, margin of half the need again with at least 100, urgent review at plenty 0.5. (b) Revert to S5c. (c) Other margin values, untested | Against S5c, towns ok rise in all six arrangements (shared 22 → 24, private 9 → 12). Stored wood stays 14–43% below pre-S5b. Private stays below pre-S5b (12 vs 15). Pooled cold deaths return to 60, mostly from one town that outgrew its wood | (a), keeping the values chosen before any results |
-| 2 | Reserve order | Reserve last, after the larder, neighbours and the market; or keep the current order (reserve first) | Hunger deaths: shared 67 → 23 (fewer in 16 towns, more in 3), private 31 → 28 | Adopt reserve-last. The current order spends the player's reserve before a family's own means |
-| 3 | Limit on emergency draws | None; 0.5 of need; another share, untested | 0.5 raises hunger deaths to 107 (shared) and 81 (private), more in most towns | No limit now. If the owner wants limited help, test 0.75 with one trace before deciding |
-| 4 | 30-day danger window | Adopt or leave | Little effect: shared hunger 67 → 48, private level | Optional. Adopting it is fair at month ends and low-risk |
-| 5 | Phase 0 pass criteria | Set before the run | — | Suite, validation, saves and determinism pass. The consolidated chain reproduces the recorded S5d tables with the chosen rules off. With them on, results are reported in full, with no target to hit |
+| # | Decision | Evidence | Decided |
+|---|---|---|---|
+| 1 | S5d wood need and margin | Against S5c, towns ok rise in all six arrangements. Stored wood stays 14–43% below pre-S5b | **Keep S5d:** need to the end of the next winter, a margin of half the need again (at least 100), urgent review at plenty 0.5 |
+| 2 | Reserve order | Hunger deaths: shared 67 → 23, private 31 → 28 | **Reserve last.** A family in danger exhausts its larder, its neighbours' help and the market first. In ordinary times the player's reserve stays protected |
+| 3 | Limit on emergency draws | A limit at 0.5 of need raised hunger deaths to 107 and 81 | **No limit.** What the reserve actually holds is the only constraint |
+| 4 | 30-day danger window | Little effect | **Deferred.** Its impact doesn't justify another rule yet |
+| 5 | Pass criteria | — | **Approved:** regression, save compatibility and determinism pass, and results are reported in full with no survival target |
 
 Known limits that don't block Phase 0:
 - A town with no one toolmaking or cutting wood can stay that way. This probably still loses marginal 0, and it is to be traced in Phase 2 with V2.
@@ -160,7 +166,7 @@ Known limits that don't block Phase 0:
 
 | Before | Decisions |
 |---|---|
-| Phase 0 | The table above |
+| Phase 0 | Decided (table above) |
 | Phase 1 | Authorize E13 V0; pass criteria for X1, X4 and the scale benchmark; weighted households as E14's core (direction approved; confirm as the build basis) |
 | Phase 2 | V1/V2 timing after playing V0; `LAND_YIELD_FLOOR` in S13 |
 | Phase 3 | How intact value combinations stay (after X4); inheritance and estate division; lifetime value change; length of the climb |
