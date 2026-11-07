@@ -1,0 +1,32 @@
+﻿| Run | Environment | Cond. | Player | Towns | ok | People | Hunger days | Cold days | Deaths (h/c) | Outside food | Stone made | Bricks made | Stone/brick homes | Tick ms |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| S5d-pooled | balanced | ordinary | none | 8 | 6 | 32 | 140 | 2 | 13/19 | 0.30 | 20 | 0 | 0.1 | 5.7 |
+| S5d-pooled | fertile_valley | ordinary | none | 8 | 4 | 39 | 226 | 61 | 18/3 | 0.22 | 30 | 32 | 0.3 | 7.3 |
+| S5d-pooled | forested | ordinary | none | 8 | 4 | 22 | 308 | 54 | 18/6 | 0.29 | 41 | 0 | 0.0 | 5.4 |
+| S5d-pooled | marginal | ordinary | none | 8 | 4 | 22 | 141 | 122 | 9/32 | 0.25 | 0 | 0 | 0.0 | 6.5 |
+| S5d-pooled | rocky_highland | ordinary | none | 8 | 2 | 0 | 247 | 62 | 17/0 | 0.00 | 379 | 0 | 0.5 | 3.4 |
+| S5d-communal | balanced | ordinary | none | 8 | 6 | 32 | 140 | 2 | 13/1 | 0.29 | 20 | 0 | 0.1 | 6.2 |
+| S5d-communal | fertile_valley | ordinary | none | 8 | 4 | 39 | 223 | 68 | 14/4 | 0.30 | 30 | 32 | 0.3 | 6.9 |
+| S5d-communal | forested | ordinary | none | 8 | 4 | 18 | 308 | 47 | 18/4 | 0.33 | 41 | 0 | 0.0 | 5.4 |
+| S5d-communal | marginal | ordinary | none | 8 | 3 | 22 | 141 | 122 | 9/32 | 0.25 | 0 | 0 | 0.0 | 6.7 |
+| S5d-communal | rocky_highland | ordinary | none | 8 | 2 | 0 | 255 | 73 | 16/0 | 0.00 | 379 | 0 | 0.5 | 3.2 |
+| S5d-shared | balanced | ordinary | none | 8 | 6 | 33 | 141 | 24 | 15/1 | 0.23 | 114 | 0 | 0.0 | 5.7 |
+| S5d-shared | fertile_valley | ordinary | none | 8 | 7 | 28 | 161 | 90 | 11/2 | 0.42 | 21 | 27 | 0.0 | 6.1 |
+| S5d-shared | forested | ordinary | none | 8 | 6 | 45 | 112 | 84 | 3/2 | 0.40 | 1171 | 0 | 1.8 | 8.7 |
+| S5d-shared | marginal | ordinary | none | 8 | 4 | 29 | 170 | 202 | 11/16 | 0.36 | 0 | 0 | 0.0 | 5.8 |
+| S5d-shared | rocky_highland | ordinary | none | 8 | 1 | 0 | 438 | 104 | 20/0 | 0.00 | 94 | 0 | 0.0 | 3.6 |
+| S5d-private | balanced | ordinary | none | 8 | 5 | 24 | 629 | 8 | 9/1 | 0.17 | 117 | 0 | 0.0 | 5.4 |
+| S5d-private | fertile_valley | ordinary | none | 8 | 4 | 30 | 638 | 112 | 7/4 | 0.33 | 147 | 13 | 1.1 | 6.4 |
+| S5d-private | forested | ordinary | none | 8 | 3 | 24 | 508 | 108 | 6/2 | 0.27 | 668 | 0 | 0.8 | 5.6 |
+| S5d-private | marginal | ordinary | none | 8 | 0 | 8 | 624 | 162 | 8/14 | 0.00 | 0 | 0 | 0.0 | 4.0 |
+| S5d-private | rocky_highland | ordinary | none | 8 | 0 | 4 | 622 | 307 | 12/5 | 0.00 | 108 | 0 | 0.0 | 4.1 |
+| S5d-shared-commons | balanced | ordinary | none | 8 | 5 | 27 | 218 | 27 | 15/5 | 0.26 | 175 | 0 | 0.1 | 5.5 |
+| S5d-shared-commons | fertile_valley | ordinary | none | 8 | 5 | 24 | 461 | 108 | 16/5 | 0.20 | 410 | 28 | 0.6 | 6.9 |
+| S5d-shared-commons | forested | ordinary | none | 8 | 4 | 32 | 344 | 116 | 9/5 | 0.33 | 679 | 0 | 1.3 | 6.5 |
+| S5d-shared-commons | marginal | ordinary | none | 8 | 3 | 22 | 209 | 239 | 4/20 | 0.25 | 0 | 0 | 0.0 | 5.4 |
+| S5d-shared-commons | rocky_highland | ordinary | none | 8 | 1 | 0 | 330 | 89 | 23/0 | 0.00 | 78 | 0 | 0.0 | 3.2 |
+| S5d-private-commons | balanced | ordinary | none | 8 | 0 | 24 | 743 | 124 | 7/2 | 0.33 | 334 | 0 | 0.5 | 6.7 |
+| S5d-private-commons | fertile_valley | ordinary | none | 8 | 3 | 28 | 1008 | 51 | 2/3 | 0.30 | 421 | 5 | 0.3 | 9.1 |
+| S5d-private-commons | forested | ordinary | none | 8 | 1 | 18 | 892 | 202 | 8/1 | 0.20 | 328 | 0 | 0.0 | 7.1 |
+| S5d-private-commons | marginal | ordinary | none | 8 | 0 | 13 | 1081 | 239 | 1/19 | 0.25 | 0 | 0 | 0.0 | 5.2 |
+| S5d-private-commons | rocky_highland | ordinary | none | 8 | 0 | 0 | 592 | 264 | 13/8 | 0.00 | 83 | 0 | 0.3 | 4.3 |
