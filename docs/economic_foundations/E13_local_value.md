@@ -146,3 +146,15 @@ Families are simulated individually at first, but settlements will eventually re
 - **Aggregation must preserve distributions** of wealth, resource ownership, economic circumstances and inherited cultural values. A simple average would hide widespread hunger in a settlement where a few wealthy families control most of the food.
 - **Family lineages and their inherited values stay meaningful** as the simulation scales.
 
+## V0 sprint card (plan)
+
+- **Objective:** find out whether the formula is useful, without changing play.
+- **Base:** the build the owner accepts after S5c, S5d and the reserve review, so values are observed on the wood reading and reserve rules that stay.
+- **Scope:** a harness observer in `tests/sim/`, on a switch. Each month it logs raw inputs by good and household: holdings, commons entitlement, keep-back, offers, wants, prices and claims by type (continuous, periodic, committed, latent). Formula variants then run over saved logs, so settings and the keep-back reading can be tested without repeating the sims.
+- **Latent demand:** estimated from `MaterialChoice` with supply ignored, plus use over the past year.
+- **Out of scope:** any read of a value by play; market, wealth or work changes; demographic aggregation; new goods.
+- **Acceptance:** gameplay logs byte-identical with the observer on and off; physical and accessible coverage identical in pooled towns; a report answering the eight questions in section 4, with sensitivity to the general settings.
+- **Runs:** six arrangements, five lands, eight starts, ordinary, as the S9 comparison. About 4 hours unattended.
+- **Risks:** forecasting from "current work continues" may be poor early in a town; the observer's own cost could slow the batches; V0 can't show feedback, so V2 keeps its own stability gate.
+- **Scaling:** log holdings per household, not town totals, so the distributions aggregation must preserve can be studied.
+
