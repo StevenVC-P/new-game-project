@@ -306,7 +306,7 @@ func rebuild_land_use() -> bool:
 		for city: City in cities:
 			if city.local_map.is_empty():
 				continue
-			var site: Vector2i = local_tile_to_global(Vector2i(city.tile))
+			var site: Vector2i = city.global_site if city.global_site.x >= 0 else local_tile_to_global(Vector2i(city.tile))
 			if not land_base_cache.has(site):
 				var size: Vector2i = Vector2i((city.local_map[0] as Array).size(), city.local_map.size())
 				land_base_cache[site] = LocalCityMapGenerator.new(size.x, size.y).generate_base_from_terrain(terrain, site, terrain.climate_at(site))

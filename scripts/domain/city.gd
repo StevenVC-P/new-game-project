@@ -59,6 +59,10 @@ const ENABLE_HOUSEHOLD_LIFECYCLE_LOGS: bool = true
 var name: String = "City"
 var role: String = ROLE_PLAYER
 var tile: Vector2 = Vector2.ZERO
+# The town's heart on the planet: its global regional tile (master roadmap Phase 1, Stage C), set
+# where the town is placed and, for an older save, on load. tile is in the neighbourhood's
+# coordinates, which move; this does not. (-1, -1) where no planet is known (bounded maps).
+var global_site: Vector2i = Vector2i(-1, -1)
 var local_map: Array = []
 var buildings: Array[Building] = []
 var households: Array[Household] = []
@@ -1592,6 +1596,17 @@ func count_housing_capacity() -> int:
 			capacity += HOUSE_CAPACITY
 
 	return capacity
+
+# A settlement's stable identity: the key of its heart's regional tile on the planet. Two
+# settlements never share a tile, and the key survives saves and neighbourhood moves. -1 without a
+# known site.
+static func settlement_id_for(site: Vector2i, planet_width: int) -> int:
+	if site.x < 0 or planet_width <= 0:
+		return -1
+	return site.y * planet_width + posmod(site.x, planet_width)
+
+func get_settlement_id(planet_width: int) -> int:
+	return settlement_id_for(global_site, planet_width)
 
 func get_total_population() -> int:
 	var total_population: int = 0
