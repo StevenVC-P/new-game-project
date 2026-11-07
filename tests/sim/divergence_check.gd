@@ -30,6 +30,7 @@ extends SceneTree
 #                            then nearest the town centre; a family is found to work it as in play
 #   --repeat                 play each town twice and compare its monthly fingerprints (determinism)
 #   --seed=N                 only the town on the site with this seed
+#   --value-log=DIR          E13 V0: each town's monthly value inputs to DIR (tests/sim/value_observer.gd)
 # Lines: "[DIV] TOWN ..." one per town and snapshot (JSON), "[DIV] SUM ..." per group, "[DIV] INV ..."
 # for invariant violations, "[DIV] REPEAT ..." for determinism.
 
@@ -37,6 +38,7 @@ const TownBuildingCheck = preload("res://tests/sim/town_building_check.gd")
 const StandInPlayerScript = preload("res://tests/sim/stand_in_player.gd")
 const Layouts = preload("res://tests/sim/residential_layouts.gd")
 const Invariants = preload("res://tests/sim/economy_invariants.gd")
+const ValueObserver = preload("res://tests/sim/value_observer.gd")
 
 const ENVIRONMENTS: Array[String] = ["rocky_highland", "fertile_valley", "forested", "marginal", "balanced"]
 # Regions and sites per region in the pool, from the authored test world (as the other checks use).
@@ -60,6 +62,9 @@ var left_out: Array = []
 var compact: String = ""
 # The commons' rules under it (TownCommons): reserve days and grant rule, "30:in_need".
 var commons: String = ""
+# E13 V0: where each town's monthly value inputs go ("" off), and the town being played's label.
+var value_log: String = ""
+var playing_label: String = ""
 # The deposit a workplace is best placed on, for choosing a commissioned site.
 const DEPOSIT_OF: Dictionary = {"quarry": "stone", "brickworks": "clay"}
 
@@ -101,6 +106,9 @@ func run() -> void:
 			repeat = true
 		elif argument.begins_with("--seed="):
 			only_seed = int(argument.trim_prefix("--seed="))
+		elif argument.begins_with("--value-log="):
+			value_log = argument.trim_prefix("--value-log=")
+			DirAccess.make_dir_recursive_absolute(value_log)
 	var groups: Dictionary = classify(collect_pool())
 	for environment: String in ENVIRONMENTS:
 		var seeds: Array = (groups[environment] as Array).map(func(s: Dictionary) -> int: return int(s["seed"]))
@@ -123,6 +131,7 @@ func run() -> void:
 					if only_seed >= 0 and int(site["seed"]) != only_seed:
 						continue
 					var start: int = from + index
+					playing_label = "%s_%s_%s_%d" % [environment, condition, policy, start]
 					var result: Dictionary = play(site, start, condition, policy)
 					if repeat:
 						var again: Dictionary = play(site, start, condition, policy)
@@ -283,6 +292,8 @@ func play(site: Dictionary, start: int, condition: String, policy: String) -> Di
 		if day % Calendar.DAYS_PER_MONTH == Calendar.DAYS_PER_MONTH - 1:
 			checker.check_month(town, day)
 			(state["fingerprints"] as Array).append(fingerprint(town))
+			if value_log != "":
+				ValueObserver.append(value_log.path_join(playing_label + ".jsonl"), ValueObserver.record(town, day, playing_label))
 		if day % Calendar.DAYS_PER_MONTH == 0:
 			state["short_days_last_month"] = int(state.get("short_days_this_month", 0))
 			state["short_days_this_month"] = 0
