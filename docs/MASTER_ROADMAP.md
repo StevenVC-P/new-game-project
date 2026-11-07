@@ -23,7 +23,7 @@ Don't reopen these without a concrete technical or gameplay contradiction.
 
 The **no-use fix** from the S4 review stays and is verified (`FamilyInitiative.has_no_use`, `OccupationReview.is_oversupplied`). It counts against stone, brick and similar work when nothing needs the good, no building waits for it, no workshop uses it, and a pile is already in store. A family's own wish to build of that material still gives it a reason to make it. This is separate from S5b's winter-wood term.
 
-Player reserves are respected and never silently overridden to save a town. The Phase 0 values are decided: see below.
+Player reserves are respected and never silently overridden to save a town. The Phase 0 values are final: see below.
 5. **Grouped families.** Weighted households are the basis of scaling.
    - Labour is the primary grouping, subdivided further as needed.
    - Groups keep their cultural combinations and the spread of them.
@@ -67,10 +67,10 @@ Player reserves are respected and never silently overridden to save a town. The 
 
 ### Phase 0: Consolidate and decide
 
-Decisions: see "Phase 0 decisions" below (decided 2026-11-07).
+Decisions: see "Phase 0 decisions" below. They are final and locked.
 
 Phase 0 is complete only when all five of these are done:
-1. The S5d and reserve decisions are resolved, and any adopted reserve rule is carried from the experiment branch onto the chain.
+1. **Done.** The owner made the S5d and reserve decisions final on 2026-11-07. Carrying the reserve-last rule from the experiment branch onto the chain is integration work, and items 2–4 check it.
 2. Full regression: the whole test suite, `validate_project.ps1`, save loading and determinism.
 3. Matched sims on the consolidated chain against the `develop` baseline B0 and the recorded S5d tables, with criteria fixed before the run.
 4. A consolidated integration review: one report across S1a–S9 that covers interactions, tick cost, the docs to update, and known limits.
@@ -148,6 +148,8 @@ Also in this phase:
 
 ## Phase 0 decisions (owner, 2026-11-07)
 
+**Final and locked.** Treat these like the settled decisions: don't reopen them without a concrete contradiction, and don't hold any work for them.
+
 Evidence: `S5d_wood_margin.md` and `S9c_reserve_rules.md`, from 40 towns (5 lands × 8 starts), ordinary difficulty, no player, year 6.
 
 | # | Decision | Evidence | Decided |
@@ -166,7 +168,7 @@ Known limits that don't block Phase 0:
 
 | Before | Decisions |
 |---|---|
-| Phase 0 | Decided (table above) |
+| Phase 0 | Final and locked (table above) |
 | Phase 1 | Authorize E13 V0; pass criteria for X1, X4 and the scale benchmark; weighted households as E14's core (direction approved; confirm as the build basis) |
 | Phase 2 | V1/V2 timing after playing V0; `LAND_YIELD_FLOOR` in S13 |
 | Phase 3 | How intact value combinations stay (after X4); inheritance and estate division; lifetime value change; length of the climb |
