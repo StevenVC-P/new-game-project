@@ -16,6 +16,7 @@ func run_all() -> void:
 	test_pooled_is_untouched()
 	test_without_a_reserve_everyone_eats_alike()
 	test_the_reserve_is_for_families_in_danger()
+	test_own_means_before_the_reserve()
 	test_neighbours_answer_a_hungry_family()
 	test_values_decide_who_gives()
 	test_grants_follow_the_rule()
@@ -69,6 +70,22 @@ func test_the_reserve_is_for_families_in_danger() -> void:
 	_check(not danger.short_today, "a family in danger eats from the reserve")
 	_check(city.households.slice(1).all(func(h: Household) -> bool: return h.short_today), "the others don't")
 	_check(int(city.resources["food"]) < reserve and int(city.resources["food"]) >= reserve - int(ceil(HouseholdEconomy.get_daily_need(danger))), "only the family in danger's day came out of it")
+
+# Own means first, the player's reserve last (owner, 2026-11-07).
+func test_own_means_before_the_reserve() -> void:
+	var city: City = town()
+	TownCommons.set_reserve_days(city, 30)
+	var reserve: int = TownCommons.get_reserve(city)
+	city.resources["food"] = reserve
+	var danger: Household = city.households[0]
+	danger.severe_hunger_months = 1
+	danger.larder = HouseholdEconomy.get_daily_need(danger) * 2.0
+	var larder: float = danger.larder
+	city.consume_food()
+	_check(danger.larder < larder and int(city.resources["food"]) == reserve and not danger.short_today, "a family in danger eats its own larder and the reserve stays whole")
+	danger.larder = 0.0
+	city.consume_food()
+	_check(int(city.resources["food"]) < reserve and not danger.short_today, "the reserve answers once its own food is gone")
 
 func test_neighbours_answer_a_hungry_family() -> void:
 	var city: City = town()

@@ -29,6 +29,7 @@ func run_all() -> void:
 	test_no_map_works_as_before()
 	test_families_take_up_stone_work()
 	test_food_security_and_own_demand_weigh_in()
+	test_stone_no_one_uses()
 	if failure_count > 0:
 		push_error("Quarry deposit validation failed: " + str(failure_count) + " failure(s)")
 		quit(1)
@@ -221,6 +222,32 @@ func test_food_security_and_own_demand_weigh_in() -> void:
 		builder.housing_status = Household.RESIDENCE_TEMPORARY
 		var wants: Dictionary = FamilyInitiative.get_work_desire(city, builder, "quarry")
 		_check(str(FamilyInitiative.get_reasons(wants["terms"], true, 6)).contains("its own home of"), "a family meaning to build its own stone home has its own reason to quarry: %s" % str(FamilyInitiative.get_reasons(wants["terms"], true, 6)))
+
+# Sprint S4 review (owner 2026-11-03, kept 2026-11-07): stone no need, building or workshop uses,
+# with a pile already in store, counts against more stone work and tells a quarrying family it may
+# reconsider; once building waits for stone, it counts for the work again.
+func test_stone_no_one_uses() -> void:
+	var city: City = town()
+	city.influence.enabled = true
+	var stone: String = FamilyInitiative.get_activity("quarry")
+	city.resources[stone] = FamilyInitiative.NO_USE_STOCK - 1
+	_check(not FamilyInitiative.has_no_use(city, stone), "a little stone in store isn't yet a pile no one uses")
+	city.resources[stone] = FamilyInitiative.NO_USE_STOCK * 3
+	_check(FamilyInitiative.has_no_use(city, stone), "a pile of stone with no use is one")
+	var household: Household = city.households[0]
+	if not FamilyInitiative.means_to_build_with(city, household, stone):
+		var desire: Dictionary = FamilyInitiative.get_work_desire(city, household, "quarry")
+		_check(str(FamilyInitiative.get_reasons(desire["terms"], false, 6)).contains("than it uses"), "and it counts against stone work: %s" % str(FamilyInitiative.get_reasons(desire["terms"], false, 6)))
+	var pit: Building = quarry(city, Vector2i(31, 10), household)
+	_check(OccupationReview.is_oversupplied(city, pit), "a quarrying family sees its work oversupplied")
+	_check(not FamilyInitiative.has_no_use(city, "food") and not FamilyInitiative.has_no_use(city, "wood"), "food and wood are never piles no one uses")
+	city.influence.build_material = EconomyBalance.MATERIAL_STONE
+	for i in range(6):
+		if int(city.construction.get_committed_materials().get(stone, 0)) <= FamilyInitiative.NO_USE_STOCK:
+			city.construction.request_building("toolmaker", Vector2i(4 + 6 * i, 30))
+	city.resources[stone] = FamilyInitiative.NO_USE_STOCK
+	var committed: int = int(city.construction.get_committed_materials().get(stone, 0))
+	_check(committed > FamilyInitiative.NO_USE_STOCK and not FamilyInitiative.has_no_use(city, stone), "building that waits for more stone than the store holds gives it a use again (%d waiting)" % committed)
 
 func _check(condition: bool, message: String) -> void:
 	if condition:
