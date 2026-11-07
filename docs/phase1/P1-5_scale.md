@@ -49,4 +49,18 @@ Branch `feature/p1-scale`. This replaces `docs/HOUSEHOLD_SIM_BENCHMARK.md`, whic
 
 ## Rendering at a million
 
-RENDER_RESULTS
+This uses the map proving test's renderer (`tests/spike/shared_state_render.gd` on `experiment/map-scale-proving-tests`), with 1,000,000 people on 3072×3072 town tiles: 262,211 buildings (240,000 homes, 12,211 farms), 693,976 instances. It ran on an RTX 3070 Ti, off screen. The layout is placeholder load, not a growth design.
+
+| Measure | 1080p | 4K |
+|---|---|---|
+| Frame, whole city | 1.41 ms | 4.38 ms |
+| Frame, districts / street (with 50,000 walkers) | 1.40 / 1.40 ms | — |
+| Opening the city | 33.6 s (ground textures 30.3 s, instances 3.2 s) | 33.6 s |
+| Video memory | 754 MB | 840 MB |
+| Save beyond the seed | 4.9 MB (against 1,980 MB for the land at today's 220 bytes a tile) | |
+| Drawing the record on the regional map | 0.54 s | |
+
+- **Frame time doesn't limit a million on this GPU.** It is flat from the whole city to the street, and 50,000 walkers cost nothing measurable.
+- **Opening time is the dead end to fix:** 33.6 s, against 15 s at 500k, so it grows linearly with land area. It is per-tile script work on ground textures, so it needs to be saved, threaded or built by sector (roadmap Phase 6, and the map report's first risk). At 10M concentrated in a few cities it would reach minutes.
+- **Video memory at about 0.8 GB** for one million-person city fits mid-range hardware, but not integrated GPUs (minimum hardware is deferred to Phase 6).
+- Real growth, simulation cost at this size and weak hardware were not tested here.
