@@ -16,6 +16,7 @@ func run_all() -> void:
 	test_pooled_is_untouched()
 	test_without_a_reserve_everyone_eats_alike()
 	test_the_reserve_is_for_families_in_danger()
+	test_reserve_experiments()
 	test_neighbours_answer_a_hungry_family()
 	test_values_decide_who_gives()
 	test_grants_follow_the_rule()
@@ -70,6 +71,40 @@ func test_the_reserve_is_for_families_in_danger() -> void:
 	_check(city.households.slice(1).all(func(h: Household) -> bool: return h.short_today), "the others don't")
 	_check(int(city.resources["food"]) < reserve and int(city.resources["food"]) >= reserve - int(ceil(HouseholdEconomy.get_daily_need(danger))), "only the family in danger's day came out of it")
 
+# The owner's three proposed reserve changes, each on its own switch (experiments, not adopted).
+func test_reserve_experiments() -> void:
+	var city: City = town()
+	TownCommons.set_reserve_days(city, 30)
+	var reserve: int = TownCommons.get_reserve(city)
+	city.resources["food"] = reserve
+	var danger: Household = city.households[0]
+	danger.severe_hunger_months = 1
+	danger.larder = HouseholdEconomy.get_daily_need(danger) * 2.0
+	var larder: float = danger.larder
+	city.set_meta("reserve_last", true)
+	city.consume_food()
+	_check(danger.larder < larder and int(city.resources["food"]) == reserve and not danger.short_today, "reserve last: the larder feeds it first and the reserve stays whole")
+	danger.larder = 0.0
+	city.consume_food()
+	_check(int(city.resources["food"]) < reserve and not danger.short_today, "and the reserve answers once the larder is gone")
+	city = town()
+	TownCommons.set_reserve_days(city, 30)
+	reserve = TownCommons.get_reserve(city)
+	city.resources["food"] = reserve
+	danger = city.households[0]
+	danger.severe_hunger_months = 1
+	city.set_meta("reserve_limit", true)
+	city.consume_food()
+	_check(danger.short_today and int(city.resources["food"]) < reserve and int(city.resources["food"]) >= reserve - int(ceil(HouseholdEconomy.get_daily_need(danger) * EconomyBalance.RESERVE_DRAW_SHARE)), "reserve limit: it draws a survival share and still goes short")
+	city = town()
+	danger = city.households[0]
+	var today: int = city.construction.day
+	city.set_meta("reserve_30_days", true)
+	danger.recent_short_days.assign([today, today - 1, today - 2, today - 3, today - 4])
+	_check(TownCommons.is_in_danger(city, danger) and danger.short_days_this_month == 0, "30-day danger: days short last month still count")
+	danger.recent_short_days.assign([today - 60, today - 61, today - 62, today - 63, today - 64])
+	_check(not TownCommons.is_in_danger(city, danger), "and older ones don't")
+
 func test_neighbours_answer_a_hungry_family() -> void:
 	var city: City = town()
 	var hungry: Household = city.households[0]
@@ -122,7 +157,7 @@ func test_grants_follow_the_rule() -> void:
 	TownCommons.set_grants(city, TownCommons.GRANTS_IN_NEED)
 	TownCommons.advance_month(city)
 	_check(TownLedger.get_share(short_one, "food") > 0, "a family in need gets a grant")
-	_check(city.households.slice(1).all(func(h: Household) -> bool: return TownLedger.get_share(h, "food") == 0 or TownCommons.is_in_danger(h) or h.short_days_this_month > 0 or TownSocial.is_in_need(city, h)), "families not in need get none")
+	_check(city.households.slice(1).all(func(h: Household) -> bool: return TownLedger.get_share(h, "food") == 0 or TownCommons.is_in_danger(city, h) or h.short_days_this_month > 0 or TownSocial.is_in_need(city, h)), "families not in need get none")
 	var keeps: int = TownCommons.get_reserve(city) + EconomyBalance.GRANT_KEEPS_DAYS * city.get_food_consumption_for_population(city.get_total_population())
 	_check(TownLedger.get_community(city, "food") >= keeps, "the community keeps two months and its reserve")
 	TownCommons.set_grants(city, TownCommons.GRANTS_EQUAL)

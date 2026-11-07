@@ -377,6 +377,9 @@ const HELP_KEEPS_FOOD_DAYS: int = 30
 # run: reading danger only from hardship and severe months, families left without ever counting
 # as in danger while the reserve held food.
 const DANGER_SHORT_DAYS: int = 5
+# Experiment (meta "reserve_limit", not adopted): the share of a family's daily need it may draw from
+# the reserve.
+const RESERVE_DRAW_SHARE: float = 0.5
 
 # --- The market day (sprint S9; TownMarket) ---
 # Monthly, families barter what they hold beyond their own needs, food the medium. A family keeps

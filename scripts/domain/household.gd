@@ -124,6 +124,8 @@ var larder: float = 0.0
 var larder_target_days: int = 0
 var short_today: bool = false
 var short_days_this_month: int = 0
+# The days it went short lately (experiment, meta "reserve_30_days"; TownCommons).
+var recent_short_days: Array[int] = []
 # Winter fuel (TownFuel, sprint S3): whether the family's hearth went short today, and on how many
 # days this month.
 var cold_today: bool = false

@@ -40,7 +40,7 @@ func run() -> void:
 		# The month's end, before hardship is counted: each family's month (filter for [CTM]).
 		if day % Calendar.DAYS_PER_MONTH == Calendar.DAYS_PER_MONTH - 2:
 			for household: Household in town.households:
-				print("[CTM] day %d household %d | short %d cold %d | hardship %d of %d | rough %d | own food %.0f | danger %s | commons %d reserve %d" % [day, household.id, household.short_days_this_month, household.cold_days_this_month, household.hardship_points, HouseholdMigration.get_departure_threshold(household), household.rough_housing_months, HouseholdEconomy.get_own_food(household), str(TownCommons.is_in_danger(household)), TownLedger.get_community(town, "food"), TownCommons.get_reserve(town)])
+				print("[CTM] day %d household %d | short %d cold %d | hardship %d of %d | rough %d | own food %.0f | danger %s | commons %d reserve %d" % [day, household.id, household.short_days_this_month, household.cold_days_this_month, household.hardship_points, HouseholdMigration.get_departure_threshold(household), household.rough_housing_months, HouseholdEconomy.get_own_food(household), str(TownCommons.is_in_danger(town, household)), TownLedger.get_community(town, "food"), TownCommons.get_reserve(town)])
 		for household: Household in town.households:
 			var holding: Building = FamilyInitiative.get_holding(town, household)
 			var trade: String = BuildingTiers.get_base_type(holding.type) if holding != null else "none"

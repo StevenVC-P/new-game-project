@@ -319,6 +319,7 @@ static func feed(city: City, rate: int) -> void:
 			household.short_today = true
 			household.short_days_this_month += 1
 			city.influence.household_short_days += 1
+			TownCommons.note_short_day(city, household)
 
 # What families eat of their own shares in the store (TownCompact), lowering what each still needs
 # from the table. Whole units leave the store as the fractions add up (Household.share_food_owed).

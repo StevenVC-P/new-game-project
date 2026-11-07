@@ -29,8 +29,21 @@ static func get_reserve(city: City) -> int:
 
 # A family going hungry this month, one the shortage could drive away, or one already in severe
 # hunger or cold (HouseholdMortality).
-static func is_in_danger(household: Household) -> bool:
-	return household.short_days_this_month >= EconomyBalance.DANGER_SHORT_DAYS or household.severe_hunger_months > 0 or household.severe_cold_months > 0 or HouseholdMigration.is_considering_departure(household)
+static func is_in_danger(city: City, household: Household) -> bool:
+	return get_danger_short_days(city, household) >= EconomyBalance.DANGER_SHORT_DAYS or household.severe_hunger_months > 0 or household.severe_cold_months > 0 or HouseholdMigration.is_considering_departure(household)
+
+# Experiment (not adopted; owner 2026-11-06): with the meta "reserve_30_days", danger reads the last
+# 30 days, so a family short since the 20th isn't turned away on the 1st.
+static func get_danger_short_days(city: City, household: Household) -> int:
+	if not city.has_meta("reserve_30_days"):
+		return household.short_days_this_month
+	var from_day: int = city.construction.day - Calendar.DAYS_PER_MONTH
+	household.recent_short_days = household.recent_short_days.filter(func(day: int) -> bool: return day > from_day)
+	return household.recent_short_days.size()
+
+static func note_short_day(city: City, household: Household) -> void:
+	if city.has_meta("reserve_30_days"):
+		household.recent_short_days.append(city.construction.day)
 
 # The common table under a compact, after families ate their own (HouseholdEconomy.feed): the
 # community's food above the reserve feeds every family alike (as before S8 when there is no
@@ -40,22 +53,28 @@ static func is_in_danger(household: Household) -> bool:
 static func feed_from_table(city: City, from_store: Dictionary) -> void:
 	var community: int = TownLedger.get_community(city, "food")
 	var open: float = float(maxi(0, community - get_reserve(city)))
+	# Experiments (not adopted; owner 2026-11-06): the meta "reserve_last" moves the reserve after the
+	# larder, neighbours and the market; "reserve_limit" holds a family's daily draw to a survival share.
+	var reserve_last: bool = city.has_meta("reserve_last")
+	var draw_limit: float = EconomyBalance.RESERVE_DRAW_SHARE if city.has_meta("reserve_limit") else 1.0
 	var danger_need: float = 0.0
 	var total_need: float = 0.0
 	for household: Household in city.households:
 		total_need += float(from_store[household.id])
-		if is_in_danger(household):
+		if is_in_danger(city, household):
 			danger_need += float(from_store[household.id])
 	var from_open: float = minf(total_need, open)
 	var fed_open: float = from_open / total_need if total_need > 0.0 else 1.0
-	var from_reserve: float = minf(danger_need * (1.0 - fed_open), float(community) - from_open)
+	var from_reserve: float = 0.0 if reserve_last else minf(danger_need * minf(1.0 - fed_open, draw_limit), float(community) - from_open)
 	var units: int = mini(community, int(ceil(from_open + from_reserve - 0.000001)))
 	city.consume_need_bucket(GoodsNeedBucketHelper.BUCKET_FOOD, units)
+	var reserve_left: float = float(community - units)
+	var drawn_last: float = 0.0
 	var fed_others: float = fed_open
 	var fed_danger: float = fed_open + (from_reserve / danger_need if danger_need > 0.0 else 0.0)
 	var town_short: bool = false
 	for household: Household in city.households:
-		var unmet: float = float(from_store[household.id]) * (1.0 - (fed_danger if is_in_danger(household) else fed_others))
+		var unmet: float = float(from_store[household.id]) * (1.0 - (fed_danger if is_in_danger(city, household) else fed_others))
 		if unmet <= 0.001:
 			continue
 		town_short = true
@@ -68,10 +87,18 @@ static func feed_from_table(city: City, from_store: Dictionary) -> void:
 		# Still short: it may sell what it holds for food, any day (TownMarket, sprint S9).
 		if unmet > 0.001:
 			unmet -= TownMarket.sell_for_food(city, household, unmet)
+		if reserve_last and unmet > 0.001 and is_in_danger(city, household):
+			var draw: float = minf(minf(unmet, float(from_store[household.id]) * draw_limit), reserve_left)
+			reserve_left -= draw
+			drawn_last += draw
+			unmet -= draw
 		if unmet > 0.001:
 			household.short_today = true
 			household.short_days_this_month += 1
 			city.influence.household_short_days += 1
+			note_short_day(city, household)
+	if drawn_last > 0.0:
+		city.consume_need_bucket(GoodsNeedBucketHelper.BUCKET_FOOD, int(ceil(drawn_last - 0.000001)))
 	city.resources["food_shortage"] = town_short
 
 # What a family holds of its own food it could give on a hungry day: beyond its own month.
@@ -146,7 +173,7 @@ static func advance_month(city: City) -> void:
 	ordered.sort_custom(func(a: Household, b: Household) -> bool: return a.id < b.id)
 	var recipients: Array[Household] = ordered
 	if city.commons_grants == GRANTS_IN_NEED:
-		recipients = ordered.filter(func(h: Household) -> bool: return h.short_days_this_month > 0 or is_in_danger(h) or TownSocial.is_in_need(city, h))
+		recipients = ordered.filter(func(h: Household) -> bool: return h.short_days_this_month > 0 or is_in_danger(city, h) or TownSocial.is_in_need(city, h))
 	if recipients.is_empty():
 		return
 	var keeps: Dictionary = {
