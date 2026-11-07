@@ -5,7 +5,7 @@ An investigation of how town, regional and world maps should relate as settlemen
 ## The Short Version
 
 1. **The planet already has the room.** One typical region holds about 0.8-1.25 million town tiles, which is one to two Songs of Syx base maps. The problem is not the size of the world. It is that the town is cut out of it.
-2. **The town is already nearly continuous with the land.** On shared land, adjacent town maps agreed on water, roads and hills in every tile measured, and on terrain type in 99.6%. Only the town-scale detail disagrees (farmland and trees, 4.1% of tiles overall).
+2. **The town is already nearly continuous with the land.** On shared land, adjacent town maps differed on water, roads and hills in under 0.05% of tiles, and on terrain type in 0.4%. The disagreement is almost all town-scale detail, farmland and trees (4.1% of tiles differ in some way).
 3. **Songs of Syx is an inspiration for density and presence, not for continuity.** It has a detailed city and an abstract world, and its developer's stated aim was one city per game. Your goal, continuous land with many settlements, goes further than Syx does, and our target population is beyond what it simulates.
 4. **Recommendation: one continuous land, stored in sectors, with a land-use record per regional tile as the shared truth between scales.** Detail exists only where a settlement has reached. A city's outer districts are drawn from data rather than simulated building by building. The simulation level follows the settlement, never the camera.
 5. **Nothing needs rewriting now, and active economic work need not stop.** A few habits avoid future cost, listed under Development Implications. The decision that matters most is number 1 in Open Questions.
@@ -205,7 +205,7 @@ Town scale      reads and writes them                buildings, or districts dra
 Simulation      writes them                          households, then groups, then numbers
 ```
 
-Detail writes the record. Aggregate simulation writes the same record. Every zoom reads it. So **the regional map finally shows what happened**, satellites have a footprint with no town map, and "decoration never shows what the data doesn't hold" still holds at every scale. A region's worth is about 1 MB.
+Detail writes the record. Aggregate simulation writes the same record. Every zoom reads it. So **the regional map finally shows what happened**, satellites have a footprint with no town map, and "decoration never shows what the data doesn't hold" still holds at every scale. A region's worth would be about 1 MB (an estimate).
 
 ### 4.3 Three levels of land
 
@@ -349,5 +349,4 @@ Each has a recommendation.
 - [Region cities growth (players, 2025)](https://steamcommunity.com/app/1162750/discussions/0/693121929170761853/)
 - [Early development thread (developer, 2016)](https://jvm-gaming.org/t/songs-of-syx-2019/57797)
 - [Larger map mod](https://mod.io/g/songsofsyx/m/larger-map)
-- [Bigger City Size mod](https://steamcommunity.com/sharedfiles/filedetails/?id=3434918193)
-- [Arcen bug tracker thread on minimap and zoom](https://bugtracker.arcengames.com/view.php?id=28231) was excluded: the search summary's "developer" there may not be Songs of Syx's, so its statements aren't used above.
+- [Bigger City Size mod](https://steamcommunity.com/sharedfiles/filedetails/?id=3434918193) (search listing only; the page could not be opened)
