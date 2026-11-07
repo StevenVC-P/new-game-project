@@ -180,15 +180,18 @@ func test_wood_beyond_winter() -> void:
 	var city: City = town(0.3, [Rect2i(20, 18, 10, 10)])
 	set_season(city, SPRING)
 	var household: Household = city.households[0]
-	var need: float = FamilyInitiative.get_use(city, TownInfluence.ACTIVITY_WOOD, Calendar.DAYS_PER_YEAR - (city.get_day_of_year() - 1))
+	var need: float = FamilyInitiative.get_wood_need(city)
 	city.resources["wood"] = int(need * 0.9)
 	_check(FamilyInitiative.get_wood_plenty(city, household) == 0.0, "a store that won't see the coming winter out is no plenty (%d for %.0f)" % [int(city.resources["wood"]), need])
 	var lean: float = float(FamilyInitiative.get_work_desire(city, household, "woodcutter")["score"])
+	city.resources["wood"] = int(need + FamilyInitiative.get_wood_margin(need))
+	_check(FamilyInitiative.get_wood_plenty(city, household) == 0.0, "nor is what lies within the margin beyond it")
 	set_season(city, WINTER)
-	_check(FamilyInitiative.get_wood_plenty(city, household) > 0.0, "the same store is spare with only the winter's end left to burn")
+	_check(FamilyInitiative.get_wood_need(city) > need, "late in winter the next winter counts, so the need doesn't collapse")
+	_check(FamilyInitiative.get_wood_plenty(city, household) == 0.0, "and the same store isn't spare with only the winter's end left to burn")
 	set_season(city, SPRING)
-	city.resources["wood"] = int(need * 2.5)
-	_check(is_equal_approx(FamilyInitiative.get_wood_plenty(city, household), 1.0), "twice the coming need and more is plenty")
+	city.resources["wood"] = int(need * 3.0) + int(FamilyInitiative.WOOD_PLENTY_FLOOR)
+	_check(is_equal_approx(FamilyInitiative.get_wood_plenty(city, household), 1.0), "well beyond the need and its margin is plenty")
 	var desire: Dictionary = FamilyInitiative.get_work_desire(city, household, "woodcutter")
 	_check(has_reason(desire["terms"], FamilyInitiative.WOOD_PLENTY_REASON) and float(desire["score"]) < lean, "and weighs against wood work (%.2f, %.2f before)" % [float(desire["score"]), lean])
 	household.cold_days_this_month = int(FamilyInitiative.HUNGRY_DAYS_DESPERATE)
@@ -197,7 +200,7 @@ func test_wood_beyond_winter() -> void:
 	city.resources["wood"] = 0
 	_check(float(FamilyInitiative.get_cold_hardship(city, household)["level"]) == 1.0, "and fully while the store is empty")
 	household.cold_days_this_month = 0
-	city.resources["wood"] = int(need * 2.5)
+	city.resources["wood"] = int(need * 3.0) + int(FamilyInitiative.WOOD_PLENTY_FLOOR)
 	var holding: Building = Building.new(-1, BuildingTiers.get_hand_work_type("woodcutter"), Vector2i(34, 30), Vector2i(2, 2))
 	city.add_building(holding, household)
 	var gathering: Dictionary = HouseholdEconomy.get_secondary_desire(city, household, Building.new(-1, "farm", Vector2i(30, 30), Vector2i(3, 3)), "wood", {})
@@ -206,6 +209,9 @@ func test_wood_beyond_winter() -> void:
 	city.resources["food"] = 0
 	var triggers: Array[String] = OccupationReview.get_triggers(city, household, holding)
 	_check(triggers.has(OccupationReview.WOOD_PLENTY) and OccupationReview.is_urgent(triggers), "a hungry town's woodcutter looks at its work again: %s" % str(triggers))
+	var now_need: float = FamilyInitiative.get_wood_need(city)
+	city.resources["wood"] = int(now_need + FamilyInitiative.get_wood_margin(now_need) + maxf(now_need, FamilyInitiative.WOOD_PLENTY_FLOOR) * 0.25)
+	_check(FamilyInitiative.get_wood_plenty(city, household) > 0.0 and not OccupationReview.get_triggers(city, household, holding).has(OccupationReview.WOOD_PLENTY), "a little spare isn't cause to look again at once")
 	city.set_meta("no_wood_plenty", true)
 	_check(FamilyInitiative.get_wood_plenty(city, household) == 0.0 and not OccupationReview.get_triggers(city, household, holding).has(OccupationReview.WOOD_PLENTY), "the Track A comparison switch restores the old judgment")
 

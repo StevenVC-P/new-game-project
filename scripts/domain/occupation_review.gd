@@ -82,8 +82,10 @@ const TIMBER: String = "timber_failing"
 const COLD: String = "cold"
 # Wood work while the store already holds more than the coming winter needs and the town is short of
 # something else (sprint S5b, FamilyInitiative.get_wood_plenty): the family looks again without
-# waiting for its year; what it then chooses is its own weighing.
+# waiting for its year; what it then chooses is its own weighing. Only at real plenty (sprint S5d): a
+# little spare still weighs in its yearly look, but isn't cause to look again at once.
 const WOOD_PLENTY: String = "wood_beyond_winter"
+const WOOD_PLENTY_TRIGGER: float = 0.5
 const TIMBER_FAILING_SHARE: float = 0.5
 
 static func is_on(city: City) -> bool:
@@ -203,7 +205,7 @@ static func get_triggers(city: City, household: Household, holding: Building) ->
 	if int(household.work_strain.get(COLD, 0)) >= HUNGRY_MONTHS:
 		triggers.append(COLD)
 	var activity: String = FamilyInitiative.get_activity(holding.type)
-	if activity == TownInfluence.ACTIVITY_WOOD and FamilyInitiative.get_wood_plenty(city, household) > 0.0 and is_short_elsewhere(city, activity):
+	if activity == TownInfluence.ACTIVITY_WOOD and FamilyInitiative.get_wood_plenty(city, household) >= WOOD_PLENTY_TRIGGER and is_short_elsewhere(city, activity):
 		triggers.append(WOOD_PLENTY)
 	return triggers
 

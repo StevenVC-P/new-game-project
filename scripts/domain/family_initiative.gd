@@ -61,6 +61,10 @@ const NO_USE_WEIGHT: float = 3.0
 # needed, this much spare counts as full plenty.
 const WOOD_PLENTY_WEIGHT: float = 3.0
 const WOOD_PLENTY_FLOOR: float = 100.0
+# What a family keeps in mind beyond that need before calling wood spare (sprint S5d): half the need
+# again, and never less than WOOD_PLENTY_FLOOR, about a home and a workplace for each of six founding
+# families. Need counts only what is already under way, so a young town's next building isn't in it.
+const WOOD_MARGIN_SHARE: float = 0.5
 # A family wanting a better home of a material it would make itself (owner 2026-11-03).
 const OWN_DEMAND_WEIGHT: float = 1.5
 # New deposit trades (stone, brick) while the town holds less than SECURE_FOOD_DAYS of food in store
@@ -598,17 +602,28 @@ static func get_reachable_wood(city: City, household: Household) -> int:
 		return int(city.resources["wood"])
 	return TownLedger.get_share(household, "wood") + TownLedger.get_community(city, "wood") + TownMarket.get_obtainable(city, household, "wood")
 
-# How far the wood within a family's reach exceeds what the town will burn and use through the end of the coming
-# winter, and what its building still waits for (sprint S5b; owner 2026-11-05, option b of the Track A
-# review): 0 (nothing spare) to 1 (spare as large again as that need, or WOOD_PLENTY_FLOOR where
-# little is needed). What families see in the store, not what is coming. It weighs in their choices
-# as a reason, never as a rule. Off with the meta "no_wood_plenty" (the Track A build).
+# What the town will burn and use through the end of the next winter not yet begun, and what its
+# building still waits for (sprint S5d). Once winter has begun the one after it is the next to
+# prepare for, so late in winter the need doesn't collapse to the few days left.
+static func get_wood_need(city: City) -> float:
+	var days: int = Calendar.DAYS_PER_YEAR - (city.get_day_of_year() - 1)
+	if city.get_season_index() == 3:
+		days += Calendar.DAYS_PER_YEAR
+	return get_use(city, TownInfluence.ACTIVITY_WOOD, days) + float(int(city.construction.get_committed_materials().get("wood", 0)))
+
+static func get_wood_margin(need: float) -> float:
+	return maxf(need * WOOD_MARGIN_SHARE, WOOD_PLENTY_FLOOR)
+
+# How far the wood within a family's reach exceeds that need and its margin (sprints S5b, S5d; owner
+# 2026-11-05, option b of the Track A review): 0 (nothing spare) to 1 (spare as large again as the
+# need, or WOOD_PLENTY_FLOOR where little is needed). What families see in the store, not what is
+# coming. It weighs in their choices as a reason, never as a rule. Off with the meta "no_wood_plenty"
+# (the Track A build).
 static func get_wood_plenty(city: City, household: Household) -> float:
 	if city.has_meta("no_wood_plenty"):
 		return 0.0
-	var days: int = Calendar.DAYS_PER_YEAR - (city.get_day_of_year() - 1)
-	var need: float = get_use(city, TownInfluence.ACTIVITY_WOOD, days) + float(int(city.construction.get_committed_materials().get("wood", 0)))
-	return clampf((float(get_reachable_wood(city, household)) - need) / maxf(need, WOOD_PLENTY_FLOOR), 0.0, 1.0)
+	var need: float = get_wood_need(city)
+	return clampf((float(get_reachable_wood(city, household)) - need - get_wood_margin(need)) / maxf(need, WOOD_PLENTY_FLOOR), 0.0, 1.0)
 
 static func get_use(city: City, good: String, days: int) -> float:
 	var use: float = 0.0
