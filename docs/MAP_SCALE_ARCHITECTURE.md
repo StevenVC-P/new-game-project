@@ -1,13 +1,15 @@
 # Map Scale Architecture Investigation
 
-An investigation of how town, regional and world maps should relate as settlements grow to hundreds of thousands of people, with Songs of Syx as a reference (2026-11-06). **A proposal only.** Nothing here is built, authorized or on the roadmap. No gameplay code changed. Where this conflicts with `GAME_VISION.md` or a recorded owner decision, those stand until the owner decides otherwise.
+An investigation of how town, regional and world maps should relate as settlements grow to hundreds of thousands of people, with Songs of Syx as a reference (2026-11-06, updated 2026-11-07). **A proposal only.** Nothing here is built, authorized or on the roadmap. No gameplay code changed. Where this conflicts with `GAME_VISION.md` or a recorded owner decision, those stand until the owner decides otherwise.
+
+**Owner decision (2026-11-06):** the game requires a shared geographic model, not a single continuously rendered map. City and regional views may be separate scenes with different rendering, provided geography, developed footprint and major infrastructure come from the same authoritative world state. Seamless zooming and scrolling between cities are not requirements; the player can switch views. A settlement's regional appearance must reflect its actual development, and opening a city should reveal the recognizable settlement shown on the regional map. This report is revised to match, and the two proving tests are recorded in section 7. For planning, read `MAP_SCALE_PLANNING_BRIEF.md`.
 
 ## The Short Version
 
 1. **The planet already has the room.** One typical region holds about 0.8-1.25 million town tiles, which is one to two Songs of Syx base maps. The problem is not the size of the world. It is that the town is cut out of it.
 2. **The town is already nearly continuous with the land.** On shared land, adjacent town maps differed on water, roads and hills in under 0.05% of tiles, and on terrain type in 0.4%. The disagreement is almost all town-scale detail, farmland and trees (4.1% of tiles differ in some way).
-3. **Songs of Syx is an inspiration for density and presence, not for continuity.** It has a detailed city and an abstract world, and its developer's stated aim was one city per game. Your goal, continuous land with many settlements, goes further than Syx does, and our target population is beyond what it simulates.
-4. **Recommendation: one continuous land, stored in sectors, with a land-use record per regional tile as the shared truth between scales.** Detail exists only where a settlement has reached. A city's outer districts are drawn from data rather than simulated building by building. The simulation level follows the settlement, never the camera.
+3. **Songs of Syx is an inspiration for density and presence, not for continuity.** It has a detailed city and an abstract world, and its developer's stated aim was one city per game. Your goal, one shared land with many settlements, goes further than Syx does, and our target population is beyond what it simulates.
+4. **Recommendation: one world state, separate views.** Land comes from position, stored in sectors where touched, with a land-use record per regional tile as the shared truth between scales. Detail exists only where a settlement has reached. A city's outer districts are drawn from data rather than simulated building by building. The simulation level follows the settlement, never the camera.
 5. **Nothing needs rewriting now, and active economic work need not stop.** A few habits avoid future cost, listed under Development Implications. The decision that matters most is number 1 in Open Questions.
 
 ## 1. Songs of Syx: What Is Worth Adopting
@@ -30,7 +32,7 @@ Sources were developer statements, the store page, devlogs and player reports. T
 
 ### The principles worth adopting
 
-1. **The city as one physical mass.** The feeling of scale comes from one continuous piece of land that can be read at any zoom, without changing mode. This is the principle most worth taking.
+1. **The city as one physical mass.** The feeling of scale comes from one continuous piece of land inside the city view, readable from street to whole city. This is the principle most worth taking.
 2. **Density you can read.** A great city feels great because it is dense and varied up close and has a recognizable shape from afar.
 3. **Spatial hierarchy for movement.** Syx's layered grid is the proven way to route across huge maps.
 4. **What the world gives must physically arrive.** Regions send shipments that travel, so the world's economy is visible at the city's gates. This suits our satellites and the economic fragility principle: a road can be cut.
@@ -39,7 +41,7 @@ Sources were developer statements, the store page, devlogs and player reports. T
 ### What not to adopt
 
 - **Individually simulating everyone.** Syx reaches tens of thousands, and our target is many times that. Our route through Houses and groups stays right, and Syx shows the limit of the alternative.
-- **A hard split between city and world.** This is exactly what you want to avoid.
+- **A split in truth between city and world.** The views may be separate; the facts may not.
 - **The player placing every room and zone.** Families lead in this game.
 - **One city per game.** Our vision requires several settlements.
 
@@ -162,25 +164,27 @@ Each simulated settlement gets a large map, say 1024x1024, or one that grows by 
 - **For:** a known-good model, with a real single-map feel. Simple for the player.
 - **Against:** the edge only moves further out. Two towns can't meet on one piece of land, so each is still a separate board. Fixed sizes either waste memory or cap growth. It solves density but not the relationship with the world, and much of the same work as C gets spent without gaining continuity.
 
-### Option C: One continuous land, in sectors, with fidelity levels (recommended)
+### Option C: One world state, separate views (recommended; revised 2026-11-06)
 
 Every town tile on the planet already exists as a pure function of position, just as regional tiles do. Only sectors a settlement has touched are held and saved. A compact land-use record per regional tile carries what happened on the land up to the regional and world maps.
 
 - **Cost:** highest in total, but it comes in stages, each useful alone. **Performance:** cost follows what is built, not map size. **Risk:** the generator change shifts balance, and rendering a great city is unproven.
-- **For:** the only option where roads, rivers, woods and neighbouring towns are really one land. No edges. Two towns can meet. Zoom works across all scales.
+- **For:** the only option where roads, rivers, woods and neighbouring towns are really one land. No edges. Two towns can meet. The city view and regional view stay separate scenes, so neither has to do the other's work.
 - **Against:** the most new concepts, and the most care needed to keep saves deterministic.
+
+The owner's decision also narrows the gap with B: a city view is a large window on shared land, so C takes B's picture and adds a shared truth. Dropping seamless zoom removes the zoom hand-off work.
 
 ### Compared
 
 | | A: Core and blocks | B: Large map | C: Continuous sectors |
 | --- | --- | --- | --- |
-| Town continuous with the world | No | No | Yes |
+| Town and world share one truth | No | No | Yes |
 | Footprint can spread freely | No, only a depiction | Up to the map's edge | Yes, limited by geography |
 | Two settlements can meet | Only as a depiction | No | Yes |
 | Memory for a large city | Very low | Fixed, large | Follows development |
 | Fits satellites and aggregation | Yes | Partly | Yes |
 | Changes current balance | No | Slightly | Yes; must be measured |
-| Rough size (low confidence) | 1-2 milestones | 3-4 | 5-7, staged |
+| Rough size (low confidence) | 1-2 milestones | 3-4 | 4-6, staged |
 
 A later move from A to C throws most of A away. A later move from B to C keeps its tile format, drawing and routing work, so B is a partial path to C, but it has no reason to stop there.
 
@@ -221,16 +225,18 @@ Detail writes the record. Aggregate simulation writes the same record. Every zoo
 
 Fidelity belongs to a settlement or district and changes only through the simulation's own transitions. Zooming into a Patterned district shows its drawing and never turns it Lived. Otherwise looking at something would change what happens, and determinism (a loaded game decides as the original would have) would be lost.
 
-### 4.5 Zoom is one motion
+### 4.5 Views are separate; their facts are shared
 
-Zooming the regional map into a town should hand off the way atlas and regional already do, with the land around the town still there. Roughly:
+The player switches between views (owner decision). Each view has its own scene and drawing and reads the same state:
 
-| Zoom | Shows |
-| --- | --- |
-| World | Civilizations as tinted territory and city shapes; trade corridors |
-| Region | The settlement's real outline, fields, roads, clearings, satellites |
-| Settlement | Districts, density, the road network, the old town |
-| Street | Lived buildings and families, or Patterned drawing |
+| View | Shows | Reads |
+| --- | --- | --- |
+| World | Civilizations as tinted territory and city shapes; trade corridors | Records, summed |
+| Region | The settlement's real outline, fields, roads, clearings, satellites | Records, major roads |
+| City, far | Districts, density, the road network, the old town | Buildings or Patterned data, land |
+| City, near | Lived buildings and families, or Patterned drawing | Buildings or Patterned data, land |
+
+Opening a city should show the same river bends, woods, roads and outline the player just saw on the regional map. That recognizability is the test of this design, and far-zoom legibility is what it most depends on (section 7).
 
 ### How each question from the brief comes out
 
@@ -239,7 +245,7 @@ Zooming the regional map into a town should hand off the way atlas and regional 
 | Town map size | No fixed size. A window onto continuous land, and at founding it can look the same as today |
 | Local terrain and world maps | Direct correspondence; already true for geography, and detail becomes consistent |
 | Footprint growth | Follows where families and groups choose to settle, written to the land-use record |
-| Zoom between views | Yes, one continuous motion |
+| Zoom between views | No: the player switches views, and both read one state (owner decision) |
 | Two growing settlements | Each regional tile is claimed by one settlement; they meet at a boundary and stay separate unless deliberately merged |
 | Roads, rivers, forests, mountains | Rivers and mountains stay fixed and flow down. Roads and cleared woods are changes that flow up. Town paths with enough traffic can become regional roads. Roads become one network in global coordinates |
 | Consistent geography without full detail | Yes. Base land is computed on demand, so nothing is simulated or held until reached |
@@ -275,9 +281,9 @@ The drawing reads wealth and value **distributions**, not averages, as the E13 s
 
 ### Risks in the recommendation
 
-- **Rendering a great city is the largest unknown.** Nothing here was measured on a GPU, and integrated GPUs have never been tested. This should be the first thing proven, before committing.
+- **Drawing a great city is no longer the largest unknown (section 7).** Opening it, reading it from afar, and running it on weak hardware are. Integrated GPUs are still unmeasured.
 - **Patterned districts might look alike.** "Recognizably different societies" is a promise art must keep.
-- **The generator change alters every town,** so `map_luck_check` and `town_map_probe` must be re-run. It may conflict with active economy tuning if done at the wrong moment.
+- **The generator change alters every town a little,** and poor land varies more (section 7). It may conflict with active economy tuning if done at the wrong moment.
 - **Scope.** `GAME_VISION.md` names scope as the main risk, and this is a large addition. The stages must each be good alone, and the hamlet must not suffer.
 - **Grouped simulation is not designed yet.** Patterned land depends on it. Its design and this one should be made together.
 
@@ -308,23 +314,21 @@ These cost almost nothing, need no sprint, and don't disturb the economic work:
 
 ### If you choose C: a possible order, not a roadmap
 
-Each stage is playable by itself. Economic Foundations finishes first unless you say otherwise.
+Each stage is playable by itself. Economic Foundations finishes first unless you say otherwise. Stage 0 is done (section 7).
 
 | Stage | Result | Depends on |
 | --- | --- | --- |
-| 0. Prove it | Two spikes: a position-pure generator under matched map-luck sims, and a rendering test of a 100,000-person city including an integrated GPU | Nothing |
-| 1. No more board | The land continues past the town and zoom flows from region to town; building stays limited as today | Position-pure base |
-| 2. The map tells the truth | Land-use records; the regional map shows real fields, clearings and buildings | 1 |
-| 3. Room to grow | Sectors and packed tiles; a Lived town grows past 64x44, with roads and reach | 2 |
-| 4. Towns meet the world | Road network across scales; trade along real routes; satellites | 3 |
-| 5. The great city | Groups and Patterned districts; old town and anchors | 3, plus the household lookup gate and Grouped design |
-| 6. Many settlements | Second settlements, claims, meeting and merging | 4, 5 |
+| 1. The map tells the truth | Position-pure land; land-use records; the regional map shows real fields, clearings and buildings. Building stays limited as today | Nothing |
+| 2. Room to grow | Sectors and packed tiles; a Lived town grows past 64x44, with roads and reach, in a city view that opens quickly and reads from afar | 1 |
+| 3. Towns meet the world | Road network across scales; trade along real routes; satellites | 2 |
+| 4. The great city | Groups and Patterned districts; old town and anchors | 2, plus the household lookup gate and Grouped design |
+| 5. Many settlements | Second settlements, claims, meeting and merging | 3, 4 |
 
 ## 6. Open Questions For The Owner
 
 Each has a recommendation.
 
-1. **Direction:** A, B or C? *Recommended: C, starting with stage 0 only, so you can see the rendering proof before committing.*
+1. **Direction:** A, B or C? *Recommended: C, one world state with separate views. Stage 0 is finished.*
 2. **The ×4 scale:** keep it? *Recommended: keep. It has room for everything you described.*
 3. **What limits a settlement's land?** Only geography and how far families will travel, or also a claim the player must establish (`GAME_VISION.md`: influence before territory)? *Recommended: land is reached through roads and travel, and claimed through influence, with no fixed map edge.*
 4. **The player's tools at scale:** the current model has the player placing neighbourhoods and districts. Your brief says influence through infrastructure, land use, policy and law. Replace it? *Recommended: replace it. The player marks land use and builds infrastructure, and people decide the rest.*
@@ -332,9 +336,100 @@ Each has a recommendation.
 6. **Satellites:** is this the definition you intend: a footprint on the land, economic and cultural extension, no town map, can't be opened? Can one ever become a full settlement? *Recommended: yes, and promotion only by a deliberate founding act.*
 7. **When two settlements meet,** do they stay separate? *Recommended: separate, sharing a boundary. Merging is a deliberate act for settlements of one polity, designed later.*
 8. **Can rival towns be taken and then opened in detail?** `GAME_VISION.md` has capture. If they exist only as summaries, what does the player get? *No recommendation yet; this needs its own thinking.*
-9. **Lowest hardware to support?** Rendering budgets depend on it. Integrated GPUs are untested. *Recommended: name a target before stage 0.*
+9. **Lowest hardware to support?** Rendering budgets depend on it, and integrated GPUs are still unmeasured. *Recommended: name a target, then measure on it.*
 10. **Does geography itself change?** *Recommended: woods, fields and roads change; rivers, coasts and mountains don't, for now.*
-11. **Timing:** after Economic Foundations, or stage 0 alongside it? *Recommended: stage 0's two spikes can run alongside, as they change nothing merged.*
+11. **Timing:** after Economic Foundations? *Recommended: yes, unless you want the regional map to tell the truth sooner.*
+12. **Poor land:** position-based land removes the exact arable share per town, so the poorest maps vary more. Accept it, or strengthen the founding floor? *Recommended: accept it, with the floor set from arid sites in `map_luck_check`.*
+13. **How long may opening a city take?** *Recommended: set a target before design, as it decides how much is prepared in advance.*
+
+## 7. Proving Tests (2026-11-07)
+
+Code: branch `experiment/map-scale-proving-tests`, `tests/spike/`, and a switch in `LocalCityMapGenerator` that is off unless `--spike-pure` is passed. Nothing is merged. Tested on `develop`, not on the `feature/ef-*` line.
+
+### Test 1: land from position alone
+
+**What changed in the test:** shares of a window became thresholds on the noise, chosen so the same share of the planet qualifies; each tile reads the climate of its place; position is worked out from global coordinates. The cleared heart and the floors became a change a founding makes. The first run found two tiles of disagreement, from rounding in each window's own coordinates; computing from global position removed them.
+
+| Measure | Result |
+| --- | --- |
+| Base land, windows 2 and 8 regional tiles apart, and 64x44 inside 256x256 | 0 differences in about 583,000 shared tiles, 7 fields each, 3 worlds, frontier and settled sites |
+| Tiles a founding changes on the land | Median 8-13, worst 132, of 2,816 |
+| Tiles moved in a town, today against new | Median 73, worst 227, of 72 towns |
+| Regional tile holds a feature; town holds it too | Water 98-100%, woods 93-97%, roads 91-97%, rock 90-91% |
+| Town tiles show a feature the regional tile doesn't | Water under 1%, roads about 2%, woods and rock about 5%, as copses and outcrops are meant to |
+
+Matched sims, same seeds and stand-in player, two years. Towns off the ground:
+
+| Maps | Today | Position-based |
+| --- | --- | --- |
+| Original regional maps, 8 worlds | 48/48 | 48/48 |
+| Authored planet | 40/42 | 40/42 |
+| Generated worlds 12345, 777, 31337 | 41, 41, 40 of 42 | 41, 41, 40 of 42 |
+| Generated world 2026 | 39/42 | 40/42 |
+| **All** | **249/258** | **250/258** |
+
+| Check | Today | Position-based |
+| --- | --- | --- |
+| Least farmland, 80 continuous-map sites | 118 tiles | 71 tiles |
+| Median farmland, same sites | 364 | 331 |
+| Least room, world 2026 | 11 farms | 8 farms |
+| Least room, authored planet | 9 farms | 10 farms |
+| Different best openings across kinds of land (`site_variety_check`) | 2 | 2 |
+| Town building, "houses" layout | 18/20, 49 people | 17/20, 46 people |
+
+`town_map_validation`, `town_map_view_validation` and `founding_city_validation` pass both ways. The full test suite and the long household sims were not run. `opening_check` ignores terrain, so it says nothing here.
+
+**Reading this:** land from position works and costs almost nothing in play, because the floors still hold. The real cost is on poor land, where a town no longer gets an exact arable share. The date line was not tested. The `feature/ef-*` line adds clay and limestone, and `add_clay_and_limestone` would need the same treatment: it reads neighbours clipped at the window's edge, and limestone is picked by an outcrop's first tile in scan order.
+
+### Test 2: two views, one state
+
+One settlement record drives a separate city scene and the real regional map, which reads only the land-use record and major roads. Off screen on an RTX 3070 Ti with an i9-12900K, using the game's own ground shader and building and tree painters. Buildings and trees are drawn once into an atlas and placed by GPU instancing, one list per 64x64-tile sector. **The city layout is placeholder load, not a design for growth.**
+
+| People | Buildings | Instances | Map | 1080p, zoom 0.5-3.2 | 4K, same | Opening | Memory on GPU, total |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 10,000 | 3,750 | 108,816 | 512² | 1.4-1.5 ms | 4.1-5.1 ms | 1.2 s | 257 MB |
+| 100,000 | 34,655 | 230,957 | 1024² | 1.4-1.5 ms | 5.0 ms | 4.1 s | 241 MB |
+| 500,000 | 138,376 | 473,567 | 2048² | 1.4 ms | 5.0 ms | 15 s | 515 MB |
+
+The whole-city view costs 1.0-1.3 ms at 1080p and about 3 ms at 4K, after a one-time first-view hitch of about 10-14 ms. The real 64x44 baseline uses about 225 MB in the same test, and the regional map costs about 4 ms at 1080p with or without the settlement.
+
+- **Frame time doesn't grow with the city.** Ground alone is about 1.2 of 1.4 ms; instancing culled by sector does the rest. 50,000 walkers moved by the shader cost almost nothing.
+- **Opening is the real cost:** mostly per-tile script work on ground textures (3.2 of 4.1 s at 100,000; 13 of 15 s at 500,000). Generating 2048² of land took 41 s. Saving, threading or sector-building these may fix it, but that is untested.
+- **The record is small.** A save would hold about 0.7 MB beyond the seed at 100,000, and 2.6 MB at 500,000, against 220 MB and 880 MB for that land at today's bytes per tile. These are computed sizes for buildings, roads, streets and records only, with no people. Drawing the record once takes 80 ms at 100,000.
+
+**Weak hardware.** No integrated GPU exists on this machine, so this is unmeasured. The Windows software renderer, a harsh stand-in that runs on the CPU, at 100,000 people:
+
+| View | 720p | 1080p |
+| --- | --- | --- |
+| Regional map, today's | not sampled | 142-166 ms |
+| City, ground alone | 62 ms | 134 ms |
+| City, street to district | 65-69 ms | 141-156 ms |
+| City, whole | 150 ms | 194 ms |
+| City with 50,000 walkers | adds about 15 ms | adds about 15 ms |
+
+The city costs about what the map we already ship costs. On this renderer neither is playable, and the limit is the existing ground shader. A cheaper ground for far zoom or low settings is a likely need. The Compatibility renderer also runs the whole test at about the same speed, on the same NVIDIA GPU.
+
+**Is it recognizably the same place?** By eye, yes for geography: rivers, coast, woods and rock line up at every scale. A town grown by the real simulation (17 households, 32 buildings) showed its fields and homes in the right place in both views. As a measure, each view was captured with and without the settlement, and a cell counted as developed when its change passed a quarter of that view's 95th percentile. The rule was fixed before the 100,000-person result.
+
+| People | Developed in both views | City only | Regional only | Overlap | Correlation |
+| --- | --- | --- | --- | --- | --- |
+| 10,000 | 1,825 | 188 | 467 | 74% | 0.66 |
+| 100,000 | 7,507 | 988 | 4,088 | 60% | 0.53 |
+| 500,000 | 18,555 | 2,134 | 492 | 88% | 0.42 |
+
+The real town's 60% is not meaningful: the regional map's zoom limit stopped the two pictures matching in scale.
+
+**Three findings from the pictures:**
+
+1. **From afar, the city view reads less like a city than the regional view does.** One-tile homes with green yards fade into meadow, while the regional drawing reads as brown development. At 500,000 the two views look markedly different in color. Far zoom needs its own drawing, in the spirit of Syx's readable mass. This matters most for "the recognizable settlement".
+2. **The regional map must read the record, not sit under it.** Regional trees and fields come from position, so the test painted cleared land over them. A real version would have chunks read the record.
+3. **Major roads as one shared line work.** The same polylines drew in both views and matched exactly.
+
+**Not tested:** real growth, simulation cost at these sizes, overlays and selection, changing a single building, per-building state such as weathering, shrubs, flowers and boulders, or an integrated GPU. Farms fell short, because the test maps ran out of farmland (9,655 of 12,500 at 100,000; 13,376 of 62,500 at 500,000), so those loads are light on farms.
+
+### What the tests mean for the recommendation
+
+The direction stands and is stronger. Land from position works; the record is small; drawing a great city is cheap. The risks are now opening time, far-view legibility, weak hardware, and the undesigned Grouped simulation.
 
 ## Sources
 
