@@ -59,7 +59,7 @@ Build `044e567`, run in `../ngg-ef-runs7`. Labels `S5d-pooled`, `-communal`, `-s
 | Marginal 0: ok, people, wood cut | yes, 82, 9,036 | no, 7, 420 | no, 18, 816 | no, 13, 663 |
 
 - **Balanced 5 recovers:** wood is cut from the start and tools hold.
-- **Marginal 0 stays lost, and the false wood readings are no longer why.** No family now leaves wood work on a false plenty; the one review on `wood_beyond_winter` changes nothing in the story. The toolmaker turns to farming on day 180, tools reach 0 by year 2, and wood cut stalls at 634 by then (663 by year 6), though a family stays a woodcutter until day 1140. The store, 344 wood held in common by year 2, reads 0.94 plenty against a small town's need, and that reading is honest: the wood is there. It looks like the tool gap, with nothing prompting a family back to toolmaking, but this wasn't traced further. Not corrected.
+- **Marginal 0 stays lost, and the false wood readings are no longer why.** The toolmaker turns to farming on day 180, tools reach 0 by year 2, and wood cut stalls at 634 by then (663 by year 6), though a family stays a woodcutter. On day 1140 that last woodcutter looks again on `wood_beyond_winter`, the only such review in the town, and takes up herding, its calling, by a margin of 6.2. That reading is honest: about 270 wood lay in common for three families that had cut almost nothing in a year. It looks like the tool gap, with nothing prompting a family back to toolmaking, but this wasn't traced further. Not corrected.
 - Before S5b this town's success came with 9,036 wood cut, against 663 now. Whether its 82 people depended on that surplus isn't established.
 
 ## For the owner
