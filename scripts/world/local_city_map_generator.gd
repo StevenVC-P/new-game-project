@@ -11,8 +11,15 @@ extends RefCounted
 # global town coordinates, so a site always gives the same town.
 #
 # What a regional tile cannot say is decided at town scale: which open land is arable (the
-# regional fertile flag only marks land near water), small copses on open land, and floors
-# that give every town room to start.
+# regional fertile flag only marks land near water), small copses on open land, glades, outcrops,
+# clay and limestone.
+#
+# Land is a function of global position alone (master roadmap Phase 1, docs/MAP_SCALE_ARCHITECTURE.md):
+# every window onto the planet, of any size or place, agrees on every tile. Shares of the land
+# (arable pockets, outcrops, glades, copses) are thresholds on noise, read from a fixed sample of it,
+# never ranks within a window. Founding is a change made to that land: its heart is cleared, and land
+# it opens is judged for farming as any open land is. There are no floors (owner, 2026-11-07): a poor
+# site stays poor, and nothing is added to rescue it.
 #
 # Town tiles: "type" (ground, water, rough), "has_trees", "is_fertile", "occupied", and
 # "water_kind" (river, lake, sea, or ""), "resource" (none, stone, iron), "has_road", "is_hill"
@@ -59,12 +66,16 @@ const HILL_ARABLE_FACTOR: float = 0.5
 const COPSE_SHARE: float = 0.03
 const COPSE_CENTER_DISTANCE: float = 7.0
 
-# Floors kept from the original generator: every town has room to start.
+# Founding clears its heart: the families' first ground.
 const CENTER_CLEAR_RADIUS: float = 4.0
-const MIN_BUILDABLE_TILES: int = 180
-const MIN_FERTILE_TILES: int = 18
-# A town with no woods in reach cannot cut wood; the original maps never had fewer tree tiles.
-const MIN_TREE_TILES: int = 90
+
+# Noise seed -> sorted sample of that noise, so a share of the planet's tiles becomes a threshold.
+static var noise_quantiles: Dictionary = {}
+const QUANTILE_SAMPLES: int = 400
+const QUANTILE_STEP: float = 7.0
+# Town tiles of land worked out around the map on each side, so rules that look at neighbours
+# (clay by the bank) see the same land whatever the window.
+const NEIGHBOUR_MARGIN: int = 2
 
 var width: int = 64
 var height: int = 44
@@ -81,6 +92,10 @@ var window_tiles: Array = []
 var window_size: Vector2i = Vector2i.ZERO
 # Regional tile -> its fields, filled as the blend reads them.
 var field_cache: Dictionary = {}
+# The continuous map reads the climate per regional tile, not the site's (a site's single climate
+# would differ along an edge two towns share). Bounded maps have none and use the site's.
+var climate_terrain: RegionalTerrain = null
+var arable_cache: Dictionary = {}
 
 func _init(local_width: int = 64, local_height: int = 44):
 	width = local_width
@@ -93,72 +108,139 @@ static func make_noise(seed_value: int, frequency: float) -> FastNoiseLite:
 	noise.frequency = frequency
 	return noise
 
-# Regional tiles the map reads around its site, each way: its half-extent plus one for blending.
+# Regional tiles the map reads around its site, each way: its half-extent, the neighbour margin,
+# and a tile more for blending past a warped sample and for the nearest-kind look around it.
 func regional_reach() -> Vector2i:
-	var half: Vector2 = Vector2(width, height) * 0.5 / TOWN_TILES_PER_REGIONAL_TILE
-	return Vector2i(ceili(half.x) + 1, ceili(half.y) + 1)
+	var half: Vector2 = (Vector2(width, height) * 0.5 + Vector2(NEIGHBOUR_MARGIN, NEIGHBOUR_MARGIN)) / TOWN_TILES_PER_REGIONAL_TILE
+	return Vector2i(ceili(half.x) + 3, ceili(half.y) + 3)
 
 # The continuous map: reads a window cut around the site, so a site near the edge of the
 # game's neighbourhood still gets the land beyond it.
 func generate_from_terrain(terrain: RegionalTerrain, global_site: Vector2i, climate: Dictionary) -> Array:
 	var reach: Vector2i = regional_reach()
 	var window_origin: Vector2i = global_site - reach
-	return generate(reach, terrain.extract_window(window_origin, reach * 2 + Vector2i.ONE), window_origin, climate)
+	return generate(reach, terrain.extract_window(window_origin, reach * 2 + Vector2i.ONE), window_origin, climate, terrain)
+
+# The land alone at a site, before any founding: what every window onto the planet agrees on.
+func generate_base_from_terrain(terrain: RegionalTerrain, global_site: Vector2i, climate: Dictionary) -> Array:
+	var reach: Vector2i = regional_reach()
+	var window_origin: Vector2i = global_site - reach
+	begin(terrain.extract_window(window_origin, reach * 2 + Vector2i.ONE), terrain)
+	return land(reach, window_origin, climate)["map"]
 
 # site: the town's regional tile in regional_tiles' coordinates. hash_origin: the global
 # regional tile at regional_tiles' (0, 0), so noise follows the planet; outside the given
-# tiles the nearest edge tile repeats.
-func generate(site: Vector2i, regional_tiles: Array, hash_origin: Vector2i, climate: Dictionary) -> Array:
+# tiles the nearest edge tile repeats. terrain, when given, supplies each regional tile's climate.
+func generate(site: Vector2i, regional_tiles: Array, hash_origin: Vector2i, climate: Dictionary, terrain: RegionalTerrain = null) -> Array:
+	begin(regional_tiles, terrain)
+	var base: Dictionary = land(site, hash_origin, climate)
+	apply_founding(base, climate)
+	return base["map"]
+
+func begin(regional_tiles: Array, terrain: RegionalTerrain) -> void:
 	window_tiles = regional_tiles
 	window_size = Vector2i((regional_tiles[0] as Array).size(), regional_tiles.size()) if not regional_tiles.is_empty() else Vector2i.ZERO
 	field_cache.clear()
+	arable_cache.clear()
+	climate_terrain = terrain
+
+# The town map's land: each tile from its own position, worked out NEIGHBOUR_MARGIN tiles past
+# the map so clay sees the bank beyond the edge, then cut to the map. Returns the map and what
+# founding reads (origin, and the hill, forest and fertile amounts per tile).
+func land(site: Vector2i, hash_origin: Vector2i, climate: Dictionary) -> Dictionary:
 	var town_origin: Vector2 = Vector2(hash_origin + site) * TOWN_TILES_PER_REGIONAL_TILE - Vector2(width, height) * 0.5 + Vector2(TOWN_TILES_PER_REGIONAL_TILE, TOWN_TILES_PER_REGIONAL_TILE) * 0.5
-	var local_map: Array = []
+	var margin: int = NEIGHBOUR_MARGIN
+	var wide: Vector2i = Vector2i(width + margin * 2, height + margin * 2)
+	var wide_origin: Vector2 = town_origin - Vector2(margin, margin)
 	var hill_amount: PackedFloat32Array = PackedFloat32Array()
 	var forest_amount: PackedFloat32Array = PackedFloat32Array()
 	var fertile_amount: PackedFloat32Array = PackedFloat32Array()
 	hill_amount.resize(width * height)
 	forest_amount.resize(width * height)
 	fertile_amount.resize(width * height)
-
-	for y in range(height):
+	var outcrop_above: float = noise_above(detail_noise, HILL_OUTCROP_SHARE)
+	var glade_above: float = noise_above(copse_noise, GLADE_SHARE)
+	var copse_above: float = noise_above(copse_noise, COPSE_SHARE)
+	var wide_map: Array = []
+	for y in range(wide.y):
 		var row: Array = []
-		for x in range(width):
-			var global: Vector2 = town_origin + Vector2(x, y)
-			var regional: Vector2 = Vector2(site) + Vector2(0.5, 0.5) + (Vector2(x, y) + Vector2(0.5, 0.5) - Vector2(width, height) * 0.5) / TOWN_TILES_PER_REGIONAL_TILE
-			regional += Vector2(warp_noise_x.get_noise_2d(global.x, global.y), warp_noise_y.get_noise_2d(global.x, global.y)).limit_length(1.0) * WARP_TILES
-			var fields: PackedFloat32Array = blended_fields(regional)
+		for x in range(wide.x):
+			var global: Vector2 = wide_origin + Vector2(x, y)
+			# Worked out from global position in doubles: a Vector2 measured from the window's corner
+			# rounds differently in each window, enough to flip a tile that sits on a threshold.
+			var warp: Vector2 = Vector2(warp_noise_x.get_noise_2d(global.x, global.y), warp_noise_y.get_noise_2d(global.x, global.y)).limit_length(1.0) * WARP_TILES
+			var rx: float = (float(global.x) + 0.5) / TOWN_TILES_PER_REGIONAL_TILE + float(warp.x)
+			var ry: float = (float(global.y) + 0.5) / TOWN_TILES_PER_REGIONAL_TILE + float(warp.y)
+			var cell: Vector2i = Vector2i(floori(rx - 0.5), floori(ry - 0.5)) - hash_origin
+			var within: Vector2 = Vector2(rx - 0.5 - floorf(rx - 0.5), ry - 0.5 - floorf(ry - 0.5))
+			var fields: PackedFloat32Array = blended_fields_at(cell, within)
 			var edge: float = edge_noise.get_noise_2d(global.x, global.y) * EDGE_NOISE
 			var tile: Dictionary = {"type": "ground", "has_trees": false, "is_fertile": false, "occupied": false, "water_kind": "", "resource": "none", "has_road": false, "is_hill": false}
-			var i: int = y * width + x
-			hill_amount[i] = fields[FIELD_HILL]
-			# Sloping land, slow to cross; its steepest share becomes rock (add_hill_outcrops).
-			tile["is_hill"] = hill_amount[i] > FEATURE_THRESHOLD
-			forest_amount[i] = fields[FIELD_FOREST]
-			fertile_amount[i] = fields[FIELD_FERTILE] + edge
+			var near: Vector2i = Vector2i(floori(rx), floori(ry)) - hash_origin
+			var near_within: Vector2 = Vector2(rx - floorf(rx), ry - floorf(ry))
+			# Sloping land, slow to cross; its steepest share is rock (outcrops, below).
+			tile["is_hill"] = fields[FIELD_HILL] > FEATURE_THRESHOLD
+			var fertile: float = fields[FIELD_FERTILE] + edge
 			if fields[FIELD_WATER] + edge > WATER_THRESHOLD:
 				tile["type"] = "water"
-				tile["water_kind"] = dominant_kind(regional, "water")
+				tile["water_kind"] = nearest_kind(near, near_within, "water", hash_origin)[0]
 			elif fields[FIELD_MOUNTAIN] + edge > FEATURE_THRESHOLD:
 				tile["type"] = "rough"
 			elif fields[FIELD_DEPOSIT] + edge > DEPOSIT_THRESHOLD:
 				tile["type"] = "rough"
-				tile["resource"] = dominant_kind(regional, "resource")
+				var found: Array = nearest_kind(near, near_within, "resource", hash_origin)
+				tile["resource"] = found[0]
+				# Limestone (sprint S5): whole deposits, LIMESTONE_SHARE of them, known by the regional
+				# tile the stone comes from.
+				var source: Vector2i = found[1]
+				if found[0] == "stone" and float(absi(hash([source.x, source.y, "limestone"])) % 1000) / 1000.0 < EconomyBalance.LIMESTONE_SHARE:
+					tile["stone_kind"] = "limestone"
 			elif fields[FIELD_ROAD] - absf(edge) * 0.5 > ROAD_THRESHOLD:
 				tile["has_road"] = true
 			elif fields[FIELD_FOREST] + edge > FEATURE_THRESHOLD:
 				tile["has_trees"] = true
+			# Outcrops on hill land, glades in woods, copses on open land, then arable land.
+			if tile["type"] == "ground" and not tile["has_road"] and tile["is_hill"] and detail_noise.get_noise_2d(global.x, global.y) >= outcrop_above:
+				tile["type"] = "rough"
+				tile["has_trees"] = false
+			if tile["has_trees"] and copse_noise.get_noise_2d(global.x, global.y) >= glade_above:
+				tile["has_trees"] = false
+			if tile["type"] == "ground" and not tile["has_trees"] and not tile["has_road"] and fields[FIELD_FOREST] <= 0.3 and copse_noise.get_noise_2d(global.x + 500.0, global.y) >= copse_above:
+				tile["has_trees"] = true
+			if tile["type"] == "ground" and not tile["has_trees"] and not tile["has_road"]:
+				tile["is_fertile"] = is_arable(global, fertile, fields[FIELD_HILL], climate)
+			var inner: Vector2i = Vector2i(x - margin, y - margin)
+			if inner.x >= 0 and inner.y >= 0 and inner.x < width and inner.y < height:
+				var i: int = inner.y * width + inner.x
+				hill_amount[i] = fields[FIELD_HILL]
+				forest_amount[i] = fields[FIELD_FOREST]
+				fertile_amount[i] = fertile
 			row.append(tile)
-		local_map.append(row)
+		wide_map.append(row)
+	add_clay(wide_map, wide_origin)
+	var local_map: Array = []
+	for y in range(height):
+		local_map.append((wide_map[y + margin] as Array).slice(margin, margin + width))
+	return {"map": local_map, "origin": town_origin, "hill": hill_amount, "forest": forest_amount, "fertile": fertile_amount}
 
-	add_hill_outcrops(local_map, hill_amount, town_origin)
-	add_glades(local_map, town_origin)
+# What a founding changes on the land: its heart is cleared (water stays water), and so is the ring
+# of copses about it; land they open is judged for farming as any open land is. Nothing else.
+func apply_founding(base: Dictionary, climate: Dictionary) -> void:
+	var local_map: Array = base["map"]
+	var town_origin: Vector2 = base["origin"]
+	var center: Vector2 = Vector2(width, height) * 0.5
 	clear_center(local_map)
-	add_copses(local_map, forest_amount, town_origin, COPSE_SHARE)
-	add_arable_land(local_map, hill_amount, fertile_amount, town_origin, climate)
-	ensure_floors(local_map, forest_amount, town_origin)
-	add_clay_and_limestone(local_map, town_origin)
-	return local_map
+	for y in range(height):
+		for x in range(width):
+			var tile: Dictionary = local_map[y][x]
+			var i: int = y * width + x
+			var opened: bool = Vector2(x + 0.5, y + 0.5).distance_to(center) <= CENTER_CLEAR_RADIUS
+			if tile["has_trees"] and float(base["forest"][i]) <= 0.3 and Vector2(x, y).distance_to(center) < COPSE_CENTER_DISTANCE:
+				tile["has_trees"] = false
+				opened = true
+			if opened and tile["type"] == "ground" and not tile["has_trees"] and not tile["has_road"]:
+				tile["is_fertile"] = is_arable(town_origin + Vector2(x, y), base["fertile"][i], base["hill"][i], climate)
+
 
 # --- Regional fields ------------------------------------------------------------------------
 
@@ -179,11 +261,9 @@ static func tile_fields(tile: Dictionary) -> PackedFloat32Array:
 	fields[FIELD_ROAD] = 1.0 if tile.get("has_road", false) == true and not is_water else 0.0
 	return fields
 
-# Bilinear blend of the four regional tiles whose centers surround a regional position.
-func blended_fields(regional: Vector2) -> PackedFloat32Array:
-	var q: Vector2 = regional - Vector2(0.5, 0.5)
-	var base: Vector2i = Vector2i(q.floor())
-	var f: Vector2 = q - Vector2(base)
+# Bilinear blend of the four regional tiles whose centers surround a position: base is the
+# corner tile (window coordinates), f the position between it and the next.
+func blended_fields_at(base: Vector2i, f: Vector2) -> PackedFloat32Array:
 	var result: PackedFloat32Array = PackedFloat32Array()
 	result.resize(FIELD_COUNT)
 	for corner in range(4):
@@ -198,11 +278,12 @@ func blended_fields(regional: Vector2) -> PackedFloat32Array:
 	return result
 
 # The kind of water ("river", "lake", "sea") or deposit ("stone", "iron") among the regional
-# tiles around a position: the nearest tile that has one.
-func dominant_kind(regional: Vector2, what: String) -> String:
+# tiles around a position, the nearest that has one, and that tile's global position:
+# [kind, global regional tile]. center is in window coordinates, within the position inside it.
+func nearest_kind(center: Vector2i, within: Vector2, what: String, hash_origin: Vector2i) -> Array:
 	var best: String = ""
+	var best_cell: Vector2i = center
 	var best_distance: float = INF
-	var center: Vector2i = Vector2i(regional.floor())
 	for dy in range(-1, 2):
 		for dx in range(-1, 2):
 			var tile: Dictionary = regional_tile(center.x + dx, center.y + dy)
@@ -215,38 +296,16 @@ func dominant_kind(regional: Vector2, what: String) -> String:
 				kind = tile["resource"]
 			if kind == "":
 				continue
-			var distance: float = regional.distance_to(Vector2(center.x + dx, center.y + dy) + Vector2(0.5, 0.5))
+			var distance: float = within.distance_to(Vector2(dx, dy) + Vector2(0.5, 0.5))
 			if distance < best_distance:
 				best_distance = distance
 				best = kind
+				best_cell = center + Vector2i(dx, dy)
 	if best == "":
-		return "river" if what == "water" else "stone"
-	return best
+		best = "river" if what == "water" else "stone"
+	return [best, best_cell + hash_origin]
 
 # --- Town-scale detail ------------------------------------------------------------------------
-
-# Steep rock on hill land: the highest-ranked share of a detail noise among hill tiles.
-func add_hill_outcrops(local_map: Array, hill_amount: PackedFloat32Array, town_origin: Vector2) -> void:
-	var candidates: Array[Vector2i] = []
-	for y in range(height):
-		for x in range(width):
-			var tile: Dictionary = local_map[y][x]
-			if tile["type"] == "ground" and not tile["has_road"] and hill_amount[y * width + x] > FEATURE_THRESHOLD:
-				candidates.append(Vector2i(x, y))
-	for cell: Vector2i in top_ranked(candidates, detail_noise, town_origin, HILL_OUTCROP_SHARE):
-		var tile: Dictionary = local_map[cell.y][cell.x]
-		tile["type"] = "rough"
-		tile["has_trees"] = false
-
-# Small openings inside woods, so a forest edge site still reads as woodland with clearings.
-func add_glades(local_map: Array, town_origin: Vector2) -> void:
-	var wooded: Array[Vector2i] = []
-	for y in range(height):
-		for x in range(width):
-			if local_map[y][x]["has_trees"] == true:
-				wooded.append(Vector2i(x, y))
-	for cell: Vector2i in top_ranked(wooded, copse_noise, town_origin, GLADE_SHARE):
-		local_map[cell.y][cell.x]["has_trees"] = false
 
 # The founding tile is open land, but blending can bring trees or rock onto it: the town's
 # heart is kept clear (water stays water).
@@ -260,91 +319,54 @@ func clear_center(local_map: Array) -> void:
 			if tile["type"] == "rough":
 				tile["type"] = "ground"
 				tile["resource"] = "none"
+				tile.erase("stone_kind")
 			tile["has_trees"] = false
-
-# Copses: the highest-ranked share of open land outside the woods and away from the center.
-func add_copses(local_map: Array, forest_amount: PackedFloat32Array, town_origin: Vector2, share: float) -> void:
-	var center: Vector2 = Vector2(width, height) * 0.5
-	var open_land: Array[Vector2i] = []
-	for y in range(height):
-		for x in range(width):
-			var tile: Dictionary = local_map[y][x]
-			if tile["type"] != "ground" or tile["has_trees"] or tile["has_road"]:
-				continue
-			if forest_amount[y * width + x] > 0.3 or Vector2(x, y).distance_to(center) < COPSE_CENTER_DISTANCE:
-				continue
-			open_land.append(Vector2i(x, y))
-	for cell: Vector2i in top_ranked(open_land, copse_noise, town_origin + Vector2(500.0, 0.0), share):
-		local_map[cell.y][cell.x]["has_trees"] = true
-		# Copses added late (the tree floor) can fall on farmland; wooded land is not farmland.
-		local_map[cell.y][cell.x]["is_fertile"] = false
 
 static func arable_share(climate: Dictionary) -> float:
 	var warmth: float = smoothstep(0.2, 0.42, float(climate.get("temperature", 0.55)))
 	var wetness: float = smoothstep(0.15, 0.5, float(climate.get("moisture", 0.6)))
 	return lerpf(ARABLE_SHARE_POOR, ARABLE_SHARE_GOOD, warmth * wetness)
 
-# Regional fertile land stays fertile; other open land is arable in pockets, ranked by a slow
-# noise so they form fields rather than speckles.
-func add_arable_land(local_map: Array, hill_amount: PackedFloat32Array, fertile_amount: PackedFloat32Array, town_origin: Vector2, climate: Dictionary) -> void:
-	var lowland: Array[Vector2i] = []
-	var upland: Array[Vector2i] = []
-	for y in range(height):
-		for x in range(width):
-			var tile: Dictionary = local_map[y][x]
-			if tile["type"] != "ground" or tile["has_trees"] or tile["has_road"]:
-				continue
-			if fertile_amount[y * width + x] > FEATURE_THRESHOLD:
-				tile["is_fertile"] = true
-			elif hill_amount[y * width + x] > FEATURE_THRESHOLD:
-				upland.append(Vector2i(x, y))
-			else:
-				lowland.append(Vector2i(x, y))
-	var share: float = arable_share(climate)
-	for cell: Vector2i in top_ranked(lowland, pocket_noise, town_origin, share):
-		local_map[cell.y][cell.x]["is_fertile"] = true
-	for cell: Vector2i in top_ranked(upland, pocket_noise, town_origin, share * HILL_ARABLE_FACTOR):
-		local_map[cell.y][cell.x]["is_fertile"] = true
+# Regional fertile land stays fertile; other open land is arable in pockets of a slow noise, so
+# they form fields rather than speckles, the share set by the climate (half on hills).
+func is_arable(global: Vector2, fertile_amount: float, hill_amount: float, climate: Dictionary) -> bool:
+	if fertile_amount > FEATURE_THRESHOLD:
+		return true
+	var share: float = arable_share_at(global, climate)
+	if hill_amount > FEATURE_THRESHOLD:
+		share *= HILL_ARABLE_FACTOR
+	return pocket_noise.get_noise_2d(global.x, global.y) >= noise_above(pocket_noise, share)
 
-# Every town keeps room to build, a little farmland, and woods in reach. Shortfalls are made up
-# nearest the center first: rock and trees cleared, open land made arable, copses added.
-func ensure_floors(local_map: Array, forest_amount: PackedFloat32Array, town_origin: Vector2) -> void:
-	var by_distance: Array[Vector2i] = tiles_by_center_distance()
-	var buildable: int = count_tiles(local_map, func(t: Dictionary) -> bool: return is_buildable(t))
-	for cell: Vector2i in by_distance:
-		if buildable >= MIN_BUILDABLE_TILES:
-			break
-		var tile: Dictionary = local_map[cell.y][cell.x]
-		if tile["type"] == "water" or tile["has_road"] or is_buildable(tile):
-			continue
-		tile["type"] = "ground"
-		tile["resource"] = "none"
-		tile["has_trees"] = false
-		buildable += 1
-	var fertile: int = count_tiles(local_map, func(t: Dictionary) -> bool: return t["is_fertile"] == true)
-	for cell: Vector2i in by_distance:
-		if fertile >= MIN_FERTILE_TILES:
-			break
-		var tile: Dictionary = local_map[cell.y][cell.x]
-		if is_buildable(tile) and not tile["is_fertile"]:
-			tile["is_fertile"] = true
-			fertile += 1
-	var share: float = COPSE_SHARE
-	while count_tiles(local_map, func(t: Dictionary) -> bool: return t["has_trees"] == true) < MIN_TREE_TILES and share < 0.5:
-		share += 0.02
-		add_copses(local_map, forest_amount, town_origin, share)
+# The climate's arable share at a town tile: blended between regional tiles' climates on the
+# continuous map; the site's own on a bounded one.
+func arable_share_at(global: Vector2, climate: Dictionary) -> float:
+	if climate_terrain == null:
+		return arable_share(climate)
+	var q: Vector2 = (global + Vector2(0.5, 0.5)) / TOWN_TILES_PER_REGIONAL_TILE - Vector2(0.5, 0.5)
+	var base: Vector2i = Vector2i(q.floor())
+	var f: Vector2 = q - Vector2(base)
+	var result: float = 0.0
+	for corner in range(4):
+		var offset: Vector2i = Vector2i(corner % 2, corner / 2)
+		var cell: Vector2i = base + offset
+		if not arable_cache.has(cell):
+			arable_cache[cell] = arable_share(climate_terrain.climate_at(cell))
+		result += float(arable_cache[cell]) * (f.x if offset.x == 1 else 1.0 - f.x) * (f.y if offset.y == 1 else 1.0 - f.y)
+	return result
 
-# Clay and limestone (sprint S5), a last pass that changes nothing but the tiles' resource, so the
-# land itself is as before. Clay: open ground beside a river or lake (never the sea), the bank itself
-# and, here and there, a tile further back. Limestone: whole stone outcrops, LIMESTONE_SHARE of them,
-# picked by the outcrop's place on the planet. Both a pure function of global position, like the
-# rest of the town map (no game randomness).
+# Clay (sprint S5), which changes nothing but the tiles' resource: open ground beside a river or
+# lake (never the sea), the bank itself and, here and there, a tile further back. A tile's
+# neighbours are read only where the map holds them, so callers work the land out past the edge
+# they care about (land, NEIGHBOUR_MARGIN). A pure function of global position.
 const CLAY_BANK_REACH: int = 2
 const CLAY_BACK_SHARE: float = 0.5
 
-func add_clay_and_limestone(local_map: Array, town_origin: Vector2) -> void:
-	for y in range(height):
-		for x in range(width):
+func add_clay(local_map: Array, origin: Vector2) -> void:
+	var rows: int = local_map.size()
+	var columns: int = (local_map[0] as Array).size() if rows > 0 else 0
+	var clay: Array[Vector2i] = []
+	for y in range(rows):
+		for x in range(columns):
 			var tile: Dictionary = local_map[y][x]
 			if tile["type"] != "ground" or tile["resource"] != "none":
 				continue
@@ -353,69 +375,30 @@ func add_clay_and_limestone(local_map: Array, town_origin: Vector2) -> void:
 				for dx in range(-CLAY_BANK_REACH, CLAY_BANK_REACH + 1):
 					var ny: int = y + dy
 					var nx: int = x + dx
-					if ny < 0 or ny >= height or nx < 0 or nx >= width:
+					if ny < 0 or ny >= rows or nx < 0 or nx >= columns:
 						continue
 					var other: Dictionary = local_map[ny][nx]
 					if other["type"] == "water" and other.get("water_kind", "") != "sea":
 						nearest = mini(nearest, maxi(absi(dx), absi(dy)))
-			var global: Vector2i = Vector2i(town_origin) + Vector2i(x, y)
+			var global: Vector2i = Vector2i(origin) + Vector2i(x, y)
 			if nearest <= 1 or (nearest <= CLAY_BANK_REACH and float(absi(hash([global.x, global.y, "clay"])) % 1000) / 1000.0 < CLAY_BACK_SHARE):
-				tile["resource"] = "clay"
-	var seen: Dictionary = {}
-	for y in range(height):
-		for x in range(width):
-			if seen.has(Vector2i(x, y)) or local_map[y][x]["resource"] != "stone":
-				continue
-			# The outcrop, by flood fill, known by its first tile on the planet.
-			var outcrop: Array[Vector2i] = []
-			var open: Array[Vector2i] = [Vector2i(x, y)]
-			seen[Vector2i(x, y)] = true
-			while not open.is_empty():
-				var cell: Vector2i = open.pop_back()
-				outcrop.append(cell)
-				for side: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-					var next: Vector2i = cell + side
-					if next.x >= 0 and next.y >= 0 and next.x < width and next.y < height and not seen.has(next) and local_map[next.y][next.x]["resource"] == "stone":
-						seen[next] = true
-						open.append(next)
-			var key: Vector2i = Vector2i(town_origin) + Vector2i(x, y)
-			if float(absi(hash([key.x, key.y, "limestone"])) % 1000) / 1000.0 < EconomyBalance.LIMESTONE_SHARE:
-				for cell: Vector2i in outcrop:
-					local_map[cell.y][cell.x]["stone_kind"] = "limestone"
+				clay.append(Vector2i(x, y))
+	for cell: Vector2i in clay:
+		local_map[cell.y][cell.x]["resource"] = "clay"
 
 static func is_buildable(tile: Dictionary) -> bool:
 	return tile["type"] == "ground" and not tile["has_trees"] and not tile["has_road"]
 
-func count_tiles(local_map: Array, predicate: Callable) -> int:
-	var count: int = 0
-	for row: Array in local_map:
-		for tile: Dictionary in row:
-			if predicate.call(tile):
-				count += 1
-	return count
-
-func tiles_by_center_distance() -> Array[Vector2i]:
-	var center: Vector2 = Vector2(width, height) * 0.5
-	var cells: Array[Vector2i] = []
-	for y in range(height):
-		for x in range(width):
-			cells.append(Vector2i(x, y))
-	cells.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return (Vector2(a) + Vector2(0.5, 0.5)).distance_squared_to(center) < (Vector2(b) + Vector2(0.5, 0.5)).distance_squared_to(center))
-	return cells
-
-# The given share of cells with the highest noise; ranking rather than a fixed threshold keeps
-# the share exact whatever the noise does locally. Ties break by position, so the result is
-# deterministic.
-func top_ranked(cells: Array[Vector2i], noise: FastNoiseLite, town_origin: Vector2, share: float) -> Array[Vector2i]:
-	var result: Array[Vector2i] = []
-	var count: int = roundi(cells.size() * clampf(share, 0.0, 1.0))
-	if count <= 0:
-		return result
-	var scored: Array = []
-	for cell: Vector2i in cells:
-		var global: Vector2 = town_origin + Vector2(cell)
-		scored.append([noise.get_noise_2d(global.x, global.y), cell.y * width + cell.x, cell])
-	scored.sort_custom(func(a: Array, b: Array) -> bool: return a[0] > b[0] or (a[0] == b[0] and a[1] < b[1]))
-	for i in range(count):
-		result.append(scored[i][2])
-	return result
+# The noise value above which the given share of the planet's tiles lie. Noise is not uniform, so
+# this reads a fixed sample of it; the sample, like the noise, is the same every run.
+static func noise_above(noise: FastNoiseLite, share: float) -> float:
+	if not noise_quantiles.has(noise.seed):
+		var values: PackedFloat32Array = PackedFloat32Array()
+		values.resize(QUANTILE_SAMPLES * QUANTILE_SAMPLES)
+		for y in range(QUANTILE_SAMPLES):
+			for x in range(QUANTILE_SAMPLES):
+				values[y * QUANTILE_SAMPLES + x] = noise.get_noise_2d(x * QUANTILE_STEP, y * QUANTILE_STEP)
+		values.sort()
+		noise_quantiles[noise.seed] = values
+	var sorted: PackedFloat32Array = noise_quantiles[noise.seed]
+	return sorted[clampi(roundi((1.0 - clampf(share, 0.0, 1.0)) * (sorted.size() - 1)), 0, sorted.size() - 1)]

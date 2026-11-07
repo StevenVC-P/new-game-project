@@ -2,7 +2,8 @@ extends SceneTree
 
 # Town maps magnify the regional land around their site (LocalCityMapGenerator): the same
 # site always gives the same town; deep inside a regional feature the town has that feature;
-# every town keeps room to start; the town's heart is clear.
+# every window onto the planet agrees on the land; founding clears the town's heart and changes
+# nothing else (no floors).
 
 const MainScript = preload("res://scripts/main.gd")
 
@@ -27,6 +28,7 @@ func run_all() -> void:
 	test_generation_is_deterministic()
 	test_town_follows_the_region()
 	test_every_town_can_start()
+	test_windows_agree()
 	test_original_maps_still_work()
 	terrain.wait_for_tasks()
 
@@ -133,22 +135,77 @@ static func regional_category(tile: Dictionary) -> String:
 		return "forest"
 	return "open"
 
+# Founding clears the town's heart and nothing more: no floors of room, farmland or woods
+# (owner, 2026-11-07). The land under a town is the land there.
 func test_every_town_can_start() -> void:
 	var center: Vector2i = Vector2i(MainScript.CITY_MAP_WIDTH, MainScript.CITY_MAP_HEIGHT) / 2
+	var fertile_counts: Array[int] = []
 	for entry: Array in probed:
-		check_floors(entry[1], str(entry[0]))
+		check_tiles(entry[1], str(entry[0]))
 		var heart: Dictionary = entry[1][center.y][center.x]
 		_check(heart["type"] != "rough" and not heart["has_trees"], "the town's heart should be clear " + str(entry[0]))
+		var global_site: Vector2i = entry[0]
+		var base: Array = LocalCityMapGenerator.new(MainScript.CITY_MAP_WIDTH, MainScript.CITY_MAP_HEIGHT).generate_base_from_terrain(terrain, global_site, terrain.climate_at(global_site))
+		var changed: int = 0
+		var outside: int = 0
+		var fertile: int = 0
+		for y in range(MainScript.CITY_MAP_HEIGHT):
+			for x in range(MainScript.CITY_MAP_WIDTH):
+				fertile += 1 if entry[1][y][x]["is_fertile"] else 0
+				if entry[1][y][x] == base[y][x]:
+					continue
+				changed += 1
+				# Founding opens the heart and the copses near it; anything farther is unchanged.
+				if Vector2(x, y).distance_to(Vector2(center)) >= LocalCityMapGenerator.COPSE_CENTER_DISTANCE + 1.0:
+					outside += 1
+		fertile_counts.append(fertile)
+		_check(outside == 0, "founding should change only the town's heart and the copses by it (%d tiles beyond) %s" % [outside, str(global_site)])
+	fertile_counts.sort()
+	print("[TOWN] farmland tiles per town, lowest to highest: ", fertile_counts)
 
-func check_floors(local_map: Array, label: String) -> void:
-	var buildable: int = 0
-	var fertile: int = 0
-	var trees: int = 0
+# Every window onto the planet agrees on the land (master roadmap Phase 1): maps of sites 2 and 8
+# regional tiles apart agree where they overlap, and 64x44 maps agree with a large map around them.
+func test_windows_agree() -> void:
+	var fields: Array[String] = ["type", "water_kind", "resource", "stone_kind", "has_road", "is_hill", "has_trees", "is_fertile"]
+	var compared: int = 0
+	var mismatched: int = 0
+	var size: Vector2i = Vector2i(MainScript.CITY_MAP_WIDTH, MainScript.CITY_MAP_HEIGHT)
+	for entry: Array in probed.slice(0, 8):
+		var site: Vector2i = entry[0]
+		var here: Array = base_at(site, size)
+		for shift: int in [2, 8]:
+			var offset: int = shift * LocalCityMapGenerator.TOWN_TILES_PER_REGIONAL_TILE
+			var there: Array = base_at(Vector2i(terrain.wrap_tile_x(site.x + shift), site.y), size)
+			for y in range(size.y):
+				for x in range(size.x - offset):
+					compared += 1
+					mismatched += 0 if same_land(here[y][x + offset], there[y][x], fields) else 1
+	var big_size: Vector2i = Vector2i(160, 120)
+	for entry: Array in probed.slice(0, 3):
+		var site: Vector2i = entry[0]
+		var big: Array = base_at(site, big_size)
+		for shift: Vector2i in [Vector2i.ZERO, Vector2i(-5, 4), Vector2i(6, -7)]:
+			var small: Array = base_at(site + shift, size)
+			var at: Vector2i = shift * LocalCityMapGenerator.TOWN_TILES_PER_REGIONAL_TILE + big_size / 2 - size / 2
+			for y in range(size.y):
+				for x in range(size.x):
+					compared += 1
+					mismatched += 0 if same_land(small[y][x], big[at.y + y][at.x + x], fields) else 1
+	print("[TOWN] windows onto the same land: %d tiles compared, %d differ" % [compared, mismatched])
+	_check(compared > 20000 and mismatched == 0, "every window should agree on the land (%d of %d tiles differ)" % [mismatched, compared])
+
+func base_at(site: Vector2i, size: Vector2i) -> Array:
+	return LocalCityMapGenerator.new(size.x, size.y).generate_base_from_terrain(terrain, site, terrain.climate_at(site))
+
+static func same_land(a: Dictionary, b: Dictionary, fields: Array[String]) -> bool:
+	for field: String in fields:
+		if a.get(field, "") != b.get(field, ""):
+			return false
+	return true
+
+func check_tiles(local_map: Array, label: String) -> void:
 	for row: Array in local_map:
 		for tile: Dictionary in row:
-			buildable += 1 if LocalCityMapGenerator.is_buildable(tile) else 0
-			fertile += 1 if tile["is_fertile"] else 0
-			trees += 1 if tile["has_trees"] else 0
 			if tile["type"] == "water":
 				_check(tile["water_kind"] in ["river", "lake", "sea"], "water should say what kind it is " + label)
 				_check(not tile["has_trees"] and not tile["is_fertile"], "water should hold no trees or farmland " + label)
@@ -159,9 +216,8 @@ func check_floors(local_map: Array, label: String) -> void:
 				_check(tile["type"] == "rough", "deposits should be rough ground " + label)
 			if tile["is_fertile"]:
 				_check(LocalCityMapGenerator.is_buildable(tile), "farmland should be open ground " + label)
-	_check(buildable >= LocalCityMapGenerator.MIN_BUILDABLE_TILES, "a town should have room to build " + label)
-	_check(fertile >= LocalCityMapGenerator.MIN_FERTILE_TILES, "a town should have some farmland " + label)
-	_check(trees >= LocalCityMapGenerator.MIN_TREE_TILES, "a town should have woods in reach " + label)
+			if tile.has("stone_kind"):
+				_check(tile["resource"] == "stone", "only stone deposits can be limestone " + label)
 
 # Bounded regional maps (no world) still get town maps, the same for the same site.
 func test_original_maps_still_work() -> void:
@@ -175,7 +231,7 @@ func test_original_maps_still_work() -> void:
 			if not FoundingSiteHelper.is_valid_founding_tile(tiles, region["cities"], Vector2i(x, y), MainScript.MIN_CITY_DISTANCE):
 				continue
 			var local_map: Array = generator.generate(Vector2i(x, y), tiles, Vector2i.ZERO, LocalCityMapGenerator.DEFAULT_CLIMATE)
-			check_floors(local_map, "original map " + str(Vector2i(x, y)))
+			check_tiles(local_map, "original map " + str(Vector2i(x, y)))
 			_check(local_map == generator.generate(Vector2i(x, y), tiles, Vector2i.ZERO, LocalCityMapGenerator.DEFAULT_CLIMATE), "original maps should give the same town for the same site")
 			checked += 1
 	_check(checked >= 5, "the original map should offer sites to check")

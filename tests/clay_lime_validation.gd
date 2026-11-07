@@ -67,7 +67,7 @@ func clay_tiles(map: Array) -> Array[Vector2i]:
 func test_the_map_lays_clay_and_limestone() -> void:
 	var generator: LocalCityMapGenerator = LocalCityMapGenerator.new(64, 44)
 	var map: Array = land()
-	generator.add_clay_and_limestone(map, Vector2(100, 200))
+	generator.add_clay(map, Vector2(100, 200))
 	var clay: Array[Vector2i] = clay_tiles(map)
 	_check(not clay.is_empty(), "clay lies by the lake (%d tiles)" % clay.size())
 	_check(clay.all(func(t: Vector2i) -> bool: return t.x >= 2 and t.x < 12 and t.y >= 8 and t.y < 18), "and only near it, never by the sea")
@@ -77,25 +77,32 @@ func test_the_map_lays_clay_and_limestone() -> void:
 		for x in [3, 10]:
 			bank = bank and map[y][x]["resource"] == "clay"
 	_check(bank, "the bank itself is clay all along")
-	for outcrop: Rect2i in [Rect2i(20, 4, 5, 4), Rect2i(30, 30, 4, 4)]:
-		var kinds: Dictionary = {}
-		for y in range(outcrop.position.y, outcrop.end.y):
-			for x in range(outcrop.position.x, outcrop.end.x):
-				kinds[str(map[y][x].get("stone_kind", ""))] = true
-		_check(kinds.size() == 1, "an outcrop is limestone or not as a whole: %s" % str(kinds.keys()))
 	var again: Array = land()
-	generator.add_clay_and_limestone(again, Vector2(100, 200))
-	_check(again == map, "the same place lays the same clay and limestone")
-	var limestone_somewhere: bool = false
-	for i in range(40):
-		var other: Array = land()
-		generator.add_clay_and_limestone(other, Vector2(1000 * i, 37 * i))
-		limestone_somewhere = limestone_somewhere or str(other[5][21].get("stone_kind", "")) == "limestone"
-	_check(limestone_somewhere, "some places' outcrops are limestone")
+	generator.add_clay(again, Vector2(100, 200))
+	_check(again == map, "the same place lays the same clay")
+	# Limestone is a whole regional deposit (master roadmap Phase 1): on generated land, the stone a
+	# deposit gives is limestone or not throughout, and some deposits are.
+	var world: WorldMapData = FixedWorldDefinition.build()
+	var terrain: RegionalTerrain = RegionalTerrain.new(world)
+	var limestone: int = 0
+	var stone: int = 0
+	for settlement: WorldMapData.Settlement in world.settlements:
+		var site: Vector2i = terrain.settlement_tile(settlement)
+		var town_map: Array = LocalCityMapGenerator.new(64, 44).generate_base_from_terrain(terrain, site, terrain.climate_at(site))
+		for row: Array in town_map:
+			for tile: Dictionary in row:
+				if tile["resource"] == "stone":
+					stone += 1
+					limestone += 1 if str(tile.get("stone_kind", "")) == "limestone" else 0
+				elif tile.has("stone_kind"):
+					_check(false, "only stone is limestone")
+	terrain.wait_for_tasks()
+	print("[CLAY] stone tiles at the world's settlements: %d, limestone %d" % [stone, limestone])
+	_check(stone > 0 and limestone > 0 and limestone < stone, "some deposits are limestone and some aren't (%d of %d stone tiles)" % [limestone, stone])
 
 func test_brickworks_stand_on_clay() -> void:
 	var map: Array = land()
-	LocalCityMapGenerator.new(64, 44).add_clay_and_limestone(map, Vector2(100, 200))
+	LocalCityMapGenerator.new(64, 44).add_clay(map, Vector2(100, 200))
 	var city: City = town(map)
 	_check(city.construction.validate("brickworks", Vector2i(30, 20))["is_valid"] == false, "a brickworks away from the clay is refused")
 	_check(city.construction.validate("brickworks", Vector2i(10, 12))["is_valid"] == true, "one on the lake's clay is allowed")
@@ -129,7 +136,7 @@ func test_brick_as_a_material() -> void:
 
 func test_families_make_bricks_where_there_is_clay() -> void:
 	var map: Array = land()
-	LocalCityMapGenerator.new(64, 44).add_clay_and_limestone(map, Vector2(100, 200))
+	LocalCityMapGenerator.new(64, 44).add_clay(map, Vector2(100, 200))
 	var city: City = town(map)
 	_check(FamilyInitiative.get_occupations(city).has("brickworks"), "brickmaking is among the trades families choose")
 	var desire: Dictionary = FamilyInitiative.get_work_desire(city, city.households[0], "brickworks")
@@ -142,7 +149,7 @@ func test_the_survey_tells_it() -> void:
 	for y in range(4, 8):
 		for x in range(20, 25):
 			map[y][x]["stone_kind"] = "limestone"
-	LocalCityMapGenerator.new(64, 44).add_clay_and_limestone(map, Vector2(100, 200))
+	LocalCityMapGenerator.new(64, 44).add_clay(map, Vector2(100, 200))
 	var lines: String = str(SiteSurvey.get_lines(map, null))
 	_check(lines.contains("Clay:") and not lines.contains("Clay: none"), "the survey names the clay: %s" % lines)
 	_check(lines.contains("limestone"), "and the limestone")
