@@ -99,4 +99,4 @@ Run in the throwaway worktree `../ngg-ef-runs8`, labels `X-reach-private` and `X
 **Not yet explained:** two private towns lost, where fuel shortage is not the main story.
 - Balanced start 5: wood cut 10,687 → 338, woodcutters 2 → 0, short days 713 → 1234, hearths never short.
 - Marginal start 0: 82 → 7 people, wood cut 9036 → 420, woodcutters 3 → 0, fuel-short days 21 → 216. Reachable wood doesn't save it either.
-- Starting stock isn't the cause: a town starts with 45 wood, below plenty's floor. These need a trace before anyone calls them a defect or a poor choice.
+- Traced since: both are further S5b defects (`S5c_reachable_wood.md`). The starting-stock remark first written here was wrong: 45 wood reads as plenty 0.45.
