@@ -8,7 +8,7 @@ What is true right now. Durable detail lives in the linked docs, and past milest
 
 **No implementation sprint is authorized.** The owner is reviewing the long-term vision and future features.
 
-- **Proposed order of all work:** `docs/MASTER_ROADMAP.md` (2026-11-07, not approved). It sets Economic Foundations, map scale and population scale in phases, with a playtest between each.
+- **Proposed order of all work:** `docs/MASTER_ROADMAP.md` (structure approved 2026-11-07 as planning only; it authorizes no build or merge). It sets Economic Foundations, map scale and population scale in phases, with a playtest between each.
 
 - **Planned next, not authorized:** household property, private exchange, communal contributions and treasury allocations. The agreed plan is on branch `docs/property-and-communal-resources` (deliberately unmerged); the earlier audit is `docs/TREASURY_AUDIT.md`. A founding allocation is the intended lever on the first weeks. None of it is built.
 - **Design baseline for the economy and geography work:** `docs/RESOURCE_AND_PRODUCTION_AUDIT.md` (2026-11-02).

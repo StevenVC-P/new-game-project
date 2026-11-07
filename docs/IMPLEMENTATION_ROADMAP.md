@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-*Beyond the first playable village, the proposed order of work is `docs/MASTER_ROADMAP.md` (not yet approved).*
+*Beyond the first playable village, the proposed order of work is `docs/MASTER_ROADMAP.md` (approved as planning, 2026-11-07).*
 
 Ordered milestones from the current code (a founded hamlet) to the **first playable village**, drawn from the build orders in the design models (2026-10-19). Blocking owner decisions R1-R6 are resolved (see end).
 
