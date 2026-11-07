@@ -1398,6 +1398,8 @@ func apply_building_production(building: Building):
 		var made: int = apply_input_output_production(str(chain["output"]), output_amount, chain["inputs"], building)
 		if TownDeposits.draws_on_deposit(building):
 			TownDeposits.extract(self, building, made)
+		# A catch comes out of the town's fish or game (TownLand, sprint S13).
+		land.note_catch(building, made)
 	# A workplace with nothing left underfoot is worked out: its family is free for other work, and
 	# nobody is put to work there again (TownDeposits).
 	if TownDeposits.is_worked_out(self, building):

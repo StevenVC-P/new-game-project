@@ -525,7 +525,7 @@ func test_kept_woods_are_binding() -> void:
 	_check(elsewhere.x >= 60 and city.woodland.is_fellable(elsewhere), "the woodcutter seeks timber beyond the kept woods (%s)" % str(elsewhere))
 	var factor: float = city.woodland.get_felling_factor(cutter)
 	# Against the season's own share of a woodcutter's wood (felling is winter work since sprint S2).
-	_check(factor < 1.0 and factor >= EconomyBalance.LAND_YIELD_FLOOR and city.land.get_output_factor(cutter) < EconomyBalance.WOOD_SEASON_YIELD[city.get_season_index()], "and brings in less for the walk (%.2f)" % factor)
+	_check(factor < 1.0 and factor > 0.0 and city.land.get_output_factor(cutter) < EconomyBalance.WOOD_SEASON_YIELD[city.get_season_index()], "and brings in less for the walk (%.2f)" % factor)
 	for day in range(200):
 		city.woodland.fell_woods()
 	var kept_standing: bool = true

@@ -99,7 +99,7 @@ func test_distance_costs_wood() -> void:
 	var near_factor: float = near.woodland.get_felling_factor(a)
 	var far_factor: float = far.woodland.get_felling_factor(b)
 	_check(is_equal_approx(near_factor, 1.0), "trees within its reach give a full cut (%.2f)" % near_factor)
-	_check(far_factor < 0.6 and far_factor >= EconomyBalance.LAND_YIELD_FLOOR, "trees a dozen tiles off give about half (%.2f)" % far_factor)
+	_check(far_factor < 0.6 and far_factor > 0.0, "trees a dozen tiles off give about half (%.2f)" % far_factor)
 	_check(is_equal_approx(far.woodland.estimate_felling_factor_at(CUTTER, Vector2i(2, 2)), far_factor), "a family judging the site sees the same")
 
 func test_kept_woods_are_not_cut() -> void:

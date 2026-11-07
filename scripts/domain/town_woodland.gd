@@ -165,7 +165,7 @@ static func get_timber(tile: Dictionary) -> int:
 
 # How much of its wood a woodcutter brings in: all of it from trees it may fell within
 # WOODCUTTER_FULL_DISTANCE of its middle, less the farther it must walk to them (woods kept, woods
-# felled), down to the land's floor (EconomyBalance.LAND_YIELD_FLOOR); nothing with no tree it may
+# felled), with no floor (S13); nothing with no tree it may
 # fell left in reach of a route.
 func get_felling_factor(building: Building) -> float:
 	if not has_map():
@@ -177,7 +177,7 @@ func get_felling_factor(building: Building) -> float:
 
 static func get_distance_factor(origin: Vector2i, target: Vector2i) -> float:
 	var distance: float = Vector2(target - origin).length()
-	return clampf(EconomyBalance.WOODCUTTER_FULL_DISTANCE / maxf(EconomyBalance.WOODCUTTER_FULL_DISTANCE, distance), EconomyBalance.LAND_YIELD_FLOOR, 1.0)
+	return clampf(EconomyBalance.WOODCUTTER_FULL_DISTANCE / maxf(EconomyBalance.WOODCUTTER_FULL_DISTANCE, distance), 0.0, 1.0)
 
 # What a woodcutter at `origin` would bring in, judged by straight distance to the nearest trees it
 # could fell (families judging a site; FamilyInitiative). Reads only.
@@ -321,7 +321,7 @@ func get_hunting_threats() -> Array[Dictionary]:
 		if wooded - lost >= full:
 			continue
 		var days: float = 0.0 if wooded <= full else maxf(0.0, wooded - full - float(marked_here) * per_tile) / maxf(0.0001, rate * per_tile)
-		var after: float = clampf((wooded - lost) / full, EconomyBalance.LAND_YIELD_FLOOR, 1.0)
+		var after: float = clampf((wooded - lost) / full, 0.0, 1.0)
 		threats.append({"building": building, "woodcutters": cutters, "wooded": wooded, "full": full, "factor": city.land.get_reach_factor(building), "after": after, "days": days, "marked": marked_here, "kept": kept, "rect": rect})
 	return threats
 

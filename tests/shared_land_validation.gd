@@ -130,7 +130,7 @@ func test_pasture_same() -> void:
 	_check(share(city, a) < alone(city, a) and share(city, b) < alone(city, b), "two folds on the same pasture each graze less than all of it (%.1f of %.0f)" % [share(city, a), alone(city, a)])
 	_check(city.land.get_reach_factor(a) < whole and is_equal_approx(city.land.get_output_factor(a), city.land.get_reach_factor(a)), "and bring in less wool, in real output too (%.2f -> %.2f)" % [whole, city.land.get_output_factor(a)])
 	city.set_meta("pasture_not_shared", true)
-	_check(is_equal_approx(city.land.get_reach_factor(a), clampf(alone(city, a) / EconomyBalance.HERDER_FULL_PASTURE_TILES, EconomyBalance.LAND_YIELD_FLOOR, 1.0)), "before the fix (meta pasture_not_shared) each grazed all of it")
+	_check(is_equal_approx(city.land.get_reach_factor(a), clampf(alone(city, a) / EconomyBalance.HERDER_FULL_PASTURE_TILES, 0.0, 1.0)), "before the fix (meta pasture_not_shared) each grazed all of it")
 	city.remove_meta("pasture_not_shared")
 
 func test_pasture_overlapping() -> void:
