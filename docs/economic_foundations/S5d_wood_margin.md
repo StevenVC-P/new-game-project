@@ -46,10 +46,10 @@ Build `044e567`, run in `../ngg-ef-runs7`. Labels `S5d-pooled`, `-communal`, `-s
 | Private + reserve | 29 → 43 → 34 → 33 | 6598 → 9118 → 8054 → 7242 | 34 → 41 → 40 → 31 | 2113 → 1115 → 1385 → 1500 |
 
 - **The harm S5b added under compacts is largely gone.** Shared and private are back near their pre-S5b cold deaths and hunger deaths, and fuel-short days fall.
-- **The oversupply S5b set out to reduce stays reduced.** Wood in store per town stays 18–43% below the pre-S5b build under every arrangement.
+- **The oversupply S5b set out to reduce stays reduced.** Wood in store per town stays 14–43% below the pre-S5b build under every arrangement.
 - **Private doesn't fully recover:** 12 towns ok against 15 before S5b, with more fuel-short days. Shared is now above its earlier 20.
-- **Pooled cold deaths return to 60.** That is one town: balanced 2, a 59-person town that outgrew its wood, identical to the pre-S5b build. S5b's lower figure was that town's chance, not a lasting gain.
-- **Private + reserve falls 7 → 4,** five towns down and one up. It stays the worst arrangement, and swings of this size between near-identical builds aren't strong evidence alone.
+- **Pooled cold deaths return to 60.** Most of the rise is one town: balanced 2, a 59-person town that outgrew its wood (17 cold deaths against 4 under S5b), matching the pre-S5b build.
+- **Private + reserve falls 7 → 4,** four towns down and one up. It stays the worst arrangement, and swings of this size between near-identical builds aren't strong evidence alone.
 
 ### The traced towns, private
 
@@ -59,10 +59,10 @@ Build `044e567`, run in `../ngg-ef-runs7`. Labels `S5d-pooled`, `-communal`, `-s
 | Marginal 0: ok, people, wood cut | yes, 82, 9,036 | no, 7, 420 | no, 18, 816 | no, 13, 663 |
 
 - **Balanced 5 recovers:** wood is cut from the start and tools hold.
-- **Marginal 0 stays lost, and it isn't the wood reading this time.** The false plenty readings are gone: the town's first woodcutter stays, and wood is cut until it leaves or dies. Then its wood passes to the community, 344 wood reads 0.94 plenty against a small town's need, and no one cuts for years. Tools reach 0 by year 2 after the toolmaker turned to farming on day 180. That reading is honest: the wood is there. The older limit stands behind it: nothing prompts a family to take up tools or wood again in a town without them. Not corrected.
-- Before S5b this town's success came with 9,036 wood cut, so its 82 people partly rested on the oversupply S5b was built to remove.
+- **Marginal 0 stays lost, and the false wood readings are no longer why.** No family now leaves wood work on a false plenty; the one review on `wood_beyond_winter` changes nothing in the story. The toolmaker turns to farming on day 180, tools reach 0 by year 2, and wood cut stalls at 634 by then (663 by year 6), though a family stays a woodcutter until day 1140. The store, 344 wood held in common by year 2, reads 0.94 plenty against a small town's need, and that reading is honest: the wood is there. It looks like the tool gap, with nothing prompting a family back to toolmaking, but this wasn't traced further. Not corrected.
+- Before S5b this town's success came with 9,036 wood cut, against 663 now. Whether its 82 people depended on that surplus isn't established.
 
 ## For the owner
 
 - **Decide:** whether to keep S5d, and whether the margin's half and 100 stand.
-- **Still open:** the older occupation-choice limit (above) is the clearest remaining cause of lost private towns. Market value in work stays deferred.
+- **Still open:** the older occupation-choice limit, nothing prompting a family to take up missing work, may be what still loses marginal 0; it needs its own trace. Market value in work stays deferred.
