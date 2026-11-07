@@ -126,6 +126,7 @@ Status: Planned, Active, Complete, Blocked. Complexity: S (days), M (about a wee
 | S7 Contributions by category ◆ | E5 | **Active** (owner approved S7–S9 in order, 2026-11-05; built on `feature/ef-s7-compact`; [report](economic_foundations/S7_compact.md)) | S6 | Player sets % per category of total output; families keep the rest; new games ask for an initial choice | Matched towns at 100/60/30/10% | — | — |
 | S8 Redistribution and asking for help | E5, E11 | **Active** (built on `feature/ef-s8-commons`; [report](economic_foundations/S8_commons.md)) | S7 | Player's reserve/redistribute rules; families in danger seek the commons and neighbours | Report: deaths and departures where goods existed | — | — |
 | S9 Market day ◆ | E6 | **Active** (built on `feature/ef-s9-market`; [report](economic_foundations/S9_market.md)) | S7 | Monthly barter among families; urgent exchange any day; specialists live by exchange | Report: specialisation and wealth spread | — | — |
+| S9c Reserve rules (experiments) | E5 | **Experiment, not adopted** (`experiment/ef-reserve-rules`, `516465c`; report on that branch: `docs/economic_foundations/S9c_reserve_rules.md`) | S5d | Owner 2026-11-06: reserve last in order, a draw limit, 30-day danger, each behind a switch | Each run separately against S5d shared and private; no survival target | — | — |
 | S10 Food kinds and spoilage | E7 | Planned | — | Several food goods meet one need; storage and spoilage differ | Saves; matched survival | — | — |
 | S11 The farming year | E7 | Planned | S10 | Sowing and harvest seasons, labour peaks, winter stores; 2–3 grains, legumes, vegetables | Report by climate | — | — |
 | S12 Soil | E7 | Planned | S11 | Fertility tires and recovers (fallow, manure); suitability by soil and climate | Report over 10 years | — | — |
@@ -249,3 +250,4 @@ From `AGENTS.md`, `HANDOFF.md` and the brief: `main.gd` gets no simulation logic
 - 2026-11-02: owner's testing mandate → `docs/ECONOMIC_FOUNDATIONS_TEST_PLAN.md`. S1 split into S1a (framework and baseline) and S1b (quarries). Not started.
 - 2026-11-02: owner approved Q1–Q6 and authorized the work. Mortality from sustained hunger and cold added as S3b.
 - 2026-11-06: owner added E13 Local Value (V0–V4). Nothing built; V0 waits for the owner's word.
+- 2026-11-07: S5d built and compared; the three reserve rules run as experiments (S9c), none adopted. Planning reference: `economic_foundations/PLANNING_BRIEF.md`.
