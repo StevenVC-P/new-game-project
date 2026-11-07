@@ -6,8 +6,9 @@ What is true right now. Durable detail lives in the linked docs, and past milest
 
 ## Current Objective
 
-**Economic foundations and geographic diversity, in progress (authorized 2026-11-02).** Living backlog, sprint status and the next sprint: `docs/ECONOMIC_FOUNDATIONS_ROADMAP.md`; tests and evidence: `docs/ECONOMIC_FOUNDATIONS_TEST_PLAN.md`; sprint reports: `docs/economic_foundations/`. Integration branch `feature/economic-foundations` (worktree `../ngg-economic-foundations`); nothing reaches `develop` without the owner.
-- **Planned next, not authorized:** household property, private exchange, communal contributions and treasury allocations. The agreed plan is on branch `docs/property-and-communal-resources` (deliberately unmerged); the earlier audit is `docs/TREASURY_AUDIT.md`. A founding allocation is the intended lever on the first weeks. None of it is built.
+**Master roadmap Phase 0, integration (authorized 2026-11-07, through Phase 1).** The order of all work is `docs/MASTER_ROADMAP.md`. Phase 0 consolidates Economic Foundations S1a–S9 and the owner's Phase 0 decisions on branch `feature/phase0-integration` (worktree `../ngg-phase0`). The integration review is `docs/economic_foundations/PHASE0_INTEGRATION.md`. Nothing reaches `develop` without the owner's review, and Phase 1 starts after the Phase 0 checkpoint.
+
+- **Economic Foundations:** backlog and sprint cards in `docs/ECONOMIC_FOUNDATIONS_ROADMAP.md`, tests and evidence in `docs/ECONOMIC_FOUNDATIONS_TEST_PLAN.md`, sprint reports in `docs/economic_foundations/`.
 - **Design baseline for the economy and geography work:** `docs/RESOURCE_AND_PRODUCTION_AUDIT.md` (2026-11-02).
 
 ## State of Play
