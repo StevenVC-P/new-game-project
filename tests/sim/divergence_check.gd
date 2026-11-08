@@ -302,10 +302,18 @@ func play(site: Dictionary, start: int, condition: String, policy: String) -> Di
 			checker.check_month(town, day)
 			(state["fingerprints"] as Array).append(fingerprint(town))
 			if value_log != "":
-				ValueObserver.append(value_log.path_join(playing_label + ".jsonl"), ValueObserver.record(town, day, playing_label))
+				ValueObserver.append(value_log.path_join(playing_label + ".jsonl"), ValueObserver.record(town, day, playing_label, state.get("month_short", {})))
+				state["month_short"] = {}
 		if day % Calendar.DAYS_PER_MONTH == 0:
 			state["short_days_last_month"] = int(state.get("short_days_this_month", 0))
 			state["short_days_this_month"] = 0
+		# Each family's hungry days this month, for the value observer (E13 V0).
+		if value_log != "":
+			var month_short: Dictionary = state.get("month_short", {})
+			for household: Household in town.households:
+				if household.short_today:
+					month_short[household.id] = int(month_short.get(household.id, 0)) + 1
+			state["month_short"] = month_short
 		if town.resources["food_shortage"] == true:
 			state["short_days_this_month"] = int(state.get("short_days_this_month", 0)) + 1
 			state["short_days"] = int(state["short_days"]) + 1

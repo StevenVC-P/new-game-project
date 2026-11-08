@@ -12,7 +12,9 @@ extends RefCounted
 const Invariants = preload("res://tests/sim/economy_invariants.gd")
 const HORIZONS: Array[int] = [30, 90, 180, 360]
 
-static func record(city: City, day: int, label: String) -> Dictionary:
+# short_by_household: each family's hungry days this month, counted by the caller day by day (the
+# family's own count is reset at the month's turn, before the month's last day is observed).
+static func record(city: City, day: int, label: String, short_by_household: Dictionary = {}) -> Dictionary:
 	var started: int = Time.get_ticks_usec()
 	var goods: Dictionary = {}
 	var committed: Dictionary = city.construction.get_committed_materials()
@@ -49,7 +51,7 @@ static func record(city: City, day: int, label: String) -> Dictionary:
 			"keep": keep,
 			"offers": TownMarket.get_offers(city, household) if market else {},
 			"wants": TownMarket.get_wants(city, household) if market else {},
-			"short_days": household.short_days_this_month,
+			"short_days": int(short_by_household.get(household.id, household.short_days_this_month)),
 			"in_danger": TownCommons.is_in_danger(household),
 			"housing": household.housing_status,
 			"latent_home": str(MaterialChoice.choose(city, household, "house", true)["material"]),
