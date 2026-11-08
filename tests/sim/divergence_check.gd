@@ -30,6 +30,8 @@ extends SceneTree
 #                            then nearest the town centre; a family is found to work it as in play
 #   --repeat                 play each town twice and compare its monthly fingerprints (determinism)
 #   --seed=N                 only the town on the site with this seed
+#   --value-log=DIR          E13 V0: each town's monthly value inputs to DIR (tests/sim/value_observer.gd)
+#   --every-year             a TOWN line at every year's end (X1's long runs), not only years 3 and last
 # Lines: "[DIV] TOWN ..." one per town and snapshot (JSON), "[DIV] SUM ..." per group, "[DIV] INV ..."
 # for invariant violations, "[DIV] REPEAT ..." for determinism.
 
@@ -37,6 +39,7 @@ const TownBuildingCheck = preload("res://tests/sim/town_building_check.gd")
 const StandInPlayerScript = preload("res://tests/sim/stand_in_player.gd")
 const Layouts = preload("res://tests/sim/residential_layouts.gd")
 const Invariants = preload("res://tests/sim/economy_invariants.gd")
+const ValueObserver = preload("res://tests/sim/value_observer.gd")
 
 const ENVIRONMENTS: Array[String] = ["rocky_highland", "fertile_valley", "forested", "marginal", "balanced"]
 # Regions and sites per region in the pool, from the authored test world (as the other checks use).
@@ -60,6 +63,11 @@ var left_out: Array = []
 var compact: String = ""
 # The commons' rules under it (TownCommons): reserve days and grant rule, "30:in_need".
 var commons: String = ""
+# E13 V0: where each town's monthly value inputs go ("" off), and the town being played's label.
+var value_log: String = ""
+var playing_label: String = ""
+# X1 (master roadmap Phase 1): a snapshot at every year's end, for long runs.
+var every_year: bool = false
 # The deposit a workplace is best placed on, for choosing a commissioned site.
 const DEPOSIT_OF: Dictionary = {"quarry": "stone", "brickworks": "clay"}
 
@@ -101,6 +109,11 @@ func run() -> void:
 			repeat = true
 		elif argument.begins_with("--seed="):
 			only_seed = int(argument.trim_prefix("--seed="))
+		elif argument == "--every-year":
+			every_year = true
+		elif argument.begins_with("--value-log="):
+			value_log = argument.trim_prefix("--value-log=")
+			DirAccess.make_dir_recursive_absolute(value_log)
 	var groups: Dictionary = classify(collect_pool())
 	for environment: String in ENVIRONMENTS:
 		var seeds: Array = (groups[environment] as Array).map(func(s: Dictionary) -> int: return int(s["seed"]))
@@ -117,12 +130,17 @@ func run() -> void:
 			for environment: String in environments:
 				var sites: Array = (groups[environment] as Array).slice(from, from + starts)
 				var rows: Dictionary = {SNAPSHOT_YEAR: [], years: []} if years > SNAPSHOT_YEAR else {years: []}
+				if every_year:
+					rows.clear()
+					for year in range(1, years + 1):
+						rows[year] = []
 				var started: int = Time.get_ticks_msec()
 				for index in range(sites.size()):
 					var site: Dictionary = sites[index]
 					if only_seed >= 0 and int(site["seed"]) != only_seed:
 						continue
 					var start: int = from + index
+					playing_label = "%s_%s_%s_%d" % [environment, condition, policy, start]
 					var result: Dictionary = play(site, start, condition, policy)
 					if repeat:
 						var again: Dictionary = play(site, start, condition, policy)
@@ -283,9 +301,19 @@ func play(site: Dictionary, start: int, condition: String, policy: String) -> Di
 		if day % Calendar.DAYS_PER_MONTH == Calendar.DAYS_PER_MONTH - 1:
 			checker.check_month(town, day)
 			(state["fingerprints"] as Array).append(fingerprint(town))
+			if value_log != "":
+				ValueObserver.append(value_log.path_join(playing_label + ".jsonl"), ValueObserver.record(town, day, playing_label, state.get("month_short", {})))
+				state["month_short"] = {}
 		if day % Calendar.DAYS_PER_MONTH == 0:
 			state["short_days_last_month"] = int(state.get("short_days_this_month", 0))
 			state["short_days_this_month"] = 0
+		# Each family's hungry days this month, for the value observer (E13 V0).
+		if value_log != "":
+			var month_short: Dictionary = state.get("month_short", {})
+			for household: Household in town.households:
+				if household.short_today:
+					month_short[household.id] = int(month_short.get(household.id, 0)) + 1
+			state["month_short"] = month_short
 		if town.resources["food_shortage"] == true:
 			state["short_days_this_month"] = int(state.get("short_days_this_month", 0)) + 1
 			state["short_days"] = int(state["short_days"]) + 1
@@ -322,7 +350,9 @@ func play(site: Dictionary, start: int, condition: String, policy: String) -> Di
 				var spot: Vector2i = choose_commission_site(town, str(order["type"]))
 				var planned: bool = spot.x >= 0 and town.construction.request_building(str(order["type"]), spot, ConstructionProject.REQUESTED_BY_PLAYER) != null
 				(state["commissioned"] as Array).append({"type": order["type"], "day": day, "planned": planned, "deposit_tiles": count_deposit(town, str(order["type"]), spot) if planned else 0})
-		if day == SNAPSHOT_YEAR * Calendar.DAYS_PER_YEAR - 1 and years > SNAPSHOT_YEAR:
+		if every_year and (day + 1) % Calendar.DAYS_PER_YEAR == 0 and (day + 1) / Calendar.DAYS_PER_YEAR < years:
+			measured[(day + 1) / Calendar.DAYS_PER_YEAR] = measure(town, state, false)
+		elif day == SNAPSHOT_YEAR * Calendar.DAYS_PER_YEAR - 1 and years > SNAPSHOT_YEAR:
 			measured[SNAPSHOT_YEAR] = measure(town, state, false)
 		state["last_ms"] = Time.get_ticks_usec()
 	var result: Dictionary = StandInPlayerScript.new().play(city, scenario, years * Calendar.DAYS_PER_YEAR)
@@ -482,6 +512,19 @@ func measure(city: City, state: Dictionary, off_the_ground: bool) -> Dictionary:
 	m["failure"] = city.households.size() < EconomyBalance.FOUNDING_FAMILIES
 	m["people"] = city.get_total_population()
 	m["households"] = city.households.size()
+	# How full the town map is (X1): ground in use, ground still open to build on, farmland worked.
+	if not city.local_map.is_empty():
+		var ground: int = 0
+		var used: int = 0
+		var open: int = 0
+		for row: Array in city.local_map:
+			for tile: Dictionary in row:
+				if tile["type"] != "ground":
+					continue
+				ground += 1
+				used += 1 if tile["occupied"] == true else 0
+				open += 1 if LocalCityMapGenerator.is_buildable(tile) and tile["occupied"] != true else 0
+		m["map_fill"] = {"ground": ground, "used": used, "open": open, "share_used": snappedf(float(used) / maxf(1.0, ground), 0.001)}
 	m["departed"] = int(city.resources.get("departed_households", 0))
 	m["arrived"] = int(city.resources.get("arrived_households", 0))
 	m["old_age"] = int(state["old_age"])

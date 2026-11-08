@@ -246,8 +246,8 @@ const FOREST_WEAR_FACTOR: float = 0.5
 # FISHER_FULL_WATER_TILES of water lie within FISHER_REACH of it, all year; a hunter's lodge brings
 # in HUNTER_FOOD_PER_DAY when HUNTER_FULL_WOODS_TILES of woods lie within HUNTER_REACH, more in
 # autumn and winter, and less as the woods around it are felled. Less water or woods, less food,
-# down to LAND_YIELD_FLOOR. A farm (FARM_FOOD_PER_DAY on average) yields more but needs farmland and
-# follows the farming year.
+# down to nothing: there is no floor (S13; owner, 2026-11-07, no guarantees). A farm
+# (FARM_FOOD_PER_DAY on average) yields more but needs farmland and follows the farming year.
 const FISHER_FOOD_PER_DAY: float = 4.0
 const FISHER_REACH: int = 3
 const FISHER_FULL_WATER_TILES: int = 12
@@ -255,7 +255,19 @@ const HUNTER_FOOD_PER_DAY: float = 3.5
 const HUNTER_REACH: int = 6
 const HUNTER_FULL_WOODS_TILES: int = 40
 const HUNT_SEASON_YIELD: Array[float] = [0.9, 0.8, 1.2, 1.1]
-const LAND_YIELD_FLOOR: float = 0.25
+# Fish and game stocks (sprint S13; TownLand): the town's fish and game, each a share of what its
+# water and woods can hold, regrow logistically (FISH_GROWTH_PER_YEAR, GAME_GROWTH_PER_YEAR at half
+# stock) and fall by every catch; a stock of 0 recovers only from beyond the town's reach
+# (STOCK_INFLOW_PER_YEAR of what is missing). A fisher's and hunter's yield follows the stock.
+# Capacities were set before any comparison, from the yields above: one full-reach fisher per
+# FISHER_FULL_WATER_TILES of water, or hunter per HUNTER_FULL_WOODS_TILES of woods, takes the most
+# the stock can sustain, which a logistic stock gives at half stock and is growth x capacity / 4: so
+# capacity per tile = 4 x a year's catch at half stock / (those tiles x growth).
+const FISH_GROWTH_PER_YEAR: float = 0.6
+const GAME_GROWTH_PER_YEAR: float = 0.35
+const STOCK_INFLOW_PER_YEAR: float = 0.02
+const FISH_STOCK_PER_WATER_TILE: float = 4.0 * FISHER_FOOD_PER_DAY * 360.0 * 0.5 / (FISHER_FULL_WATER_TILES * FISH_GROWTH_PER_YEAR)
+const GAME_STOCK_PER_WOODS_TILE: float = 4.0 * HUNTER_FOOD_PER_DAY * 360.0 * 0.5 / (HUNTER_FULL_WOODS_TILES * GAME_GROWTH_PER_YEAR)
 # Hazards. Some springs (HIGH_WATER_CHANCE) bring high water: a field beside a river or lake yields
 # HIGH_WATER_FIELD_YIELD of its spring harvest. In winter, an unfenced hunter's lodge or gatherer's
 # camp within WOLF_WOODS_DISTANCE of woods works warily: WOLF_WINTER_YIELD of its output.
@@ -456,7 +468,7 @@ const CLEAR_DAYS_PER_TILE: float = 2.0
 # spread grow in young, with YOUNG_WOODS_TIMBER, and gain TIMBER_GROWTH_PER_YEAR each spring until
 # mature (about ten years). A woodcutter cuts its full rate from trees within
 # WOODCUTTER_FULL_DISTANCE tiles of its middle (the reach it was placed by), and less the farther it
-# must go, down to LAND_YIELD_FLOOR.
+# must go, with no floor (S13; owner, 2026-11-07).
 const TIMBER_PER_TILE: int = 135
 const YOUNG_WOODS_TIMBER: int = 15
 const TIMBER_GROWTH_PER_YEAR: int = 12

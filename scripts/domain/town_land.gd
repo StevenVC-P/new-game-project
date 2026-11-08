@@ -35,6 +35,12 @@ var _reach_version: int = -1
 var _shared_reach: Dictionary = {}
 var _shared_reach_key: int = 0
 var _has_flowing_water: int = -1
+# Fish and game (sprint S13): each the share of what the town's water and woods can hold, 0 to 1.
+var fish_stock: float = 1.0
+var game_stock: float = 1.0
+# Capacity (in food) for the layout and woods it was counted at.
+var _capacity: Dictionary = {}
+var _capacity_key: int = 0
 
 func _init(owner: City) -> void:
 	_city_ref = weakref(owner)
@@ -45,7 +51,11 @@ func has_map() -> bool:
 # On the first day of spring, the year's water is known: high some years where a river or lake
 # runs through the town.
 func advance_day() -> void:
-	if not has_map() or city.get_day_of_year() != 1:
+	if not has_map():
+		return
+	fish_stock = regrow(fish_stock, EconomyBalance.FISH_GROWTH_PER_YEAR)
+	game_stock = regrow(game_stock, EconomyBalance.GAME_GROWTH_PER_YEAR)
+	if city.get_day_of_year() != 1:
 		return
 	springs_seen += 1
 	high_water_this_year = false
@@ -56,6 +66,54 @@ func advance_day() -> void:
 	high_water_this_year = rng.randf() < EconomyBalance.HIGH_WATER_CHANCE
 	if high_water_this_year:
 		high_water_springs += 1
+
+# --- Fish and game stocks (sprint S13) ----------------------------------------------------------
+
+# A day's logistic regrowth, peaking at half stock, and the trickle from beyond the town's reach.
+static func regrow(stock: float, growth_per_year: float) -> float:
+	var grown: float = stock + growth_per_year / 360.0 * stock * (1.0 - stock)
+	grown += EconomyBalance.STOCK_INFLOW_PER_YEAR / 360.0 * (1.0 - grown)
+	return clampf(grown, 0.0, 1.0)
+
+static func get_stock_kind(building_type: String) -> String:
+	match BuildingTiers.get_base_type(building_type):
+		Building.BUILDING_FISHER:
+			return "fish"
+		Building.BUILDING_HUNTER:
+			return "game"
+	return ""
+
+func get_stock(kind: String) -> float:
+	return fish_stock if kind == "fish" else (game_stock if kind == "game" else 1.0)
+
+# The food the town's water (fish) or woods (game) can hold at full stock.
+func get_capacity(kind: String) -> float:
+	var key: int = hash([city.logistics.layout_version, city.woodland.land_version])
+	if key != _capacity_key:
+		_capacity_key = key
+		_capacity.clear()
+	if not _capacity.has(kind):
+		var tiles: int = 0
+		for row: Array in city.local_map:
+			for tile: Dictionary in row:
+				if kind == "fish" and tile["type"] == "water":
+					tiles += 1
+				elif kind == "game" and tile["has_trees"] == true:
+					tiles += 1
+		_capacity[kind] = tiles * (EconomyBalance.FISH_STOCK_PER_WATER_TILE if kind == "fish" else EconomyBalance.GAME_STOCK_PER_WOODS_TILE)
+	return float(_capacity[kind])
+
+# A catch comes out of the stock (City.apply_building_production).
+func note_catch(building: Building, food: int) -> void:
+	var kind: String = get_stock_kind(building.type)
+	if kind == "" or not has_map() or food <= 0:
+		return
+	var capacity: float = get_capacity(kind)
+	var taken: float = float(food) / capacity if capacity > 0.0 else 1.0
+	if kind == "fish":
+		fish_stock = maxf(0.0, fish_stock - taken)
+	else:
+		game_stock = maxf(0.0, game_stock - taken)
 
 func has_flowing_water() -> bool:
 	if _has_flowing_water < 0:
@@ -110,10 +168,14 @@ func is_wolf_exposed(building: Building) -> bool:
 	return exposed and count_near(building.tile, building.size, EconomyBalance.WOLF_WOODS_DISTANCE, "woods") > 0
 
 # The share of a full catch (fisher: water in reach), bag (hunter: woods in reach) or flock (herder:
-# pasture in reach) a workplace can make, from LAND_YIELD_FLOOR up to 1. This is what it really brings
-# in (get_output_factor), and what its family judges it by: land it shares with other workplaces of
-# its kind that families work is shared with them.
+# pasture in reach) a workplace can make, from nothing up to 1, and for a fisher or hunter the stock
+# left in the water or woods (S13). This is what it really brings in (get_output_factor), and what its
+# family judges it by: land it shares with other workplaces of its kind that families work is shared
+# with them.
 func get_reach_factor(building: Building) -> float:
+	return get_land_factor(building) * get_stock(get_stock_kind(building.type))
+
+func get_land_factor(building: Building) -> float:
 	if not has_map():
 		return 1.0
 	# Wood work: the trees it may still fell, which change with every tile felled or kept, so never
@@ -129,13 +191,13 @@ func get_reach_factor(building: Building) -> float:
 			_shared_reach_key = key
 			_shared_reach.clear()
 		if not _shared_reach.has(building.id):
-			_shared_reach[building.id] = get_reach_factor_at(building.type, building.tile, building.size, false)
+			_shared_reach[building.id] = get_land_factor_at(building.type, building.tile, building.size, false)
 		return float(_shared_reach[building.id])
 	if _reach_version != city.logistics.layout_version:
 		_reach_version = city.logistics.layout_version
 		_reach.clear()
 	if not _reach.has(building.id):
-		_reach[building.id] = get_reach_factor_at(building.type, building.tile, building.size, false)
+		_reach[building.id] = get_land_factor_at(building.type, building.tile, building.size, false)
 	return float(_reach[building.id])
 
 # What a workplace's yield depends on in its reach ("water", "woods", "pasture", or "timber": the
@@ -171,6 +233,10 @@ static func get_reach_kind(building_type: String) -> String:
 # with those families work (that is what it brings in); a place still being judged or built shares
 # also with those families are setting up, since those will work there too (`planned`).
 func get_reach_factor_at(building_type: String, origin: Vector2i, size: Vector2i, planned: bool = true) -> float:
+	return get_land_factor_at(building_type, origin, size, planned) * get_stock(get_stock_kind(building_type))
+
+# The land alone, without the stock.
+func get_land_factor_at(building_type: String, origin: Vector2i, size: Vector2i, planned: bool = true) -> float:
 	var kind: String = get_reach_kind(building_type)
 	if kind == "":
 		return 1.0
@@ -185,7 +251,7 @@ func get_reach_factor_at(building_type: String, origin: Vector2i, size: Vector2i
 		"pasture":
 			full = EconomyBalance.HERDER_FULL_PASTURE_TILES
 	var found: float = count_share(kind, origin, size, get_rival_reaches(building_type, origin, planned))
-	return clampf(found / float(full), EconomyBalance.LAND_YIELD_FLOOR, 1.0)
+	return clampf(found / float(full), 0.0, 1.0)
 
 # --- Shared land (hunting grounds, fishing water, pasture) -----------------------------------------
 

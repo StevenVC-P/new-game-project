@@ -78,6 +78,11 @@ var neighbourhood_origin: Vector2i = Vector2i.ZERO
 var neighbourhood_offset: Vector2 = Vector2.ZERO
 # World roads through the neighbourhood, in its map units; its towns line their streets along them.
 var neighbourhood_context_roads: Array[RegionMapGeometry.RoadShape] = []
+# What the neighbourhood's towns have done to the land, per regional tile (LandUseRecord): the
+# continuous map stops drawing woods the towns have felled. Derived from the towns' maps.
+var land_use: LandUseRecord = LandUseRecord.new()
+# Global site -> the land under that town before founding, which the record compares against.
+var land_base_cache: Dictionary = {}
 var show_borders: bool = true
 var hud_region_text: String = ""
 # When the camera last moved or zoomed (Time.get_ticks_msec), so the owner can wait for it to rest.
@@ -252,6 +257,7 @@ func set_neighbourhood(window_tiles: Array, window_cities: Array[City], window_r
 	for settlement: WorldMapData.Settlement in terrain.world.settlements:
 		geometry.world_tiers[settlement.name] = settlement.tier
 	geometry.build(tiles, cities, roads, neighbourhood_context_roads)
+	rebuild_land_use()
 	for layer: RegionMapLayer in [field_layer, structure_layer, site_layer, overlay_layer, label_layer]:
 		layer.rebuild()
 	board_clip.queue_redraw()
@@ -287,7 +293,27 @@ func is_cleared_by_neighbourhood(map_point: Vector2) -> bool:
 	var planet: float = terrain.size_tiles.x * RegionMapStyle.TILE
 	var local: Vector2 = map_point - Vector2(neighbourhood_origin) * RegionMapStyle.TILE
 	local.x -= roundf(local.x / planet) * planet
-	return geometry.is_cleared(local)
+	if geometry.is_cleared(local):
+		return true
+	var tile: Vector2i = Vector2i(floori(map_point.x / RegionMapStyle.TILE), floori(map_point.y / RegionMapStyle.TILE))
+	return land_use.is_cleared(Vector2i(terrain.wrap_tile_x(tile.x), tile.y))
+
+# The land-use record of the neighbourhood's towns that have town maps, against the land under
+# each. Returns whether it changed.
+func rebuild_land_use() -> bool:
+	var record: LandUseRecord = LandUseRecord.new()
+	if is_continuous():
+		for city: City in cities:
+			if city.local_map.is_empty():
+				continue
+			var site: Vector2i = city.global_site if city.global_site.x >= 0 else local_tile_to_global(Vector2i(city.tile))
+			if not land_base_cache.has(site):
+				var size: Vector2i = Vector2i((city.local_map[0] as Array).size(), city.local_map.size())
+				land_base_cache[site] = LocalCityMapGenerator.new(size.x, size.y).generate_base_from_terrain(terrain, site, terrain.climate_at(site))
+			record.add(LandUseRecord.of_town(city, land_base_cache[site], site, terrain.size_tiles.x))
+	var changed: bool = record.tiles != land_use.tiles
+	land_use = record
+	return changed
 
 # The owner calls this after changing tiles (LAYER_GROUND) or towns and roads
 # (LAYER_DEVELOPMENT). The arrays are shared, so it may also pass replaced ones.
@@ -298,9 +324,10 @@ func notify_changed(layer: String, region_cities: Array[City] = cities, region_r
 	roads = region_roads
 	var previous_clearings: PackedByteArray = geometry.clear_grid
 	geometry.build(tiles, cities, roads, neighbourhood_context_roads)
+	var land_changed: bool = rebuild_land_use()
 	if is_continuous():
-		# The chunks draw the ground; trees there make way for new development.
-		if geometry.clear_grid != previous_clearings:
+		# The chunks draw the ground; trees there make way for new development and felled woods.
+		if geometry.clear_grid != previous_clearings or land_changed:
 			streamer.mark_features_dirty_near(neighbourhood_map_rect())
 	else:
 		if layer == LAYER_GROUND:

@@ -69,6 +69,10 @@ static func restore(main: Node, state: Dictionary) -> String:
 	# (HomeSites.ensure_starting_land: only once, and never over land the player marked).
 	for city: City in cities:
 		HomeSites.ensure_starting_land(city)
+		# A town saved before towns kept their heart on the planet (Phase 1) gets it from where the
+		# saved neighbourhood puts it.
+		if city.global_site.x < 0 and main.is_continuous_region_map():
+			city.global_site = main.local_to_global_tile(Vector2i(city.tile))
 	main.cities = cities
 	main.roads = state["roads"]
 	# The player's spur road is marked on the neighbourhood's tiles, as founding marked it.

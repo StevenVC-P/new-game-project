@@ -651,6 +651,8 @@ func apply_neighbourhood(data: Dictionary) -> void:
 	var neighbourhood_cities: Array[City] = []
 	for entry: Array in data["settlements"]:
 		var town: City = City.new(entry[0], Vector2(entry[1] as Vector2i), City.ROLE_NEUTRAL)
+		if is_continuous_region_map():
+			town.global_site = local_to_global_tile(entry[1] as Vector2i)
 		# Neutral towns are never opened, so they get a site profile but no town map.
 		town.site_profile = SettlementSiteProfile.analyze(town.tile, tiles, CITY_RESOURCE_RANGE)
 		neighbourhood_cities.append(town)
@@ -1138,6 +1140,8 @@ func found_player_city_at_pending_site() -> bool:
 		return false
 
 	var founded_city: City = create_player_city_at_tile(pending_founding_tile)
+	if is_continuous_region_map():
+		founded_city.global_site = local_to_global_tile(pending_founding_tile)
 	# Families leading their own work is how the game is played (owner, 2026-10-30); --classic
 	# founds a town under the earlier rules, for comparison. Either can be switched in the menu.
 	var classic: bool = OS.get_cmdline_user_args().has("--classic") or OS.get_cmdline_args().has("--classic")

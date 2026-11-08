@@ -177,7 +177,7 @@ func test_shared_woods_over_time() -> void:
 	for x in range(18, 26):
 		for y in range(14, 20):
 			fell(city, Vector2i(x, y))
-	_check(city.land.get_reach_factor(a) == EconomyBalance.LAND_YIELD_FLOOR, "the woods all felled: the land's floor")
+	_check(city.land.get_reach_factor(a) == 0.0, "the woods all felled: nothing to hunt (no floor, S13)")
 
 # Families judge hunting by the share they would have: a third lodge in woods two already hunt is
 # "little game in reach", and the town's food outlook counts the shares, not the whole woods twice.
