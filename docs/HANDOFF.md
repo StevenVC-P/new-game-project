@@ -2,11 +2,15 @@
 
 What is true right now. Durable detail lives in the linked docs, and past milestones are in git history and each design doc's log. Update this when a milestone closes.
 
-*Last updated: 2026-11-02.* The early-game simulation sprint is complete: `feature/autonomous-occupations` → `develop` (`91e820e`) → `main` (`6611c74`). The full 46-script suite, import validation, save loading and determinism checks all pass.
+*Last updated: 2026-11-08.* Phase 0 (Economic Foundations S1a–S9) and master roadmap Phase 1 with S13 are on `develop`. 60 of 60 tests pass, along with saves and determinism. `main` is unchanged since 2026-11-02 and awaits the owner's review.
 
 ## Current Objective
 
-**Master roadmap Phase 0, integration (authorized 2026-11-07, through Phase 1).** The order of all work is `docs/MASTER_ROADMAP.md`. Phase 0 consolidates Economic Foundations S1a–S9 and the owner's Phase 0 decisions on branch `feature/phase0-integration` (worktree `../ngg-phase0`). The integration review is `docs/economic_foundations/PHASE0_INTEGRATION.md`. Nothing reaches `develop` without the owner's review, and Phase 1 starts after the Phase 0 checkpoint.
+**Master roadmap Phases 1–3 (authorized 2026-11-07; Phase 4 is not).** The order of all work is `docs/MASTER_ROADMAP.md`. Each sprint merges into `develop` at its gate.
+- **On `develop`:** Phase 1 (`docs/phase1/`: land from position without floors, the land-use record, Stage C foundations, E13 V0, scale check and benchmark, X1 and X4), and S13 fish and game stocks.
+- **Built and held for the owner's review:** S10, S11 (behind a switch), S12, S14 (`docs/phase2/S10_S12_S14_review.md`, `docs/phase2/OPEN_QUESTIONS.md`), on the stacked branches `feature/p2-s10-food` … `feature/p2-s14-livestock` (worktree `../ngg-p1`).
+- **Player Agency A and B** (owner, 2026-11-07): on `feature/player-agency` (worktree `../ngg-agency`), not to be merged or pushed without the owner's approval.
+- **Playtests deferred, not dropped:** checkpoints 0 and 1 are owed when the owner returns.
 
 - **Economic Foundations:** backlog and sprint cards in `docs/ECONOMIC_FOUNDATIONS_ROADMAP.md`, tests and evidence in `docs/ECONOMIC_FOUNDATIONS_TEST_PLAN.md`, sprint reports in `docs/economic_foundations/`.
 - **Design baseline for the economy and geography work:** `docs/RESOURCE_AND_PRODUCTION_AUDIT.md` (2026-11-02).
